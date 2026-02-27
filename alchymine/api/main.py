@@ -9,6 +9,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from alchymine import __version__
+from alchymine.api.middleware import ErrorHandlerMiddleware, RateLimitMiddleware, RequestLoggingMiddleware
 from alchymine.api.routers import astrology, biorhythm, compatibility, health, numerology, reports, wealth
 
 
@@ -32,7 +33,11 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# CORS
+# Middleware (outermost first — execution order is bottom-to-top)
+# 1. Error handler wraps everything — catches unhandled exceptions
+app.add_middleware(ErrorHandlerMiddleware)
+
+# 2. CORS
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://localhost:3000"],  # overridden by env in production
@@ -40,6 +45,12 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# 3. Request logging — logs method, path, status, duration
+app.add_middleware(RequestLoggingMiddleware)
+
+# 4. Rate limiting — simple in-memory sliding window (100 req/min per IP)
+app.add_middleware(RateLimitMiddleware, max_requests=100, window_seconds=60)
 
 # Routers
 app.include_router(health.router, tags=["health"])
