@@ -21,6 +21,13 @@ export const metadata: Metadata = {
     'archetype',
     'big five',
   ],
+  manifest: '/manifest.json',
+  themeColor: '#DAA520',
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'black-translucent',
+    title: 'Alchymine',
+  },
 };
 
 export default function RootLayout({

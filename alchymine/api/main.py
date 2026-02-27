@@ -9,7 +9,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from alchymine import __version__
-from alchymine.api.routers import astrology, health, numerology, reports
+from alchymine.api.routers import astrology, compatibility, health, numerology, reports, wealth
 
 
 @asynccontextmanager
@@ -46,3 +46,5 @@ app.include_router(health.router, tags=["health"])
 app.include_router(numerology.router, prefix="/api/v1", tags=["numerology"])
 app.include_router(astrology.router, prefix="/api/v1", tags=["astrology"])
 app.include_router(reports.router, prefix="/api/v1", tags=["reports"])
+app.include_router(wealth.router, prefix="/api/v1", tags=["wealth"])
+app.include_router(compatibility.router, prefix="/api/v1", tags=["compatibility"])

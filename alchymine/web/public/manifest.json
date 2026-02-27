@@ -1,0 +1,27 @@
+{
+  "name": "Alchymine — Personal Transformation Operating System",
+  "short_name": "Alchymine",
+  "description": "Five-system personal transformation: Identity, Healing, Wealth, Creative, Perspective",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0A0A0F",
+  "theme_color": "#DAA520",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/icons/icon-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icons/icon-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["lifestyle", "health", "education"],
+  "lang": "en",
+  "dir": "ltr"
+}
