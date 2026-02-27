@@ -1,17 +1,11 @@
 import type { Metadata } from 'next';
-import { Inter } from 'next/font/google';
 import './globals.css';
-
-const inter = Inter({
-  subsets: ['latin'],
-  variable: '--font-inter',
-  display: 'swap',
-});
+import Navigation from '@/components/shared/Navigation';
 
 export const metadata: Metadata = {
   title: 'Alchymine — Personal Transformation Operating System',
   description:
-    'Discover who you truly are through five integrated systems: Identity, Healing, Wealth, Creative, and Perspective. Open-source, AI-powered personal transformation.',
+    'Discover who you truly are through five integrated systems: Intelligence, Healing, Wealth, Creative, and Perspective. Open-source, AI-powered personal transformation.',
   keywords: [
     'personal transformation',
     'numerology',
@@ -36,9 +30,13 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className={inter.variable}>
+    <html lang="en">
       <body className="font-sans bg-bg text-text min-h-screen antialiased">
-        {children}
+        <Navigation />
+        {/* Main content area: offset for sidebar on desktop, top bar + bottom nav on mobile */}
+        <div className="lg:ml-64 pt-14 pb-16 lg:pt-0 lg:pb-0 min-h-screen">
+          {children}
+        </div>
       </body>
     </html>
   );
