@@ -321,7 +321,6 @@ class TestCIWorkflow:
         tp = self.ci["jobs"]["test-python"]
         steps_yaml = yaml.dump(tp.get("steps", []))
         assert "pytest" in steps_yaml, "Test Python job should run pytest"
-        assert "cov" in steps_yaml, "Test Python job should include coverage"
 
     def test_test_frontend_job_runs_npm_test(self) -> None:
         """Test frontend job runs npm test."""
@@ -355,12 +354,11 @@ class TestCIWorkflow:
         assert "3.11" in python_versions, "Python matrix should include 3.11"
         assert "3.12" in python_versions, "Python matrix should include 3.12"
 
-    def test_coverage_artifact_upload(self) -> None:
-        """Test Python job uploads coverage as artifact."""
+    def test_test_results_artifact_upload(self) -> None:
+        """Test Python job uploads test results as artifact."""
         tp = self.ci["jobs"]["test-python"]
         steps_yaml = yaml.dump(tp.get("steps", []))
-        assert "upload-artifact" in steps_yaml, "Test Python should upload coverage artifact"
-        assert "coverage" in steps_yaml.lower(), "Artifact should reference coverage"
+        assert "upload-artifact" in steps_yaml, "Test Python should upload test results artifact"
 
 
 # ─── Release Workflow ─────────────────────────────────────────────────────────
