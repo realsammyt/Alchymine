@@ -75,7 +75,28 @@ jobs:
         run: mypy alchymine/ --install-types --non-interactive || true
 
       - name: Run mypy
-        run: mypy alchymine/ --show-error-codes
+        id: mypy
+        run: |
+          set +e
+          mypy alchymine/ --show-error-codes 2>&1 | tee mypy-output.txt
+          MYPY_RC=${PIPESTATUS[0]}
+          set -e
+          echo "rc=$MYPY_RC" >> $GITHUB_OUTPUT
+          exit $MYPY_RC
+
+      - name: Post mypy results to PR
+        if: failure() && github.event_name == 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          {
+            echo "**mypy (Python ${{ matrix.python-version }})** exited ${{ steps.mypy.outputs.rc }}"
+            echo ""
+            echo '```'
+            tail -50 mypy-output.txt 2>/dev/null || echo "No output captured"
+            echo '```'
+          } > /tmp/pr-comment.md
+          gh pr comment ${{ github.event.pull_request.number }} --body-file /tmp/pr-comment.md || true
 
   # ──────────────────────────────────────────────
   # Test Python: pytest with coverage (matrix)
