@@ -118,15 +118,21 @@ jobs:
         env:
           CELERY_ALWAYS_EAGER: "true"
         run: |
-          python -m pytest tests/ -v --tb=short --junitxml=junit-results.xml 2>&1 || {
-            RC=$?
-            echo "=== PYTEST FAILED WITH EXIT CODE $RC ==="
-            echo "=== SHOWING JUNIT RESULTS ==="
-            cat junit-results.xml 2>/dev/null || echo "No junit file"
-            echo "=== TRYING WITH -x TO SHOW FIRST FAILURE ==="
-            python -m pytest tests/ -x --tb=long 2>&1 | tail -100 || true
-            exit $RC
-          }
+          python -m pytest tests/ -v --tb=short --junitxml=junit-results.xml 2>&1 | tee pytest-output.txt || true
+          PYTEST_RC=${PIPESTATUS[0]}
+          echo "## Pytest Results (Python ${{ matrix.python-version }})" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          tail -50 pytest-output.txt >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          exit $PYTEST_RC
+
+      - name: Upload pytest output
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pytest-output-${{ matrix.python-version }}
+          path: pytest-output.txt
+          retention-days: 3
 
       - name: Upload test results
         if: always()
