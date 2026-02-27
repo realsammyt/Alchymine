@@ -97,12 +97,23 @@ jobs:
       - name: Install dependencies
         run: pip install -e ".[dev]"
 
+      - name: Verify test collection
+        env:
+          CELERY_ALWAYS_EAGER: "true"
+        run: |
+          python -c "import alchymine; print('alchymine OK')"
+          python -c "import alchymine.workers.celery_app; print('celery OK')"
+          python -c "import alchymine.api.main; print('api OK')"
+          pytest --collect-only tests/engine/ tests/api/ tests/agents/ tests/workers/ -q 2>&1 | tail -20
+
       - name: Run pytest with coverage
         env:
           CELERY_ALWAYS_EAGER: "true"
         run: |
           pytest tests/engine/ tests/api/ tests/agents/ tests/workers/ \
             -v \
+            --tb=long \
+            --no-header \
             --cov=alchymine \
             --cov-report=term-missing \
             --cov-report=xml:coverage.xml \

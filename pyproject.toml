@@ -128,7 +128,7 @@ check_untyped_defs = true
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 asyncio_mode = "auto"
-addopts = "-v --cov=alchymine --cov-report=term-missing"
+addopts = "-v"
 
 [tool.hatch.build.targets.wheel]
 packages = ["alchymine"]
