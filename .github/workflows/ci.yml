@@ -116,10 +116,22 @@ jobs:
           python -c "import swisseph; print('swisseph OK')" || echo "FAIL: swisseph"
           pytest --collect-only tests/engine/ tests/api/ tests/agents/ tests/workers/ -q 2>&1 || true
 
-      - name: Run pytest with coverage
+      - name: Run pytest (basic)
         env:
           CELERY_ALWAYS_EAGER: "true"
-        run: python -m pytest tests/engine/ tests/api/ tests/agents/ tests/workers/ -v --tb=short --cov=alchymine --cov-report=term-missing --cov-report=xml:coverage.xml --junitxml=junit-results.xml
+        run: python -m pytest tests/ -x -q --tb=short 2>&1 || echo "PYTEST_EXIT=$?"
+
+      - name: Run pytest with coverage
+        if: success()
+        env:
+          CELERY_ALWAYS_EAGER: "true"
+        run: |
+          python -m pytest tests/ \
+            -v --tb=short \
+            --cov=alchymine \
+            --cov-report=term-missing \
+            --cov-report=xml:coverage.xml \
+            --junitxml=junit-results.xml
 
       - name: Upload coverage report
         if: always()
