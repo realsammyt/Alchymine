@@ -1,0 +1,99 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  body {
+    @apply bg-bg text-text;
+    min-height: 100vh;
+  }
+
+  /* Custom scrollbar — dark theme */
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  ::-webkit-scrollbar-track {
+    @apply bg-bg;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    @apply bg-surface rounded-full;
+    border: 2px solid transparent;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background-color: #2a2a4e;
+  }
+
+  /* Firefox scrollbar */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: #1a1a2e #0a0a0f;
+  }
+
+  /* Selection color */
+  ::selection {
+    @apply bg-primary/30 text-text;
+  }
+}
+
+@layer components {
+  /* Gold gradient text */
+  .text-gradient-gold {
+    @apply bg-clip-text text-transparent;
+    background-image: linear-gradient(135deg, #B8860B, #DAA520, #F0C050, #DAA520);
+  }
+
+  /* Purple gradient text */
+  .text-gradient-purple {
+    @apply bg-clip-text text-transparent;
+    background-image: linear-gradient(135deg, #4A0E4E, #7B2D8E, #9B4DCA);
+  }
+
+  /* Gold shimmer background animation */
+  .shimmer-gold {
+    background: linear-gradient(
+      90deg,
+      transparent 0%,
+      rgba(218, 165, 32, 0.08) 25%,
+      rgba(218, 165, 32, 0.15) 50%,
+      rgba(218, 165, 32, 0.08) 75%,
+      transparent 100%
+    );
+    background-size: 200% 100%;
+    animation: shimmer 2s linear infinite;
+  }
+
+  /* Surface card styling */
+  .card-surface {
+    @apply bg-surface rounded-2xl border border-white/5;
+  }
+
+  /* Glow effect for interactive elements */
+  .glow-gold {
+    box-shadow: 0 0 20px rgba(218, 165, 32, 0.15),
+                0 0 60px rgba(218, 165, 32, 0.05);
+  }
+
+  .glow-purple {
+    box-shadow: 0 0 20px rgba(123, 45, 142, 0.15),
+                0 0 60px rgba(123, 45, 142, 0.05);
+  }
+}
+
+@layer utilities {
+  /* Delay utilities for staggered animations */
+  .animation-delay-100 { animation-delay: 100ms; }
+  .animation-delay-200 { animation-delay: 200ms; }
+  .animation-delay-300 { animation-delay: 300ms; }
+  .animation-delay-400 { animation-delay: 400ms; }
+  .animation-delay-500 { animation-delay: 500ms; }
+}
