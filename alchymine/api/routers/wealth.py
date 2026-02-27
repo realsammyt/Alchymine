@@ -6,7 +6,7 @@ and 90-day activation plan generation.
 
 from __future__ import annotations
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter
 from pydantic import BaseModel, Field
 
 from alchymine.engine.profile import (
@@ -14,7 +14,6 @@ from alchymine.engine.profile import (
     Intention,
     RiskTolerance,
     WealthContext,
-    WealthLever,
 )
 from alchymine.engine.wealth.archetype import (
     WealthArchetype,

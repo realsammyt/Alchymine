@@ -14,28 +14,32 @@ from alchymine.engine.profile import Intention, RiskTolerance, WealthContext, We
 # ─── Income range classification ──────────────────────────────────────────
 
 # Income ranges considered "low" — EARN gets a priority boost
-_LOW_INCOME_KEYWORDS: frozenset[str] = frozenset({
-    "under $25k",
-    "$0-$25k",
-    "under $50k",
-    "$25k-$50k",
-    "<$25k",
-    "<$50k",
-    "0-25k",
-    "25k-50k",
-})
+_LOW_INCOME_KEYWORDS: frozenset[str] = frozenset(
+    {
+        "under $25k",
+        "$0-$25k",
+        "under $50k",
+        "$25k-$50k",
+        "<$25k",
+        "<$50k",
+        "0-25k",
+        "25k-50k",
+    }
+)
 
 # Income ranges considered "high" — GROW and TRANSFER get a boost
-_HIGH_INCOME_KEYWORDS: frozenset[str] = frozenset({
-    "$150k-$200k",
-    "$200k+",
-    "over $200k",
-    "$200k-$500k",
-    "$500k+",
-    ">$200k",
-    "150k-200k",
-    "200k+",
-})
+_HIGH_INCOME_KEYWORDS: frozenset[str] = frozenset(
+    {
+        "$150k-$200k",
+        "$200k+",
+        "over $200k",
+        "$200k-$500k",
+        "$500k+",
+        ">$200k",
+        "150k-200k",
+        "200k+",
+    }
+)
 
 
 def _classify_income(income_range: str | None) -> str:
@@ -80,7 +84,11 @@ _INTENTION_BOOSTS: dict[Intention, dict[WealthLever, float]] = {
     Intention.CAREER: {WealthLever.EARN: 15.0, WealthLever.GROW: 5.0},
     Intention.BUSINESS: {WealthLever.EARN: 20.0, WealthLever.GROW: 10.0},
     Intention.FAMILY: {WealthLever.PROTECT: 20.0, WealthLever.TRANSFER: 15.0},
-    Intention.LEGACY: {WealthLever.TRANSFER: 25.0, WealthLever.PROTECT: 10.0, WealthLever.GROW: 5.0},
+    Intention.LEGACY: {
+        WealthLever.TRANSFER: 25.0,
+        WealthLever.PROTECT: 10.0,
+        WealthLever.GROW: 5.0,
+    },
     Intention.LOVE: {WealthLever.PROTECT: 10.0, WealthLever.KEEP: 5.0},
     Intention.HEALTH: {WealthLever.KEEP: 10.0, WealthLever.PROTECT: 10.0},
     Intention.PURPOSE: {WealthLever.EARN: 10.0, WealthLever.GROW: 10.0, WealthLever.TRANSFER: 5.0},

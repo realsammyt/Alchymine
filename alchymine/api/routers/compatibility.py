@@ -25,26 +25,57 @@ router = APIRouter()
 
 _LIFE_PATH_COMPAT: dict[tuple[int, int], float] = {
     # 1 with others
-    (1, 1): 70.0, (1, 2): 60.0, (1, 3): 85.0, (1, 4): 55.0,
-    (1, 5): 90.0, (1, 6): 65.0, (1, 7): 75.0, (1, 8): 80.0, (1, 9): 70.0,
+    (1, 1): 70.0,
+    (1, 2): 60.0,
+    (1, 3): 85.0,
+    (1, 4): 55.0,
+    (1, 5): 90.0,
+    (1, 6): 65.0,
+    (1, 7): 75.0,
+    (1, 8): 80.0,
+    (1, 9): 70.0,
     # 2 with others
-    (2, 2): 75.0, (2, 3): 70.0, (2, 4): 80.0, (2, 5): 50.0,
-    (2, 6): 90.0, (2, 7): 65.0, (2, 8): 75.0, (2, 9): 70.0,
+    (2, 2): 75.0,
+    (2, 3): 70.0,
+    (2, 4): 80.0,
+    (2, 5): 50.0,
+    (2, 6): 90.0,
+    (2, 7): 65.0,
+    (2, 8): 75.0,
+    (2, 9): 70.0,
     # 3 with others
-    (3, 3): 80.0, (3, 4): 45.0, (3, 5): 90.0,
-    (3, 6): 85.0, (3, 7): 60.0, (3, 8): 55.0, (3, 9): 85.0,
+    (3, 3): 80.0,
+    (3, 4): 45.0,
+    (3, 5): 90.0,
+    (3, 6): 85.0,
+    (3, 7): 60.0,
+    (3, 8): 55.0,
+    (3, 9): 85.0,
     # 4 with others
-    (4, 4): 70.0, (4, 5): 40.0,
-    (4, 6): 80.0, (4, 7): 75.0, (4, 8): 85.0, (4, 9): 50.0,
+    (4, 4): 70.0,
+    (4, 5): 40.0,
+    (4, 6): 80.0,
+    (4, 7): 75.0,
+    (4, 8): 85.0,
+    (4, 9): 50.0,
     # 5 with others
     (5, 5): 65.0,
-    (5, 6): 45.0, (5, 7): 80.0, (5, 8): 60.0, (5, 9): 75.0,
+    (5, 6): 45.0,
+    (5, 7): 80.0,
+    (5, 8): 60.0,
+    (5, 9): 75.0,
     # 6 with others
-    (6, 6): 85.0, (6, 7): 50.0, (6, 8): 70.0, (6, 9): 90.0,
+    (6, 6): 85.0,
+    (6, 7): 50.0,
+    (6, 8): 70.0,
+    (6, 9): 90.0,
     # 7 with others
-    (7, 7): 80.0, (7, 8): 55.0, (7, 9): 70.0,
+    (7, 7): 80.0,
+    (7, 8): 55.0,
+    (7, 9): 70.0,
     # 8 with others
-    (8, 8): 65.0, (8, 9): 60.0,
+    (8, 8): 65.0,
+    (8, 9): 60.0,
     # 9 with others
     (9, 9): 75.0,
 }
@@ -89,30 +120,34 @@ def _life_path_compatibility(lp1: int, lp2: int) -> float:
 # ─── Archetype compatibility ────────────────────────────────────────────
 
 # Archetype pairs with natural synergy (high compatibility)
-_SYNERGY_PAIRS: frozenset[frozenset[ArchetypeType]] = frozenset({
-    frozenset({ArchetypeType.CREATOR, ArchetypeType.SAGE}),
-    frozenset({ArchetypeType.HERO, ArchetypeType.CAREGIVER}),
-    frozenset({ArchetypeType.EXPLORER, ArchetypeType.CREATOR}),
-    frozenset({ArchetypeType.RULER, ArchetypeType.SAGE}),
-    frozenset({ArchetypeType.LOVER, ArchetypeType.CAREGIVER}),
-    frozenset({ArchetypeType.MYSTIC, ArchetypeType.SAGE}),
-    frozenset({ArchetypeType.JESTER, ArchetypeType.EXPLORER}),
-    frozenset({ArchetypeType.EVERYMAN, ArchetypeType.CAREGIVER}),
-    frozenset({ArchetypeType.REBEL, ArchetypeType.EXPLORER}),
-    frozenset({ArchetypeType.INNOCENT, ArchetypeType.CAREGIVER}),
-    frozenset({ArchetypeType.HERO, ArchetypeType.RULER}),
-    frozenset({ArchetypeType.MYSTIC, ArchetypeType.LOVER}),
-})
+_SYNERGY_PAIRS: frozenset[frozenset[ArchetypeType]] = frozenset(
+    {
+        frozenset({ArchetypeType.CREATOR, ArchetypeType.SAGE}),
+        frozenset({ArchetypeType.HERO, ArchetypeType.CAREGIVER}),
+        frozenset({ArchetypeType.EXPLORER, ArchetypeType.CREATOR}),
+        frozenset({ArchetypeType.RULER, ArchetypeType.SAGE}),
+        frozenset({ArchetypeType.LOVER, ArchetypeType.CAREGIVER}),
+        frozenset({ArchetypeType.MYSTIC, ArchetypeType.SAGE}),
+        frozenset({ArchetypeType.JESTER, ArchetypeType.EXPLORER}),
+        frozenset({ArchetypeType.EVERYMAN, ArchetypeType.CAREGIVER}),
+        frozenset({ArchetypeType.REBEL, ArchetypeType.EXPLORER}),
+        frozenset({ArchetypeType.INNOCENT, ArchetypeType.CAREGIVER}),
+        frozenset({ArchetypeType.HERO, ArchetypeType.RULER}),
+        frozenset({ArchetypeType.MYSTIC, ArchetypeType.LOVER}),
+    }
+)
 
 # Archetype pairs with natural tension (lower compatibility)
-_TENSION_PAIRS: frozenset[frozenset[ArchetypeType]] = frozenset({
-    frozenset({ArchetypeType.RULER, ArchetypeType.REBEL}),
-    frozenset({ArchetypeType.HERO, ArchetypeType.JESTER}),
-    frozenset({ArchetypeType.SAGE, ArchetypeType.JESTER}),
-    frozenset({ArchetypeType.INNOCENT, ArchetypeType.REBEL}),
-    frozenset({ArchetypeType.MYSTIC, ArchetypeType.EVERYMAN}),
-    frozenset({ArchetypeType.RULER, ArchetypeType.EXPLORER}),
-})
+_TENSION_PAIRS: frozenset[frozenset[ArchetypeType]] = frozenset(
+    {
+        frozenset({ArchetypeType.RULER, ArchetypeType.REBEL}),
+        frozenset({ArchetypeType.HERO, ArchetypeType.JESTER}),
+        frozenset({ArchetypeType.SAGE, ArchetypeType.JESTER}),
+        frozenset({ArchetypeType.INNOCENT, ArchetypeType.REBEL}),
+        frozenset({ArchetypeType.MYSTIC, ArchetypeType.EVERYMAN}),
+        frozenset({ArchetypeType.RULER, ArchetypeType.EXPLORER}),
+    }
+)
 
 
 def _archetype_compatibility(a1: ArchetypeType, a2: ArchetypeType) -> float:
@@ -157,7 +192,7 @@ def _big_five_similarity(
         sum_sq += diff * diff
 
     distance = math.sqrt(sum_sq)
-    max_distance = math.sqrt(5.0 * (100.0 ** 2))  # ~223.6
+    max_distance = math.sqrt(5.0 * (100.0**2))  # ~223.6
 
     # Convert distance to similarity: 0 distance = 100, max distance = 0
     similarity = max(0.0, 100.0 * (1.0 - distance / max_distance))
@@ -217,15 +252,11 @@ def _compute_compatibility(
 ) -> tuple[float, CompatibilityBreakdown]:
     """Compute the overall compatibility and breakdown."""
     lp_score = _life_path_compatibility(profile_a.life_path, profile_b.life_path)
-    arch_score = _archetype_compatibility(
-        profile_a.archetype_primary, profile_b.archetype_primary
-    )
+    arch_score = _archetype_compatibility(profile_a.archetype_primary, profile_b.archetype_primary)
     bf_score = _big_five_similarity(profile_a.big_five, profile_b.big_five)
 
     overall = round(
-        _LIFE_PATH_WEIGHT * lp_score
-        + _ARCHETYPE_WEIGHT * arch_score
-        + _BIG_FIVE_WEIGHT * bf_score,
+        _LIFE_PATH_WEIGHT * lp_score + _ARCHETYPE_WEIGHT * arch_score + _BIG_FIVE_WEIGHT * bf_score,
         1,
     )
 
@@ -242,7 +273,9 @@ def _generate_summary(overall: float, breakdown: CompatibilityBreakdown) -> str:
     """Generate a human-readable compatibility summary."""
     if overall >= 80:
         level = "Exceptional"
-        description = "a deeply resonant connection with natural alignment across multiple dimensions"
+        description = (
+            "a deeply resonant connection with natural alignment across multiple dimensions"
+        )
     elif overall >= 65:
         level = "Strong"
         description = "significant compatibility with shared values and complementary strengths"
@@ -251,7 +284,9 @@ def _generate_summary(overall: float, breakdown: CompatibilityBreakdown) -> str:
         description = "a balanced connection with both areas of harmony and growth opportunities"
     elif overall >= 35:
         level = "Challenging"
-        description = "notable differences that can become growth catalysts with mutual understanding"
+        description = (
+            "notable differences that can become growth catalysts with mutual understanding"
+        )
     else:
         level = "Complex"
         description = "significant contrasts that require intentional bridge-building and patience"

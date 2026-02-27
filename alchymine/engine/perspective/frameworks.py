@@ -16,7 +16,6 @@ Attribution:
 
 from __future__ import annotations
 
-
 # ─── Weighted Decision Matrix ────────────────────────────────────────────
 
 
@@ -74,8 +73,11 @@ def weighted_decision_matrix(
 
     # Rank options
     ranked = sorted(
-        [{"option": opt, "weighted_score": round(score, 4)} for opt, score in option_scores.items()],
-        key=lambda x: x["weighted_score"],
+        [
+            {"option": opt, "weighted_score": round(score, 4)}
+            for opt, score in option_scores.items()
+        ],
+        key=lambda x: float(str(x["weighted_score"])),
         reverse=True,
     )
 
@@ -201,9 +203,7 @@ def six_thinking_hats(
     for key in perspectives:
         lower_key = key.lower().strip()
         if lower_key not in VALID_HATS:
-            raise ValueError(
-                f"Invalid hat colour '{key}'. Valid colours: {sorted(VALID_HATS)}"
-            )
+            raise ValueError(f"Invalid hat colour '{key}'. Valid colours: {sorted(VALID_HATS)}")
         provided_hats.add(lower_key)
 
     hats_output = []
@@ -215,12 +215,14 @@ def six_thinking_hats(
                 user_thinking = val
                 break
 
-        hats_output.append({
-            "hat": f"{colour.capitalize()} Hat",
-            "colour": colour,
-            "description": HAT_DESCRIPTIONS[colour],
-            "user_thinking": user_thinking,
-        })
+        hats_output.append(
+            {
+                "hat": f"{colour.capitalize()} Hat",
+                "colour": colour,
+                "description": HAT_DESCRIPTIONS[colour],
+                "user_thinking": user_thinking,
+            }
+        )
 
     missing = sorted(VALID_HATS - provided_hats)
     coverage = len(provided_hats) / len(VALID_HATS) if VALID_HATS else 0
@@ -242,11 +244,17 @@ def six_thinking_hats(
         )
 
     if has_risk and has_benefit:
-        synthesis_parts.append("Both risk and benefit perspectives are represented, supporting balanced evaluation.")
+        synthesis_parts.append(
+            "Both risk and benefit perspectives are represented, supporting balanced evaluation."
+        )
     elif has_risk and not has_benefit:
-        synthesis_parts.append("Risk perspective is present but benefit perspective is missing — consider what could go well.")
+        synthesis_parts.append(
+            "Risk perspective is present but benefit perspective is missing — consider what could go well."
+        )
     elif has_benefit and not has_risk:
-        synthesis_parts.append("Benefit perspective is present but risk assessment is missing — consider potential downsides.")
+        synthesis_parts.append(
+            "Benefit perspective is present but risk assessment is missing — consider potential downsides."
+        )
 
     if not has_creative:
         synthesis_parts.append("Creative/alternative thinking (green hat) is not yet explored.")
@@ -305,26 +313,32 @@ def second_order_effects(
     # Generate second-order effects deterministically:
     # Each first-order effect produces two second-order projections
     second_order = []
-    for i, effect in enumerate(effects):
-        second_order.append({
-            "effect": f"Adaptation to: {effect}",
-            "derived_from": effect,
-            "order": 2,
-        })
-        second_order.append({
-            "effect": f"Ripple impact of: {effect}",
-            "derived_from": effect,
-            "order": 2,
-        })
+    for _i, effect in enumerate(effects):
+        second_order.append(
+            {
+                "effect": f"Adaptation to: {effect}",
+                "derived_from": effect,
+                "order": 2,
+            }
+        )
+        second_order.append(
+            {
+                "effect": f"Ripple impact of: {effect}",
+                "derived_from": effect,
+                "order": 2,
+            }
+        )
 
     # Generate third-order effects: one per second-order effect
     third_order = []
     for se in second_order:
-        third_order.append({
-            "effect": f"Long-term consequence of: {se['effect']}",
-            "derived_from": se["effect"],
-            "order": 3,
-        })
+        third_order.append(
+            {
+                "effect": f"Long-term consequence of: {se['effect']}",
+                "derived_from": se["effect"],
+                "order": 3,
+            }
+        )
 
     total = len(first_order) + len(second_order) + len(third_order)
 

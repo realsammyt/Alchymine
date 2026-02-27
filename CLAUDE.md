@@ -125,6 +125,45 @@ gh issue comment <#> -R realsammyt/Alchymine --body "⚠️ [Feature] blocked �
 gh issue close <#> -R realsammyt/Alchymine --comment "🔀 Merged. Full suite: [N] tests passing."
 ```
 
+## CI Monitoring Protocol (MANDATORY)
+
+**Every PR merge or push MUST be verified against GitHub Actions before closing issues or marking work complete.**
+
+### Pre-Merge Checklist
+Before committing code, always run locally:
+```bash
+ruff check alchymine/             # 0 errors required
+ruff format --check alchymine/    # All files formatted
+mypy alchymine/                   # Success: no issues found
+CELERY_ALWAYS_EAGER=true pytest tests/ -v  # All tests passing
+```
+
+### Post-Push Verification
+After every `git push`, monitor the GitHub Actions run:
+```bash
+# Check latest CI run status (poll until complete)
+gh run list -R realsammyt/Alchymine --limit 3
+gh run view <run-id> -R realsammyt/Alchymine
+
+# If a run fails, view the logs
+gh run view <run-id> -R realsammyt/Alchymine --log-failed
+```
+
+### Issue/Task Closure Rules
+1. **NEVER close a GitHub issue until CI is green** on the branch/PR that implements it
+2. **NEVER mark a task as complete** if CI has not been verified
+3. If CI fails after push, fix the failures before doing any other work
+4. Include the CI run URL or test count in the issue close comment
+
+### Common CI Failure Categories
+| Check | Fix |
+|-------|-----|
+| `ruff check` | Run `ruff check --fix alchymine/` then fix remaining manually |
+| `ruff format` | Run `ruff format alchymine/` |
+| `mypy` | Check `pyproject.toml` overrides; add `type: ignore` only as last resort |
+| `pytest` | Run failing tests locally with `-v --tb=long` |
+| `pip-audit` | Update vulnerable deps or add `[tool.pip-audit]` ignore with justification |
+
 ## Key Principles
 - Ethics-first: "First, Do No Harm" applies to all outputs
 - Local-first: User data stays on user's device/infrastructure (ADR-002)

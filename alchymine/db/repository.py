@@ -171,8 +171,7 @@ async def update_layer(
     """
     if layer_name not in _LAYER_MAP:
         raise ValueError(
-            f"Unknown layer {layer_name!r}. "
-            f"Valid layers: {', '.join(sorted(_LAYER_MAP))}"
+            f"Unknown layer {layer_name!r}. Valid layers: {', '.join(sorted(_LAYER_MAP))}"
         )
 
     model_cls = _LAYER_MAP[layer_name]
@@ -197,10 +196,9 @@ async def update_layer(
     else:
         # Create new layer row
         filtered = {
-            k: v for k, v in data.items()
-            if hasattr(model_cls, k) and k not in ("id", "user_id")
+            k: v for k, v in data.items() if hasattr(model_cls, k) and k not in ("id", "user_id")
         }
-        row = model_cls(user_id=user_id, **filtered)  # type: ignore[call-arg]
+        row = model_cls(user_id=user_id, **filtered)
         session.add(row)
 
     await session.flush()

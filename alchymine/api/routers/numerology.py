@@ -58,7 +58,8 @@ async def calculate_numerology(
         birth_date = date(2000, 1, 1)  # Default for name-only calculations
 
     profile = calculate_pythagorean_profile(
-        name, birth_date,
+        name,
+        birth_date,
     )
 
     chaldean_name = None

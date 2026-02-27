@@ -33,7 +33,6 @@ from sqlalchemy import (
     ForeignKey,
     Integer,
     String,
-    Text,
     Time,
     func,
 )
@@ -43,7 +42,6 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from alchymine.db.base import Base
 from alchymine.db.encryption import EncryptedJSON, EncryptedString
 
-
 # ─── Helpers ────────────────────────────────────────────────────────────
 
 # Use dialect-agnostic JSON so SQLite (tests) works too.
@@ -51,7 +49,7 @@ from alchymine.db.encryption import EncryptedJSON, EncryptedString
 try:
     from sqlalchemy import JSON as SA_JSON
 except ImportError:  # pragma: no cover
-    SA_JSON = PG_JSON  # type: ignore[assignment,misc]
+    SA_JSON = PG_JSON
 
 JSONColumn = SA_JSON
 
@@ -69,9 +67,7 @@ class User(Base):
 
     __tablename__ = "users"
 
-    id: Mapped[str] = mapped_column(
-        String(36), primary_key=True, default=_uuid
-    )
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), index=True
     )
@@ -79,6 +75,10 @@ class User(Base):
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )
     version: Mapped[str] = mapped_column(String(10), default="2.0")
+
+    # Authentication (nullable for backward compatibility)
+    email: Mapped[str | None] = mapped_column(String(255), unique=True, index=True, nullable=True)
+    password_hash: Mapped[str | None] = mapped_column(String(255), nullable=True)
 
     # Cross-system fields
     active_plan_day: Mapped[int | None] = mapped_column(Integer, nullable=True)
@@ -350,3 +350,28 @@ class PerspectiveProfile(Base):
 
     def __repr__(self) -> str:
         return f"<PerspectiveProfile user_id={self.user_id!r}>"
+
+
+# ─── Report ───────────────────────────────────────────────────────────
+
+
+class Report(Base):
+    """Report generation job tracking."""
+
+    __tablename__ = "reports"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    status: Mapped[str] = mapped_column(
+        String(50), default="queued", comment="queued | generating | completed | failed"
+    )
+    progress: Mapped[float] = mapped_column(Float, default=0.0)
+    intake: Mapped[dict | None] = mapped_column(JSONColumn, nullable=True)
+    modules: Mapped[dict | None] = mapped_column(JSONColumn, nullable=True)
+    tone: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    result: Mapped[dict | None] = mapped_column(JSONColumn, nullable=True)
+    quality_gates_passed: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    def __repr__(self) -> str:
+        return f"<Report id={self.id!r} status={self.status!r}>"

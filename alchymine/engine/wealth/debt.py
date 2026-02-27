@@ -13,10 +13,9 @@ Financial data never leaves the local environment.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from decimal import ROUND_HALF_UP, Decimal
-from enum import Enum
-
+from enum import StrEnum
 
 # ─── Constants ────────────────────────────────────────────────────────────
 
@@ -31,7 +30,7 @@ _MAX_PAYOFF_MONTHS = 600  # 50 years
 # ─── Enums ────────────────────────────────────────────────────────────────
 
 
-class DebtType(str, Enum):
+class DebtType(StrEnum):
     """Classification of debt types."""
 
     CREDIT_CARD = "credit_card"
@@ -260,9 +259,7 @@ def _calculate_payoff(
     if sort_key == "snowball":
         sorted_debts = sorted(active_debts, key=lambda d: (d.balance, d.name))
     else:  # avalanche
-        sorted_debts = sorted(
-            active_debts, key=lambda d: (-d.interest_rate, d.balance, d.name)
-        )
+        sorted_debts = sorted(active_debts, key=lambda d: (-d.interest_rate, d.balance, d.name))
 
     # Calculate total monthly payment budget
     total_minimum = sum((d.minimum_payment for d in sorted_debts), Decimal("0"))
@@ -288,9 +285,7 @@ def _calculate_payoff(
 
         # Calculate available extra payment for this month
         # Extra = budget minus minimums of still-active debts
-        active_names = [
-            name for name in priority_order if balances[name] > Decimal("0")
-        ]
+        active_names = [name for name in priority_order if balances[name] > Decimal("0")]
         active_minimums = sum(minimums[name] for name in active_names)
         available_extra = monthly_budget - active_minimums
 
@@ -317,17 +312,13 @@ def _calculate_payoff(
                 payment = balance
 
             payment = payment.quantize(_DECIMAL_PLACES, rounding=ROUND_HALF_UP)
-            principal = (payment - interest).quantize(
-                _DECIMAL_PLACES, rounding=ROUND_HALF_UP
-            )
+            principal = (payment - interest).quantize(_DECIMAL_PLACES, rounding=ROUND_HALF_UP)
 
             # Handle edge case where interest exceeds payment
             if principal < Decimal("0"):
                 principal = Decimal("0.00")
 
-            balance = (balance - payment).quantize(
-                _DECIMAL_PLACES, rounding=ROUND_HALF_UP
-            )
+            balance = (balance - payment).quantize(_DECIMAL_PLACES, rounding=ROUND_HALF_UP)
 
             # Prevent tiny negative balances from rounding
             if balance < Decimal("0"):
@@ -361,9 +352,7 @@ def _calculate_payoff(
         total_paid=total_paid.quantize(_DECIMAL_PLACES, rounding=ROUND_HALF_UP),
         total_interest=total_interest.quantize(_DECIMAL_PLACES, rounding=ROUND_HALF_UP),
         months_to_payoff=month,
-        monthly_payment=monthly_budget.quantize(
-            _DECIMAL_PLACES, rounding=ROUND_HALF_UP
-        ),
+        monthly_payment=monthly_budget.quantize(_DECIMAL_PLACES, rounding=ROUND_HALF_UP),
         schedules=schedules,
     )
 

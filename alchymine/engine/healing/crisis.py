@@ -9,13 +9,12 @@ crisis detection before delivery.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from enum import Enum
-
+from enum import StrEnum
 
 # ─── Severity levels ────────────────────────────────────────────────
 
 
-class CrisisSeverity(str, Enum):
+class CrisisSeverity(StrEnum):
     """Severity tiers for crisis detection."""
 
     LOW = "low"

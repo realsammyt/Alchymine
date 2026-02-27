@@ -9,10 +9,9 @@ to the appropriate validator.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
-from .ethics_check import EthicsCheckResult, EthicsViolation, check_text
-
+from .ethics_check import EthicsCheckResult, check_text
 
 # ─── Quality gate result ────────────────────────────────────────────
 
@@ -25,7 +24,7 @@ class QualityGateResult:
     passed: bool
     details: list[str] = field(default_factory=list)
     ethics_result: EthicsCheckResult | None = None
-    timestamp: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    timestamp: datetime = field(default_factory=lambda: datetime.now(UTC))
 
 
 # ─── Healing output validator ───────────────────────────────────────
@@ -100,10 +99,11 @@ def validate_healing_output(output: dict) -> QualityGateResult:
             details.append("Missing: crisis_flag is True but no crisis_response provided")
         else:
             # Check resources exist
-            resources = getattr(crisis_response, "resources", None) or crisis_response.get(
-                "resources", None
-            ) if isinstance(crisis_response, dict) else getattr(
-                crisis_response, "resources", None
+            resources = (
+                getattr(crisis_response, "resources", None)
+                or crisis_response.get("resources", None)
+                if isinstance(crisis_response, dict)
+                else getattr(crisis_response, "resources", None)
             )
             if not resources:
                 passed = False
@@ -119,9 +119,7 @@ def validate_healing_output(output: dict) -> QualityGateResult:
             difficulty = mod.difficulty_level
         if difficulty is None:
             passed = False
-            details.append(
-                f"Missing: modality recommendation missing difficulty_level"
-            )
+            details.append("Missing: modality recommendation missing difficulty_level")
             break
 
     if not details:
@@ -197,9 +195,7 @@ def validate_wealth_output(output: dict) -> QualityGateResult:
         )
         if not has_financial_disclaimer:
             passed = False
-            details.append(
-                "Missing: disclaimers must state this is not financial advice"
-            )
+            details.append("Missing: disclaimers must state this is not financial advice")
 
     # Check determinism flag
     if "llm_generated" in output and output["llm_generated"] is True:
@@ -266,9 +262,7 @@ def validate_creative_output(output: dict) -> QualityGateResult:
             text_parts.extend(str(item) for item in val if isinstance(item, str))
     combined_text = " ".join(text_parts)
 
-    ethics_result = (
-        check_text(combined_text, context="creative") if combined_text.strip() else None
-    )
+    ethics_result = check_text(combined_text, context="creative") if combined_text.strip() else None
 
     if ethics_result is not None and not ethics_result.passed:
         passed = False
@@ -283,9 +277,14 @@ def validate_creative_output(output: dict) -> QualityGateResult:
     if (traditions or techniques) and not attributions:
         # Check if attributions are embedded in text
         attribution_indicators = [
-            "originated from", "tradition of", "developed by",
-            "inspired by", "rooted in", "drawing from",
-            "attribution", "credit",
+            "originated from",
+            "tradition of",
+            "developed by",
+            "inspired by",
+            "rooted in",
+            "drawing from",
+            "attribution",
+            "credit",
         ]
         text_lower = combined_text.lower()
         has_attribution = any(ind in text_lower for ind in attribution_indicators)

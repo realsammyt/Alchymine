@@ -15,10 +15,9 @@ from sqlalchemy import pool
 from sqlalchemy.engine import Connection
 from sqlalchemy.ext.asyncio import async_engine_from_config
 
-from alchymine.db.base import Base
-
 # Import all models so that Base.metadata is populated
 import alchymine.db.models  # noqa: F401
+from alchymine.db.base import Base
 
 # Alembic Config object
 config = context.config

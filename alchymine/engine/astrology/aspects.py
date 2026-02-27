@@ -10,10 +10,10 @@ All calculations are deterministic — no LLM or randomness.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from enum import Enum
+from enum import StrEnum
 
 
-class AspectType(str, Enum):
+class AspectType(StrEnum):
     """Aspect types with their exact angles."""
 
     # Major aspects

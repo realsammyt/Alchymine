@@ -22,10 +22,10 @@ Public API:
 """
 
 from .aspects import (
-    Aspect,
-    AspectType,
     MAJOR_ASPECTS,
     MINOR_ASPECTS,
+    Aspect,
+    AspectType,
     angular_separation,
     aspect_strength,
     calculate_aspects,

@@ -26,7 +26,6 @@ from __future__ import annotations
 
 from alchymine.engine.profile import KeganStage
 
-
 # ─── Stage Metadata ──────────────────────────────────────────────────────
 
 _STAGE_DESCRIPTIONS: dict[KeganStage, dict] = {

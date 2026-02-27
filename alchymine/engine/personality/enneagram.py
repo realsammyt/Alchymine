@@ -67,9 +67,7 @@ def _validate_responses(responses: dict[str, int]) -> None:
     for qid in _REQUIRED_KEYS:
         val = responses[qid]
         if not isinstance(val, int) or val < 1 or val > 5:
-            raise ValueError(
-                f"Item '{qid}' must be an integer 1-5, got {val!r}"
-            )
+            raise ValueError(f"Item '{qid}' must be an integer 1-5, got {val!r}")
 
 
 def score_enneagram(responses: dict[str, int]) -> tuple[int, int]:
@@ -93,9 +91,7 @@ def score_enneagram(responses: dict[str, int]) -> tuple[int, int]:
     _validate_responses(responses)
 
     # Build {type_number: score} mapping.
-    type_scores: dict[int, int] = {
-        i: responses[f"enn_{i}"] for i in range(1, 10)
-    }
+    type_scores: dict[int, int] = {i: responses[f"enn_{i}"] for i in range(1, 10)}
 
     # Primary type: highest score, ties broken by lower type number.
     primary = max(
@@ -123,9 +119,7 @@ def _validate_risk_responses(responses: dict[str, int]) -> None:
     for qid in _RISK_KEYS:
         val = responses[qid]
         if not isinstance(val, int) or val < 1 or val > 5:
-            raise ValueError(
-                f"Item '{qid}' must be an integer 1-5, got {val!r}"
-            )
+            raise ValueError(f"Item '{qid}' must be an integer 1-5, got {val!r}")
 
 
 def score_risk_tolerance(responses: dict[str, int]) -> RiskTolerance:

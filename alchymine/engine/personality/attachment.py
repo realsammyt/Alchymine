@@ -47,9 +47,7 @@ def _validate_responses(responses: dict[str, int]) -> None:
     for qid in _REQUIRED_KEYS:
         val = responses[qid]
         if not isinstance(val, int) or val < 1 or val > 5:
-            raise ValueError(
-                f"Item '{qid}' must be an integer 1-5, got {val!r}"
-            )
+            raise ValueError(f"Item '{qid}' must be an integer 1-5, got {val!r}")
 
 
 def score_attachment(responses: dict[str, int]) -> AttachmentStyle:

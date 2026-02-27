@@ -15,9 +15,6 @@ Methodology:
 
 from __future__ import annotations
 
-import math
-
-
 # ─── Scenario Modeling ───────────────────────────────────────────────────
 
 
@@ -90,14 +87,16 @@ def model_scenarios(
                 f"at their expected values. Aggregate score: {aggregate}."
             )
 
-        scenarios.append({
-            "scenario_type": scenario_type,
-            "decision": decision,
-            "variable_values": variable_values,
-            "aggregate_score": aggregate,
-            "description": desc,
-            "methodology": methodology,
-        })
+        scenarios.append(
+            {
+                "scenario_type": scenario_type,
+                "decision": decision,
+                "variable_values": variable_values,
+                "aggregate_score": aggregate,
+                "description": desc,
+                "methodology": methodology,
+            }
+        )
 
     return scenarios
 
@@ -172,25 +171,29 @@ def probability_assessment(scenarios: list[dict]) -> dict:
                 prob_low = 0.10
                 prob_high = 0.30
 
-            assessments.append({
-                "scenario_type": st,
-                "aggregate_score": agg,
-                "probability_low": round(prob_low, 4),
-                "probability_high": round(prob_high, 4),
-                "probability_midpoint": round((prob_low + prob_high) / 2, 4),
-            })
+            assessments.append(
+                {
+                    "scenario_type": st,
+                    "aggregate_score": agg,
+                    "probability_low": round(prob_low, 4),
+                    "probability_high": round(prob_high, 4),
+                    "probability_midpoint": round((prob_low + prob_high) / 2, 4),
+                }
+            )
     else:
         # Fallback: equal probability across all scenarios
         n = len(scenarios)
         equal_mid = 1.0 / n if n > 0 else 0
         for s in scenarios:
-            assessments.append({
-                "scenario_type": s.get("scenario_type", "unknown"),
-                "aggregate_score": s.get("aggregate_score", 0),
-                "probability_low": round(equal_mid * 0.7, 4),
-                "probability_high": round(equal_mid * 1.3, 4),
-                "probability_midpoint": round(equal_mid, 4),
-            })
+            assessments.append(
+                {
+                    "scenario_type": s.get("scenario_type", "unknown"),
+                    "aggregate_score": s.get("aggregate_score", 0),
+                    "probability_low": round(equal_mid * 0.7, 4),
+                    "probability_high": round(equal_mid * 1.3, 4),
+                    "probability_midpoint": round(equal_mid, 4),
+                }
+            )
 
     total_midpoint = sum(a["probability_midpoint"] for a in assessments)
 
@@ -255,12 +258,14 @@ def sensitivity_analysis(variables: list[dict]) -> dict:
         else:
             skew_direction = "centred"
 
-        ranges.append({
-            "name": v["name"],
-            "range": round(var_range, 4),
-            "skew": round(skew, 4),
-            "skew_direction": skew_direction,
-        })
+        ranges.append(
+            {
+                "name": v["name"],
+                "range": round(var_range, 4),
+                "skew": round(skew, 4),
+                "skew_direction": skew_direction,
+            }
+        )
 
     # Normalise by maximum range
     max_range = max(r["range"] for r in ranges) if ranges else 1.0

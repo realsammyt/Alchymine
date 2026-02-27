@@ -15,16 +15,15 @@ Five layers:
 from __future__ import annotations
 
 from datetime import date, datetime, time
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 from pydantic import BaseModel, Field
 
-
 # ─── Enums ──────────────────────────────────────────────────────────────
 
 
-class ArchetypeType(str, Enum):
+class ArchetypeType(StrEnum):
     CREATOR = "creator"
     SAGE = "sage"
     EXPLORER = "explorer"
@@ -39,7 +38,7 @@ class ArchetypeType(str, Enum):
     EVERYMAN = "everyman"
 
 
-class AttachmentStyle(str, Enum):
+class AttachmentStyle(StrEnum):
     SECURE = "secure"
     ANXIOUS = "anxious"
     AVOIDANT = "avoidant"
@@ -48,13 +47,13 @@ class AttachmentStyle(str, Enum):
     AVOIDANT_SECURE = "avoidant-secure"
 
 
-class RiskTolerance(str, Enum):
+class RiskTolerance(StrEnum):
     CONSERVATIVE = "conservative"
     MODERATE = "moderate"
     AGGRESSIVE = "aggressive"
 
 
-class WealthLever(str, Enum):
+class WealthLever(StrEnum):
     EARN = "EARN"
     KEEP = "KEEP"
     GROW = "GROW"
@@ -62,7 +61,7 @@ class WealthLever(str, Enum):
     TRANSFER = "TRANSFER"
 
 
-class Intention(str, Enum):
+class Intention(StrEnum):
     CAREER = "career"
     LOVE = "love"
     PURPOSE = "purpose"
@@ -73,7 +72,7 @@ class Intention(str, Enum):
     LEGACY = "legacy"
 
 
-class PracticeDifficulty(str, Enum):
+class PracticeDifficulty(StrEnum):
     FOUNDATION = "foundation"
     DEVELOPING = "developing"
     ESTABLISHED = "established"
@@ -81,7 +80,7 @@ class PracticeDifficulty(str, Enum):
     INTENSIVE = "intensive"
 
 
-class KeganStage(str, Enum):
+class KeganStage(StrEnum):
     IMPULSIVE = "impulsive"  # Stage 1
     IMPERIAL = "imperial"  # Stage 2
     SOCIALIZED = "socialized"  # Stage 3
@@ -89,7 +88,7 @@ class KeganStage(str, Enum):
     SELF_TRANSFORMING = "self-transforming"  # Stage 5
 
 
-class CreativeProductionMode(str, Enum):
+class CreativeProductionMode(StrEnum):
     SPRINT = "sprint"
     MARATHON = "marathon"
     HARVEST = "harvest"
@@ -268,9 +267,7 @@ class CreativeDNA(BaseModel):
     primary_sensory_mode: str = Field(
         "visual", description="visual | verbal | kinesthetic | musical"
     )
-    convergent_vs_divergent: float = Field(
-        0.5, ge=0, le=1, description="0=convergent, 1=divergent"
-    )
+    convergent_vs_divergent: float = Field(0.5, ge=0, le=1, description="0=convergent, 1=divergent")
     creative_peak: str = Field("morning", description="morning | evening")
 
 
@@ -279,9 +276,7 @@ class CreativeLayer(BaseModel):
 
     guilford_scores: GuilfordScores | None = None
     creative_dna: CreativeDNA | None = None
-    creative_orientation: str | None = Field(
-        None, description="Life Path → Creative orientation"
-    )
+    creative_orientation: str | None = Field(None, description="Life Path → Creative orientation")
     medium_affinities: list[str] = Field(
         default_factory=list, description="Top creative modality tracks"
     )
@@ -368,9 +363,7 @@ class UserProfile(BaseModel):
     perspective: PerspectiveLayer = Field(default_factory=PerspectiveLayer)
 
     # Cross-system
-    active_plan_day: int | None = Field(
-        None, ge=0, le=90, description="Current day in 90-day plan"
-    )
+    active_plan_day: int | None = Field(None, ge=0, le=90, description="Current day in 90-day plan")
     systems_engaged: list[str] = Field(
         default_factory=list, description="Which systems the user has activated"
     )

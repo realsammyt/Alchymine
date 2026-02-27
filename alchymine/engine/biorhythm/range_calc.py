@@ -10,7 +10,6 @@ from __future__ import annotations
 from datetime import date, timedelta
 
 from alchymine.engine.biorhythm.calculator import (
-    CRITICAL_THRESHOLD,
     BiorhythmResult,
     calculate_biorhythm,
 )
@@ -70,26 +69,32 @@ def find_critical_days(
 
     for result in results:
         if result.is_physical_critical:
-            critical_days.append({
-                "date": result.target_date,
-                "cycle": "physical",
-                "value": result.physical,
-                "days_alive": result.days_alive,
-            })
+            critical_days.append(
+                {
+                    "date": result.target_date,
+                    "cycle": "physical",
+                    "value": result.physical,
+                    "days_alive": result.days_alive,
+                }
+            )
         if result.is_emotional_critical:
-            critical_days.append({
-                "date": result.target_date,
-                "cycle": "emotional",
-                "value": result.emotional,
-                "days_alive": result.days_alive,
-            })
+            critical_days.append(
+                {
+                    "date": result.target_date,
+                    "cycle": "emotional",
+                    "value": result.emotional,
+                    "days_alive": result.days_alive,
+                }
+            )
         if result.is_intellectual_critical:
-            critical_days.append({
-                "date": result.target_date,
-                "cycle": "intellectual",
-                "value": result.intellectual,
-                "days_alive": result.days_alive,
-            })
+            critical_days.append(
+                {
+                    "date": result.target_date,
+                    "cycle": "intellectual",
+                    "value": result.intellectual,
+                    "days_alive": result.days_alive,
+                }
+            )
 
     return critical_days
 
@@ -124,12 +129,14 @@ def find_peak_days(
             ("intellectual", result.intellectual),
         ]:
             if abs(value) >= PEAK_THRESHOLD:
-                peak_days.append({
-                    "date": result.target_date,
-                    "cycle": cycle_name,
-                    "value": value,
-                    "peak_type": "high" if value > 0 else "low",
-                    "days_alive": result.days_alive,
-                })
+                peak_days.append(
+                    {
+                        "date": result.target_date,
+                        "cycle": cycle_name,
+                        "value": value,
+                        "peak_type": "high" if value > 0 else "low",
+                        "days_alive": result.days_alive,
+                    }
+                )
 
     return peak_days
