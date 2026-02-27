@@ -91,6 +91,11 @@ class BiasDetectResponse(BaseModel):
             "Identifying a bias pattern does not mean your reasoning is wrong."
         )
     )
+    evidence_level: str = Field(default="moderate")
+    calculation_type: str = Field(default="deterministic")
+    methodology: str = Field(
+        default="Pattern-based detection against a catalog of 20 cognitive biases from Kahneman, Tversky, and Ariely. Results include confidence scores and academic attributions.",
+    )
 
 
 class KeganAssessRequest(BaseModel):
@@ -119,6 +124,8 @@ class KeganAssessResponse(BaseModel):
     supportive_environments: list[str]
     encouragement: str
     methodology: str
+    evidence_level: str = Field(default="strong")
+    calculation_type: str = Field(default="ai-assisted")
 
 
 # --- Endpoints ----------------------------------------------------------------

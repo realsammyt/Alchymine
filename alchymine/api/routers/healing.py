@@ -87,6 +87,11 @@ class MatchResponse(BaseModel):
 
     matches: list[HealingPreferenceResponse]
     total: int
+    evidence_level: str = Field(default="moderate")
+    calculation_type: str = Field(default="hybrid")
+    methodology: str = Field(
+        default="Modalities matched via deterministic scoring of archetype affinity, personality traits, and safety constraints. Evidence levels vary per modality.",
+    )
 
 
 class BreathworkResponse(BaseModel):
@@ -100,6 +105,11 @@ class BreathworkResponse(BaseModel):
     cycles: int
     difficulty: str
     description: str
+    evidence_level: str = Field(default="moderate")
+    calculation_type: str = Field(default="deterministic")
+    methodology: str = Field(
+        default="Breathwork patterns use fixed timing cycles from established protocols (Box Breathing, Coherence, 4-7-8).",
+    )
 
 
 class CrisisDetectRequest(BaseModel):

@@ -39,6 +39,14 @@ class NumerologyResponse(BaseModel):
     system: str
     name_used: str
     birth_date: date
+    evidence_level: str = Field(
+        default="traditional",
+        description="Evidence quality: strong | moderate | emerging | traditional",
+    )
+    calculation_type: str = Field(default="deterministic")
+    methodology: str = Field(
+        default="Pythagorean numerology uses standard letter-to-number mapping (A=1..I=9, cycling). All calculations are fully deterministic and reproducible.",
+    )
 
 
 @router.get("/numerology/{name}")

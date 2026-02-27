@@ -47,6 +47,11 @@ class GuilfordScoresResponse(BaseModel):
     elaboration: float
     sensitivity: float
     redefinition: float
+    evidence_level: str = Field(default="strong")
+    calculation_type: str = Field(default="deterministic")
+    methodology: str = Field(
+        default="Guilford SOI divergent thinking scores. All calculations are deterministic averages of assessment responses.",
+    )
 
 
 class StyleFingerprintRequest(BaseModel):
@@ -68,6 +73,11 @@ class StyleFingerprintResponse(BaseModel):
     strengths: list[str]
     growth_areas: list[str]
     recommended_mediums: list[str]
+    evidence_level: str = Field(default="strong")
+    calculation_type: str = Field(default="hybrid")
+    methodology: str = Field(
+        default="Style fingerprint combines Guilford divergent thinking scores with Tharp-inspired Creative DNA. All scoring is deterministic; style classification uses rule-based mapping.",
+    )
 
 
 class ProjectSuggestRequest(BaseModel):

@@ -7,6 +7,7 @@ and 90-day activation plan generation.
 from __future__ import annotations
 
 from fastapi import APIRouter
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
 from alchymine.engine.profile import (
@@ -20,6 +21,7 @@ from alchymine.engine.wealth.archetype import (
     get_wealth_archetype_scores,
     map_wealth_archetype,
 )
+from alchymine.engine.wealth.export import plan_to_csv
 from alchymine.engine.wealth.levers import prioritize_levers
 from alchymine.engine.wealth.plan import ActivationPlan, generate_activation_plan
 
@@ -52,6 +54,17 @@ class WealthProfileResponse(BaseModel):
         default_factory=dict,
         description="Raw scores for all 8 wealth archetypes (for transparency)",
     )
+    evidence_level: str = Field(
+        default="strong",
+        description="Evidence quality rating: strong | moderate | emerging | traditional",
+    )
+    calculation_type: str = Field(
+        default="deterministic",
+        description="How the result was produced: deterministic | ai-assisted | hybrid",
+    )
+    methodology: str = Field(
+        default="Wealth archetype mapping uses deterministic scoring from Life Path number and Jungian archetype cross-reference. No financial data is sent to any LLM.",
+    )
 
 
 class WealthPlanRequest(BaseModel):
@@ -81,6 +94,11 @@ class WealthPlanResponse(BaseModel):
     phases: list[PlanPhaseResponse]
     daily_habits: list[str]
     weekly_reviews: list[str]
+    evidence_level: str = Field(default="strong")
+    calculation_type: str = Field(default="deterministic")
+    methodology: str = Field(
+        default="90-day plan uses deterministic action templates matched to lever priorities and risk tolerance. All content is pre-written, not LLM-generated.",
+    )
 
 
 class LeverRequest(BaseModel):
@@ -206,3 +224,40 @@ async def get_lever_priorities(request: LeverRequest) -> LeverResponse:
     )
 
     return LeverResponse(levers=[lever.value for lever in levers])
+
+
+@router.post("/wealth/plan/export")
+async def export_wealth_plan_csv(request: WealthPlanRequest) -> StreamingResponse:
+    """Export a 90-day wealth activation plan as a downloadable CSV.
+
+    Generates the same deterministic plan as ``POST /wealth/plan`` but
+    returns it as a CSV file for independent verification and task tracking.
+    """
+    archetype = map_wealth_archetype(
+        life_path=request.life_path,
+        archetype_primary=request.archetype_primary,
+        risk_tolerance=request.risk_tolerance,
+    )
+
+    levers = prioritize_levers(
+        wealth_context=request.wealth_context,
+        risk_tolerance=request.risk_tolerance,
+        intention=request.intention,
+        life_path=request.life_path,
+    )
+
+    plan = generate_activation_plan(
+        wealth_archetype=archetype,
+        lever_priorities=levers,
+        risk_tolerance=request.risk_tolerance,
+    )
+
+    csv_content = plan_to_csv(plan)
+
+    return StreamingResponse(
+        iter([csv_content]),
+        media_type="text/csv",
+        headers={
+            "Content-Disposition": 'attachment; filename="alchymine-wealth-plan.csv"',
+        },
+    )

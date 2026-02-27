@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import date, time
 
 from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 router = APIRouter()
 
@@ -23,6 +23,14 @@ class AstrologyResponse(BaseModel):
     venus_retrograde: bool = False
     birth_date: date
     calculation_note: str | None = None
+    evidence_level: str = Field(
+        default="traditional",
+        description="Evidence quality: strong | moderate | emerging | traditional",
+    )
+    calculation_type: str = Field(default="deterministic")
+    methodology: str = Field(
+        default="Planetary positions calculated via Swiss Ephemeris. All calculations are astronomical and fully deterministic.",
+    )
 
 
 @router.get("/astrology/{birth_date}")
