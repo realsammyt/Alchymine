@@ -41,7 +41,7 @@ services:
   worker:
     restart: always
     command: >
-      celery -A alchymine.worker.app worker
+      celery -A alchymine.workers.celery_app worker
       --loglevel=warning
       --concurrency=${CELERY_WORKER_CONCURRENCY:-4}
       --max-tasks-per-child=1000
@@ -60,7 +60,7 @@ services:
           memory: 256m
           cpus: "0.25"
     healthcheck:
-      test: ["CMD", "celery", "-A", "alchymine.worker.app", "inspect", "ping", "--timeout", "10"]
+      test: ["CMD", "celery", "-A", "alchymine.workers.celery_app", "inspect", "ping", "--timeout", "10"]
       interval: 30s
       timeout: 15s
       retries: 3

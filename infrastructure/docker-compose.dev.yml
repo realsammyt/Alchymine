@@ -32,7 +32,7 @@ services:
   worker:
     restart: "no"
     command: >
-      celery -A alchymine.worker.app worker
+      celery -A alchymine.workers.celery_app worker
       --loglevel=debug
       --concurrency=2
     volumes:

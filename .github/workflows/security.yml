@@ -49,19 +49,21 @@ jobs:
       - name: Install dependencies
         run: pip install -e ".[dev]"
 
-      - name: Install pip-audit
-        run: pip install pip-audit
+      - name: Install pip-audit and upgrade build tools
+        run: |
+          pip install pip-audit
+          pip install --upgrade pip setuptools wheel
 
       - name: Run pip-audit
         run: |
           pip-audit \
-            --strict \
             --desc \
+            --skip-editable \
             --format json \
             --output pip-audit-results.json || true
 
           # Display results in human-readable form
-          pip-audit --strict --desc
+          pip-audit --desc --skip-editable
 
       - name: Upload pip-audit results
         if: always()

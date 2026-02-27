@@ -2,6 +2,12 @@
 
 from __future__ import annotations
 
+import os
+
+# Enable Celery eager mode before any Celery imports — tasks execute
+# synchronously in-process so tests never need a running Redis broker.
+os.environ.setdefault("CELERY_ALWAYS_EAGER", "true")
+
 from datetime import date, datetime, time
 
 import pytest
