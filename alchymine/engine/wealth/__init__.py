@@ -13,6 +13,15 @@ Public API:
     ActivationPlan               — 90-day plan dataclass
     PlanPhase                    — Single phase in the activation plan
     generate_activation_plan     — Generate a 90-day wealth plan
+    Debt                         — Single debt obligation
+    DebtType                     — Debt type classification enum
+    MonthlyEntry                 — Single month in a payoff schedule
+    PayoffSchedule               — Per-debt month-by-month schedule
+    PayoffResult                 — Complete strategy result with schedules
+    StrategyComparison           — Side-by-side snowball vs. avalanche
+    calculate_snowball           — Snowball debt payoff strategy
+    calculate_avalanche          — Avalanche debt payoff strategy
+    compare_strategies           — Compare snowball vs. avalanche
 """
 
 from .archetype import (
@@ -20,6 +29,17 @@ from .archetype import (
     WealthArchetype,
     get_wealth_archetype_scores,
     map_wealth_archetype,
+)
+from .debt import (
+    Debt,
+    DebtType,
+    MonthlyEntry,
+    PayoffResult,
+    PayoffSchedule,
+    StrategyComparison,
+    calculate_avalanche,
+    calculate_snowball,
+    compare_strategies,
 )
 from .levers import prioritize_levers
 from .plan import ActivationPlan, PlanPhase, generate_activation_plan
@@ -33,4 +53,13 @@ __all__ = [
     "ActivationPlan",
     "PlanPhase",
     "generate_activation_plan",
+    "Debt",
+    "DebtType",
+    "MonthlyEntry",
+    "PayoffSchedule",
+    "PayoffResult",
+    "StrategyComparison",
+    "calculate_snowball",
+    "calculate_avalanche",
+    "compare_strategies",
 ]
