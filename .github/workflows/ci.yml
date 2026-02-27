@@ -101,10 +101,14 @@ jobs:
         env:
           CELERY_ALWAYS_EAGER: "true"
         run: |
-          python -c "import alchymine; print('alchymine OK')"
-          python -c "import alchymine.workers.celery_app; print('celery OK')"
-          python -c "import alchymine.api.main; print('api OK')"
-          pytest --collect-only tests/engine/ tests/api/ tests/agents/ tests/workers/ -q 2>&1 | tail -20
+          set -x
+          pip list | grep -iE "celery|redis|aiosqlite|swisseph|asyncpg|sqlalchemy|fastapi|pytest"
+          python -c "import alchymine; print('alchymine OK')" || echo "FAIL: alchymine"
+          python -c "import alchymine.workers.celery_app; print('celery OK')" || echo "FAIL: celery"
+          python -c "import alchymine.api.main; print('api OK')" || echo "FAIL: api.main"
+          python -c "import aiosqlite; print('aiosqlite OK')" || echo "FAIL: aiosqlite"
+          python -c "import swisseph; print('swisseph OK')" || echo "FAIL: swisseph"
+          pytest --collect-only tests/engine/ tests/api/ tests/agents/ tests/workers/ -q 2>&1 || true
 
       - name: Run pytest with coverage
         env:
@@ -113,7 +117,6 @@ jobs:
           pytest tests/engine/ tests/api/ tests/agents/ tests/workers/ \
             -v \
             --tb=long \
-            --no-header \
             --cov=alchymine \
             --cov-report=term-missing \
             --cov-report=xml:coverage.xml \
