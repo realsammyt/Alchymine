@@ -1,0 +1,50 @@
+# Alchymine CODEOWNERS
+# https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
+#
+# Each line is a file pattern followed by one or more owners.
+# Order matters: later rules take precedence over earlier rules.
+
+# ============================================================================
+# Default: Core team owns everything
+# ============================================================================
+*                                       @alchymine/core
+
+# ============================================================================
+# Domain-specific skill ownership
+# ============================================================================
+
+# Expanded Healing -- healing domain experts
+skills/expanded-healing/                @alchymine/healing-domain
+
+# Wealth Engine -- wealth/financial domain experts
+skills/wealth-engine/                   @alchymine/wealth-domain
+
+# Creative Development -- creative domain experts
+skills/creative-development/            @alchymine/creative-domain
+
+# Perspective Enhancement -- perspective/psychology domain experts
+skills/perspective-enhancement/         @alchymine/perspective-domain
+
+# Cross-system skills require core team review
+skills/cross-system/                    @alchymine/core
+
+# ============================================================================
+# Infrastructure and security
+# ============================================================================
+
+# Infrastructure -- security team
+infrastructure/                         @alchymine/security
+
+# API middleware (authentication, authorization, rate limiting) -- security team
+alchymine/api/middleware/               @alchymine/security
+
+# ============================================================================
+# Governance and documentation
+# ============================================================================
+
+# Architecture Decision Records require core team approval
+docs/adr/                              @alchymine/core
+
+# Contribution and conduct policies require core team approval
+CONTRIBUTING.md                        @alchymine/core
+CODE_OF_CONDUCT.md                     @alchymine/core

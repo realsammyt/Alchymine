@@ -1,0 +1,209 @@
+"""Wealth Engine API endpoints.
+
+Phase 2 endpoints for wealth archetype profiling, lever prioritization,
+and 90-day activation plan generation.
+"""
+
+from __future__ import annotations
+
+from fastapi import APIRouter, HTTPException
+from pydantic import BaseModel, Field
+
+from alchymine.engine.profile import (
+    ArchetypeType,
+    Intention,
+    RiskTolerance,
+    WealthContext,
+    WealthLever,
+)
+from alchymine.engine.wealth.archetype import (
+    WealthArchetype,
+    get_wealth_archetype_scores,
+    map_wealth_archetype,
+)
+from alchymine.engine.wealth.levers import prioritize_levers
+from alchymine.engine.wealth.plan import ActivationPlan, generate_activation_plan
+
+router = APIRouter()
+
+
+# ─── Request / Response models ───────────────────────────────────────────
+
+
+class WealthProfileRequest(BaseModel):
+    """Request to calculate a wealth archetype from intake data."""
+
+    life_path: int = Field(..., ge=1, le=33, description="Life Path number (1-9, 11, 22, 33)")
+    archetype_primary: ArchetypeType = Field(..., description="Primary Jungian archetype")
+    risk_tolerance: RiskTolerance = Field(
+        RiskTolerance.MODERATE, description="Financial risk tolerance"
+    )
+
+
+class WealthProfileResponse(BaseModel):
+    """Wealth archetype profile response."""
+
+    wealth_archetype: str
+    description: str
+    primary_levers: list[str]
+    strengths: list[str]
+    blind_spots: list[str]
+    recommended_actions: list[str]
+    scores: dict[str, float] = Field(
+        default_factory=dict,
+        description="Raw scores for all 8 wealth archetypes (for transparency)",
+    )
+
+
+class WealthPlanRequest(BaseModel):
+    """Request to generate a 90-day activation plan."""
+
+    life_path: int = Field(..., ge=1, le=33, description="Life Path number")
+    archetype_primary: ArchetypeType = Field(..., description="Primary Jungian archetype")
+    risk_tolerance: RiskTolerance = Field(RiskTolerance.MODERATE)
+    intention: Intention = Field(Intention.MONEY, description="Primary intention/goal")
+    wealth_context: WealthContext | None = Field(None, description="Optional financial context")
+
+
+class PlanPhaseResponse(BaseModel):
+    """A single phase in the activation plan."""
+
+    name: str
+    days: list[int] = Field(..., description="[start_day, end_day]")
+    focus_lever: str
+    actions: list[str]
+    milestones: list[str]
+
+
+class WealthPlanResponse(BaseModel):
+    """Complete 90-day activation plan response."""
+
+    wealth_archetype: str
+    phases: list[PlanPhaseResponse]
+    daily_habits: list[str]
+    weekly_reviews: list[str]
+
+
+class LeverRequest(BaseModel):
+    """Request to get lever priorities."""
+
+    life_path: int = Field(..., ge=1, le=33, description="Life Path number")
+    risk_tolerance: RiskTolerance = Field(RiskTolerance.MODERATE)
+    intention: Intention = Field(Intention.MONEY)
+    wealth_context: WealthContext | None = None
+
+
+class LeverResponse(BaseModel):
+    """Ordered lever priorities response."""
+
+    levers: list[str] = Field(..., description="Wealth levers ordered by priority")
+
+
+# ─── Helper converters ───────────────────────────────────────────────────
+
+
+def _archetype_to_response(
+    archetype: WealthArchetype,
+    scores: dict[str, float],
+) -> WealthProfileResponse:
+    """Convert a WealthArchetype to an API response."""
+    return WealthProfileResponse(
+        wealth_archetype=archetype.name,
+        description=archetype.description,
+        primary_levers=[lever.value for lever in archetype.primary_levers],
+        strengths=list(archetype.strengths),
+        blind_spots=list(archetype.blind_spots),
+        recommended_actions=list(archetype.recommended_actions),
+        scores=scores,
+    )
+
+
+def _plan_to_response(plan: ActivationPlan) -> WealthPlanResponse:
+    """Convert an ActivationPlan to an API response."""
+    phases = [
+        PlanPhaseResponse(
+            name=phase.name,
+            days=list(phase.days),
+            focus_lever=phase.focus_lever.value,
+            actions=list(phase.actions),
+            milestones=list(phase.milestones),
+        )
+        for phase in plan.phases
+    ]
+    return WealthPlanResponse(
+        wealth_archetype=plan.wealth_archetype,
+        phases=phases,
+        daily_habits=list(plan.daily_habits),
+        weekly_reviews=list(plan.weekly_reviews),
+    )
+
+
+# ─── Endpoints ───────────────────────────────────────────────────────────
+
+
+@router.post("/wealth/profile")
+async def calculate_wealth_profile(request: WealthProfileRequest) -> WealthProfileResponse:
+    """Calculate a wealth archetype from intake data.
+
+    Uses the deterministic wealth archetype mapping engine to score all 8
+    wealth archetypes and return the best match with transparency scores.
+    """
+    archetype = map_wealth_archetype(
+        life_path=request.life_path,
+        archetype_primary=request.archetype_primary,
+        risk_tolerance=request.risk_tolerance,
+    )
+
+    scores = get_wealth_archetype_scores(
+        life_path=request.life_path,
+        archetype_primary=request.archetype_primary,
+        risk_tolerance=request.risk_tolerance,
+    )
+
+    return _archetype_to_response(archetype, scores)
+
+
+@router.post("/wealth/plan")
+async def generate_wealth_plan(request: WealthPlanRequest) -> WealthPlanResponse:
+    """Generate a 90-day wealth activation plan.
+
+    Combines wealth archetype mapping, lever prioritization, and plan
+    generation into a single endpoint. All calculations are deterministic.
+    """
+    archetype = map_wealth_archetype(
+        life_path=request.life_path,
+        archetype_primary=request.archetype_primary,
+        risk_tolerance=request.risk_tolerance,
+    )
+
+    levers = prioritize_levers(
+        wealth_context=request.wealth_context,
+        risk_tolerance=request.risk_tolerance,
+        intention=request.intention,
+        life_path=request.life_path,
+    )
+
+    plan = generate_activation_plan(
+        wealth_archetype=archetype,
+        lever_priorities=levers,
+        risk_tolerance=request.risk_tolerance,
+    )
+
+    return _plan_to_response(plan)
+
+
+@router.post("/wealth/levers")
+async def get_lever_priorities(request: LeverRequest) -> LeverResponse:
+    """Get wealth lever priorities for a user.
+
+    Returns all 5 wealth levers (EARN, KEEP, GROW, PROTECT, TRANSFER)
+    ordered by priority based on the user's context.
+    """
+    levers = prioritize_levers(
+        wealth_context=request.wealth_context,
+        risk_tolerance=request.risk_tolerance,
+        intention=request.intention,
+        life_path=request.life_path,
+    )
+
+    return LeverResponse(levers=[lever.value for lever in levers])

@@ -1,0 +1,43 @@
+import type { Metadata } from 'next';
+import './globals.css';
+import Navigation from '@/components/shared/Navigation';
+
+export const metadata: Metadata = {
+  title: 'Alchymine — Personal Transformation Operating System',
+  description:
+    'Discover who you truly are through five integrated systems: Intelligence, Healing, Wealth, Creative, and Perspective. Open-source, AI-powered personal transformation.',
+  keywords: [
+    'personal transformation',
+    'numerology',
+    'astrology',
+    'personality assessment',
+    'self-discovery',
+    'archetype',
+    'big five',
+  ],
+  manifest: '/manifest.json',
+  themeColor: '#DAA520',
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'black-translucent',
+    title: 'Alchymine',
+  },
+};
+
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  return (
+    <html lang="en">
+      <body className="font-sans bg-bg text-text min-h-screen antialiased">
+        <Navigation />
+        {/* Main content area: offset for sidebar on desktop, top bar + bottom nav on mobile */}
+        <div className="lg:ml-64 pt-14 pb-16 lg:pt-0 lg:pb-0 min-h-screen">
+          {children}
+        </div>
+      </body>
+    </html>
+  );
+}

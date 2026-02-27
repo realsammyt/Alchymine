@@ -1,0 +1,88 @@
+# Alchymine - Development Overrides
+# Usage: docker compose -f infrastructure/docker-compose.yml -f infrastructure/docker-compose.dev.yml up
+
+services:
+  # ─── API (FastAPI) — dev mode with hot reload ────────────────────────────
+  api:
+    restart: "no"
+    command: >
+      uvicorn alchymine.api.main:app
+      --host 0.0.0.0
+      --port 8000
+      --reload
+      --reload-dir /app/alchymine
+      --log-level debug
+    volumes:
+      - ../alchymine:/app/alchymine:cached
+      - ../tests:/app/tests:cached
+      - ../pyproject.toml:/app/pyproject.toml:ro
+    ports:
+      - "${API_PORT:-8000}:8000"
+      - "5678:5678"  # debugpy remote debugging
+    environment:
+      - ENVIRONMENT=development
+      - LOG_LEVEL=DEBUG
+      - PYTHONDONTWRITEBYTECODE=1
+    deploy:
+      resources:
+        limits: {}
+        reservations: {}
+
+  # ─── Worker (Celery) — dev mode with auto-reload ────────────────────────
+  worker:
+    restart: "no"
+    command: >
+      celery -A alchymine.worker.app worker
+      --loglevel=debug
+      --concurrency=2
+    volumes:
+      - ../alchymine:/app/alchymine:cached
+      - ../pyproject.toml:/app/pyproject.toml:ro
+    environment:
+      - ENVIRONMENT=development
+      - LOG_LEVEL=DEBUG
+      - PYTHONDONTWRITEBYTECODE=1
+    deploy:
+      resources:
+        limits: {}
+        reservations: {}
+
+  # ─── Web (Next.js) — dev mode with hot reload ──────────────────────────
+  web:
+    restart: "no"
+    build:
+      context: ..
+      dockerfile: infrastructure/Dockerfile.web
+      target: deps
+    command: npm run dev
+    volumes:
+      - ../alchymine/web:/app:cached
+      - /app/node_modules
+      - /app/.next
+    ports:
+      - "${WEB_PORT:-3000}:3000"
+    environment:
+      - NODE_ENV=development
+      - WATCHPACK_POLLING=true
+    deploy:
+      resources:
+        limits: {}
+        reservations: {}
+
+  # ─── Database — expose port for local tools ────────────────────────────
+  db:
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    deploy:
+      resources:
+        limits: {}
+        reservations: {}
+
+  # ─── Redis — expose port for local tools ───────────────────────────────
+  redis:
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    deploy:
+      resources:
+        limits: {}
+        reservations: {}

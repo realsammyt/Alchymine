@@ -1,0 +1,102 @@
+# ============================================================================
+# Alchymine Worker — Multi-stage Dockerfile (Celery)
+# Stages: builder -> runtime
+# Shares the same build as Dockerfile.api with a different CMD
+# ============================================================================
+
+# ─── Stage 1: Builder ─────────────────────────────────────────────────────
+FROM python:3.11-slim AS builder
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1
+
+# Install build dependencies for compiled packages
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    gcc \
+    libffi-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /build
+
+COPY pyproject.toml ./
+
+# Install Python dependencies into a virtual environment
+RUN python -m venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
+
+RUN pip install --no-cache-dir . 2>/dev/null || \
+    pip install --no-cache-dir \
+    "fastapi>=0.115.0" \
+    "uvicorn[standard]>=0.32.0" \
+    "pydantic>=2.10.0" \
+    "pydantic-settings>=2.6.0" \
+    "celery[redis]>=5.4.0" \
+    "redis>=5.2.0" \
+    "sqlalchemy>=2.0.0" \
+    "asyncpg>=0.30.0" \
+    "alembic>=1.14.0" \
+    "pyswisseph>=2.10.0" \
+    "cryptography>=43.0.0" \
+    "python-jose[cryptography]>=3.3.0" \
+    "passlib[bcrypt]>=1.7.4" \
+    "anthropic>=0.40.0" \
+    "httpx>=0.28.0" \
+    "pyyaml>=6.0.0" \
+    "python-multipart>=0.0.12" \
+    "jinja2>=3.1.0" \
+    "watchdog"
+
+# ─── Stage 2: Runtime ─────────────────────────────────────────────────────
+FROM python:3.11-slim AS runtime
+
+LABEL maintainer="Alchymine <tyler@futuretalk.ca>"
+LABEL description="Alchymine Worker - Celery background task processor"
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1
+
+# Install runtime-only dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
+    tini \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy virtual environment from builder
+COPY --from=builder /opt/venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
+
+# Set up Swiss Ephemeris data directory
+RUN mkdir -p /usr/share/swisseph
+ENV SWISSEPH_DATA_PATH=/usr/share/swisseph
+
+# Create non-root user
+RUN groupadd --gid 1001 alchymine && \
+    useradd --uid 1001 --gid alchymine --shell /bin/false --create-home alchymine
+
+WORKDIR /app
+
+# Copy application code
+COPY alchymine/ ./alchymine/
+COPY pyproject.toml ./
+
+# Install the project package
+RUN pip install --no-cache-dir --no-deps -e .
+
+# Set ownership
+RUN chown -R alchymine:alchymine /app
+
+# Switch to non-root user
+USER alchymine
+
+# Health check via celery inspect
+HEALTHCHECK --interval=30s --timeout=15s --start-period=30s --retries=3 \
+    CMD celery -A alchymine.worker.app inspect ping --timeout 10 || exit 1
+
+# Use tini as init system for proper signal handling
+ENTRYPOINT ["tini", "--"]
+
+# Default command: run the Celery worker
+CMD ["celery", "-A", "alchymine.worker.app", "worker", "--loglevel=info", "--concurrency=4"]

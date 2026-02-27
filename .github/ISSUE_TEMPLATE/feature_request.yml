@@ -1,0 +1,161 @@
+name: Feature Request
+description: Propose a new feature or enhancement for Alchymine
+title: "[Feature]: "
+labels: ["enhancement", "triage"]
+assignees: []
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ## Feature Request
+
+        Thank you for helping improve Alchymine. Please describe the feature you would like
+        to see and how it fits within the Five-System architecture.
+
+        **Reminder**: All features must align with Alchymine's ethics-first principles.
+        Features that introduce dark patterns, manipulative design, or bypass safety
+        controls will not be accepted.
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+      description: A clear and concise description of the proposed feature.
+      placeholder: Describe the feature you would like to see...
+    validations:
+      required: true
+
+  - type: dropdown
+    id: system-affected
+    attributes:
+      label: System Affected
+      description: Which Alchymine system does this feature belong to?
+      options:
+        - Core (Personalized Intelligence / Orchestrator)
+        - Healing (Ethical Healing System)
+        - Wealth (Generational Wealth Engine)
+        - Creative (Creative Development System)
+        - Perspective (Perspective Enhancement System)
+        - Infrastructure (API / Database / Queue / Docker / CI)
+        - Cross-System (spans multiple systems)
+    validations:
+      required: true
+
+  - type: dropdown
+    id: phase
+    attributes:
+      label: Implementation Phase
+      description: |
+        Which development phase does this feature target?
+        See the PRD roadmap for phase definitions.
+      options:
+        - "Phase 1: Foundation (MVP — Core + Healing)"
+        - "Phase 2: Wealth Engine"
+        - "Phase 3: Creative Development"
+        - "Phase 4: Perspective Enhancement"
+        - "Phase 5: Full Integration & Polish"
+        - "Future / Backlog"
+    validations:
+      required: true
+
+  - type: textarea
+    id: use-case
+    attributes:
+      label: Use Case
+      description: |
+        Describe the user story or scenario this feature supports.
+        Who benefits and how? What problem does it solve?
+      placeholder: |
+        As a [type of user], I want [goal] so that [reason].
+
+        Example: As a first-generation wealth builder, I want a compound interest
+        simulator so that I can visualize long-term investment outcomes using
+        deterministic calculations.
+    validations:
+      required: true
+
+  - type: textarea
+    id: acceptance-criteria
+    attributes:
+      label: Acceptance Criteria
+      description: |
+        Define the conditions that must be met for this feature to be considered complete.
+        Use a checklist format.
+      placeholder: |
+        - [ ] Criterion 1
+        - [ ] Criterion 2
+        - [ ] All outputs pass Quality Swarm validation
+        - [ ] Unit and integration tests included
+      value: |
+        - [ ]
+        - [ ]
+        - [ ] All outputs pass Quality Swarm validation
+        - [ ] Unit and integration tests included
+        - [ ] Documentation updated
+    validations:
+      required: true
+
+  - type: dropdown
+    id: priority
+    attributes:
+      label: Suggested Priority
+      description: How important is this feature to you?
+      options:
+        - Critical (blocking other work or core functionality)
+        - High (significant user value)
+        - Medium (nice to have, improves experience)
+        - Low (minor improvement or polish)
+    validations:
+      required: false
+
+  - type: textarea
+    id: design-considerations
+    attributes:
+      label: Design and Architecture Considerations
+      description: |
+        Any thoughts on how this feature should be implemented?
+        Consider integration points with the hub-and-spoke agent architecture,
+        UserProfile v2.0 data model, or existing skills.
+      placeholder: |
+        - Which agents or coordinators are involved?
+        - Does this require new prompts or skills?
+        - Are there data sensitivity concerns (financial, health)?
+        - Does this affect the deterministic calculation guarantee?
+    validations:
+      required: false
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives Considered
+      description: Describe any alternative solutions or features you have considered.
+      placeholder: Describe alternatives...
+    validations:
+      required: false
+
+  - type: dropdown
+    id: ethics-review
+    attributes:
+      label: Ethics Review Required
+      description: Does this feature require special ethics review?
+      options:
+        - "No — standard quality gates are sufficient"
+        - "Yes — involves health/healing content"
+        - "Yes — involves financial advice or calculations"
+        - "Yes — involves cultural or spiritual content"
+        - "Yes — involves user data handling or privacy"
+        - "Yes — multiple ethics dimensions"
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: terms
+    attributes:
+      label: Contribution Agreement
+      description: By submitting this feature request, you agree to the following.
+      options:
+        - label: This feature aligns with Alchymine's ethics-first principles ("First, Do No Harm").
+          required: true
+        - label: I have read and agree to the project's [Code of Conduct](../CODE_OF_CONDUCT.md).
+          required: true

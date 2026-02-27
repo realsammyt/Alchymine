@@ -1,0 +1,220 @@
+# Alchymine - Production Docker Compose Configuration
+# Usage: docker compose -f infrastructure/docker-compose.yml up -d
+# Dev:   docker compose -f infrastructure/docker-compose.yml -f infrastructure/docker-compose.dev.yml up
+
+services:
+  # ─── API (FastAPI + Uvicorn) ─────────────────────────────────────────────
+  api:
+    build:
+      context: ..
+      dockerfile: infrastructure/Dockerfile.api
+    container_name: alchymine-api
+    restart: unless-stopped
+    ports:
+      - "${API_PORT:-8000}:8000"
+    environment:
+      - POSTGRES_HOST=db
+      - POSTGRES_PORT=5432
+      - POSTGRES_DB=${POSTGRES_DB:-alchymine}
+      - POSTGRES_USER=${POSTGRES_USER:-alchymine}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-changeme_in_production}
+      - REDIS_URL=redis://redis:6379/0
+      - REDIS_CACHE_URL=redis://redis:6379/1
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+      - ENVIRONMENT=${ENVIRONMENT:-production}
+      - LOG_LEVEL=${LOG_LEVEL:-WARNING}
+      - API_SECRET_KEY=${API_SECRET_KEY:-changeme_generate_with_openssl_rand_hex_32}
+      - API_CORS_ORIGINS=${API_CORS_ORIGINS:-["http://localhost:3000"]}
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          memory: 1g
+          cpus: "1.0"
+        reservations:
+          memory: 512m
+          cpus: "0.5"
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    networks:
+      - alchymine-net
+
+  # ─── Web (Next.js Frontend) ──────────────────────────────────────────────
+  web:
+    build:
+      context: ..
+      dockerfile: infrastructure/Dockerfile.web
+    container_name: alchymine-web
+    restart: unless-stopped
+    ports:
+      - "${WEB_PORT:-3000}:3000"
+    environment:
+      - NEXT_PUBLIC_API_URL=http://api:8000
+      - NODE_ENV=production
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    deploy:
+      resources:
+        limits:
+          memory: 512m
+          cpus: "0.5"
+        reservations:
+          memory: 256m
+          cpus: "0.25"
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    networks:
+      - alchymine-net
+
+  # ─── Database (PostgreSQL 15) ────────────────────────────────────────────
+  db:
+    image: postgres:15-alpine
+    container_name: alchymine-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-alchymine}
+      POSTGRES_USER: ${POSTGRES_USER:-alchymine}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme_in_production}
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-alchymine} -d ${POSTGRES_DB:-alchymine}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          memory: 1g
+          cpus: "1.0"
+        reservations:
+          memory: 512m
+          cpus: "0.5"
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    networks:
+      - alchymine-net
+
+  # ─── Redis (Redis 7) ────────────────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: alchymine-redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    deploy:
+      resources:
+        limits:
+          memory: 512m
+          cpus: "0.5"
+        reservations:
+          memory: 128m
+          cpus: "0.25"
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    networks:
+      - alchymine-net
+
+  # ─── Worker (Celery — same image as API) ─────────────────────────────────
+  worker:
+    build:
+      context: ..
+      dockerfile: infrastructure/Dockerfile.api
+    container_name: alchymine-worker
+    restart: unless-stopped
+    command: >
+      celery -A alchymine.worker.app worker
+      --loglevel=${LOG_LEVEL:-warning}
+      --concurrency=${CELERY_WORKER_CONCURRENCY:-4}
+      --max-tasks-per-child=1000
+    environment:
+      - POSTGRES_HOST=db
+      - POSTGRES_PORT=5432
+      - POSTGRES_DB=${POSTGRES_DB:-alchymine}
+      - POSTGRES_USER=${POSTGRES_USER:-alchymine}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-changeme_in_production}
+      - REDIS_URL=redis://redis:6379/0
+      - REDIS_CACHE_URL=redis://redis:6379/1
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+      - ENVIRONMENT=${ENVIRONMENT:-production}
+      - LOG_LEVEL=${LOG_LEVEL:-WARNING}
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "celery", "-A", "alchymine.worker.app", "inspect", "ping", "--timeout", "10"]
+      interval: 30s
+      timeout: 15s
+      retries: 3
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          memory: 1g
+          cpus: "1.0"
+        reservations:
+          memory: 256m
+          cpus: "0.25"
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    networks:
+      - alchymine-net
+
+# ─── Networks ────────────────────────────────────────────────────────────────
+networks:
+  alchymine-net:
+    driver: bridge
+    name: alchymine-net
+
+# ─── Volumes ─────────────────────────────────────────────────────────────────
+volumes:
+  db_data:
+    driver: local
+    name: alchymine-db-data
+  redis_data:
+    driver: local
+    name: alchymine-redis-data

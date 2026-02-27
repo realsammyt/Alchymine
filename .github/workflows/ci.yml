@@ -1,0 +1,261 @@
+# Alchymine — Continuous Integration Pipeline
+# Runs on every PR and push to main.
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NODE_VERSION: "20"
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  # ──────────────────────────────────────────────
+  # Lint: ruff check + ruff format --check
+  # ──────────────────────────────────────────────
+  lint:
+    name: "Lint (Python ${{ matrix.python-version }})"
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.11", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+          cache-dependency-path: pyproject.toml
+
+      - name: Install ruff
+        run: pip install "ruff>=0.8.0"
+
+      - name: Ruff lint check
+        run: ruff check alchymine/
+
+      - name: Ruff format check
+        run: ruff format --check alchymine/
+
+  # ──────────────────────────────────────────────
+  # Type check: mypy
+  # ──────────────────────────────────────────────
+  type-check:
+    name: "Type check: mypy (Python ${{ matrix.python-version }})"
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.11", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+          cache-dependency-path: pyproject.toml
+
+      - name: Install dependencies
+        run: pip install -e ".[dev]"
+
+      - name: Run mypy
+        run: mypy alchymine/
+
+  # ──────────────────────────────────────────────
+  # Test Python: pytest with coverage (matrix)
+  # ──────────────────────────────────────────────
+  test-python:
+    name: "Test Python (Python ${{ matrix.python-version }})"
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+          cache-dependency-path: pyproject.toml
+
+      - name: Install dependencies
+        run: pip install -e ".[dev]"
+
+      - name: Run pytest with coverage
+        run: |
+          pytest tests/engine/ tests/api/ tests/agents/ \
+            -v \
+            --cov=alchymine \
+            --cov-report=term-missing \
+            --cov-report=xml:coverage.xml \
+            --junitxml=junit-results.xml
+
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-python-${{ matrix.python-version }}
+          path: coverage.xml
+          retention-days: 7
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results-python-${{ matrix.python-version }}
+          path: junit-results.xml
+          retention-days: 7
+
+  # ──────────────────────────────────────────────
+  # Test Frontend: npm test + npm run build
+  # ──────────────────────────────────────────────
+  test-frontend:
+    name: "Test Frontend (Next.js)"
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: alchymine/web
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: alchymine/web/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run tests
+        run: npm test -- --ci --coverage --passWithNoTests
+
+      - name: Build
+        run: npm run build
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Type check
+        run: npm run type-check
+
+  # ──────────────────────────────────────────────
+  # Ethics check: validate prompts and run ethics gate
+  # ──────────────────────────────────────────────
+  ethics-check:
+    name: "Ethics: validate prompts & quality gate"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: pyproject.toml
+
+      - name: Install dependencies
+        run: pip install -e ".[dev]"
+
+      - name: Run ethics check
+        run: python -m alchymine.agents.quality.ethics_check
+
+      - name: Run quality gate tests
+        run: pytest tests/agents/ -v
+
+  # ──────────────────────────────────────────────
+  # Security: pip-audit + npm audit
+  # ──────────────────────────────────────────────
+  security:
+    name: "Security: dependency audit"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: pyproject.toml
+
+      - name: Install Python dependencies
+        run: pip install -e ".[dev]"
+
+      - name: Install pip-audit
+        run: pip install pip-audit
+
+      - name: Run pip-audit (Python deps)
+        run: pip-audit --strict --desc
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: alchymine/web/package-lock.json
+
+      - name: Install Node dependencies
+        working-directory: alchymine/web
+        run: npm ci
+
+      - name: Run npm audit (JS deps)
+        working-directory: alchymine/web
+        run: npm audit --audit-level=high
+
+  # ──────────────────────────────────────────────
+  # Final gate: all checks must pass
+  # ──────────────────────────────────────────────
+  ci-passed:
+    name: "CI: all checks passed"
+    runs-on: ubuntu-latest
+    if: always()
+    needs:
+      - lint
+      - type-check
+      - test-python
+      - test-frontend
+      - ethics-check
+      - security
+    steps:
+      - name: Verify all jobs succeeded
+        run: |
+          echo "Job results:"
+          echo "  lint:           ${{ needs.lint.result }}"
+          echo "  type-check:     ${{ needs.type-check.result }}"
+          echo "  test-python:    ${{ needs.test-python.result }}"
+          echo "  test-frontend:  ${{ needs.test-frontend.result }}"
+          echo "  ethics-check:   ${{ needs.ethics-check.result }}"
+          echo "  security:       ${{ needs.security.result }}"
+
+          if [[ "${{ needs.lint.result }}" != "success" || \
+                "${{ needs.type-check.result }}" != "success" || \
+                "${{ needs.test-python.result }}" != "success" || \
+                "${{ needs.test-frontend.result }}" != "success" || \
+                "${{ needs.ethics-check.result }}" != "success" || \
+                "${{ needs.security.result }}" != "success" ]]; then
+            echo ""
+            echo "FAILED: One or more CI jobs did not succeed."
+            exit 1
+          fi
+
+          echo ""
+          echo "All CI checks passed."

@@ -1,0 +1,197 @@
+name: Skill Proposal
+description: Propose a new skill for the Alchymine skill library
+title: "[Skill]: "
+labels: ["skill-proposal", "triage"]
+assignees: []
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ## New Skill Proposal
+
+        Skills are the atomic units of Alchymine's transformation engine. Each skill
+        produces a structured deliverable that passes through the Quality Swarm before
+        reaching the user.
+
+        Please provide as much detail as possible so reviewers can evaluate the skill's
+        value, safety, and integration feasibility.
+
+        **Reference**: See `/skills/` and `/templates/` for existing skill implementations.
+
+  - type: input
+    id: skill-name
+    attributes:
+      label: Skill Name
+      description: |
+        A descriptive, kebab-case name for the skill (e.g., "compound-interest-simulator",
+        "shadow-work-journal", "brand-voice-analyzer").
+      placeholder: e.g., debt-snowball-calculator
+    validations:
+      required: true
+
+  - type: input
+    id: trigger-command
+    attributes:
+      label: Trigger Command
+      description: |
+        The natural-language command or intent pattern that activates this skill.
+        This is how users will invoke it through the orchestrator.
+      placeholder: e.g., "Create a debt payoff plan" / "Analyze my spending patterns"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: system
+    attributes:
+      label: System
+      description: Which Alchymine system does this skill belong to?
+      options:
+        - Core (Personalized Intelligence)
+        - Healing (Ethical Healing System)
+        - Wealth (Generational Wealth Engine)
+        - Creative (Creative Development System)
+        - Perspective (Perspective Enhancement System)
+        - Cross-System (integrates multiple systems)
+    validations:
+      required: true
+
+  - type: dropdown
+    id: template-base
+    attributes:
+      label: Template Base
+      description: |
+        Which existing skill template should this skill extend?
+        Templates define the output structure, styling, and delivery format.
+      options:
+        - wealth-skill (financial analysis / calculator output)
+        - creative-skill (creative project / portfolio deliverable)
+        - insight-skill (analytical report / assessment output)
+        - perspective-skill (framework comparison / worldview analysis)
+        - New template required (describe below)
+    validations:
+      required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Skill Description
+      description: |
+        Describe what this skill does, the transformation it supports, and the
+        deliverable it produces. Be specific about inputs, processing, and outputs.
+      placeholder: |
+        **Purpose**: What transformation does this skill support?
+        **Inputs**: What data does it need from the user or UserProfile?
+        **Processing**: What calculations, analysis, or generation does it perform?
+        **Output**: What deliverable does it produce (PDF, dashboard widget, journal entry, etc.)?
+    validations:
+      required: true
+
+  - type: textarea
+    id: quality-gates
+    attributes:
+      label: Quality Gates Required
+      description: |
+        Which quality gates must this skill's output pass through?
+        The Quality Swarm validates all outputs — specify which checks are critical.
+      placeholder: |
+        - [ ] Ethics review (harm prevention)
+        - [ ] Financial accuracy verification (deterministic calculations only)
+        - [ ] Cultural sensitivity review
+        - [ ] Accessibility compliance (WCAG 2.1 AA)
+        - [ ] Disclaimer and attribution validation
+        - [ ] Evidence-level labeling
+      value: |
+        - [ ] Ethics review (harm prevention)
+        - [ ] Accessibility compliance (WCAG 2.1 AA)
+        - [ ] Evidence-level labeling
+        - [ ] Disclaimer and attribution validation
+    validations:
+      required: true
+
+  - type: dropdown
+    id: evidence-level
+    attributes:
+      label: Evidence Level
+      description: |
+        What level of evidence supports the methodology behind this skill?
+        Alchymine requires transparent evidence ratings on all outputs.
+      options:
+        - "Level 1: Strong empirical evidence (peer-reviewed research, meta-analyses)"
+        - "Level 2: Moderate evidence (established frameworks, clinical practice)"
+        - "Level 3: Emerging evidence (preliminary studies, expert consensus)"
+        - "Level 4: Traditional/experiential (cultural traditions, lived experience)"
+        - "Level 5: Experimental (novel approach, limited evidence — requires extra review)"
+    validations:
+      required: true
+
+  - type: textarea
+    id: evidence-references
+    attributes:
+      label: Evidence References
+      description: |
+        Cite the research, frameworks, or traditions that support this skill's methodology.
+        Include links, DOIs, or book references where possible.
+      placeholder: |
+        - Reference 1: [Title](URL) — brief description of relevance
+        - Reference 2: ...
+    validations:
+      required: false
+
+  - type: textarea
+    id: agent-architecture
+    attributes:
+      label: Agent Architecture
+      description: |
+        Describe how this skill integrates with the hub-and-spoke agent architecture.
+        Which coordinator manages it? Does it require new agents?
+      placeholder: |
+        - Coordinator: e.g., Wealth Coordinator
+        - Agents involved: e.g., Financial Calculator Agent, Report Generator Agent
+        - Data dependencies: e.g., UserProfile.financial_goals, income_sources
+        - External integrations: e.g., none (local-first)
+    validations:
+      required: false
+
+  - type: textarea
+    id: safety-considerations
+    attributes:
+      label: Safety and Ethics Considerations
+      description: |
+        Describe any potential risks, ethical concerns, or safety considerations.
+        How does this skill uphold "First, Do No Harm"?
+      placeholder: |
+        - What could go wrong if the output is inaccurate?
+        - Are there vulnerable populations to consider?
+        - Does this skill handle sensitive data (financial, health, spiritual)?
+        - What disclaimers are required?
+    validations:
+      required: true
+
+  - type: textarea
+    id: data-sensitivity
+    attributes:
+      label: Data Classification
+      description: |
+        What data does this skill access or produce? Classify per Alchymine's data policy.
+        Financial data is classified as Sensitive and must never be sent to an LLM.
+      placeholder: |
+        - Input data classification: Public / Internal / Sensitive
+        - Output data classification: Public / Internal / Sensitive
+        - LLM interaction: Does processing require LLM calls? If so, what data is sent?
+        - Storage requirements: Ephemeral / Session / Persistent
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: terms
+    attributes:
+      label: Proposal Agreement
+      description: By submitting this skill proposal, you confirm the following.
+      options:
+        - label: This skill aligns with Alchymine's ethics-first principles ("First, Do No Harm").
+          required: true
+        - label: I understand that all financial calculations must be deterministic (never LLM-generated).
+          required: true
+        - label: I have read and agree to the project's [Code of Conduct](../CODE_OF_CONDUCT.md).
+          required: true
