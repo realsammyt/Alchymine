@@ -357,10 +357,10 @@ class UserProfile(BaseModel):
 
     # Five system layers
     identity: IdentityLayer | None = None
-    healing: HealingLayer = Field(default_factory=HealingLayer)
-    wealth: WealthLayer = Field(default_factory=WealthLayer)
-    creative: CreativeLayer = Field(default_factory=CreativeLayer)
-    perspective: PerspectiveLayer = Field(default_factory=PerspectiveLayer)
+    healing: HealingLayer = Field(default_factory=HealingLayer)  # type: ignore[arg-type]
+    wealth: WealthLayer = Field(default_factory=WealthLayer)  # type: ignore[arg-type]
+    creative: CreativeLayer = Field(default_factory=CreativeLayer)  # type: ignore[arg-type]
+    perspective: PerspectiveLayer = Field(default_factory=PerspectiveLayer)  # type: ignore[arg-type]
 
     # Cross-system
     active_plan_day: int | None = Field(None, ge=0, le=90, description="Current day in 90-day plan")

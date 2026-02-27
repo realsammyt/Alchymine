@@ -9,6 +9,8 @@ Endpoints:
 
 from __future__ import annotations
 
+from collections.abc import AsyncGenerator
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, EmailStr, Field
 from sqlalchemy import select
@@ -73,7 +75,7 @@ _engine = None
 _session_factory = None
 
 
-async def get_db() -> AsyncSession:
+async def get_db() -> AsyncGenerator[AsyncSession, None]:
     """Yield an async database session.
 
     Lazily creates the engine and session factory on first call,

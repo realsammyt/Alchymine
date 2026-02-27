@@ -183,7 +183,7 @@ async def update_layer(
 
     # Check if the layer row already exists by querying the child table directly.
     # This avoids SQLAlchemy identity-map caching issues with relationships.
-    existing_result = await session.execute(
+    existing_result: Any = await session.execute(
         select(model_cls).where(model_cls.user_id == user_id)  # type: ignore[attr-defined]
     )
     existing = existing_result.scalar_one_or_none()

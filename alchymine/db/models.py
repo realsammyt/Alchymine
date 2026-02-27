@@ -49,7 +49,7 @@ from alchymine.db.encryption import EncryptedJSON, EncryptedString
 try:
     from sqlalchemy import JSON as SA_JSON
 except ImportError:  # pragma: no cover
-    SA_JSON = PG_JSON
+    SA_JSON = PG_JSON  # type: ignore[misc]
 
 JSONColumn = SA_JSON
 

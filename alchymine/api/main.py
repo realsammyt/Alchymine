@@ -65,7 +65,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 app.add_middleware(RequestLoggingMiddleware)
-app.add_middleware(RateLimitMiddleware, max_requests=100, window_seconds=60)
+app.add_middleware(RateLimitMiddleware, max_requests=100, window_seconds=60)  # type: ignore[arg-type]
 
 # Routers
 app.include_router(health.router, tags=["health"])
