@@ -72,7 +72,13 @@ jobs:
         run: pip install -e ".[dev]"
 
       - name: Run mypy
-        run: mypy alchymine/ --install-types --non-interactive
+        run: |
+          mypy --version
+          mypy alchymine/ --install-types --non-interactive 2>&1 || {
+            echo "--- mypy failed, showing detailed output ---"
+            mypy alchymine/ --install-types --non-interactive --show-error-codes 2>&1 || true
+            exit 1
+          }
 
   # ──────────────────────────────────────────────
   # Test Python: pytest with coverage (matrix)
@@ -114,9 +120,10 @@ jobs:
         env:
           CELERY_ALWAYS_EAGER: "true"
         run: |
-          pytest tests/engine/ tests/api/ tests/agents/ tests/workers/ \
+          python -m pytest tests/engine/ tests/api/ tests/agents/ tests/workers/ \
+            --override-ini="addopts=" \
             -v \
-            --tb=long \
+            --tb=short \
             --cov=alchymine \
             --cov-report=term-missing \
             --cov-report=xml:coverage.xml \
