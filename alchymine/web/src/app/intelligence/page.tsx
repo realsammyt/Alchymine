@@ -1,4 +1,10 @@
+'use client';
+
+import { useMemo } from 'react';
 import MethodologyPanel from '@/components/shared/MethodologyPanel';
+import ApiStateView from '@/components/shared/ApiStateView';
+import { getNumerology, getAstrology, NumerologyResponse, AstrologyResponse } from '@/lib/api';
+import { useApi, getStoredIntake } from '@/lib/useApi';
 
 const NUMEROLOGY_NUMBERS = [
   {
@@ -67,7 +73,32 @@ const BIORHYTHM_CYCLES = [
   },
 ];
 
+function NumberResult({ label, value, subtitle }: { label: string; value: number | string; subtitle?: string }) {
+  return (
+    <div className="bg-surface/50 border border-white/5 rounded-xl p-4 text-center">
+      <div className="text-3xl font-bold text-gradient-gold mb-1">{value}</div>
+      <div className="text-sm font-medium text-text/80">{label}</div>
+      {subtitle && <div className="text-xs text-text/40 mt-1">{subtitle}</div>}
+    </div>
+  );
+}
+
 export default function IntelligencePage() {
+  const intake = useMemo(() => getStoredIntake(), []);
+  const hasIntake = !!intake?.fullName && !!intake?.birthDate;
+
+  const numerology = useApi<NumerologyResponse>(
+    hasIntake ? () => getNumerology(intake!.fullName!, intake!.birthDate!) : null,
+    [intake?.fullName, intake?.birthDate],
+  );
+
+  const astrology = useApi<AstrologyResponse>(
+    hasIntake && intake?.birthDate
+      ? () => getAstrology(intake!.birthDate!, intake?.birthTime ?? undefined, intake?.birthCity ?? undefined)
+      : null,
+    [intake?.birthDate, intake?.birthTime],
+  );
+
   return (
     <main className="min-h-screen px-4 sm:px-6 lg:px-8 py-8">
       <div className="max-w-5xl mx-auto">
@@ -83,7 +114,64 @@ export default function IntelligencePage() {
           </p>
         </header>
 
-        {/* Numerology Section */}
+        {/* Personalized Numerology Results */}
+        {hasIntake && (
+          <section className="mb-12" aria-labelledby="your-numerology-heading">
+            <h2 id="your-numerology-heading" className="text-2xl font-bold mb-6 flex items-center gap-3">
+              <span className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center text-xl" aria-hidden="true">
+                {'\u{2728}'}
+              </span>
+              Your Numerology
+            </h2>
+            <ApiStateView
+              loading={numerology.loading}
+              error={numerology.error}
+              empty={!numerology.data}
+              loadingText="Calculating your numerology..."
+              onRetry={numerology.refetch}
+            >
+              {numerology.data && (
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mb-4">
+                  <NumberResult label="Life Path" value={numerology.data.life_path} subtitle={numerology.data.is_master_number ? 'Master Number' : undefined} />
+                  <NumberResult label="Expression" value={numerology.data.expression} subtitle="Destiny Number" />
+                  <NumberResult label="Soul Urge" value={numerology.data.soul_urge} subtitle="Heart's Desire" />
+                  <NumberResult label="Personality" value={numerology.data.personality} subtitle="Outer Number" />
+                  <NumberResult label="Personal Year" value={numerology.data.personal_year} subtitle="Current Cycle" />
+                  <NumberResult label="Maturity" value={numerology.data.maturity} />
+                </div>
+              )}
+            </ApiStateView>
+          </section>
+        )}
+
+        {/* Personalized Astrology Results */}
+        {hasIntake && (
+          <section className="mb-12" aria-labelledby="your-astrology-heading">
+            <h2 id="your-astrology-heading" className="text-2xl font-bold mb-6 flex items-center gap-3">
+              <span className="w-10 h-10 rounded-xl bg-secondary/10 flex items-center justify-center text-xl" aria-hidden="true">
+                {'\u{1F320}'}
+              </span>
+              Your Astrology
+            </h2>
+            <ApiStateView
+              loading={astrology.loading}
+              error={astrology.error}
+              empty={!astrology.data}
+              loadingText="Calculating your natal chart..."
+              onRetry={astrology.refetch}
+            >
+              {astrology.data && (
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mb-4">
+                  <NumberResult label="Sun Sign" value={astrology.data.sun_sign} />
+                  <NumberResult label="Moon Sign" value={astrology.data.moon_sign} />
+                  <NumberResult label="Rising Sign" value={astrology.data.rising_sign ?? 'N/A'} subtitle={!astrology.data.rising_sign ? 'Birth time required' : undefined} />
+                </div>
+              )}
+            </ApiStateView>
+          </section>
+        )}
+
+        {/* Numerology Education Section */}
         <section className="mb-12" aria-labelledby="numerology-heading">
           <h2 id="numerology-heading" className="text-2xl font-bold mb-6 flex items-center gap-3">
             <span className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center text-xl" aria-hidden="true">
@@ -167,7 +255,6 @@ export default function IntelligencePage() {
                   <span className="text-xs text-text/30">{cycle.period}</span>
                 </div>
                 <p className="text-sm text-text/50 leading-relaxed">{cycle.description}</p>
-                {/* Placeholder wave visualization */}
                 <div className="mt-4 h-8 bg-bg/50 rounded-lg flex items-center justify-center">
                   <span className="text-xs text-text/20">Chart available after assessment</span>
                 </div>
@@ -181,8 +268,8 @@ export default function IntelligencePage() {
             evidenceLevel="emerging"
             calculationType="deterministic"
             sources={[
-              'Thommen, George S. \"Is This Your Day?\" (1973) - foundational biorhythm reference',
-              'Hines, T.M. \"Comprehensive review of biorhythm theory\" (1998) - critical review noting mixed evidence',
+              'Thommen, George S. "Is This Your Day?" (1973) - foundational biorhythm reference',
+              'Hines, T.M. "Comprehensive review of biorhythm theory" (1998) - critical review noting mixed evidence',
               'Note: Biorhythm theory has limited empirical support. Presented as a self-reflection framework, not a predictive tool.',
             ]}
           />
@@ -194,7 +281,7 @@ export default function IntelligencePage() {
             href="/discover/intake"
             className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-primary-dark to-primary text-bg font-semibold rounded-xl text-sm transition-all duration-300 hover:shadow-[0_0_20px_rgba(218,165,32,0.3)] hover:scale-[1.02] active:scale-100"
           >
-            Calculate Your Profile
+            {hasIntake ? 'Recalculate Your Profile' : 'Calculate Your Profile'}
             <svg
               className="w-4 h-4"
               viewBox="0 0 24 24"

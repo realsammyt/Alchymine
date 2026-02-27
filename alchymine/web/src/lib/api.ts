@@ -136,6 +136,136 @@ export interface AstrologyResponse {
   calculation_note: string | null;
 }
 
+// ─── Healing types ──────────────────────────────────────────────────
+
+export interface ModalityResponse {
+  name: string;
+  skill_trigger: string;
+  category: string;
+  description: string;
+  contraindications: string[];
+  min_difficulty: string;
+  traditions: string[];
+  evidence_level: string;
+}
+
+export interface ModalityListResponse {
+  modalities: ModalityResponse[];
+  total: number;
+}
+
+export interface HealingMatchResponse {
+  modality: string;
+  skill_trigger: string;
+  preference_score: number;
+  contraindicated: boolean;
+  difficulty_level: string;
+}
+
+export interface HealingMatchListResponse {
+  matches: HealingMatchResponse[];
+  total: number;
+}
+
+export interface BreathworkResponse {
+  name: string;
+  inhale_seconds: number;
+  hold_seconds: number;
+  exhale_seconds: number;
+  hold_empty_seconds: number;
+  cycles: number;
+  difficulty: string;
+  description: string;
+}
+
+// ─── Wealth types ───────────────────────────────────────────────────
+
+export interface WealthProfileResponse {
+  wealth_archetype: string;
+  description: string;
+  primary_levers: string[];
+  strengths: string[];
+  blind_spots: string[];
+  recommended_actions: string[];
+  scores: Record<string, number>;
+}
+
+export interface PlanPhaseResponse {
+  name: string;
+  days: [number, number];
+  focus_lever: string;
+  actions: string[];
+  milestones: string[];
+}
+
+export interface WealthPlanResponse {
+  wealth_archetype: string;
+  phases: PlanPhaseResponse[];
+  daily_habits: string[];
+  weekly_reviews: string[];
+}
+
+export interface LeverResponse {
+  levers: string[];
+}
+
+// ─── Creative types ─────────────────────────────────────────────────
+
+export interface GuilfordScoresResponse {
+  fluency: number;
+  flexibility: number;
+  originality: number;
+  elaboration: number;
+  sensitivity: number;
+  redefinition: number;
+}
+
+export interface StyleFingerprintResponse {
+  guilford_summary: Record<string, unknown>;
+  dna_summary: Record<string, unknown>;
+  dominant_components: string[];
+  creative_style: string;
+  overall_score: number;
+  strengths: string[];
+  growth_areas: string[];
+  recommended_mediums: string[];
+}
+
+export interface ProjectResponse {
+  title: string;
+  description: string;
+  type: string;
+  medium: string;
+  skill_level: string;
+}
+
+export interface ProjectListResponse {
+  projects: ProjectResponse[];
+  total: number;
+  orientation: string;
+}
+
+// ─── Perspective types ──────────────────────────────────────────────
+
+export interface BiasDetectResponse {
+  biases_detected: Array<Record<string, unknown>>;
+  total: number;
+  disclaimer: string;
+}
+
+export interface KeganAssessResponse {
+  stage: string;
+  stage_number: number;
+  name: string;
+  description: string;
+  strengths: string[];
+  growth_edges: string[];
+  growth_practices: string[];
+  supportive_environments: string[];
+  encouragement: string;
+  methodology: string;
+}
+
 // ─── API functions ───────────────────────────────────────────────────
 
 class ApiError extends Error {
@@ -159,7 +289,6 @@ async function request<T>(url: string, options?: RequestInit): Promise<T> {
 
   // 202 is used for "still generating" status — we handle it differently
   if (res.status === 202) {
-    // For report polling, return the status info from the error detail
     const body = await res.json();
     throw new ApiError(202, body.detail || 'Still processing');
   }
@@ -172,10 +301,8 @@ async function request<T>(url: string, options?: RequestInit): Promise<T> {
   return res.json();
 }
 
-/**
- * Create a new report (POST /api/v1/reports).
- * Returns a ReportStatus with the job ID.
- */
+// ─── Reports ────────────────────────────────────────────────────────
+
 export async function createReport(
   intake: IntakePayload,
   modules: string[] = ['full'],
@@ -187,17 +314,12 @@ export async function createReport(
   });
 }
 
-/**
- * Get report status or completed report (GET /api/v1/reports/{id}).
- * Throws ApiError with status 202 if still generating.
- */
 export async function getReport(id: string): Promise<ReportResponse> {
   return request<ReportResponse>(`${BASE}/reports/${id}`);
 }
 
-/**
- * Calculate numerology for a name (GET /api/v1/numerology/{name}).
- */
+// ─── Numerology ─────────────────────────────────────────────────────
+
 export async function getNumerology(
   name: string,
   birthDate?: string,
@@ -212,9 +334,8 @@ export async function getNumerology(
   );
 }
 
-/**
- * Calculate astrology chart (GET /api/v1/astrology/{birthDate}).
- */
+// ─── Astrology ──────────────────────────────────────────────────────
+
 export async function getAstrology(
   birthDate: string,
   birthTime?: string,
@@ -227,6 +348,107 @@ export async function getAstrology(
   return request<AstrologyResponse>(
     `${BASE}/astrology/${birthDate}${query ? `?${query}` : ''}`,
   );
+}
+
+// ─── Healing ────────────────────────────────────────────────────────
+
+export async function getHealingModalities(): Promise<ModalityListResponse> {
+  return request<ModalityListResponse>(`${BASE}/healing/modalities`);
+}
+
+export async function getHealingMatch(
+  profile: Record<string, unknown>,
+): Promise<HealingMatchListResponse> {
+  return request<HealingMatchListResponse>(`${BASE}/healing/match`, {
+    method: 'POST',
+    body: JSON.stringify(profile),
+  });
+}
+
+export async function getBreathwork(
+  intention: string,
+): Promise<BreathworkResponse> {
+  return request<BreathworkResponse>(
+    `${BASE}/healing/breathwork/${encodeURIComponent(intention)}`,
+  );
+}
+
+// ─── Wealth ─────────────────────────────────────────────────────────
+
+export async function getWealthProfile(
+  data: Record<string, unknown>,
+): Promise<WealthProfileResponse> {
+  return request<WealthProfileResponse>(`${BASE}/wealth/profile`, {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+}
+
+export async function getWealthPlan(
+  data: Record<string, unknown>,
+): Promise<WealthPlanResponse> {
+  return request<WealthPlanResponse>(`${BASE}/wealth/plan`, {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+}
+
+export async function getWealthLevers(
+  data: Record<string, unknown>,
+): Promise<LeverResponse> {
+  return request<LeverResponse>(`${BASE}/wealth/levers`, {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+}
+
+// ─── Creative ───────────────────────────────────────────────────────
+
+export async function getCreativeAssessment(
+  responses: Record<string, number>,
+): Promise<GuilfordScoresResponse> {
+  return request<GuilfordScoresResponse>(`${BASE}/creative/assessment`, {
+    method: 'POST',
+    body: JSON.stringify({ responses }),
+  });
+}
+
+export async function getCreativeStyle(
+  data: Record<string, unknown>,
+): Promise<StyleFingerprintResponse> {
+  return request<StyleFingerprintResponse>(`${BASE}/creative/style`, {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+}
+
+export async function getCreativeProjects(
+  data: Record<string, unknown>,
+): Promise<ProjectListResponse> {
+  return request<ProjectListResponse>(`${BASE}/creative/projects`, {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+}
+
+// ─── Perspective ────────────────────────────────────────────────────
+
+export async function detectBiases(
+  text: string,
+): Promise<BiasDetectResponse> {
+  return request<BiasDetectResponse>(`${BASE}/perspective/biases/detect`, {
+    method: 'POST',
+    body: JSON.stringify({ text }),
+  });
+}
+
+export async function getKeganAssessment(
+  responses: Record<string, unknown>,
+): Promise<KeganAssessResponse> {
+  return request<KeganAssessResponse>(`${BASE}/perspective/kegan/assess`, {
+    method: 'POST',
+    body: JSON.stringify(responses),
+  });
 }
 
 export { ApiError };

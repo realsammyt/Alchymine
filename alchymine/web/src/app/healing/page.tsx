@@ -1,12 +1,20 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import Button from '@/components/shared/Button';
 import MethodologyPanel from '@/components/shared/MethodologyPanel';
+import ApiStateView from '@/components/shared/ApiStateView';
+import {
+  getHealingModalities,
+  getHealingMatch,
+  ModalityListResponse,
+  HealingMatchListResponse,
+} from '@/lib/api';
+import { useApi, getStoredIntake } from '@/lib/useApi';
 
 interface BreathworkPhase {
   label: string;
-  duration: number; // seconds
+  duration: number;
   color: string;
 }
 
@@ -49,16 +57,16 @@ const PATTERNS: Record<string, { name: string; phases: BreathworkPhase[]; cycles
   },
 };
 
-const HEALING_MODALITIES = [
-  { name: 'Breathwork', icon: '\u{1F32C}\u{FE0F}', status: 'active', path: '#breathwork' },
-  { name: 'Coherence Meditation', icon: '\u{1F9D8}', status: 'active', path: '#' },
-  { name: 'Language Awareness', icon: '\u{1F4DD}', status: 'coming', path: '#' },
-  { name: 'Resilience Training', icon: '\u{1F4AA}', status: 'coming', path: '#' },
-  { name: 'Sound Healing', icon: '\u{1F514}', status: 'coming', path: '#' },
-  { name: 'Somatic Practice', icon: '\u{1FAC0}', status: 'coming', path: '#' },
-  { name: 'Nature Healing', icon: '\u{1F332}', status: 'coming', path: '#' },
-  { name: 'Sleep Healing', icon: '\u{1F319}', status: 'coming', path: '#' },
-];
+const MODALITY_ICONS: Record<string, string> = {
+  'breathwork': '\u{1F32C}\u{FE0F}',
+  'meditation': '\u{1F9D8}',
+  'language': '\u{1F4DD}',
+  'resilience': '\u{1F4AA}',
+  'sound': '\u{1F514}',
+  'somatic': '\u{1FAC0}',
+  'nature': '\u{1F332}',
+  'sleep': '\u{1F319}',
+};
 
 const CRISIS_RESOURCES = [
   {
@@ -78,6 +86,14 @@ const CRISIS_RESOURCES = [
   },
 ];
 
+function getModalityIcon(name: string): string {
+  const lower = name.toLowerCase();
+  for (const [key, icon] of Object.entries(MODALITY_ICONS)) {
+    if (lower.includes(key)) return icon;
+  }
+  return '\u{2728}';
+}
+
 export default function HealingPage() {
   const [selectedPattern, setSelectedPattern] = useState<string | null>(null);
   const [isRunning, setIsRunning] = useState(false);
@@ -87,6 +103,20 @@ export default function HealingPage() {
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
 
   const pattern = selectedPattern ? PATTERNS[selectedPattern] : null;
+  const intake = useMemo(() => getStoredIntake(), []);
+  const hasIntake = !!intake?.intention;
+
+  // Fetch modalities from API
+  const modalities = useApi<ModalityListResponse>(
+    () => getHealingModalities(),
+    [],
+  );
+
+  // Fetch personalized matches if user has intake data
+  const matches = useApi<HealingMatchListResponse>(
+    hasIntake ? () => getHealingMatch({ intention: intake!.intention }) : null,
+    [intake?.intention],
+  );
 
   useEffect(() => {
     return () => {
@@ -117,7 +147,6 @@ export default function HealingPage() {
           phaseIdx = 0;
           cycle++;
           if (cycle > p.cycles) {
-            // Session complete
             clearInterval(intervalRef.current!);
             setIsRunning(false);
             setSelectedPattern(null);
@@ -139,6 +168,9 @@ export default function HealingPage() {
     setSelectedPattern(null);
   }
 
+  // Use API modalities if available, otherwise show hardcoded list
+  const modalityList = modalities.data?.modalities ?? [];
+
   return (
     <main className="min-h-screen px-4 sm:px-6 lg:px-8 py-8">
       <div className="max-w-5xl mx-auto">
@@ -153,6 +185,57 @@ export default function HealingPage() {
           </p>
         </header>
 
+        {/* Personalized Matches */}
+        {hasIntake && (
+          <section className="mb-12" aria-labelledby="matches-heading">
+            <h2 id="matches-heading" className="text-2xl font-bold mb-6 flex items-center gap-3">
+              <span className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center text-xl" aria-hidden="true">
+                {'\u{2728}'}
+              </span>
+              Your Matched Modalities
+            </h2>
+            <ApiStateView
+              loading={matches.loading}
+              error={matches.error}
+              empty={!matches.data || matches.data.matches.length === 0}
+              loadingText="Matching modalities to your profile..."
+              emptyText="Complete the full assessment to get personalized modality recommendations."
+              onRetry={matches.refetch}
+            >
+              {matches.data && (
+                <div className="grid sm:grid-cols-2 gap-4">
+                  {matches.data.matches.map((match) => (
+                    <div
+                      key={match.modality}
+                      className={`card-surface p-5 ${match.contraindicated ? 'opacity-50 border-l-2 border-red-400/30' : 'hover:glow-gold'} transition-all`}
+                    >
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xl" aria-hidden="true">{getModalityIcon(match.modality)}</span>
+                          <h3 className="font-semibold text-sm text-text">{match.modality}</h3>
+                        </div>
+                        <span className="text-xs font-mono text-primary">
+                          {Math.round(match.preference_score * 100)}%
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2 mt-2">
+                        <span className="px-2 py-0.5 bg-white/5 text-text/30 text-[10px] font-medium rounded-full">
+                          {match.difficulty_level}
+                        </span>
+                        {match.contraindicated && (
+                          <span className="px-2 py-0.5 bg-red-400/10 text-red-400 text-[10px] font-medium rounded-full">
+                            Contraindicated
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </ApiStateView>
+          </section>
+        )}
+
         {/* Breathwork Timer */}
         <section className="mb-12" aria-labelledby="breathwork-heading">
           {isRunning && pattern ? (
@@ -160,7 +243,6 @@ export default function HealingPage() {
               <h2 id="breathwork-heading" className="text-2xl font-bold mb-2">{pattern.name}</h2>
               <p className="text-text/50 mb-8">Cycle {currentCycle} of {pattern.cycles}</p>
 
-              {/* Breathing circle */}
               <div className="relative w-48 h-48 mx-auto mb-8">
                 <div
                   className={`absolute inset-0 rounded-full border-4 ${pattern.phases[currentPhaseIndex].color} border-current transition-all duration-500`}
@@ -183,7 +265,6 @@ export default function HealingPage() {
               </Button>
             </div>
           ) : (
-            /* Pattern Selection */
             <div id="breathwork">
               <h2 id="breathwork-heading" className="text-2xl font-bold mb-6">Breathwork Sessions</h2>
               <div className="grid md:grid-cols-3 gap-6">
@@ -192,7 +273,7 @@ export default function HealingPage() {
                     <h3 className="text-lg font-semibold text-primary mb-2">{p.name}</h3>
                     <p className="text-text/50 text-sm mb-4">{p.description}</p>
                     <p className="text-text/40 text-xs mb-4">
-                      {p.phases.map((ph) => `${ph.label} ${ph.duration}s`).join(' \u2192 ')} \u00B7 {p.cycles} cycles
+                      {p.phases.map((ph) => `${ph.label} ${ph.duration}s`).join(' \u2192 ')} {'\u00B7'} {p.cycles} cycles
                     </p>
                     <Button variant="primary" size="sm" onClick={() => startSession(key)}>
                       Start
@@ -207,20 +288,39 @@ export default function HealingPage() {
         {/* Modalities Grid */}
         <section className="mb-12" aria-labelledby="modalities-heading">
           <h2 id="modalities-heading" className="text-2xl font-bold mb-6">Healing Modalities</h2>
-          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
-            {HEALING_MODALITIES.map((mod) => (
-              <div
-                key={mod.name}
-                className={`card-surface p-4 ${mod.status === 'active' ? 'hover:glow-gold cursor-pointer' : 'opacity-50'} transition-all`}
-              >
-                <div className="text-3xl mb-2" aria-hidden="true">{mod.icon}</div>
-                <h3 className="font-medium text-sm">{mod.name}</h3>
-                {mod.status === 'coming' && (
-                  <span className="text-xs text-text/30 mt-1 block">Coming Soon</span>
-                )}
-              </div>
-            ))}
-          </div>
+          <ApiStateView
+            loading={modalities.loading}
+            error={modalities.error}
+            loadingText="Loading modalities..."
+            onRetry={modalities.refetch}
+          >
+            <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+              {modalityList.length > 0
+                ? modalityList.map((mod) => (
+                    <div
+                      key={mod.name}
+                      className="card-surface p-4 hover:glow-gold cursor-pointer transition-all"
+                    >
+                      <div className="text-3xl mb-2" aria-hidden="true">{getModalityIcon(mod.name)}</div>
+                      <h3 className="font-medium text-sm">{mod.name}</h3>
+                      <p className="text-xs text-text/40 mt-1">{mod.category}</p>
+                      <span className="inline-block mt-2 px-2 py-0.5 bg-white/5 text-text/30 text-[10px] font-medium rounded-full">
+                        {mod.evidence_level}
+                      </span>
+                    </div>
+                  ))
+                : /* Fallback static list */
+                  ['Breathwork', 'Coherence Meditation', 'Language Awareness', 'Resilience Training', 'Sound Healing', 'Somatic Practice', 'Nature Healing', 'Sleep Healing'].map(
+                    (name) => (
+                      <div key={name} className="card-surface p-4 opacity-60 transition-all">
+                        <div className="text-3xl mb-2" aria-hidden="true">{getModalityIcon(name)}</div>
+                        <h3 className="font-medium text-sm">{name}</h3>
+                        <span className="text-xs text-text/30 mt-1 block">Coming Soon</span>
+                      </div>
+                    ),
+                  )}
+            </div>
+          </ApiStateView>
 
           <MethodologyPanel
             title="Healing Modalities"
@@ -228,9 +328,9 @@ export default function HealingPage() {
             evidenceLevel="moderate"
             calculationType="hybrid"
             sources={[
-              'Zaccaro et al. (2018) \"How Breath-Control Can Change Your Life\" - systematic review of breathwork effects on autonomic nervous system',
-              'McCraty & Zayas (2014) \"Cardiac coherence, self-regulation\" - HeartMath Institute research on coherence breathing',
-              'Weil, A. \"4-7-8 Breathing Technique\" - clinical observations on relaxation response',
+              'Zaccaro et al. (2018) "How Breath-Control Can Change Your Life" - systematic review of breathwork effects on autonomic nervous system',
+              'McCraty & Zayas (2014) "Cardiac coherence, self-regulation" - HeartMath Institute research on coherence breathing',
+              'Weil, A. "4-7-8 Breathing Technique" - clinical observations on relaxation response',
               'SAMHSA Treatment Improvement Protocols for crisis resource standards',
             ]}
           />

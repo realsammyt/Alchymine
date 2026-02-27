@@ -1,4 +1,10 @@
+'use client';
+
+import { useMemo } from 'react';
 import MethodologyPanel from '@/components/shared/MethodologyPanel';
+import ApiStateView from '@/components/shared/ApiStateView';
+import { getKeganAssessment, KeganAssessResponse } from '@/lib/api';
+import { useApi, getStoredIntake } from '@/lib/useApi';
 
 const KEGAN_STAGES = [
   {
@@ -90,6 +96,14 @@ const SCENARIO_TYPES = [
 ];
 
 export default function PerspectivePage() {
+  const intake = useMemo(() => getStoredIntake(), []);
+  const hasIntake = !!intake?.intention;
+
+  const kegan = useApi<KeganAssessResponse>(
+    hasIntake ? () => getKeganAssessment({ intention: intake!.intention }) : null,
+    [intake?.intention],
+  );
+
   return (
     <main className="min-h-screen px-4 sm:px-6 lg:px-8 py-8">
       <div className="max-w-5xl mx-auto">
@@ -103,6 +117,77 @@ export default function PerspectivePage() {
             and scenario planning tools for how you see the world.
           </p>
         </header>
+
+        {/* Personalized Kegan Assessment */}
+        {hasIntake && (
+          <section className="mb-12" aria-labelledby="your-perspective-heading">
+            <h2 id="your-perspective-heading" className="text-2xl font-bold mb-6 flex items-center gap-3">
+              <span className="w-10 h-10 rounded-xl bg-accent/10 flex items-center justify-center text-xl" aria-hidden="true">
+                {'\u{2728}'}
+              </span>
+              Your Developmental Stage
+            </h2>
+            <ApiStateView
+              loading={kegan.loading}
+              error={kegan.error}
+              empty={!kegan.data}
+              loadingText="Assessing your developmental stage..."
+              emptyText="Complete the full assessment to discover your Kegan developmental stage."
+              onRetry={kegan.refetch}
+            >
+              {kegan.data && (
+                <div className="card-surface p-6 space-y-4">
+                  <div className="flex items-center gap-4">
+                    <div className="w-16 h-16 rounded-2xl bg-accent/10 flex items-center justify-center">
+                      <span className="text-2xl font-bold text-accent">{kegan.data.stage_number}</span>
+                    </div>
+                    <div>
+                      <h3 className="text-xl font-bold text-accent">{kegan.data.name}</h3>
+                      <p className="text-sm text-text/50">{kegan.data.description}</p>
+                    </div>
+                  </div>
+
+                  <div className="grid sm:grid-cols-2 gap-4 pt-4 border-t border-white/5">
+                    <div>
+                      <h4 className="text-xs uppercase tracking-wider text-text/40 mb-2">Strengths</h4>
+                      <div className="flex flex-wrap gap-2">
+                        {kegan.data.strengths.map(s => (
+                          <span key={s} className="px-3 py-1 bg-accent/10 text-accent text-xs rounded-full">{s}</span>
+                        ))}
+                      </div>
+                    </div>
+                    <div>
+                      <h4 className="text-xs uppercase tracking-wider text-text/40 mb-2">Growth Edges</h4>
+                      <div className="flex flex-wrap gap-2">
+                        {kegan.data.growth_edges.map(g => (
+                          <span key={g} className="px-3 py-1 bg-white/5 text-text/50 text-xs rounded-full">{g}</span>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+
+                  {kegan.data.growth_practices.length > 0 && (
+                    <div className="pt-4 border-t border-white/5">
+                      <h4 className="text-xs uppercase tracking-wider text-text/40 mb-2">Growth Practices</h4>
+                      <ul className="space-y-1">
+                        {kegan.data.growth_practices.map(p => (
+                          <li key={p} className="text-sm text-text/60 flex items-start gap-2">
+                            <span className="w-1.5 h-1.5 rounded-full bg-accent mt-2 flex-shrink-0" />
+                            {p}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  <div className="bg-accent/5 rounded-xl p-4 mt-4">
+                    <p className="text-sm text-text/60 italic">{kegan.data.encouragement}</p>
+                  </div>
+                </div>
+              )}
+            </ApiStateView>
+          </section>
+        )}
 
         {/* Developmental Frameworks Section */}
         <section className="mb-12" aria-labelledby="frameworks-heading">
@@ -120,12 +205,20 @@ export default function PerspectivePage() {
 
           <div className="space-y-4 mb-4">
             {KEGAN_STAGES.map((stage) => (
-              <div key={stage.stage} className="card-surface p-5">
+              <div
+                key={stage.stage}
+                className={`card-surface p-5 ${kegan.data?.stage_number === stage.stage ? 'ring-1 ring-accent/30 glow-gold' : ''}`}
+              >
                 <div className="flex items-center gap-3 mb-2">
                   <span className="w-8 h-8 rounded-full bg-accent/10 text-accent text-sm font-bold flex items-center justify-center flex-shrink-0">
                     {stage.stage}
                   </span>
-                  <h3 className="text-sm font-semibold text-text">{stage.name}</h3>
+                  <h3 className="text-sm font-semibold text-text">
+                    {stage.name}
+                    {kegan.data?.stage_number === stage.stage && (
+                      <span className="ml-2 text-accent text-xs">(Your stage)</span>
+                    )}
+                  </h3>
                 </div>
                 <p className="text-sm text-text/50 leading-relaxed mb-2 ml-11">{stage.description}</p>
                 <p className="text-xs text-text/30 ml-11">
@@ -141,10 +234,10 @@ export default function PerspectivePage() {
             evidenceLevel="strong"
             calculationType="ai-assisted"
             sources={[
-              'Kegan, R. (1982) \"The Evolving Self\" - foundational developmental theory',
-              'Kegan, R. (1994) \"In Over Our Heads\" - application to modern life complexity',
+              'Kegan, R. (1982) "The Evolving Self" - foundational developmental theory',
+              'Kegan, R. (1994) "In Over Our Heads" - application to modern life complexity',
               'Lahey et al. (2011) Subject-Object Interview scoring manual and reliability studies',
-              'Cook-Greuter, S. (2013) \"Nine Levels of Increasing Embrace\" - complementary ego development model',
+              'Cook-Greuter, S. (2013) "Nine Levels of Increasing Embrace" - complementary ego development model',
             ]}
           />
         </section>
@@ -214,7 +307,7 @@ export default function PerspectivePage() {
             href="/discover/intake"
             className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-accent-dark to-accent text-bg font-semibold rounded-xl text-sm transition-all duration-300 hover:shadow-[0_0_20px_rgba(32,178,170,0.3)] hover:scale-[1.02] active:scale-100"
           >
-            Map Your Perspective
+            {hasIntake ? 'Update Your Perspective Profile' : 'Map Your Perspective'}
             <svg
               className="w-4 h-4"
               viewBox="0 0 24 24"

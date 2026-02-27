@@ -1,11 +1,14 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import Link from 'next/link';
 import Button from '@/components/shared/Button';
 import Card from '@/components/shared/Card';
 import ProgressBar from '@/components/shared/ProgressBar';
 import MethodologyPanel from '@/components/shared/MethodologyPanel';
+import ApiStateView from '@/components/shared/ApiStateView';
+import { getWealthProfile, getWealthLevers, WealthProfileResponse, LeverResponse } from '@/lib/api';
+import { useApi, getStoredIntake } from '@/lib/useApi';
 
 const WEALTH_LEVERS = [
   {
@@ -56,6 +59,18 @@ const WEALTH_ARCHETYPES_PREVIEW = [
 
 export default function WealthPage() {
   const [selectedLever, setSelectedLever] = useState<string | null>(null);
+  const intake = useMemo(() => getStoredIntake(), []);
+  const hasIntake = !!intake?.intention;
+
+  const wealthProfile = useApi<WealthProfileResponse>(
+    hasIntake ? () => getWealthProfile({ intention: intake!.intention }) : null,
+    [intake?.intention],
+  );
+
+  const levers = useApi<LeverResponse>(
+    hasIntake ? () => getWealthLevers({ intention: intake!.intention }) : null,
+    [intake?.intention],
+  );
 
   return (
     <main className="min-h-screen px-4 sm:px-6 lg:px-8 py-8">
@@ -75,6 +90,79 @@ export default function WealthPage() {
             </span>
           </div>
         </header>
+
+        {/* Personalized Wealth Profile */}
+        {hasIntake && (
+          <section className="mb-12" aria-labelledby="your-wealth-heading">
+            <h2 id="your-wealth-heading" className="text-2xl font-bold mb-6 flex items-center gap-3">
+              <span className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center text-xl" aria-hidden="true">
+                {'\u{2728}'}
+              </span>
+              Your Wealth Profile
+            </h2>
+            <ApiStateView
+              loading={wealthProfile.loading}
+              error={wealthProfile.error}
+              empty={!wealthProfile.data}
+              loadingText="Analyzing your wealth archetype..."
+              emptyText="Complete the full assessment to discover your wealth archetype and personalized strategies."
+              onRetry={wealthProfile.refetch}
+            >
+              {wealthProfile.data && (
+                <div className="card-surface p-6 space-y-4">
+                  <div className="flex items-center gap-4">
+                    <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center text-3xl">
+                      {WEALTH_ARCHETYPES_PREVIEW.find(a => a.name.toLowerCase().includes(wealthProfile.data!.wealth_archetype.toLowerCase()))?.icon ?? '\u{1F4B0}'}
+                    </div>
+                    <div>
+                      <h3 className="text-xl font-bold text-primary">{wealthProfile.data.wealth_archetype}</h3>
+                      <p className="text-sm text-text/50">{wealthProfile.data.description}</p>
+                    </div>
+                  </div>
+
+                  <div className="grid sm:grid-cols-2 gap-4 pt-4 border-t border-white/5">
+                    <div>
+                      <h4 className="text-xs uppercase tracking-wider text-text/40 mb-2">Strengths</h4>
+                      <div className="flex flex-wrap gap-2">
+                        {wealthProfile.data.strengths.map(s => (
+                          <span key={s} className="px-3 py-1 bg-primary/10 text-primary text-xs rounded-full">{s}</span>
+                        ))}
+                      </div>
+                    </div>
+                    <div>
+                      <h4 className="text-xs uppercase tracking-wider text-text/40 mb-2">Blind Spots</h4>
+                      <div className="flex flex-wrap gap-2">
+                        {wealthProfile.data.blind_spots.map(b => (
+                          <span key={b} className="px-3 py-1 bg-white/5 text-text/50 text-xs rounded-full">{b}</span>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+
+                  {levers.data && (
+                    <div className="pt-4 border-t border-white/5">
+                      <h4 className="text-xs uppercase tracking-wider text-text/40 mb-3">Your Lever Priority</h4>
+                      <div className="flex flex-wrap gap-2">
+                        {levers.data.levers.map((lever, i) => (
+                          <span
+                            key={lever}
+                            className={`px-3 py-1 rounded-full text-xs font-medium ${
+                              i === 0
+                                ? 'bg-primary/20 text-primary border border-primary/30'
+                                : 'bg-white/5 text-text/50'
+                            }`}
+                          >
+                            {i + 1}. {lever}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </ApiStateView>
+          </section>
+        )}
 
         {/* Five Wealth Levers */}
         <section className="mb-12" aria-labelledby="levers-heading">
@@ -96,7 +184,6 @@ export default function WealthPage() {
             ))}
           </div>
 
-          {/* Selected Lever Detail */}
           {selectedLever && (
             <div className="card-surface p-6 mb-6 animate-fade-in">
               <h3 className="text-xl font-bold text-primary mb-4">
@@ -133,12 +220,12 @@ export default function WealthPage() {
           </div>
         </section>
 
-        {/* Debt Payoff Section */}
-        <section className="mb-12" aria-labelledby="debt-heading">
-          <h2 id="debt-heading" className="text-2xl font-bold mb-6">Debt Payoff Calculator</h2>
+        {/* 90-Day Plan Section */}
+        <section className="mb-12" aria-labelledby="plan-heading">
+          <h2 id="plan-heading" className="text-2xl font-bold mb-6">90-Day Activation Plan</h2>
           <Card
-            title="90-Day Activation Plan"
-            subtitle="Your personalized wealth-building roadmap"
+            title="Your Personalized Roadmap"
+            subtitle="Three-phase wealth-building activation plan"
             badge="Phase 2"
           >
             <div className="space-y-4">
@@ -176,7 +263,7 @@ export default function WealthPage() {
             calculationType="deterministic"
             sources={[
               'Standard amortization and compound interest formulas (mathematical constants)',
-              'Avalanche vs. Snowball debt payoff methods - Gathergood (2012) \"Self-control, financial literacy and consumer over-indebtedness\"',
+              'Avalanche vs. Snowball debt payoff methods - Gathergood (2012) "Self-control, financial literacy and consumer over-indebtedness"',
               'Five Wealth Levers framework adapted from Kiyosaki, Ramsey, and Sethi personal finance methodologies',
               'Financial data classification: Sensitive (encrypted, isolated, never sent to LLM) per ADR-002',
             ]}
@@ -187,7 +274,7 @@ export default function WealthPage() {
         <div className="text-center">
           <Link href="/discover/intake">
             <Button variant="primary" size="lg">
-              Discover Your Wealth Archetype
+              {hasIntake ? 'Update Your Wealth Profile' : 'Discover Your Wealth Archetype'}
             </Button>
           </Link>
         </div>
