@@ -95,6 +95,27 @@ pytest tests/agents/ -v
 - Financial data classified as Sensitive — encrypted, isolated, never sent to LLM
 - Hub-and-spoke agent architecture: 1 Master Orchestrator → 5 Coordinators → 28 agents
 
+## Agent Workflow — GitHub Issue Tracking (ADR-008)
+
+When building features with parallel agent swarms:
+1. **Before launching**: Identify relevant GitHub issue numbers
+2. **Each agent must**: Comment on its issue when tests pass (✅) or when blocked (⚠️)
+3. **Orchestrator must**: Comment + close issues after merging and full test suite passes
+4. **Token**: Set `GH_TOKEN` env var for `gh` CLI access
+5. **Reference**: See `docs/adr/008-agent-issue-tracking.md` for full protocol
+
+### Issue Comment Templates
+```bash
+# On success
+gh issue comment <#> -R realsammyt/Alchymine --body "✅ [Feature] complete — [summary]. All tests passing."
+
+# On blocked
+gh issue comment <#> -R realsammyt/Alchymine --body "⚠️ [Feature] blocked — [blocker]. Needs: [resolution]."
+
+# On merge + close
+gh issue close <#> -R realsammyt/Alchymine --comment "🔀 Merged. Full suite: [N] tests passing."
+```
+
 ## Key Principles
 - Ethics-first: "First, Do No Harm" applies to all outputs
 - Local-first: User data stays on user's device/infrastructure (ADR-002)
