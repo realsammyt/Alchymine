@@ -104,6 +104,15 @@ When building features with parallel agent swarms:
 4. **Token**: Set `GH_TOKEN` env var for `gh` CLI access
 5. **Reference**: See `docs/adr/008-agent-issue-tracking.md` for full protocol
 
+### Issue Creation
+```bash
+# IMPORTANT: Use separate --label flags, NOT comma-separated
+gh issue create -R realsammyt/Alchymine \
+  --title "Issue title" \
+  --label "system:core" --label "type:feature" --label "priority:critical" --label "phase:9" \
+  --body "Issue body"
+```
+
 ### Issue Comment Templates
 ```bash
 # On success
