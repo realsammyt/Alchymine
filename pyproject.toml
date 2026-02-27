@@ -16,7 +16,7 @@ dependencies = [
     # API
     "fastapi>=0.115.0",
     "uvicorn[standard]>=0.32.0",
-    "pydantic>=2.10.0",
+    "pydantic[email]>=2.10.0",
     "pydantic-settings>=2.6.0",
     # Async tasks
     "celery[redis]>=5.4.0",
