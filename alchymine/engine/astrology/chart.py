@@ -436,8 +436,10 @@ def calculate_natal_chart(
 ) -> dict[str, Any]:
     """Calculate a natal chart for the given birth data.
 
-    Attempts to use pyswisseph for precise calculations.
+    Attempts to use pyswisseph for precise planetary positions.
     Falls back to approximations if not available.
+    Rising sign, house cusps, and aspects are always calculated
+    using the approximation engine when birth time/location are available.
 
     Parameters
     ----------
@@ -470,65 +472,50 @@ def calculate_natal_chart(
             if coords is not None:
                 latitude, longitude = coords
 
+    # Step 1: Get core planetary positions (swisseph or approximate)
     try:
-        return _calculate_with_swisseph(birth_date, birth_time, birth_city)
+        base_result = _calculate_with_swisseph(birth_date, birth_time, birth_city)
     except ImportError:
-        return _calculate_approximate(
-            birth_date,
-            birth_time,
-            latitude=latitude,
-            longitude=longitude,
-            house_system=house_system,
-            include_aspects=include_aspects,
-            include_minor_aspects=include_minor_aspects,
-        )
+        base_result = _calculate_base_approximate(birth_date, birth_time)
 
+    # Step 2: Get full planetary positions for aspects (always approximate-based)
+    planetary_positions = _approximate_planetary_positions(birth_date)
+    # Override Sun and Moon with whatever the base calculation gave us
+    planetary_positions["Sun"] = base_result["sun_degree"]
+    planetary_positions["Moon"] = base_result["moon_degree"]
+    base_result["planetary_positions"] = planetary_positions
 
-def _calculate_approximate(
-    birth_date: date,
-    birth_time: time | None = None,
-    latitude: float | None = None,
-    longitude: float | None = None,
-    house_system: HouseSystem = HouseSystem.PLACIDUS,
-    include_aspects: bool = True,
-    include_minor_aspects: bool = False,
-) -> dict[str, Any]:
-    """Approximate natal chart without Swiss Ephemeris."""
-    sun_sign = approximate_sun_sign(birth_date)
-    sun_degree = approximate_sun_degree(birth_date)
-    moon_sign, moon_degree = _approximate_moon_sign(birth_date)
-
-    rising_sign: str | None = None
-    rising_degree: float | None = None
-    house_cusps: list[float] | None = None
-    house_placements: dict[str, int] | None = None
-
-    # Calculate Rising sign if birth time and location are available
+    # Step 3: Rising sign / Ascendant (requires birth time + location)
     if birth_time is not None and latitude is not None and longitude is not None:
         rising_sign, rising_degree = approximate_ascendant(
             birth_date, birth_time, latitude, longitude
         )
+        base_result["rising_sign"] = rising_sign
+        base_result["rising_degree"] = rising_degree
+
+        # Step 4: House cusps
         house_cusps = calculate_house_cusps(
             rising_degree,
             house_system=house_system,
             latitude=latitude,
         )
+        base_result["house_system"] = house_system.value
+        base_result["house_cusps"] = house_cusps
+        base_result["house_placements"] = _assign_house_placements(
+            planetary_positions, house_cusps
+        )
+    else:
+        base_result.setdefault("house_system", None)
+        base_result.setdefault("house_cusps", None)
+        base_result.setdefault("house_placements", None)
 
-    # Get all planetary positions
-    planetary_positions = _approximate_planetary_positions(birth_date)
-
-    # Calculate house placements if cusps are available
-    if house_cusps is not None:
-        house_placements = _assign_house_placements(planetary_positions, house_cusps)
-
-    # Calculate aspects
-    aspects_list: list[dict[str, Any]] = []
+    # Step 5: Aspects
     if include_aspects:
         aspects = calculate_aspects(
             planetary_positions,
             include_minor=include_minor_aspects,
         )
-        aspects_list = [
+        base_result["aspects"] = [
             {
                 "planet1": a.planet1,
                 "planet2": a.planet2,
@@ -539,27 +526,44 @@ def _calculate_approximate(
             }
             for a in aspects
         ]
+    else:
+        base_result["aspects"] = []
 
-    notes: list[str] = ["Approximate calculation — pyswisseph not installed"]
+    # Add notes about missing data
+    notes: list[str] = []
+    if base_result.get("calculation_note"):
+        notes.append(base_result["calculation_note"])
     if birth_time is not None and (latitude is None or longitude is None):
         notes.append("Rising sign requires birth location (city or lat/lon)")
+    base_result["calculation_note"] = "; ".join(notes) if notes else None
+
+    return base_result
+
+
+def _calculate_base_approximate(
+    birth_date: date,
+    birth_time: time | None = None,
+) -> dict[str, Any]:
+    """Approximate core planetary positions without Swiss Ephemeris.
+
+    Returns a base result dict with sun/moon data. Rising sign, aspects,
+    and house cusps are computed by the main calculate_natal_chart function.
+    """
+    sun_sign = approximate_sun_sign(birth_date)
+    sun_degree = approximate_sun_degree(birth_date)
+    moon_sign, moon_degree = _approximate_moon_sign(birth_date)
 
     result: dict[str, Any] = {
         "sun_sign": sun_sign,
         "sun_degree": sun_degree,
         "moon_sign": moon_sign,
         "moon_degree": moon_degree,
-        "rising_sign": rising_sign,
-        "rising_degree": rising_degree,
+        "rising_sign": None,
+        "rising_degree": None,
         "mercury_retrograde": False,
         "venus_retrograde": False,
         "birth_date": birth_date,
-        "planetary_positions": planetary_positions,
-        "aspects": aspects_list,
-        "house_system": house_system.value if house_cusps else None,
-        "house_cusps": house_cusps,
-        "house_placements": house_placements,
-        "calculation_note": "; ".join(notes),
+        "calculation_note": "Approximate calculation — pyswisseph not installed",
     }
 
     return result

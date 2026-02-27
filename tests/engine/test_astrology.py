@@ -424,10 +424,11 @@ class TestAspectDetection:
 
     def test_aspect_across_zero(self) -> None:
         """Aspect detection works across the 0/360 boundary."""
-        result = find_aspect(355.0, 5.0)
+        # 358 and 2 are 4 degrees apart, within conjunction orb of 8
+        result = find_aspect(358.0, 2.0)
         assert result is not None
         assert result.aspect_type == AspectType.CONJUNCTION
-        assert result.orb == pytest.approx(10.0, abs=0.01) or result.orb < 10.0
+        assert result.orb == pytest.approx(4.0, abs=0.01)
 
     def test_custom_orbs(self) -> None:
         """Custom orb tolerances are respected."""
