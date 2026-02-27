@@ -18,7 +18,7 @@ env:
 
 permissions:
   contents: read
-  pull-requests: read
+  pull-requests: write
 
 jobs:
   # ──────────────────────────────────────────────
@@ -107,22 +107,40 @@ jobs:
           python -c "import alchymine; print('alchymine OK')"
           python -c "import aiosqlite; print('aiosqlite OK')"
 
-      - name: Collect tests (dry run)
+      - name: Collect and run tests
+        id: pytest
         env:
           CELERY_ALWAYS_EAGER: "true"
-        run: python -m pytest tests/ --collect-only -q
+        run: |
+          set +e
+          python -m pytest tests/ -v --tb=long --junitxml=junit-results.xml 2>&1 | tee pytest-output.txt
+          PYTEST_RC=${PIPESTATUS[0]}
+          set -e
+          echo "rc=$PYTEST_RC" >> $GITHUB_OUTPUT
+          exit $PYTEST_RC
 
-      - name: Run pytest
+      - name: Post test results to PR
+        if: failure() && github.event_name == 'pull_request'
         env:
-          CELERY_ALWAYS_EAGER: "true"
-        run: python -m pytest tests/ -v --tb=short --junitxml=junit-results.xml
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          {
+            echo "**pytest (Python ${{ matrix.python-version }})** exited ${{ steps.pytest.outputs.rc }}"
+            echo ""
+            echo '```'
+            tail -100 pytest-output.txt 2>/dev/null || echo "No output captured"
+            echo '```'
+          } > /tmp/pr-comment.md
+          gh pr comment ${{ github.event.pull_request.number }} --body-file /tmp/pr-comment.md || true
 
       - name: Upload test results
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: test-results-python-${{ matrix.python-version }}
-          path: junit-results.xml
+          path: |
+            junit-results.xml
+            pytest-output.txt
           retention-days: 7
 
   # ──────────────────────────────────────────────
