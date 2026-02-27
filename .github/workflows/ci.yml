@@ -71,8 +71,11 @@ jobs:
       - name: Install dependencies
         run: pip install -e ".[dev]"
 
+      - name: Install mypy type stubs
+        run: mypy alchymine/ --install-types --non-interactive || true
+
       - name: Run mypy
-        run: mypy alchymine/ --install-types --non-interactive --show-error-codes
+        run: mypy alchymine/ --show-error-codes
 
   # ──────────────────────────────────────────────
   # Test Python: pytest with coverage (matrix)
