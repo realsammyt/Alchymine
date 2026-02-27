@@ -159,3 +159,4 @@ logs/
 .eslintcache
 .stylelintcache
 .parcel-cache/
+.claude/
