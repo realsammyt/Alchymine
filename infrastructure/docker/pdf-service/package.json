@@ -1,0 +1,16 @@
+{
+  "name": "alchymine-pdf-service",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Alchymine PDF generation service using Puppeteer",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "puppeteer-core": "^22.0.0",
+    "express": "^4.18.0"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}

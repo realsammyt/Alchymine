@@ -1,0 +1,221 @@
+name: Creative Module
+description: Propose or document a module for the Creative Development System
+title: "[Creative]: "
+labels: ["creative-development", "module", "triage"]
+assignees: []
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ## Creative Development Module
+
+        The Creative Development System supports users in discovering, developing,
+        and monetizing their creative abilities. Modules in this system are grounded
+        in neuroscience and psychology research where possible, and integrate with
+        the broader Alchymine transformation ecosystem.
+
+        **Key principles**:
+        - Creativity tools should empower, never prescribe or limit.
+        - Proper attribution for all referenced frameworks and traditions.
+        - Evidence-based where possible; transparent evidence levels always.
+        - Integrate with other systems (especially Wealth for monetization, Healing for blocks).
+
+  - type: input
+    id: module-name
+    attributes:
+      label: Module Name
+      description: A descriptive name for this creative module.
+      placeholder: e.g., Flow State Tracker, Brand Voice Analyzer, Creative Block Resolver
+    validations:
+      required: true
+
+  - type: dropdown
+    id: creative-domain
+    attributes:
+      label: Creative Domain
+      description: Which domain of the Creative Development System does this module serve?
+      options:
+        - "Identity (creative identity discovery, strengths mapping, archetype exploration)"
+        - "Skills (skill development, deliberate practice frameworks, learning paths)"
+        - "Design (design thinking, UX/UI tools, visual communication)"
+        - "Production (content creation, project management, workflow optimization)"
+        - "Business (creative monetization, pricing, client management, portfolio)"
+        - "Blocks (creative block resolution, fear/resistance work, inner critic management)"
+        - "Collaboration (team creativity, co-creation tools, feedback frameworks)"
+    validations:
+      required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Module Description
+      description: |
+        Describe the module's purpose, the creative transformation it supports,
+        and the deliverable it produces for the user.
+      placeholder: |
+        **Purpose**: What creative capability does this module develop?
+        **Process**: What methodology or framework does it use?
+        **Inputs**: What does it need from the user (prompts, uploads, preferences)?
+        **Output**: What deliverable does it produce (assessment, plan, template, visualization)?
+    validations:
+      required: true
+
+  - type: textarea
+    id: neuroscience-basis
+    attributes:
+      label: Neuroscience and Psychology Basis
+      description: |
+        Describe the scientific or theoretical foundation for this module.
+        Cite research, established frameworks, or psychological models that
+        support the module's approach to creative development.
+      placeholder: |
+        **Research foundation**:
+        - e.g., Csikszentmihalyi's Flow Theory — optimal experience states
+        - e.g., Dweck's Growth Mindset — approach to skill development
+        - e.g., Amabile's Componential Theory — intrinsic motivation in creativity
+
+        **Evidence level**: (Strong / Moderate / Emerging / Traditional / Experimental)
+
+        **Key mechanisms**:
+        - e.g., Default Mode Network activation for divergent thinking
+        - e.g., Dopaminergic reward pathways in creative flow
+        - e.g., Cognitive defocusing for incubation periods
+
+        **Limitations**:
+        - e.g., Flow research primarily conducted with Western populations
+        - e.g., Individual variation in optimal creative conditions
+    validations:
+      required: true
+
+  - type: textarea
+    id: integration
+    attributes:
+      label: Integration with Other Systems
+      description: |
+        How does this creative module connect to other Alchymine systems?
+        Cross-system integration is a core strength of the platform.
+      placeholder: |
+        **Healing System**:
+        - e.g., Creative blocks may surface trauma — handoff to Healing with safety protocols
+        - e.g., Art therapy intersections require ethics review
+
+        **Wealth Engine**:
+        - e.g., Creative skill → monetization pathway mapping
+        - e.g., Pricing calculator for creative services (deterministic)
+
+        **Perspective System**:
+        - e.g., Cross-cultural creative traditions and frameworks
+        - e.g., Different philosophical approaches to creativity
+
+        **Core (UserProfile)**:
+        - e.g., Creative strengths feed into UserProfile.creative_profile
+        - e.g., Progress tracking across creative development journey
+    validations:
+      required: true
+
+  - type: dropdown
+    id: evidence-level
+    attributes:
+      label: Evidence Level
+      description: What level of evidence supports this module's methodology?
+      options:
+        - "Level 1: Strong empirical evidence (peer-reviewed, meta-analyses)"
+        - "Level 2: Moderate evidence (established frameworks, clinical practice)"
+        - "Level 3: Emerging evidence (preliminary studies, expert consensus)"
+        - "Level 4: Traditional/experiential (cultural traditions, artistic lineages)"
+        - "Level 5: Experimental (novel approach, limited evidence)"
+    validations:
+      required: true
+
+  - type: textarea
+    id: references
+    attributes:
+      label: References and Attribution
+      description: |
+        Cite the research, frameworks, or traditions that inform this module.
+        Alchymine requires proper attribution for all referenced work.
+      placeholder: |
+        - [Author, Year] Title — relevance to this module
+        - [Framework Name] by [Creator] — how it is used/adapted
+        - [Cultural Tradition] — proper context and attribution
+    validations:
+      required: true
+
+  - type: textarea
+    id: user-experience
+    attributes:
+      label: User Experience Design
+      description: |
+        Describe the intended user experience. How does a user interact with this module?
+        Consider the creative mindset and flow state.
+      placeholder: |
+        - Entry point: How does the user discover/access this module?
+        - Interaction model: Guided wizard / freeform canvas / structured form / conversational?
+        - Session duration: Quick exercise (5 min) / deep work session (30+ min) / ongoing tracker?
+        - Output format: PDF report / interactive dashboard / journal entry / visual artifact?
+        - Emotional tone: Encouraging / neutral analytical / playful exploratory?
+    validations:
+      required: false
+
+  - type: textarea
+    id: safety-considerations
+    attributes:
+      label: Safety and Ethics Considerations
+      description: |
+        Creative work can surface deep emotions and vulnerabilities.
+        Describe the safety considerations for this module.
+      placeholder: |
+        - Does creative exploration risk surfacing trauma? (If yes, describe safety handoff to Healing)
+        - Could outputs be used for manipulation or exploitation?
+        - Are there cultural appropriation risks in referenced traditions?
+        - Does the module handle user-generated content? (moderation considerations)
+        - Are there vulnerable populations who need extra safeguards?
+    validations:
+      required: true
+
+  - type: textarea
+    id: quality-gates
+    attributes:
+      label: Quality Gates
+      description: |
+        Which Quality Swarm checks are required for this module's outputs?
+      value: |
+        - [ ] Ethics review (harm prevention)
+        - [ ] Cultural sensitivity review (proper attribution, no appropriation)
+        - [ ] Accessibility compliance (WCAG 2.1 AA)
+        - [ ] Evidence-level labeling on all methodology claims
+        - [ ] Emotional safety check (appropriate tone, no toxic positivity)
+    validations:
+      required: true
+
+  - type: textarea
+    id: acceptance-criteria
+    attributes:
+      label: Acceptance Criteria
+      description: Define the conditions for this module to be considered complete.
+      value: |
+        - [ ] Core functionality implemented and tested
+        - [ ] Neuroscience/psychology basis documented with citations
+        - [ ] All outputs pass Quality Swarm validation
+        - [ ] Integration points with other systems tested
+        - [ ] Unit and integration tests included
+        - [ ] Accessibility review passed
+        - [ ] User-facing documentation written
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: terms
+    attributes:
+      label: Creative Module Agreement
+      description: By submitting this proposal, you confirm the following.
+      options:
+        - label: This module empowers creative expression without prescribing or limiting.
+          required: true
+        - label: All referenced frameworks and traditions are properly attributed.
+          required: true
+        - label: Safety protocols are defined for any emotionally sensitive interactions.
+          required: true
+        - label: I have read and agree to the project's [Code of Conduct](../CODE_OF_CONDUCT.md).
+          required: true

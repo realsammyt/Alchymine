@@ -1,0 +1,351 @@
+# Alchymine — Security Scanning Pipeline
+# Runs weekly on schedule and on PRs that touch dependency files.
+
+name: Security
+
+on:
+  schedule:
+    # Every Monday at 06:00 UTC
+    - cron: "0 6 * * 1"
+  pull_request:
+    branches: [main, develop]
+    paths:
+      - "pyproject.toml"
+      - "alchymine/web/package.json"
+      - "alchymine/web/package-lock.json"
+      - "infrastructure/docker/**"
+      - ".github/workflows/security.yml"
+  workflow_dispatch: {}
+
+concurrency:
+  group: security-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  PYTHON_VERSION: "3.11"
+  NODE_VERSION: "20"
+
+permissions:
+  contents: read
+  security-events: write
+
+jobs:
+  # ──────────────────────────────────────────────
+  # Python dependency audit
+  # ──────────────────────────────────────────────
+  pip-audit:
+    name: "Audit: Python dependencies (pip-audit)"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: pyproject.toml
+
+      - name: Install dependencies
+        run: pip install -e ".[dev]"
+
+      - name: Install pip-audit
+        run: pip install pip-audit
+
+      - name: Run pip-audit
+        run: |
+          pip-audit \
+            --strict \
+            --desc \
+            --format json \
+            --output pip-audit-results.json || true
+
+          # Display results in human-readable form
+          pip-audit --strict --desc
+
+      - name: Upload pip-audit results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pip-audit-results
+          path: pip-audit-results.json
+          retention-days: 30
+
+  # ──────────────────────────────────────────────
+  # Node dependency audit
+  # ──────────────────────────────────────────────
+  npm-audit:
+    name: "Audit: Node dependencies (npm audit)"
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: alchymine/web
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: alchymine/web/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run npm audit
+        run: |
+          npm audit --audit-level=high --json > ../../npm-audit-results.json 2>&1 || true
+          npm audit --audit-level=high
+
+      - name: Upload npm audit results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: npm-audit-results
+          path: npm-audit-results.json
+          retention-days: 30
+
+  # ──────────────────────────────────────────────
+  # SAST — Bandit (Python security linter)
+  # ──────────────────────────────────────────────
+  bandit:
+    name: "SAST: Bandit (Python)"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install bandit
+        run: pip install bandit[toml]
+
+      - name: Run Bandit scan
+        run: |
+          bandit \
+            -r alchymine/ \
+            -c pyproject.toml \
+            -f json \
+            -o bandit-results.json \
+            --severity-level medium \
+            --confidence-level medium \
+            -x "alchymine/web" \
+            || true
+
+      - name: Display Bandit results
+        if: always()
+        run: |
+          bandit \
+            -r alchymine/ \
+            -c pyproject.toml \
+            --severity-level medium \
+            --confidence-level medium \
+            -x "alchymine/web" \
+            || true
+
+      - name: Upload Bandit results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bandit-results
+          path: bandit-results.json
+          retention-days: 30
+
+      - name: Convert Bandit to SARIF
+        if: always()
+        run: |
+          pip install bandit-sarif-formatter
+          bandit \
+            -r alchymine/ \
+            -c pyproject.toml \
+            -f sarif \
+            -o bandit.sarif \
+            --severity-level medium \
+            --confidence-level medium \
+            -x "alchymine/web" \
+            || true
+
+      - name: Upload SARIF to GitHub Security tab
+        if: always() && github.event_name != 'pull_request'
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: bandit.sarif
+          category: bandit
+
+  # ──────────────────────────────────────────────
+  # Secrets scanning — TruffleHog
+  # ──────────────────────────────────────────────
+  trufflehog:
+    name: "Secrets: TruffleHog"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Run TruffleHog (filesystem scan)
+        uses: trufflesecurity/trufflehog@main
+        with:
+          extra_args: --results=verified,unverified --json
+        continue-on-error: false
+
+      - name: Run TruffleHog (git history scan)
+        if: github.event_name == 'pull_request'
+        run: |
+          docker run --rm \
+            -v "${{ github.workspace }}:/repo" \
+            trufflesecurity/trufflehog:latest \
+            git file:///repo \
+            --since-commit ${{ github.event.pull_request.base.sha }} \
+            --fail \
+            --json \
+            > trufflehog-results.json 2>&1 || {
+              echo "::error::TruffleHog found potential secrets in the PR diff"
+              cat trufflehog-results.json
+              exit 1
+            }
+
+      - name: Run TruffleHog (full history — scheduled)
+        if: github.event_name == 'schedule'
+        run: |
+          docker run --rm \
+            -v "${{ github.workspace }}:/repo" \
+            trufflesecurity/trufflehog:latest \
+            git file:///repo \
+            --fail \
+            --json \
+            > trufflehog-results.json 2>&1 || {
+              echo "::warning::TruffleHog found potential secrets in repository history"
+              cat trufflehog-results.json
+            }
+
+      - name: Upload TruffleHog results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: trufflehog-results
+          path: trufflehog-results.json
+          retention-days: 30
+          if-no-files-found: ignore
+
+  # ──────────────────────────────────────────────
+  # Container scanning — Trivy
+  # ──────────────────────────────────────────────
+  trivy:
+    name: "Container: Trivy (${{ matrix.image }})"
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        image: [engine, api, web]
+        include:
+          - image: engine
+            context: .
+            dockerfile: infrastructure/docker/Dockerfile.engine
+          - image: api
+            context: .
+            dockerfile: infrastructure/docker/Dockerfile.api
+          - image: web
+            context: alchymine/web
+            dockerfile: infrastructure/docker/Dockerfile.web
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build ${{ matrix.image }} image for scanning
+        uses: docker/build-push-action@v6
+        with:
+          context: ${{ matrix.context }}
+          file: ${{ matrix.dockerfile }}
+          push: false
+          load: true
+          tags: alchymine-${{ matrix.image }}:scan
+          cache-from: type=gha,scope=${{ matrix.image }}
+
+      - name: Run Trivy vulnerability scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: alchymine-${{ matrix.image }}:scan
+          format: table
+          exit-code: 1
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
+          timeout: 10m
+
+      - name: Run Trivy (SARIF output)
+        if: always()
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: alchymine-${{ matrix.image }}:scan
+          format: sarif
+          output: trivy-${{ matrix.image }}.sarif
+          severity: CRITICAL,HIGH,MEDIUM
+          ignore-unfixed: true
+          timeout: 10m
+
+      - name: Upload Trivy SARIF to GitHub Security tab
+        if: always() && github.event_name != 'pull_request'
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: trivy-${{ matrix.image }}.sarif
+          category: trivy-${{ matrix.image }}
+
+      - name: Upload Trivy results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: trivy-${{ matrix.image }}
+          path: trivy-${{ matrix.image }}.sarif
+          retention-days: 30
+
+  # ──────────────────────────────────────────────
+  # Summary gate
+  # ──────────────────────────────────────────────
+  security-passed:
+    name: "Security: all scans complete"
+    runs-on: ubuntu-latest
+    if: always()
+    needs:
+      - pip-audit
+      - npm-audit
+      - bandit
+      - trufflehog
+      - trivy
+    steps:
+      - name: Evaluate security scan results
+        run: |
+          echo "Security scan results:"
+          echo "  pip-audit:    ${{ needs.pip-audit.result }}"
+          echo "  npm-audit:    ${{ needs.npm-audit.result }}"
+          echo "  bandit:       ${{ needs.bandit.result }}"
+          echo "  trufflehog:   ${{ needs.trufflehog.result }}"
+          echo "  trivy:        ${{ needs.trivy.result }}"
+
+          # TruffleHog (secrets) is always a hard fail
+          if [[ "${{ needs.trufflehog.result }}" == "failure" ]]; then
+            echo "::error::CRITICAL: Secrets detected — this is a blocking failure."
+            exit 1
+          fi
+
+          # Report on other scan results (non-blocking on schedule, blocking on PR)
+          FAILED=0
+          for job in pip-audit npm-audit bandit trivy; do
+            result="${{ needs[job].result }}"
+            if [[ "$result" == "failure" ]]; then
+              FAILED=$((FAILED + 1))
+              echo "::warning::$job reported vulnerabilities."
+            fi
+          done
+
+          if [[ "$FAILED" -gt 0 && "${{ github.event_name }}" == "pull_request" ]]; then
+            echo "::error::$FAILED security scan(s) failed on PR. Please review findings."
+            exit 1
+          fi
+
+          echo ""
+          echo "Security scanning complete."

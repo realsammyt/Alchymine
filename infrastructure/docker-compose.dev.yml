@@ -1,0 +1,83 @@
+# Alchymine - Development Overrides
+# Usage: docker compose -f docker-compose.yml -f docker-compose.dev.yml up
+
+services:
+  # ─── API (FastAPI) — dev mode with reload ────────────────────────────
+  api:
+    build:
+      target: runtime
+    command: >
+      uvicorn alchymine.api.main:app
+      --host 0.0.0.0
+      --port 8000
+      --reload
+      --reload-dir /app/alchymine
+      --log-level debug
+    volumes:
+      - ../alchymine:/app/alchymine:cached
+      - ../tests:/app/tests:cached
+      - ../pyproject.toml:/app/pyproject.toml:ro
+    ports:
+      - "${API_PORT:-8000}:8000"
+      - "5678:5678"  # debugpy remote debugging
+    environment:
+      - ENVIRONMENT=development
+      - LOG_LEVEL=DEBUG
+      - PYTHONDONTWRITEBYTECODE=1
+
+  # ─── Worker (Celery) — dev mode with auto-reload ────────────────────
+  worker:
+    build:
+      context: ..
+      dockerfile: infrastructure/docker/Dockerfile.api
+      target: runtime
+    command: >
+      watchmedo auto-restart
+      --directory=/app/alchymine
+      --pattern=*.py
+      --recursive
+      --
+      celery -A alchymine.worker.app worker
+      --loglevel=debug
+      --concurrency=2
+    volumes:
+      - ../alchymine:/app/alchymine:cached
+      - ../pyproject.toml:/app/pyproject.toml:ro
+    environment:
+      - ENVIRONMENT=development
+      - LOG_LEVEL=DEBUG
+      - PYTHONDONTWRITEBYTECODE=1
+
+  # ─── Web (Next.js) — dev mode with hot reload ──────────────────────
+  web:
+    build:
+      context: ..
+      dockerfile: infrastructure/docker/Dockerfile.web
+      target: deps
+    command: npm run dev
+    volumes:
+      - ../alchymine/web:/app:cached
+      - /app/node_modules
+      - /app/.next
+    ports:
+      - "${NEXT_PUBLIC_PORT:-3000}:3000"
+    environment:
+      - NODE_ENV=development
+      - WATCHPACK_POLLING=true
+
+  # ─── PDF Service — dev mode ─────────────────────────────────────────
+  pdf:
+    environment:
+      - NODE_ENV=development
+    volumes:
+      - ../alchymine/web:/app/templates:ro
+
+  # ─── PostgreSQL — expose for local tools ────────────────────────────
+  postgres:
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+
+  # ─── Redis — expose for local tools ─────────────────────────────────
+  redis:
+    ports:
+      - "${REDIS_PORT:-6379}:6379"

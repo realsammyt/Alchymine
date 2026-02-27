@@ -1,0 +1,148 @@
+name: Bug Report
+description: Report a bug or unexpected behavior in Alchymine
+title: "[Bug]: "
+labels: ["bug", "triage"]
+assignees: []
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ## Bug Report
+
+        Thank you for taking the time to report a bug. Please fill out the sections below
+        so we can reproduce and resolve the issue efficiently.
+
+        **Before submitting**, please check:
+        - [ ] I have searched existing issues to confirm this is not a duplicate.
+        - [ ] I am running the latest version of Alchymine.
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+      description: A clear and concise description of the bug.
+      placeholder: Describe the bug...
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps-to-reproduce
+    attributes:
+      label: Steps to Reproduce
+      description: Provide a minimal, reproducible set of steps.
+      placeholder: |
+        1. Go to '...'
+        2. Trigger skill '...'
+        3. Observe error in '...'
+      value: |
+        1.
+        2.
+        3.
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected-behavior
+    attributes:
+      label: Expected Behavior
+      description: What did you expect to happen?
+      placeholder: Describe the expected outcome...
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual-behavior
+    attributes:
+      label: Actual Behavior
+      description: What actually happened? Include error messages, stack traces, or screenshots if applicable.
+      placeholder: Describe what actually happened...
+    validations:
+      required: true
+
+  - type: dropdown
+    id: system-affected
+    attributes:
+      label: System Affected
+      description: Which Alchymine system does this bug relate to?
+      options:
+        - Core (Personalized Intelligence / Orchestrator)
+        - Healing (Ethical Healing System)
+        - Wealth (Generational Wealth Engine)
+        - Creative (Creative Development System)
+        - Perspective (Perspective Enhancement System)
+        - Infrastructure (API / Database / Queue / Docker / CI)
+        - Cross-System (affects multiple systems)
+    validations:
+      required: true
+
+  - type: dropdown
+    id: severity
+    attributes:
+      label: Severity
+      description: How severe is the impact of this bug?
+      options:
+        - Critical (data loss, security issue, or system crash)
+        - High (feature broken, no workaround)
+        - Medium (feature broken, workaround available)
+        - Low (cosmetic issue or minor inconvenience)
+    validations:
+      required: true
+
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: Provide details about your runtime environment.
+      placeholder: |
+        - OS: e.g., Ubuntu 22.04 / macOS 14.2 / Windows 11
+        - Python version: e.g., 3.11.7
+        - Node.js version: e.g., 20.10.0
+        - Docker version (if applicable): e.g., 24.0.7
+        - Browser (if frontend): e.g., Chrome 120
+        - Deployment method: Docker Compose / local dev / other
+      value: |
+        - OS:
+        - Python version:
+        - Node.js version:
+        - Docker version:
+        - Browser:
+        - Deployment method:
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant Logs or Screenshots
+      description: |
+        Paste any relevant log output or attach screenshots.
+        **Important**: Redact any personal data, API keys, or financial information before pasting.
+      placeholder: Paste logs here (redact sensitive data)...
+      render: shell
+    validations:
+      required: false
+
+  - type: dropdown
+    id: ethics-impact
+    attributes:
+      label: Potential Ethics Impact
+      description: Does this bug have implications for user safety, privacy, or ethical guidelines?
+      options:
+        - None
+        - Low (minor UX concern)
+        - Medium (could mislead users or misrepresent data)
+        - High (safety risk, privacy breach, or harmful output)
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: terms
+    attributes:
+      label: Code of Conduct
+      description: By submitting this issue, you agree to the following.
+      options:
+        - label: I have read and agree to the project's [Code of Conduct](../CODE_OF_CONDUCT.md).
+          required: true
+        - label: I confirm that no sensitive personal, financial, or health data is included in this report.
+          required: true

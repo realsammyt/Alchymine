@@ -1,0 +1,212 @@
+name: Wealth Module
+description: Propose or document a module for the Generational Wealth Engine
+title: "[Wealth]: "
+labels: ["wealth-engine", "module", "triage"]
+assignees: []
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ## Wealth Engine Module
+
+        The Generational Wealth Engine provides deterministic, ethical financial tools
+        for building multi-generational wealth. All financial calculations **must** be
+        deterministic — never LLM-generated.
+
+        **Critical requirements**:
+        - Financial data is classified as **Sensitive** and must never be sent to an LLM.
+        - All calculations must be reproducible and auditable.
+        - Appropriate disclaimers must accompany all financial outputs.
+        - No specific investment recommendations; education and simulation only.
+
+  - type: input
+    id: module-name
+    attributes:
+      label: Module Name
+      description: A descriptive name for this wealth module.
+      placeholder: e.g., Compound Interest Simulator, Estate Planning Worksheet, Tax-Advantaged Account Selector
+    validations:
+      required: true
+
+  - type: dropdown
+    id: domain
+    attributes:
+      label: Wealth Domain
+      description: Which domain of the Generational Wealth Engine does this module serve?
+      options:
+        - "Income (active income optimization, salary negotiation, career ROI)"
+        - "Investment (compound growth, portfolio allocation, retirement modeling)"
+        - "Business (entrepreneurship, business valuation, revenue modeling)"
+        - "Defense (insurance, emergency funds, asset protection, estate planning)"
+        - "Family (generational transfer, family governance, financial education)"
+        - "Intelligence (financial literacy, market awareness, economic frameworks)"
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: wealth-lever-tags
+    attributes:
+      label: Wealth Lever Tags
+      description: |
+        Select all wealth levers this module activates. These tags drive
+        cross-module recommendations and progress tracking.
+      options:
+        - label: "Earn (increase income streams)"
+        - label: "Save (optimize savings rate and reduce expenses)"
+        - label: "Invest (grow wealth through compound returns)"
+        - label: "Protect (insure against loss and liability)"
+        - label: "Transfer (pass wealth across generations)"
+        - label: "Educate (build financial literacy and capability)"
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Module Description
+      description: |
+        Describe the module's purpose, the financial concepts it implements,
+        and the deliverable it produces for the user.
+      placeholder: |
+        **Purpose**: What financial capability does this module provide?
+        **Concepts**: What financial principles or formulas does it implement?
+        **Inputs**: What financial data does it require from the user?
+        **Output**: What deliverable does it produce (calculator, report, worksheet, visualization)?
+    validations:
+      required: true
+
+  - type: textarea
+    id: financial-accuracy
+    attributes:
+      label: Financial Accuracy Requirements
+      description: |
+        Detail the mathematical models, formulas, and accuracy standards
+        this module must meet. All calculations must be deterministic.
+      placeholder: |
+        **Formulas/Models**:
+        - e.g., FV = PV * (1 + r/n)^(nt) for compound interest
+        - e.g., PMT = PV * [r(1+r)^n] / [(1+r)^n - 1] for amortization
+
+        **Precision requirements**:
+        - e.g., Currency values rounded to 2 decimal places
+        - e.g., Percentages displayed to 2 decimal places
+
+        **Validation rules**:
+        - e.g., Interest rates must be non-negative
+        - e.g., Time horizons capped at 100 years
+
+        **Edge cases**:
+        - e.g., Zero interest rate handling
+        - e.g., Negative cash flow scenarios
+    validations:
+      required: true
+
+  - type: textarea
+    id: disclaimer-requirements
+    attributes:
+      label: Disclaimer Requirements
+      description: |
+        Specify the disclaimers that must accompany this module's outputs.
+        Financial tools require clear disclaimers about their limitations.
+      placeholder: |
+        - [ ] General disclaimer: "This is for educational purposes only, not financial advice."
+        - [ ] Projection disclaimer: "Projections are hypothetical and do not guarantee future results."
+        - [ ] Tax disclaimer: "Consult a qualified tax professional for tax-related decisions."
+        - [ ] Regulatory disclaimer: specific to module's domain
+      value: |
+        - [ ] General disclaimer: "This is for educational purposes only, not financial advice. Consult a qualified financial professional before making financial decisions."
+        - [ ] Projection disclaimer (if applicable): "Projections are hypothetical, based on the inputs provided, and do not guarantee future results."
+        - [ ] Tax disclaimer (if applicable): "Tax information is general in nature. Consult a qualified tax professional for advice specific to your situation."
+        - [ ] Professional referral: "For personalized financial advice, consult a licensed financial advisor."
+    validations:
+      required: true
+
+  - type: dropdown
+    id: data-sensitivity
+    attributes:
+      label: Data Sensitivity Level
+      description: |
+        Financial data in Alchymine is classified as Sensitive by default.
+        Confirm the data handling requirements for this module.
+      options:
+        - "Sensitive (default for financial data — encrypted, isolated, never sent to LLM)"
+        - "Internal (non-PII financial education content — may be processed locally)"
+    validations:
+      required: true
+
+  - type: textarea
+    id: deterministic-guarantee
+    attributes:
+      label: Deterministic Calculation Guarantee
+      description: |
+        Explain how this module ensures all financial calculations are deterministic.
+        LLMs must never generate financial numbers, projections, or recommendations.
+      placeholder: |
+        - All calculations implemented in Python with explicit formulas
+        - No LLM calls in the calculation pipeline
+        - Inputs validated and sanitized before processing
+        - Results reproducible given identical inputs
+        - Test suite verifies calculation accuracy against known values
+    validations:
+      required: true
+
+  - type: textarea
+    id: test-vectors
+    attributes:
+      label: Test Vectors
+      description: |
+        Provide known-good input/output pairs for validating calculation accuracy.
+        These become regression tests in the test suite.
+      placeholder: |
+        | Input | Expected Output | Source |
+        |-------|----------------|--------|
+        | PV=$10,000, r=7%, n=12, t=30 | FV=$81,164.97 | Standard compound interest |
+        | ... | ... | ... |
+    validations:
+      required: false
+
+  - type: textarea
+    id: integration
+    attributes:
+      label: Integration with Other Systems
+      description: |
+        How does this wealth module integrate with other Alchymine systems?
+        Consider data flow through the UserProfile and cross-system recommendations.
+      placeholder: |
+        - Core: How does it use UserProfile data?
+        - Healing: Does financial stress trigger healing recommendations?
+        - Creative: Does it connect to creative monetization goals?
+        - Perspective: Does it surface different financial philosophies or cultural approaches?
+    validations:
+      required: false
+
+  - type: textarea
+    id: accessibility
+    attributes:
+      label: Accessibility Requirements
+      description: |
+        How will this module ensure accessibility (WCAG 2.1 AA)?
+        Consider data tables, charts, and financial visualizations.
+      placeholder: |
+        - Data tables with proper headers and ARIA labels
+        - Chart alternatives (text summary of key figures)
+        - Screen reader-friendly currency and percentage formatting
+        - Color-independent indicators for gains/losses
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: terms
+    attributes:
+      label: Wealth Module Agreement
+      description: By submitting this proposal, you confirm the following.
+      options:
+        - label: All financial calculations in this module will be deterministic (never LLM-generated).
+          required: true
+        - label: Financial data will be treated as Sensitive (encrypted, isolated, never sent to LLM).
+          required: true
+        - label: Appropriate disclaimers will accompany all financial outputs.
+          required: true
+        - label: This module does not provide personalized financial advice or specific investment recommendations.
+          required: true
+        - label: I have read and agree to the project's [Code of Conduct](../CODE_OF_CONDUCT.md).
+          required: true

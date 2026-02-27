@@ -1,0 +1,137 @@
+# Alchymine - Base Docker Compose Configuration
+# Usage:
+#   Dev:  docker compose -f docker-compose.yml -f docker-compose.dev.yml up
+#   Prod: docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+
+services:
+  # ─── API (FastAPI) ───────────────────────────────────────────────────
+  api:
+    build:
+      context: ..
+      dockerfile: infrastructure/docker/Dockerfile.api
+    container_name: alchymine-api
+    ports:
+      - "${API_PORT:-8000}:8000"
+    env_file:
+      - ../.env
+    environment:
+      - POSTGRES_HOST=postgres
+      - REDIS_URL=redis://redis:6379/0
+      - REDIS_CACHE_URL=redis://redis:6379/1
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - alchymine-net
+
+  # ─── Worker (Celery) ────────────────────────────────────────────────
+  worker:
+    build:
+      context: ..
+      dockerfile: infrastructure/docker/Dockerfile.worker
+    container_name: alchymine-worker
+    env_file:
+      - ../.env
+    environment:
+      - POSTGRES_HOST=postgres
+      - REDIS_URL=redis://redis:6379/0
+      - REDIS_CACHE_URL=redis://redis:6379/1
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+    depends_on:
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    networks:
+      - alchymine-net
+
+  # ─── Web (Next.js Frontend) ─────────────────────────────────────────
+  web:
+    build:
+      context: ..
+      dockerfile: infrastructure/docker/Dockerfile.web
+    container_name: alchymine-web
+    ports:
+      - "${NEXT_PUBLIC_PORT:-3000}:3000"
+    env_file:
+      - ../.env
+    environment:
+      - NEXT_PUBLIC_API_URL=http://api:8000
+    depends_on:
+      - api
+    networks:
+      - alchymine-net
+
+  # ─── PDF Service (Puppeteer) ────────────────────────────────────────
+  pdf:
+    build:
+      context: ..
+      dockerfile: infrastructure/docker/Dockerfile.pdf
+    container_name: alchymine-pdf
+    ports:
+      - "${PDF_PORT:-3001}:3001"
+    environment:
+      - NODE_ENV=production
+      - PDF_PORT=3001
+    networks:
+      - alchymine-net
+
+  # ─── PostgreSQL ─────────────────────────────────────────────────────
+  postgres:
+    image: postgres:15-alpine
+    container_name: alchymine-postgres
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-alchymine}
+      POSTGRES_USER: ${POSTGRES_USER:-alchymine}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme_in_production}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./postgres/init.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-alchymine} -d ${POSTGRES_DB:-alchymine}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks:
+      - alchymine-net
+
+  # ─── Redis ──────────────────────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: alchymine-redis
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - alchymine-net
+
+# ─── Networks ───────────────────────────────────────────────────────────
+networks:
+  alchymine-net:
+    driver: bridge
+    name: alchymine-net
+
+# ─── Volumes ────────────────────────────────────────────────────────────
+volumes:
+  postgres_data:
+    driver: local
+    name: alchymine-postgres-data
+  redis_data:
+    driver: local
+    name: alchymine-redis-data

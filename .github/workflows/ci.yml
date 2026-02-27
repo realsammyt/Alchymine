@@ -1,0 +1,532 @@
+# Alchymine — Continuous Integration Pipeline
+# Runs on every PR and push to develop/main branches.
+
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  PYTHON_VERSION: "3.11"
+  NODE_VERSION: "20"
+  REGISTRY: ghcr.io
+  IMAGE_PREFIX: ghcr.io/${{ github.repository_owner }}/alchymine
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  # ──────────────────────────────────────────────
+  # Stage 1: Lint
+  # ──────────────────────────────────────────────
+  lint-python:
+    name: "Lint: Python (ruff)"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: pyproject.toml
+
+      - name: Install ruff
+        run: pip install "ruff>=0.8.0"
+
+      - name: Ruff lint check
+        run: ruff check alchymine/
+
+      - name: Ruff format check
+        run: ruff format --check alchymine/
+
+  lint-typescript:
+    name: "Lint: TypeScript (eslint + prettier)"
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: alchymine/web
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: alchymine/web/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: ESLint
+        run: npm run lint
+
+      - name: Prettier check
+        run: npx prettier --check "src/**/*.{ts,tsx,js,jsx,json,css}"
+
+  lint-yaml:
+    name: "Lint: YAML validation"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install yamllint
+        run: pip install yamllint
+
+      - name: Validate YAML files
+        run: yamllint -d relaxed .github/ infrastructure/ alchymine/prompts/ templates/
+
+  # ──────────────────────────────────────────────
+  # Stage 2: Type checking
+  # ──────────────────────────────────────────────
+  typecheck-python:
+    name: "Type check: mypy"
+    runs-on: ubuntu-latest
+    needs: [lint-python]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: pyproject.toml
+
+      - name: Install dependencies
+        run: pip install -e ".[dev]"
+
+      - name: Run mypy
+        run: mypy alchymine/
+
+  typecheck-typescript:
+    name: "Type check: tsc"
+    runs-on: ubuntu-latest
+    needs: [lint-typescript]
+    defaults:
+      run:
+        working-directory: alchymine/web
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: alchymine/web/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run tsc --noEmit
+        run: npm run type-check
+
+  # ──────────────────────────────────────────────
+  # Stage 3: Unit tests (parallel matrix)
+  # ──────────────────────────────────────────────
+  unit-tests:
+    name: "Unit tests: ${{ matrix.suite }}"
+    runs-on: ubuntu-latest
+    needs: [typecheck-python, typecheck-typescript]
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - suite: engine
+            type: python
+            test-path: tests/engine/
+            cov-package: alchymine.engine
+          - suite: api
+            type: python
+            test-path: tests/api/
+            cov-package: alchymine.api
+          - suite: agents
+            type: python
+            test-path: tests/agents/
+            cov-package: alchymine.agents
+          - suite: web
+            type: node
+            test-path: alchymine/web
+    steps:
+      - uses: actions/checkout@v4
+
+      # ── Python test suites ──
+      - name: Set up Python
+        if: matrix.type == 'python'
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: pyproject.toml
+
+      - name: Install Python dependencies
+        if: matrix.type == 'python'
+        run: pip install -e ".[dev]"
+
+      - name: Run pytest (${{ matrix.suite }})
+        if: matrix.type == 'python'
+        run: |
+          pytest ${{ matrix.test-path }} \
+            -v \
+            --cov=${{ matrix.cov-package }} \
+            --cov-report=term-missing \
+            --cov-report=xml:coverage-${{ matrix.suite }}.xml \
+            --junitxml=junit-${{ matrix.suite }}.xml
+
+      # ── Node test suites ──
+      - name: Set up Node.js
+        if: matrix.type == 'node'
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: alchymine/web/package-lock.json
+
+      - name: Install Node dependencies
+        if: matrix.type == 'node'
+        working-directory: alchymine/web
+        run: npm ci
+
+      - name: Run Jest (web)
+        if: matrix.type == 'node'
+        working-directory: alchymine/web
+        run: |
+          npx jest --ci \
+            --coverage \
+            --coverageReporters=text --coverageReporters=cobertura \
+            --reporters=default --reporters=jest-junit
+        env:
+          JEST_JUNIT_OUTPUT_DIR: ../../junit-web.xml
+
+      # ── Upload artifacts ──
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-${{ matrix.suite }}
+          path: |
+            coverage-*.xml
+            alchymine/web/coverage/cobertura-coverage.xml
+          retention-days: 7
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results-${{ matrix.suite }}
+          path: junit-*.xml
+          retention-days: 7
+
+  # ──────────────────────────────────────────────
+  # Stage 3b: Ethics check (runs in parallel with unit tests)
+  # ──────────────────────────────────────────────
+  ethics-check:
+    name: "Ethics: validate prompts"
+    runs-on: ubuntu-latest
+    needs: [lint-python, lint-yaml]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: pyproject.toml
+
+      - name: Install dependencies
+        run: pip install -e ".[dev]"
+
+      - name: Validate prompt YAML schemas
+        run: python -m alchymine.prompts.validate
+
+      - name: Run ethics checks on prompts
+        run: python -m alchymine.agents.quality.ethics_check
+
+  # ──────────────────────────────────────────────
+  # Stage 4: Integration tests
+  # ──────────────────────────────────────────────
+  integration-tests:
+    name: "Integration: Docker Compose API tests"
+    runs-on: ubuntu-latest
+    needs: [unit-tests]
+    services: {}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Cache Docker layers
+        uses: actions/cache@v4
+        with:
+          path: /tmp/.buildx-cache
+          key: docker-${{ runner.os }}-${{ hashFiles('infrastructure/docker/**', 'pyproject.toml', 'alchymine/web/package-lock.json') }}
+          restore-keys: |
+            docker-${{ runner.os }}-
+
+      - name: Start services with Docker Compose
+        run: |
+          docker compose \
+            -f infrastructure/docker-compose.yml \
+            -f infrastructure/docker-compose.dev.yml \
+            up -d --build --wait
+        timeout-minutes: 10
+
+      - name: Wait for API health check
+        run: |
+          echo "Waiting for API to become healthy..."
+          for i in $(seq 1 30); do
+            if curl -sf http://localhost:8000/health > /dev/null 2>&1; then
+              echo "API is healthy"
+              exit 0
+            fi
+            echo "  Attempt $i/30 — waiting 5s..."
+            sleep 5
+          done
+          echo "API did not become healthy in time"
+          docker compose -f infrastructure/docker-compose.yml logs
+          exit 1
+        timeout-minutes: 5
+
+      - name: Set up Python for test runner
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: pyproject.toml
+
+      - name: Install test dependencies
+        run: pip install -e ".[dev]"
+
+      - name: Run API integration tests
+        run: |
+          pytest tests/api/ tests/e2e/ \
+            -v \
+            --junitxml=junit-integration.xml \
+            -m "integration or e2e"
+        env:
+          API_BASE_URL: http://localhost:8000
+          TESTING: "true"
+
+      - name: Collect Docker Compose logs on failure
+        if: failure()
+        run: |
+          docker compose -f infrastructure/docker-compose.yml logs --tail=200 > docker-compose-logs.txt 2>&1
+
+      - name: Upload Docker logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: docker-compose-logs
+          path: docker-compose-logs.txt
+          retention-days: 3
+
+      - name: Tear down Docker Compose
+        if: always()
+        run: |
+          docker compose \
+            -f infrastructure/docker-compose.yml \
+            -f infrastructure/docker-compose.dev.yml \
+            down -v --remove-orphans
+
+  # ──────────────────────────────────────────────
+  # Stage 5: Build Docker images (validation only)
+  # ──────────────────────────────────────────────
+  build-images:
+    name: "Build: Docker images (${{ matrix.image }})"
+    runs-on: ubuntu-latest
+    needs: [unit-tests, ethics-check]
+    strategy:
+      fail-fast: false
+      matrix:
+        image: [engine, api, web]
+        include:
+          - image: engine
+            context: .
+            dockerfile: infrastructure/docker/Dockerfile.engine
+          - image: api
+            context: .
+            dockerfile: infrastructure/docker/Dockerfile.api
+          - image: web
+            context: alchymine/web
+            dockerfile: infrastructure/docker/Dockerfile.web
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build ${{ matrix.image }} image
+        uses: docker/build-push-action@v6
+        with:
+          context: ${{ matrix.context }}
+          file: ${{ matrix.dockerfile }}
+          push: false
+          tags: ${{ env.IMAGE_PREFIX }}-${{ matrix.image }}:ci-${{ github.sha }}
+          cache-from: type=gha,scope=${{ matrix.image }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.image }}
+
+  # ──────────────────────────────────────────────
+  # Stage 6: Coverage enforcement
+  # ──────────────────────────────────────────────
+  coverage-gate:
+    name: "Coverage: enforce thresholds"
+    runs-on: ubuntu-latest
+    needs: [unit-tests]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download all coverage artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: coverage-*
+          merge-multiple: true
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install coverage tools
+        run: pip install coverage pycobertura
+
+      - name: Check engine coverage (threshold 80%)
+        run: |
+          if [ -f coverage-engine.xml ]; then
+            COVERAGE=$(python -c "
+          import xml.etree.ElementTree as ET
+          tree = ET.parse('coverage-engine.xml')
+          root = tree.getroot()
+          rate = float(root.attrib.get('line-rate', 0))
+          print(f'{rate * 100:.1f}')
+          ")
+            echo "Engine coverage: ${COVERAGE}%"
+            python -c "
+          import sys
+          cov = float('${COVERAGE}')
+          if cov < 80.0:
+              print(f'FAIL: Engine coverage {cov}% is below 80% threshold')
+              sys.exit(1)
+          print(f'PASS: Engine coverage {cov}% meets 80% threshold')
+          "
+          else
+            echo "WARNING: No engine coverage report found"
+            exit 1
+          fi
+
+      - name: Check API coverage (threshold 70%)
+        run: |
+          if [ -f coverage-api.xml ]; then
+            COVERAGE=$(python -c "
+          import xml.etree.ElementTree as ET
+          tree = ET.parse('coverage-api.xml')
+          root = tree.getroot()
+          rate = float(root.attrib.get('line-rate', 0))
+          print(f'{rate * 100:.1f}')
+          ")
+            echo "API coverage: ${COVERAGE}%"
+            python -c "
+          import sys
+          cov = float('${COVERAGE}')
+          if cov < 70.0:
+              print(f'FAIL: API coverage {cov}% is below 70% threshold')
+              sys.exit(1)
+          print(f'PASS: API coverage {cov}% meets 70% threshold')
+          "
+          else
+            echo "WARNING: No API coverage report found"
+            exit 1
+          fi
+
+      - name: Check web coverage (threshold 60%)
+        run: |
+          COBFILE="cobertura-coverage.xml"
+          if [ -f "$COBFILE" ]; then
+            COVERAGE=$(python -c "
+          import xml.etree.ElementTree as ET
+          tree = ET.parse('${COBFILE}')
+          root = tree.getroot()
+          rate = float(root.attrib.get('line-rate', 0))
+          print(f'{rate * 100:.1f}')
+          ")
+            echo "Web coverage: ${COVERAGE}%"
+            python -c "
+          import sys
+          cov = float('${COVERAGE}')
+          if cov < 60.0:
+              print(f'FAIL: Web coverage {cov}% is below 60% threshold')
+              sys.exit(1)
+          print(f'PASS: Web coverage {cov}% meets 60% threshold')
+          "
+          else
+            echo "WARNING: No web coverage report found"
+            exit 1
+          fi
+
+  # ──────────────────────────────────────────────
+  # Final gate: all checks must pass
+  # ──────────────────────────────────────────────
+  ci-passed:
+    name: "CI: all checks passed"
+    runs-on: ubuntu-latest
+    if: always()
+    needs:
+      - lint-python
+      - lint-typescript
+      - lint-yaml
+      - typecheck-python
+      - typecheck-typescript
+      - unit-tests
+      - ethics-check
+      - integration-tests
+      - build-images
+      - coverage-gate
+    steps:
+      - name: Verify all jobs succeeded
+        run: |
+          echo "Job results:"
+          echo "  lint-python:          ${{ needs.lint-python.result }}"
+          echo "  lint-typescript:      ${{ needs.lint-typescript.result }}"
+          echo "  lint-yaml:            ${{ needs.lint-yaml.result }}"
+          echo "  typecheck-python:     ${{ needs.typecheck-python.result }}"
+          echo "  typecheck-typescript: ${{ needs.typecheck-typescript.result }}"
+          echo "  unit-tests:           ${{ needs.unit-tests.result }}"
+          echo "  ethics-check:         ${{ needs.ethics-check.result }}"
+          echo "  integration-tests:    ${{ needs.integration-tests.result }}"
+          echo "  build-images:         ${{ needs.build-images.result }}"
+          echo "  coverage-gate:        ${{ needs.coverage-gate.result }}"
+
+          if [[ "${{ needs.lint-python.result }}" != "success" || \
+                "${{ needs.lint-typescript.result }}" != "success" || \
+                "${{ needs.lint-yaml.result }}" != "success" || \
+                "${{ needs.typecheck-python.result }}" != "success" || \
+                "${{ needs.typecheck-typescript.result }}" != "success" || \
+                "${{ needs.unit-tests.result }}" != "success" || \
+                "${{ needs.ethics-check.result }}" != "success" || \
+                "${{ needs.integration-tests.result }}" != "success" || \
+                "${{ needs.build-images.result }}" != "success" || \
+                "${{ needs.coverage-gate.result }}" != "success" ]]; then
+            echo ""
+            echo "FAILED: One or more CI jobs did not succeed."
+            exit 1
+          fi
+
+          echo ""
+          echo "All CI checks passed."
