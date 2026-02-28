@@ -451,4 +451,115 @@ export async function getKeganAssessment(
   });
 }
 
+// ─── Journal ──────────────────────────────────────────────────────
+
+export interface JournalEntry {
+  id: string;
+  user_id: string;
+  system: string;
+  entry_type: string;
+  title: string;
+  content: string;
+  tags: string[];
+  mood_score: number | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface JournalListResponse {
+  entries: JournalEntry[];
+  total: number;
+  page: number;
+  per_page: number;
+}
+
+export interface JournalStatsResponse {
+  total_entries: number;
+  entries_by_system: Record<string, number>;
+  entries_by_type: Record<string, number>;
+  average_mood: number | null;
+  streak_days: number;
+  tags_used: string[];
+}
+
+export async function createJournalEntry(
+  data: Record<string, unknown>,
+): Promise<JournalEntry> {
+  return request<JournalEntry>(`${BASE}/journal`, {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+}
+
+export async function getJournalEntries(
+  userId: string,
+  opts?: { system?: string; entryType?: string; page?: number; perPage?: number },
+): Promise<JournalListResponse> {
+  const params = new URLSearchParams({ user_id: userId });
+  if (opts?.system) params.set('system', opts.system);
+  if (opts?.entryType) params.set('entry_type', opts.entryType);
+  if (opts?.page) params.set('page', String(opts.page));
+  if (opts?.perPage) params.set('per_page', String(opts.perPage));
+  return request<JournalListResponse>(`${BASE}/journal?${params}`);
+}
+
+export async function getJournalStats(
+  userId: string,
+): Promise<JournalStatsResponse> {
+  return request<JournalStatsResponse>(`${BASE}/journal/stats/${userId}`);
+}
+
+// ─── Outcomes ─────────────────────────────────────────────────────
+
+export interface SystemProgress {
+  system: string;
+  engagement_score: number;
+  milestones_total: number;
+  milestones_completed: number;
+  completion_pct: number;
+  active_days: number;
+  last_activity: string | null;
+}
+
+export interface OutcomeSummary {
+  user_id: string;
+  overall_score: number;
+  systems: SystemProgress[];
+  total_milestones: number;
+  completed_milestones: number;
+  total_journal_entries: number;
+  active_plan_day: number | null;
+  generated_at: string;
+}
+
+export async function getOutcomeSummary(
+  userId: string,
+  journalCount?: number,
+): Promise<OutcomeSummary> {
+  const params = new URLSearchParams();
+  if (journalCount !== undefined) params.set('journal_count', String(journalCount));
+  const query = params.toString();
+  return request<OutcomeSummary>(
+    `${BASE}/outcomes/summary/${userId}${query ? `?${query}` : ''}`,
+  );
+}
+
+export async function createMilestone(
+  data: Record<string, unknown>,
+): Promise<Record<string, unknown>> {
+  return request<Record<string, unknown>>(`${BASE}/outcomes/milestones`, {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+}
+
+export async function logActivity(
+  data: Record<string, unknown>,
+): Promise<Record<string, unknown>> {
+  return request<Record<string, unknown>>(`${BASE}/outcomes/activity`, {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+}
+
 export { ApiError };
