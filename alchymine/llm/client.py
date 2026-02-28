@@ -13,9 +13,11 @@ Environment Variables:
 
 from __future__ import annotations
 
+import json
 import logging
 import os
-from dataclasses import dataclass
+from collections.abc import AsyncGenerator
+from dataclasses import dataclass, field
 from enum import StrEnum
 
 from alchymine.config import get_settings
@@ -56,10 +58,248 @@ class LLMResponse:
     output_tokens: int = 0
 
 
+# ── OllamaClient ────────────────────────────────────────────────────────
+
+
+@dataclass
+class OllamaModelInfo:
+    """Information about an available Ollama model.
+
+    Attributes
+    ----------
+    name:
+        The model identifier (e.g., ``llama3.2``).
+    size:
+        Model size in bytes (0 if unknown).
+    digest:
+        Model digest hash.
+    modified_at:
+        ISO timestamp of last modification.
+    """
+
+    name: str
+    size: int = 0
+    digest: str = ""
+    modified_at: str = ""
+
+
+class OllamaClient:
+    """Client for a local Ollama instance.
+
+    Provides non-streaming and streaming generation, model listing,
+    and health-check methods. All HTTP calls use ``httpx``.
+
+    Parameters
+    ----------
+    base_url:
+        Ollama server URL (default from settings).
+    default_model:
+        Default model to use if not specified per call.
+    timeout:
+        HTTP timeout in seconds.
+    """
+
+    def __init__(
+        self,
+        base_url: str | None = None,
+        default_model: str = "llama3.2",
+        timeout: float = 120.0,
+    ) -> None:
+        settings = get_settings()
+        self._base_url = base_url or settings.ollama_base_url
+        self._default_model = default_model
+        self._timeout = timeout
+
+    @property
+    def base_url(self) -> str:
+        """Return the configured Ollama base URL."""
+        return self._base_url
+
+    @property
+    def default_model(self) -> str:
+        """Return the configured default model name."""
+        return self._default_model
+
+    async def generate(
+        self,
+        prompt: str,
+        model: str | None = None,
+        system_prompt: str = "",
+        max_tokens: int = 2048,
+        temperature: float = 0.7,
+    ) -> LLMResponse:
+        """Generate text using the Ollama REST API.
+
+        Parameters
+        ----------
+        prompt:
+            The user prompt / data to process.
+        model:
+            Model name (uses default if not provided).
+        system_prompt:
+            Optional system instructions.
+        max_tokens:
+            Maximum output tokens.
+        temperature:
+            Sampling temperature.
+
+        Returns
+        -------
+        LLMResponse
+            The generated text and metadata.
+        """
+        import httpx
+
+        model = model or self._default_model
+        url = f"{self._base_url}/api/generate"
+        payload: dict = {
+            "model": model,
+            "prompt": prompt,
+            "stream": False,
+            "options": {
+                "num_predict": max_tokens,
+                "temperature": temperature,
+            },
+        }
+        if system_prompt:
+            payload["system"] = system_prompt
+
+        async with httpx.AsyncClient(timeout=self._timeout) as client:
+            resp = await client.post(url, json=payload)
+            resp.raise_for_status()
+            data = resp.json()
+
+        return LLMResponse(
+            text=data.get("response", ""),
+            backend=LLMBackend.OLLAMA.value,
+            model=model,
+        )
+
+    async def stream_generate(
+        self,
+        prompt: str,
+        model: str | None = None,
+        system_prompt: str = "",
+        max_tokens: int = 2048,
+        temperature: float = 0.7,
+    ) -> AsyncGenerator[str, None]:
+        """Stream text from the Ollama REST API.
+
+        Yields chunks as they arrive from the Ollama streaming endpoint.
+
+        Parameters
+        ----------
+        prompt:
+            The user prompt / data to process.
+        model:
+            Model name (uses default if not provided).
+        system_prompt:
+            Optional system instructions.
+        max_tokens:
+            Maximum output tokens.
+        temperature:
+            Sampling temperature.
+
+        Yields
+        ------
+        str
+            Text chunks from the model.
+        """
+        import httpx
+
+        model = model or self._default_model
+        url = f"{self._base_url}/api/generate"
+        payload: dict = {
+            "model": model,
+            "prompt": prompt,
+            "stream": True,
+            "options": {
+                "num_predict": max_tokens,
+                "temperature": temperature,
+            },
+        }
+        if system_prompt:
+            payload["system"] = system_prompt
+
+        async with httpx.AsyncClient(timeout=self._timeout) as client:
+            async with client.stream("POST", url, json=payload) as resp:
+                resp.raise_for_status()
+                async for line in resp.aiter_lines():
+                    if not line.strip():
+                        continue
+                    try:
+                        data = json.loads(line)
+                    except json.JSONDecodeError:
+                        continue
+                    chunk = data.get("response", "")
+                    if chunk:
+                        yield chunk
+                    if data.get("done", False):
+                        break
+
+    async def list_models(self) -> list[OllamaModelInfo]:
+        """List locally available Ollama models.
+
+        Calls ``GET /api/tags`` on the Ollama server.
+
+        Returns
+        -------
+        list[OllamaModelInfo]
+            Available models with metadata.
+        """
+        import httpx
+
+        url = f"{self._base_url}/api/tags"
+        async with httpx.AsyncClient(timeout=self._timeout) as client:
+            resp = await client.get(url)
+            resp.raise_for_status()
+            data = resp.json()
+
+        models: list[OllamaModelInfo] = []
+        for m in data.get("models", []):
+            models.append(
+                OllamaModelInfo(
+                    name=m.get("name", ""),
+                    size=m.get("size", 0),
+                    digest=m.get("digest", ""),
+                    modified_at=m.get("modified_at", ""),
+                )
+            )
+        return models
+
+    async def is_available(self) -> bool:
+        """Check if the Ollama server is reachable and healthy.
+
+        Returns
+        -------
+        bool
+            True if the server responded successfully, False otherwise.
+        """
+        import httpx
+
+        try:
+            async with httpx.AsyncClient(timeout=5.0) as client:
+                resp = await client.get(self._base_url)
+                return resp.status_code == 200
+        except (httpx.HTTPError, OSError):
+            return False
+
+
+# ── Unified LLM Client ──────────────────────────────────────────────────
+
+
+@dataclass
+class _StreamState:
+    """Tracks which backend was used during a streaming call."""
+
+    backend_used: str = LLMBackend.NONE.value
+    _field_order: list[str] = field(default_factory=list)
+
+
 class LLMClient:
     """Unified LLM client with automatic fallback.
 
-    Tries backends in order: Claude → Ollama → graceful degradation.
+    Tries backends in order: Claude -> Ollama -> graceful degradation.
     """
 
     def __init__(self) -> None:
@@ -72,6 +312,16 @@ class LLMClient:
         self._anthropic_key = settings.anthropic_api_key
         self._ollama_url = settings.ollama_base_url
         self._ollama_model = os.environ.get("OLLAMA_MODEL", "llama3.2")
+        self._ollama_client = OllamaClient(
+            base_url=self._ollama_url,
+            default_model=self._ollama_model,
+        )
+        self._last_backend: str = LLMBackend.NONE.value
+
+    @property
+    def last_backend(self) -> str:
+        """Return the backend used for the most recent call."""
+        return self._last_backend
 
     async def generate(
         self,
@@ -99,28 +349,130 @@ class LLMClient:
             The generated text and metadata.
         """
         if self._forced_backend == LLMBackend.NONE:
+            self._last_backend = LLMBackend.NONE.value
             return self._fallback_response()
 
         # Try Claude first
         if self._forced_backend in (None, LLMBackend.CLAUDE) and self._anthropic_key:
             try:
-                return await self._generate_claude(
+                result = await self._generate_claude(
                     system_prompt, user_prompt, max_tokens, temperature
                 )
+                self._last_backend = LLMBackend.CLAUDE.value
+                logger.info("LLM generation completed via Claude backend")
+                return result
             except Exception as exc:
                 logger.warning("Claude API failed, trying Ollama fallback: %s", exc)
 
         # Try Ollama
         if self._forced_backend in (None, LLMBackend.OLLAMA):
             try:
-                return await self._generate_ollama(
+                result = await self._generate_ollama(
                     system_prompt, user_prompt, max_tokens, temperature
                 )
+                self._last_backend = LLMBackend.OLLAMA.value
+                logger.info("LLM generation completed via Ollama backend")
+                return result
             except Exception as exc:
                 logger.warning("Ollama failed: %s", exc)
 
         # Graceful degradation
+        self._last_backend = LLMBackend.NONE.value
         return self._fallback_response()
+
+    async def stream_generate(
+        self,
+        prompt: str,
+        system_prompt: str = "",
+        max_tokens: int = 2048,
+        temperature: float = 0.7,
+    ) -> AsyncGenerator[str, None]:
+        """Stream LLM response chunks using the best available backend.
+
+        For mock/testing: yields prompt words one at a time.
+        For real usage: streams from Claude API or Ollama.
+
+        Parameters
+        ----------
+        prompt:
+            The user prompt / data to process.
+        system_prompt:
+            Optional system instructions.
+        max_tokens:
+            Maximum output tokens.
+        temperature:
+            Sampling temperature.
+
+        Yields
+        ------
+        str
+            Text chunks from the model.
+        """
+        if self._forced_backend == LLMBackend.NONE:
+            self._last_backend = LLMBackend.NONE.value
+            # Yield words of the fallback message one at a time
+            fallback_text = self._fallback_response().text
+            for word in fallback_text.split():
+                yield word + " "
+            return
+
+        # Try Claude streaming first
+        if self._forced_backend in (None, LLMBackend.CLAUDE) and self._anthropic_key:
+            try:
+                self._last_backend = LLMBackend.CLAUDE.value
+                logger.info("Streaming LLM response via Claude backend")
+                async for chunk in self._stream_claude(
+                    prompt, system_prompt, max_tokens, temperature
+                ):
+                    yield chunk
+                return
+            except Exception as exc:
+                logger.warning("Claude streaming failed, trying Ollama fallback: %s", exc)
+
+        # Try Ollama streaming
+        if self._forced_backend in (None, LLMBackend.OLLAMA):
+            try:
+                self._last_backend = LLMBackend.OLLAMA.value
+                logger.info("Streaming LLM response via Ollama backend")
+                async for chunk in self._ollama_client.stream_generate(
+                    prompt=prompt,
+                    system_prompt=system_prompt,
+                    max_tokens=max_tokens,
+                    temperature=temperature,
+                ):
+                    yield chunk
+                return
+            except Exception as exc:
+                logger.warning("Ollama streaming failed: %s", exc)
+
+        # Graceful degradation
+        self._last_backend = LLMBackend.NONE.value
+        fallback_text = self._fallback_response().text
+        for word in fallback_text.split():
+            yield word + " "
+
+    async def _stream_claude(
+        self,
+        prompt: str,
+        system_prompt: str,
+        max_tokens: int,
+        temperature: float,
+    ) -> AsyncGenerator[str, None]:
+        """Stream text from the Claude API using server-sent events."""
+        import anthropic
+
+        client = anthropic.AsyncAnthropic(api_key=self._anthropic_key)
+        model = "claude-sonnet-4-20250514"
+
+        async with client.messages.stream(
+            model=model,
+            max_tokens=max_tokens,
+            temperature=temperature,
+            system=system_prompt,
+            messages=[{"role": "user", "content": prompt}],
+        ) as stream:
+            async for text in stream.text_stream:
+                yield text
 
     async def _generate_claude(
         self,
@@ -163,30 +515,12 @@ class LLMClient:
         max_tokens: int,
         temperature: float,
     ) -> LLMResponse:
-        """Generate text using a local Ollama instance."""
-        import httpx
-
-        url = f"{self._ollama_url}/api/generate"
-        payload = {
-            "model": self._ollama_model,
-            "system": system_prompt,
-            "prompt": user_prompt,
-            "stream": False,
-            "options": {
-                "num_predict": max_tokens,
-                "temperature": temperature,
-            },
-        }
-
-        async with httpx.AsyncClient(timeout=120.0) as client:
-            resp = await client.post(url, json=payload)
-            resp.raise_for_status()
-            data = resp.json()
-
-        return LLMResponse(
-            text=data.get("response", ""),
-            backend=LLMBackend.OLLAMA.value,
-            model=self._ollama_model,
+        """Generate text using the OllamaClient."""
+        return await self._ollama_client.generate(
+            prompt=user_prompt,
+            system_prompt=system_prompt,
+            max_tokens=max_tokens,
+            temperature=temperature,
         )
 
     @staticmethod

@@ -7,6 +7,6 @@ deployments.
 
 from __future__ import annotations
 
-from alchymine.llm.client import LLMClient, LLMResponse
+from alchymine.llm.client import LLMClient, LLMResponse, OllamaClient, OllamaModelInfo
 
-__all__ = ["LLMClient", "LLMResponse"]
+__all__ = ["LLMClient", "LLMResponse", "OllamaClient", "OllamaModelInfo"]

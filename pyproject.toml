@@ -43,6 +43,9 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+mcp = [
+    "mcp>=1.0.0",
+]
 pdf = [
     "playwright>=1.40.0",
 ]

@@ -1,10 +1,82 @@
+# ============================================================================
 # Alchymine - Production Overrides
 # Usage: docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+# ============================================================================
 
 services:
+  # ─── Nginx Reverse Proxy ─────────────────────────────────────────────
+  nginx:
+    image: nginx:1.25-alpine
+    container_name: alchymine-nginx
+    restart: always
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/ssl-params.conf:/etc/nginx/conf.d/ssl-params.conf:ro
+      - certbot_webroot:/var/www/certbot:ro
+      - certbot_certs:/etc/letsencrypt:ro
+    depends_on:
+      api:
+        condition: service_healthy
+      web:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost/nginx-health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    deploy:
+      resources:
+        limits:
+          memory: 256m
+          cpus: "0.5"
+        reservations:
+          memory: 64m
+          cpus: "0.1"
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+    networks:
+      - alchymine-net
+
+  # ─── Certbot (Let's Encrypt auto-renewal) ────────────────────────────
+  certbot:
+    image: certbot/certbot:latest
+    container_name: alchymine-certbot
+    restart: unless-stopped
+    volumes:
+      - certbot_webroot:/var/www/certbot
+      - certbot_certs:/etc/letsencrypt
+    # Check for renewal every 12 hours (certbot only renews if within 30 days of expiry)
+    entrypoint: /bin/sh -c 'trap exit TERM; while :; do certbot renew --webroot -w /var/www/certbot --quiet; sleep 12h & wait $${!}; done'
+    deploy:
+      resources:
+        limits:
+          memory: 128m
+          cpus: "0.25"
+        reservations:
+          memory: 32m
+          cpus: "0.05"
+    logging:
+      driver: json-file
+      options:
+        max-size: "5m"
+        max-file: "3"
+    networks:
+      - alchymine-net
+
   # ─── API (FastAPI) — production settings ─────────────────────────────
   api:
     restart: always
+    ports: []  # Not exposed to host; nginx handles routing
+    env_file:
+      - path: ../.env.production
+        required: true
     command: >
       uvicorn alchymine.api.main:app
       --host 0.0.0.0
@@ -37,9 +109,12 @@ services:
         max-size: "10m"
         max-file: "3"
 
-  # ─── Worker (Celery) — production settings ──────────────────────────
+  # ─── Worker (Celery) — production settings ───────────────────────────
   worker:
     restart: always
+    env_file:
+      - path: ../.env.production
+        required: true
     command: >
       celery -A alchymine.workers.celery_app worker
       --loglevel=warning
@@ -71,9 +146,13 @@ services:
         max-size: "10m"
         max-file: "3"
 
-  # ─── Web (Next.js) — production settings ────────────────────────────
+  # ─── Web (Next.js) — production settings ─────────────────────────────
   web:
     restart: always
+    ports: []  # Not exposed to host; nginx handles routing
+    env_file:
+      - path: ../.env.production
+        required: true
     environment:
       - NODE_ENV=production
     deploy:
@@ -96,35 +175,17 @@ services:
         max-size: "10m"
         max-file: "3"
 
-  # ─── PDF Service — production settings ──────────────────────────────
-  pdf:
-    restart: always
-    environment:
-      - NODE_ENV=production
-    deploy:
-      resources:
-        limits:
-          memory: 1g
-          cpus: "1.0"
-        reservations:
-          memory: 256m
-          cpus: "0.25"
-    healthcheck:
-      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3001/health', (r) => { process.exit(r.statusCode === 200 ? 0 : 1) })"]
-      interval: 15s
-      timeout: 5s
-      retries: 3
-      start_period: 20s
-    logging:
-      driver: json-file
-      options:
-        max-size: "10m"
-        max-file: "3"
+  # NOTE: PDF service production overrides will be added here once the pdf
+  # service is defined in the base docker-compose.yml. Dockerfile exists at
+  # infrastructure/docker/Dockerfile.pdf and is ready to be wired up.
 
-  # ─── PostgreSQL — production settings ───────────────────────────────
-  postgres:
+  # ─── PostgreSQL — production settings ────────────────────────────────
+  db:
     restart: always
     ports: []  # Do not expose to host in production
+    env_file:
+      - path: ../.env.production
+        required: true
     command: >
       postgres
       -c shared_buffers=256MB
@@ -153,7 +214,7 @@ services:
         max-size: "10m"
         max-file: "3"
 
-  # ─── Redis — production settings ────────────────────────────────────
+  # ─── Redis — production settings ─────────────────────────────────────
   redis:
     restart: always
     ports: []  # Do not expose to host in production
@@ -185,3 +246,12 @@ services:
       options:
         max-size: "10m"
         max-file: "3"
+
+# ─── Additional Volumes ────────────────────────────────────────────────────
+volumes:
+  certbot_webroot:
+    driver: local
+    name: alchymine-certbot-webroot
+  certbot_certs:
+    driver: local
+    name: alchymine-certbot-certs
