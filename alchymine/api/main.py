@@ -34,6 +34,7 @@ from alchymine.api.routers import (
     spiral,
     wealth,
 )
+from alchymine.config import get_settings
 
 
 @asynccontextmanager
@@ -63,13 +64,13 @@ app = FastAPI(
 app.add_middleware(ErrorHandlerMiddleware)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],
+    allow_origins=get_settings().allowed_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 app.add_middleware(RequestLoggingMiddleware)
-app.add_middleware(RateLimitMiddleware, max_requests=100, window_seconds=60)  # type: ignore[arg-type]
+app.add_middleware(RateLimitMiddleware)  # type: ignore[arg-type]
 
 # Routers
 app.include_router(health.router, tags=["health"])

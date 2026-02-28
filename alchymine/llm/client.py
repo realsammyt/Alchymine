@@ -18,6 +18,8 @@ import os
 from dataclasses import dataclass
 from enum import StrEnum
 
+from alchymine.config import get_settings
+
 logger = logging.getLogger(__name__)
 
 
@@ -66,8 +68,9 @@ class LLMClient:
         if forced in ("claude", "ollama", "none"):
             self._forced_backend = LLMBackend(forced)
 
-        self._anthropic_key = os.environ.get("ANTHROPIC_API_KEY", "")
-        self._ollama_url = os.environ.get("OLLAMA_BASE_URL", "http://localhost:11434")
+        settings = get_settings()
+        self._anthropic_key = settings.anthropic_api_key
+        self._ollama_url = settings.ollama_base_url
         self._ollama_model = os.environ.get("OLLAMA_MODEL", "llama3.2")
 
     async def generate(

@@ -60,10 +60,13 @@ async def session_factory(
 
 @pytest_asyncio.fixture
 async def client(
+    engine: AsyncEngine,
     session_factory: async_sessionmaker[AsyncSession],
 ) -> AsyncGenerator[AsyncClient, None]:
     """Provide an async HTTP test client with DB dependency overridden."""
+    from alchymine.api.deps import set_db_engine
     from alchymine.api.main import app
+    from alchymine.workers.tasks import _set_task_engine
 
     async def _override_get_db_session() -> AsyncGenerator[AsyncSession, None]:
         async with session_factory() as session:
@@ -75,12 +78,16 @@ async def client(
                 raise
 
     app.dependency_overrides[get_db_session] = _override_get_db_session
+    set_db_engine(engine)
+    _set_task_engine(engine)
 
     transport = ASGITransport(app=app)  # type: ignore[arg-type]
     async with AsyncClient(transport=transport, base_url="http://testserver") as ac:
         yield ac
 
     app.dependency_overrides.clear()
+    set_db_engine(None)
+    _set_task_engine(None)
 
 
 # ─── Helpers ───────────────────────────────────────────────────────────
@@ -418,7 +425,7 @@ async def test_reports_post_with_db(client: AsyncClient) -> None:
     )
     assert resp.status_code == 202
     data = resp.json()
-    assert data["status"] == "queued"
+    assert data["status"] == "pending"
     assert "id" in data
 
 

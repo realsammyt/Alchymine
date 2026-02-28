@@ -12,7 +12,6 @@ Configuration via environment variables:
 
 from __future__ import annotations
 
-import os
 from datetime import UTC, datetime, timedelta
 
 import bcrypt
@@ -20,12 +19,17 @@ from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError, jwt
 
-# ─── Configuration ────────────────────────────────────────────────────────
+from alchymine.config import get_settings
 
-JWT_SECRET_KEY: str = os.environ.get("JWT_SECRET_KEY", "dev-secret-key-change-in-production")
-JWT_ALGORITHM: str = os.environ.get("JWT_ALGORITHM", "HS256")
-ACCESS_TOKEN_EXPIRE_MINUTES: int = int(os.environ.get("ACCESS_TOKEN_EXPIRE_MINUTES", "30"))
-REFRESH_TOKEN_EXPIRE_DAYS: int = int(os.environ.get("REFRESH_TOKEN_EXPIRE_DAYS", "7"))
+# ─── Configuration ────────────────────────────────────────────────────────
+# Convenience aliases so existing call-sites (and tests that import these
+# names) continue to work without changes.
+
+_settings = get_settings()
+JWT_SECRET_KEY: str = _settings.jwt_secret_key
+JWT_ALGORITHM: str = _settings.jwt_algorithm
+ACCESS_TOKEN_EXPIRE_MINUTES: int = _settings.access_token_expire_minutes
+REFRESH_TOKEN_EXPIRE_DAYS: int = _settings.refresh_token_expire_days
 
 # ─── Password Hashing ────────────────────────────────────────────────────
 

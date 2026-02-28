@@ -8,28 +8,114 @@ Covers:
 
 from __future__ import annotations
 
-import pytest
-from fastapi.testclient import TestClient
+import os
 
-from alchymine.api.main import app
-from alchymine.engine.reports.html_renderer import render_report_html
-from alchymine.workers.tasks import report_store
+os.environ.setdefault("CELERY_ALWAYS_EAGER", "true")
 
+import pytest  # noqa: E402
+import pytest_asyncio  # noqa: E402
+from cryptography.fernet import Fernet  # noqa: E402
+from fastapi.testclient import TestClient  # noqa: E402
+from sqlalchemy.ext.asyncio import (  # noqa: E402
+    AsyncSession,
+    async_sessionmaker,
+    create_async_engine,
+)
 
-@pytest.fixture
-def client() -> TestClient:
-    return TestClient(app)
+import alchymine.db.models  # noqa: F401,E402
+from alchymine.api.deps import get_db_session, set_db_engine  # noqa: E402
+from alchymine.api.main import app  # noqa: E402
+from alchymine.db import repository  # noqa: E402
+from alchymine.db.base import Base  # noqa: E402
+from alchymine.engine.reports.html_renderer import render_report_html  # noqa: E402
+from alchymine.workers.tasks import _set_task_engine  # noqa: E402
 
 
 @pytest.fixture(autouse=True)
-def _clear_store() -> None:
-    """Clear report store between tests."""
-    report_store.clear()
+def _set_encryption_key(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Ensure a valid Fernet key is available."""
+    key = Fernet.generate_key().decode()
+    monkeypatch.setenv("ALCHYMINE_ENCRYPTION_KEY", key)
+
+
+@pytest_asyncio.fixture
+async def engine():
+    """Create an in-memory SQLite engine and initialise the schema."""
+    eng = create_async_engine(
+        "sqlite+aiosqlite://",
+        connect_args={"check_same_thread": False},
+        echo=False,
+    )
+    async with eng.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+    yield eng
+    async with eng.begin() as conn:
+        await conn.run_sync(Base.metadata.drop_all)
+    await eng.dispose()
+
+
+@pytest.fixture
+def client(engine) -> TestClient:
+    """Provide a TestClient wired to the in-memory SQLite engine."""
+    factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+
+    async def _override_session():
+        async with factory() as session:
+            try:
+                yield session
+                await session.commit()
+            except Exception:
+                await session.rollback()
+                raise
+
+    app.dependency_overrides[get_db_session] = _override_session
+    set_db_engine(engine)
+    _set_task_engine(engine)
+
+    yield TestClient(app)
+
+    app.dependency_overrides.clear()
+    set_db_engine(None)
+    _set_task_engine(None)
+
+
+def _seed_report(engine, report_id: str, status: str, result: dict | None = None) -> None:
+    """Seed a report row into the test database."""
+    import asyncio
+
+    from alchymine.db.base import get_async_session_factory
+
+    async def _seed():
+        factory = get_async_session_factory(engine)
+        async with factory() as session:
+            await repository.create_report(
+                session,
+                report_id=report_id,
+                status=status,
+                user_input="test",
+            )
+            if result is not None or status in ("complete", "failed"):
+                await repository.update_report_content(
+                    session,
+                    report_id,
+                    result=result,
+                    status=status,
+                )
+            await session.commit()
+
+    try:
+        asyncio.get_running_loop()
+        from concurrent.futures import ThreadPoolExecutor
+
+        with ThreadPoolExecutor(max_workers=1) as pool:
+            pool.submit(asyncio.run, _seed()).result()
+    except RuntimeError:
+        asyncio.run(_seed())
 
 
 @pytest.fixture
 def sample_report_data() -> dict:
-    """A completed report with identity layer data."""
+    """A completed report dict for the HTML renderer (render_report_html)."""
     return {
         "report_id": "test-report-123",
         "status": "complete",
@@ -83,6 +169,12 @@ def sample_report_data() -> dict:
             "quality_passed": True,
         },
     }
+
+
+@pytest.fixture
+def sample_result_data(sample_report_data: dict) -> dict:
+    """The result dict portion for seeding into DB."""
+    return sample_report_data["result"]
 
 
 class TestHtmlRenderer:
@@ -148,18 +240,24 @@ class TestHtmlRenderer:
 class TestHtmlExportEndpoint:
     """Tests for GET /api/v1/reports/{report_id}/html"""
 
-    def test_html_export_returns_200(self, client: TestClient, sample_report_data: dict) -> None:
-        report_store["test-123"] = sample_report_data
+    def test_html_export_returns_200(
+        self, client: TestClient, engine, sample_result_data: dict
+    ) -> None:
+        _seed_report(engine, "test-123", "complete", sample_result_data)
         response = client.get("/api/v1/reports/test-123/html")
         assert response.status_code == 200
 
-    def test_html_export_content_type(self, client: TestClient, sample_report_data: dict) -> None:
-        report_store["test-123"] = sample_report_data
+    def test_html_export_content_type(
+        self, client: TestClient, engine, sample_result_data: dict
+    ) -> None:
+        _seed_report(engine, "test-123", "complete", sample_result_data)
         response = client.get("/api/v1/reports/test-123/html")
         assert "text/html" in response.headers["content-type"]
 
-    def test_html_export_contains_html(self, client: TestClient, sample_report_data: dict) -> None:
-        report_store["test-123"] = sample_report_data
+    def test_html_export_contains_html(
+        self, client: TestClient, engine, sample_result_data: dict
+    ) -> None:
+        _seed_report(engine, "test-123", "complete", sample_result_data)
         response = client.get("/api/v1/reports/test-123/html")
         assert "<!DOCTYPE html>" in response.text
         assert "Alchymine Report" in response.text
@@ -168,20 +266,12 @@ class TestHtmlExportEndpoint:
         response = client.get("/api/v1/reports/nonexistent/html")
         assert response.status_code == 404
 
-    def test_html_export_still_processing(self, client: TestClient) -> None:
-        report_store["processing-id"] = {
-            "report_id": "processing-id",
-            "status": "processing",
-            "created_at": "2026-02-28T12:00:00+00:00",
-        }
-        response = client.get("/api/v1/reports/processing-id/html")
+    def test_html_export_still_generating(self, client: TestClient, engine) -> None:
+        _seed_report(engine, "generating-id", "generating")
+        response = client.get("/api/v1/reports/generating-id/html")
         assert response.status_code == 202
 
-    def test_html_export_queued(self, client: TestClient) -> None:
-        report_store["queued-id"] = {
-            "report_id": "queued-id",
-            "status": "queued",
-            "created_at": "2026-02-28T12:00:00+00:00",
-        }
-        response = client.get("/api/v1/reports/queued-id/html")
+    def test_html_export_pending(self, client: TestClient, engine) -> None:
+        _seed_report(engine, "pending-id", "pending")
+        response = client.get("/api/v1/reports/pending-id/html")
         assert response.status_code == 202

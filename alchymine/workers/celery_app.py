@@ -10,20 +10,20 @@ Configuration is loaded from environment variables:
 
 from __future__ import annotations
 
-import os
-
 from celery import Celery
 
-# ── Redis URL ────────────────────────────────────────────────────────────
+from alchymine.config import get_settings
 
-REDIS_URL: str = os.environ.get("REDIS_URL", "redis://localhost:6379/0")
+# ── Settings ─────────────────────────────────────────────────────────────
+
+_settings = get_settings()
 
 # ── Celery app ───────────────────────────────────────────────────────────
 
 celery_app = Celery(
     "alchymine",
-    broker=REDIS_URL,
-    backend=REDIS_URL,
+    broker=_settings.celery_broker_url,
+    backend=_settings.celery_result_backend,
 )
 
 celery_app.conf.update(
@@ -37,6 +37,7 @@ celery_app.conf.update(
     # Task routing
     task_routes={
         "alchymine.workers.tasks.generate_report": {"queue": "reports"},
+        "alchymine.workers.tasks.generate_pdf_report": {"queue": "reports"},
     },
     # Task defaults
     task_track_started=True,
@@ -46,12 +47,7 @@ celery_app.conf.update(
 
 # ── Eager mode for testing ───────────────────────────────────────────────
 
-_always_eager = os.environ.get("CELERY_ALWAYS_EAGER", "").lower() in (
-    "true",
-    "1",
-    "yes",
-)
-if _always_eager:
+if _settings.celery_always_eager:
     celery_app.conf.update(
         task_always_eager=True,
         task_eager_propagates=True,

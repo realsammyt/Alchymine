@@ -1,17 +1,25 @@
-"""Async CRUD operations for Alchymine user profiles.
+"""Async CRUD operations for Alchymine user profiles and reports.
 
 All database access goes through this module so that:
 - Encryption/decryption is handled transparently by the ORM layer
 - Session lifecycle is managed consistently
 - Queries are easy to test (swap in SQLite session)
 
-Functions
-~~~~~~~~~
+Functions — Profiles
+~~~~~~~~~~~~~~~~~~~~
 - ``create_profile``  — create a User with intake data and optional layers
 - ``get_profile``     — fetch a full User by id (eager-loads all relationships)
 - ``update_layer``    — update a specific layer (identity, healing, etc.)
 - ``delete_profile``  — hard-delete a User and all dependent rows
 - ``list_profiles``   — paginated user list
+
+Functions — Reports
+~~~~~~~~~~~~~~~~~~~
+- ``create_report``          — insert a new Report row
+- ``get_report``             — fetch a Report by id
+- ``list_reports_by_user``   — paginated reports for a given user
+- ``update_report_status``   — change status (and optionally error)
+- ``update_report_content``  — set result / html_content on completion
 """
 
 from __future__ import annotations
@@ -29,6 +37,7 @@ from alchymine.db.models import (
     IdentityProfile,
     IntakeData,
     PerspectiveProfile,
+    Report,
     User,
     WealthProfile,
 )
@@ -226,3 +235,132 @@ async def delete_profile(session: AsyncSession, user_id: str) -> bool:
     await session.delete(user)
     await session.flush()
     return True
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# Report CRUD
+# ═══════════════════════════════════════════════════════════════════════
+
+
+async def create_report(
+    session: AsyncSession,
+    *,
+    report_id: str,
+    status: str = "pending",
+    user_input: str | None = None,
+    user_profile: dict[str, Any] | None = None,
+    user_id: str | None = None,
+    report_type: str = "full",
+) -> Report:
+    """Insert a new report row.
+
+    Parameters
+    ----------
+    session:
+        Active async session.
+    report_id:
+        Pre-generated UUID string for the report.
+    status:
+        Initial status (default ``"pending"``).
+    user_input:
+        Free-text user request.
+    user_profile:
+        Optional user profile dict forwarded to orchestrator.
+    user_id:
+        Optional FK to the ``users`` table.
+    report_type:
+        Report type identifier (default ``"full"``).
+
+    Returns
+    -------
+    Report
+        The newly created report row.
+    """
+    report = Report(
+        id=report_id,
+        status=status,
+        user_input=user_input,
+        user_profile=user_profile,
+        user_id=user_id,
+        report_type=report_type,
+    )
+    session.add(report)
+    await session.flush()
+    return report
+
+
+async def get_report(session: AsyncSession, report_id: str) -> Report | None:
+    """Fetch a single report by id.
+
+    Returns ``None`` if the report does not exist.
+    """
+    result = await session.execute(select(Report).where(Report.id == report_id))
+    return result.scalar_one_or_none()
+
+
+async def list_reports_by_user(
+    session: AsyncSession,
+    user_id: str,
+    *,
+    skip: int = 0,
+    limit: int = 20,
+) -> list[Report]:
+    """Return a paginated list of reports for *user_id* (most recent first)."""
+    result = await session.execute(
+        select(Report)
+        .where(Report.user_id == user_id)
+        .order_by(Report.created_at.desc())
+        .offset(skip)
+        .limit(limit)
+    )
+    return list(result.scalars().all())
+
+
+async def update_report_status(
+    session: AsyncSession,
+    report_id: str,
+    status: str,
+    *,
+    error: str | None = None,
+) -> Report | None:
+    """Update the status of a report (and optionally set an error message).
+
+    Returns the updated ``Report``, or ``None`` if not found.
+    """
+    report = await get_report(session, report_id)
+    if report is None:
+        return None
+    report.status = status
+    if error is not None:
+        report.error = error
+    await session.flush()
+    await session.refresh(report)
+    return report
+
+
+async def update_report_content(
+    session: AsyncSession,
+    report_id: str,
+    *,
+    result: dict[str, Any] | None = None,
+    html_content: str | None = None,
+    status: str = "complete",
+) -> Report | None:
+    """Set orchestrator result and/or HTML content on a report.
+
+    Typically called when the Celery task finishes successfully.
+
+    Returns the updated ``Report``, or ``None`` if not found.
+    """
+    report = await get_report(session, report_id)
+    if report is None:
+        return None
+    report.status = status
+    if result is not None:
+        report.result = result
+    if html_content is not None:
+        report.html_content = html_content
+    report.error = None
+    await session.flush()
+    await session.refresh(report)
+    return report

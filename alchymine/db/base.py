@@ -6,7 +6,6 @@ The driver is selected automatically based on the DATABASE_URL scheme.
 
 from __future__ import annotations
 
-import os
 from collections.abc import AsyncGenerator
 
 from sqlalchemy.ext.asyncio import (
@@ -18,6 +17,8 @@ from sqlalchemy.ext.asyncio import (
 )
 from sqlalchemy.orm import DeclarativeBase
 
+from alchymine.config import get_settings
+
 # ─── Declarative Base ───────────────────────────────────────────────────
 
 
@@ -26,9 +27,6 @@ class Base(AsyncAttrs, DeclarativeBase):
 
 
 # ─── Engine Factory ─────────────────────────────────────────────────────
-
-
-_default_url = "postgresql+asyncpg://alchymine:alchymine@localhost:5432/alchymine"
 
 
 def get_async_engine(
@@ -41,12 +39,11 @@ def get_async_engine(
     Parameters
     ----------
     url:
-        Database URL.  Falls back to ``DATABASE_URL`` env-var, then to the
-        local-dev PostgreSQL default.
+        Database URL.  Falls back to the centralized ``Settings.database_url``.
     echo:
         When *True*, emit SQL statements to the log (useful for debugging).
     """
-    db_url = url or os.environ.get("DATABASE_URL", _default_url)
+    db_url = url or get_settings().database_url
 
     # SQLite needs special connect_args for async
     connect_args: dict = {}
