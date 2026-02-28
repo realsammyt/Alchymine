@@ -10,9 +10,11 @@ import uuid
 from datetime import UTC, datetime
 
 from fastapi import APIRouter, HTTPException
+from fastapi.responses import HTMLResponse
 from pydantic import BaseModel, Field
 
 from alchymine.engine.profile import IntakeData
+from alchymine.engine.reports.html_renderer import render_report_html
 from alchymine.workers.tasks import generate_report as generate_report_task
 from alchymine.workers.tasks import report_store
 
@@ -147,3 +149,29 @@ async def get_report(report_id: str) -> ReportResult:
         created_at=entry["created_at"],
         updated_at=entry.get("updated_at"),
     )
+
+
+@router.get("/reports/{report_id}/html")
+async def get_report_html(report_id: str) -> HTMLResponse:
+    """Render a completed report as a styled HTML page.
+
+    The HTML is self-contained (inline CSS) and includes a "Save as PDF"
+    button that triggers the browser's native print dialog.
+
+    - **200** — HTML page with report content.
+    - **202** — report is still being generated.
+    - **404** — report_id not found.
+    """
+    if report_id not in report_store:
+        raise HTTPException(status_code=404, detail="Report not found")
+
+    entry = report_store[report_id]
+
+    if entry["status"] in ("queued", "processing"):
+        raise HTTPException(
+            status_code=202,
+            detail=f"Report is {entry['status']}",
+        )
+
+    html_content = render_report_html(entry)
+    return HTMLResponse(content=html_content)

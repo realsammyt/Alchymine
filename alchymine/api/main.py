@@ -23,7 +23,9 @@ from alchymine.api.routers import (
     creative,
     healing,
     health,
+    journal,
     numerology,
+    outcomes,
     personality,
     perspective,
     profile,
@@ -81,3 +83,5 @@ app.include_router(healing.router, prefix="/api/v1", tags=["healing"])
 app.include_router(creative.router, prefix="/api/v1", tags=["creative"])
 app.include_router(perspective.router, prefix="/api/v1", tags=["perspective"])
 app.include_router(personality.router, prefix="/api/v1", tags=["personality"])
+app.include_router(journal.router, prefix="/api/v1", tags=["journal"])
+app.include_router(outcomes.router, prefix="/api/v1", tags=["outcomes"])

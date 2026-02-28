@@ -113,6 +113,7 @@ module = [
     "anthropic.*",
     "httpx.*",
     "yaml.*",
+    "jinja2.*",
 ]
 ignore_missing_imports = true
 

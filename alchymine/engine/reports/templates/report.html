@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Alchymine Report</title>
+<style>
+  /* ── Base ────────────────────────────────────────── */
+  :root {
+    --bg: #0f0f14;
+    --surface: #1a1a24;
+    --border: rgba(255,255,255,0.08);
+    --text: #e8e4df;
+    --text-muted: rgba(232,228,223,0.5);
+    --primary: #c4a04a;
+    --primary-light: #d4b45a;
+    --secondary: #7b68ee;
+    --accent: #e07a5f;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.6;
+    padding: 2rem;
+  }
+  .container { max-width: 800px; margin: 0 auto; }
+
+  /* ── Print styles ───────────────────────────────── */
+  @media print {
+    body { background: white; color: #111; padding: 0; }
+    .container { max-width: 100%; }
+    .card { break-inside: avoid; border: 1px solid #ddd; box-shadow: none; }
+    .no-print { display: none !important; }
+    .card { background: white; }
+    .number-card { background: #f7f7f7; border-color: #ddd; }
+    h1, h2, h3 { color: #111; }
+    .trait-bar-fill { background: #c4a04a !important; }
+    .badge { border-color: #ccc; }
+  }
+
+  /* ── Header ─────────────────────────────────────── */
+  .header { text-align: center; margin-bottom: 3rem; }
+  .header h1 {
+    font-size: 2.5rem;
+    font-weight: 700;
+    background: linear-gradient(135deg, var(--primary), var(--primary-light));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    margin-bottom: 0.5rem;
+  }
+  .header p { color: var(--text-muted); font-size: 0.95rem; }
+  .header .meta { font-size: 0.8rem; color: var(--text-muted); margin-top: 0.5rem; }
+
+  /* ── Cards ──────────────────────────────────────── */
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+  }
+  .card h2 {
+    font-size: 1.3rem;
+    margin-bottom: 0.25rem;
+  }
+  .card .subtitle {
+    color: var(--text-muted);
+    font-size: 0.85rem;
+    margin-bottom: 1rem;
+  }
+
+  /* ── Number grid ────────────────────────────────── */
+  .number-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 0.75rem;
+  }
+  .number-card {
+    background: rgba(255,255,255,0.03);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 0.75rem;
+    text-align: center;
+  }
+  .number-card .value {
+    font-size: 1.8rem;
+    font-weight: 700;
+    color: var(--primary);
+  }
+  .number-card .label {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    margin-top: 0.15rem;
+  }
+  .number-card .note {
+    font-size: 0.7rem;
+    color: var(--text-muted);
+  }
+
+  /* ── Trait bars ─────────────────────────────────── */
+  .trait-row {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-bottom: 0.6rem;
+  }
+  .trait-label {
+    width: 9rem;
+    text-align: right;
+    font-size: 0.85rem;
+    color: var(--text-muted);
+  }
+  .trait-bar {
+    flex: 1;
+    height: 8px;
+    background: rgba(255,255,255,0.06);
+    border-radius: 4px;
+    overflow: hidden;
+  }
+  .trait-bar-fill {
+    height: 100%;
+    border-radius: 4px;
+    background: linear-gradient(90deg, var(--primary), var(--primary-light));
+  }
+  .trait-value {
+    width: 2.5rem;
+    font-size: 0.85rem;
+    font-family: monospace;
+    color: var(--primary);
+  }
+
+  /* ── Badges ─────────────────────────────────────── */
+  .badge-row { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+  .badge {
+    display: inline-block;
+    padding: 0.35rem 0.75rem;
+    border-radius: 8px;
+    font-size: 0.85rem;
+    border: 1px solid var(--border);
+  }
+  .badge-primary { background: rgba(196,160,74,0.1); border-color: rgba(196,160,74,0.2); color: var(--primary); }
+  .badge-secondary { background: rgba(123,104,238,0.1); border-color: rgba(123,104,238,0.2); color: var(--secondary); }
+  .badge-accent { background: rgba(224,122,95,0.1); border-color: rgba(224,122,95,0.2); color: var(--accent); }
+  .badge-shadow { background: rgba(239,68,68,0.1); border-color: rgba(239,68,68,0.2); color: #ef4444; }
+  .badge-light { background: rgba(255,255,255,0.03); }
+
+  /* ── Strengths ──────────────────────────────────── */
+  .strengths-row { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.5rem; }
+  .strength {
+    padding: 0.4rem 0.85rem;
+    background: linear-gradient(135deg, rgba(196,160,74,0.1), rgba(196,160,74,0.05));
+    border: 1px solid rgba(196,160,74,0.15);
+    border-radius: 10px;
+    font-size: 0.85rem;
+    font-weight: 500;
+    color: var(--primary);
+  }
+
+  /* ── Section labels ─────────────────────────────── */
+  .section-label {
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--text-muted);
+    margin-bottom: 0.5rem;
+    margin-top: 1rem;
+  }
+
+  /* ── Footer ─────────────────────────────────────── */
+  .footer {
+    text-align: center;
+    margin-top: 2rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid var(--border);
+    color: var(--text-muted);
+    font-size: 0.8rem;
+  }
+  .footer p { margin-bottom: 0.25rem; }
+
+  /* ── Print button ───────────────────────────────── */
+  .print-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.6rem 1.5rem;
+    background: var(--primary);
+    color: var(--bg);
+    border: none;
+    border-radius: 8px;
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+    margin-top: 1rem;
+  }
+  .print-btn:hover { opacity: 0.9; }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <!-- Header -->
+  <div class="header">
+    <h1>Alchymine Report</h1>
+    <p>Your unique identity mapped through numerology, astrology, archetypes, and personality science</p>
+    <div class="meta">Report ID: {{ report_id }} &middot; Generated: {{ created_at }}</div>
+    <button class="print-btn no-print" onclick="window.print()">
+      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      Save as PDF
+    </button>
+  </div>
+
+  {% if numerology %}
+  <!-- Numerology -->
+  <div class="card">
+    <h2>Numerology</h2>
+    <p class="subtitle">Pythagorean numerology calculations from your name and birth date</p>
+    <div class="number-grid">
+      <div class="number-card">
+        <div class="value">{{ numerology.get('life_path', '—') }}</div>
+        <div class="label">Life Path</div>
+        {% if numerology.get('is_master_number') %}<div class="note">Master Number</div>{% endif %}
+      </div>
+      <div class="number-card">
+        <div class="value">{{ numerology.get('expression', '—') }}</div>
+        <div class="label">Expression</div>
+        <div class="note">Destiny Number</div>
+      </div>
+      <div class="number-card">
+        <div class="value">{{ numerology.get('soul_urge', '—') }}</div>
+        <div class="label">Soul Urge</div>
+        <div class="note">Heart's Desire</div>
+      </div>
+      <div class="number-card">
+        <div class="value">{{ numerology.get('personality', '—') }}</div>
+        <div class="label">Personality</div>
+        <div class="note">Outer Number</div>
+      </div>
+      <div class="number-card">
+        <div class="value">{{ numerology.get('personal_year', '—') }}</div>
+        <div class="label">Personal Year</div>
+        <div class="note">Current Cycle</div>
+      </div>
+      <div class="number-card">
+        <div class="value">{{ numerology.get('maturity', '—') }}</div>
+        <div class="label">Maturity</div>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
+  {% if astrology %}
+  <!-- Astrology -->
+  <div class="card">
+    <h2>Astrology</h2>
+    <p class="subtitle">Natal chart positions from Swiss Ephemeris</p>
+    <div class="number-grid">
+      <div class="number-card">
+        <div class="value">{{ astrology.get('sun_sign', '—') }}</div>
+        <div class="label">Sun Sign</div>
+      </div>
+      <div class="number-card">
+        <div class="value">{{ astrology.get('moon_sign', '—') }}</div>
+        <div class="label">Moon Sign</div>
+      </div>
+      <div class="number-card">
+        <div class="value">{{ astrology.get('rising_sign', 'N/A') }}</div>
+        <div class="label">Rising Sign</div>
+        {% if not astrology.get('rising_sign') %}<div class="note">Birth time required</div>{% endif %}
+      </div>
+    </div>
+    {% if astrology.get('mercury_retrograde') or astrology.get('venus_retrograde') %}
+    <div class="badge-row" style="margin-top: 0.75rem;">
+      {% if astrology.get('mercury_retrograde') %}<span class="badge badge-accent">Mercury Retrograde</span>{% endif %}
+      {% if astrology.get('venus_retrograde') %}<span class="badge badge-secondary">Venus Retrograde</span>{% endif %}
+    </div>
+    {% endif %}
+  </div>
+  {% endif %}
+
+  {% if archetype %}
+  <!-- Archetype -->
+  <div class="card">
+    <h2>Archetype</h2>
+    <p class="subtitle">Jungian archetype mapping from numerology and astrology signals</p>
+    <div class="badge-row">
+      <span class="badge badge-primary" style="font-size: 1rem;">
+        <small style="display:block;font-size:0.65rem;opacity:0.6;">Primary</small>
+        {{ archetype.get('primary', '—') | capitalize }}
+      </span>
+      {% if archetype.get('secondary') %}
+      <span class="badge badge-secondary" style="font-size: 1rem;">
+        <small style="display:block;font-size:0.65rem;opacity:0.6;">Secondary</small>
+        {{ archetype.get('secondary') | capitalize }}
+      </span>
+      {% endif %}
+      <span class="badge badge-shadow" style="font-size: 1rem;">
+        <small style="display:block;font-size:0.65rem;opacity:0.6;">Shadow</small>
+        {{ archetype.get('shadow', '—') }}
+      </span>
+    </div>
+
+    {% if archetype.get('light_qualities') %}
+    <p class="section-label">Light Qualities</p>
+    <div class="badge-row">
+      {% for q in archetype.get('light_qualities', []) %}
+      <span class="badge badge-light">{{ q }}</span>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    {% if archetype.get('shadow_qualities') %}
+    <p class="section-label">Shadow Qualities</p>
+    <div class="badge-row">
+      {% for q in archetype.get('shadow_qualities', []) %}
+      <span class="badge badge-light">{{ q }}</span>
+      {% endfor %}
+    </div>
+    {% endif %}
+  </div>
+  {% endif %}
+
+  {% if personality %}
+  <!-- Personality -->
+  <div class="card">
+    <h2>Personality</h2>
+    <p class="subtitle">Big Five traits from the mini-IPIP assessment</p>
+    {% set big_five = personality.get('big_five', {}) %}
+    {% for trait_name in ['openness', 'conscientiousness', 'extraversion', 'agreeableness', 'neuroticism'] %}
+    {% set val = big_five.get(trait_name, 0) %}
+    <div class="trait-row">
+      <span class="trait-label">{{ trait_name | capitalize }}</span>
+      <div class="trait-bar">
+        <div class="trait-bar-fill" style="width: {{ val }}%;"></div>
+      </div>
+      <span class="trait-value">{{ val | round | int }}</span>
+    </div>
+    {% endfor %}
+
+    <div class="badge-row" style="margin-top: 1rem;">
+      <span class="badge badge-accent">
+        <small style="display:block;font-size:0.65rem;opacity:0.6;">Attachment</small>
+        {{ personality.get('attachment_style', '—') | replace('-', ' / ') | capitalize }}
+      </span>
+      {% if personality.get('enneagram_type') %}
+      <span class="badge badge-secondary">
+        <small style="display:block;font-size:0.65rem;opacity:0.6;">Enneagram</small>
+        Type {{ personality.get('enneagram_type') }}{% if personality.get('enneagram_wing') %}w{{ personality.get('enneagram_wing') }}{% endif %}
+      </span>
+      {% endif %}
+    </div>
+  </div>
+  {% endif %}
+
+  {% if strengths_map %}
+  <!-- Strengths Map -->
+  <div class="card">
+    <h2>Strengths Map</h2>
+    <p class="subtitle">Top strengths derived from all identity systems</p>
+    <div class="strengths-row">
+      {% for s in strengths_map %}
+      <span class="strength">{{ s }}</span>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- Footer -->
+  <div class="footer">
+    <p>Generated by Alchymine — Open-Source Personal Transformation OS</p>
+    <p>This report uses deterministic calculations. No financial advice is provided.</p>
+    <p>License: CC-BY-NC-SA 4.0</p>
+  </div>
+
+</div>
+</body>
+</html>
