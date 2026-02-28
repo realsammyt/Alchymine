@@ -1,25 +1,41 @@
-"""Report generation API endpoints."""
+"""Report generation API endpoints.
+
+Dispatches report generation to a Celery task queue and exposes
+endpoints for checking status and retrieving completed reports.
+"""
 
 from __future__ import annotations
 
 import uuid
-from datetime import datetime
+from datetime import UTC, datetime
 
 from fastapi import APIRouter, HTTPException
+from fastapi.responses import HTMLResponse
 from pydantic import BaseModel, Field
 
 from alchymine.engine.profile import IntakeData
+from alchymine.engine.reports.html_renderer import render_report_html
+from alchymine.workers.tasks import generate_report as generate_report_task
+from alchymine.workers.tasks import report_store
 
 router = APIRouter()
 
-# In-memory store for development — replaced by PostgreSQL in production
-_reports: dict[str, dict] = {}
+
+# ── Request / Response models ────────────────────────────────────────────
 
 
 class ReportRequest(BaseModel):
     """Request to generate a full Alchymine report."""
 
     intake: IntakeData
+    user_input: str = Field(
+        default="Generate my full Alchymine report",
+        description="Free-text description of what the user wants",
+    )
+    user_profile: dict | None = Field(
+        default=None,
+        description="Optional user profile data to forward to orchestrator",
+    )
     modules: list[str] = Field(
         default_factory=lambda: ["full"],
         description="Modules to generate: 'full' or list of specific modules",
@@ -31,82 +47,131 @@ class ReportStatus(BaseModel):
     """Report generation status."""
 
     id: str
-    status: str = Field(..., description="queued | generating | completed | failed")
-    progress: float = Field(0.0, ge=0, le=1, description="0.0 to 1.0")
-    created_at: datetime
-    completed_at: datetime | None = None
-    quality_gates_passed: bool | None = None
+    status: str = Field(..., description="queued | processing | complete | failed")
+    created_at: str
+    updated_at: str | None = None
 
 
-class ReportResponse(BaseModel):
-    """Completed report response."""
+class ReportResult(BaseModel):
+    """Completed report data."""
 
     id: str
     status: str
-    profile_summary: dict | None = None
-    modules: dict | None = None
-    quality_gates: dict | None = None
-    created_at: datetime
-    completed_at: datetime | None = None
+    result: dict | None = None
+    error: str | None = None
+    created_at: str
+    updated_at: str | None = None
+
+
+# ── Endpoints ────────────────────────────────────────────────────────────
 
 
 @router.post("/reports", status_code=202)
-async def generate_report(request: ReportRequest) -> ReportStatus:
-    """Generate a full Alchymine report (async).
+async def create_report(request: ReportRequest) -> ReportStatus:
+    """Queue generation of a full Alchymine report.
 
-    Returns a job ID. Poll GET /reports/{id} for status and results.
-    In production, this dispatches a Celery task for the full swarm pipeline.
+    Returns a report ID and ``"queued"`` status immediately.  Use
+    ``GET /reports/{id}/status`` to poll for progress or
+    ``GET /reports/{id}`` to retrieve the completed result.
     """
     report_id = str(uuid.uuid4())
-    now = datetime.utcnow()
+    now = datetime.now(UTC).isoformat()
 
-    _reports[report_id] = {
-        "id": report_id,
+    # Seed the store so status queries work immediately
+    report_store[report_id] = {
+        "report_id": report_id,
         "status": "queued",
-        "progress": 0.0,
-        "intake": request.intake.model_dump(),
-        "modules": request.modules,
-        "tone": request.tone,
-        "created_at": now,
-        "completed_at": None,
+        "user_input": request.user_input,
+        "user_profile": request.user_profile,
         "result": None,
+        "error": None,
+        "created_at": now,
+        "updated_at": now,
     }
 
-    # TODO: Dispatch Celery task
-    # from alchymine.api.workers.report_pipeline import generate_report_task
-    # generate_report_task.delay(report_id, request.model_dump())
+    # Dispatch Celery task
+    generate_report_task.delay(
+        report_id,
+        request.user_input,
+        request.user_profile,
+    )
 
     return ReportStatus(
         id=report_id,
         status="queued",
-        progress=0.0,
         created_at=now,
+        updated_at=now,
+    )
+
+
+@router.get("/reports/{report_id}/status")
+async def get_report_status(report_id: str) -> ReportStatus:
+    """Return the current processing status of a report.
+
+    Returns 404 if the report_id is not recognised.
+    """
+    if report_id not in report_store:
+        raise HTTPException(status_code=404, detail="Report not found")
+
+    entry = report_store[report_id]
+    return ReportStatus(
+        id=report_id,
+        status=entry["status"],
+        created_at=entry["created_at"],
+        updated_at=entry.get("updated_at"),
     )
 
 
 @router.get("/reports/{report_id}")
-async def get_report(report_id: str) -> ReportResponse:
+async def get_report(report_id: str) -> ReportResult:
     """Retrieve a completed report by ID.
 
-    Returns 202 if still generating, 200 if complete, 404 if not found.
+    - **200** — report is complete (or failed) and data is returned.
+    - **202** — report is still queued or processing.
+    - **404** — report_id not found.
     """
-    if report_id not in _reports:
+    if report_id not in report_store:
         raise HTTPException(status_code=404, detail="Report not found")
 
-    report = _reports[report_id]
+    entry = report_store[report_id]
 
-    if report["status"] in ("queued", "generating"):
+    if entry["status"] in ("queued", "processing"):
         raise HTTPException(
             status_code=202,
-            detail=f"Report is {report['status']} ({report['progress']:.0%} complete)",
+            detail=f"Report is {entry['status']}",
         )
 
-    return ReportResponse(
-        id=report["id"],
-        status=report["status"],
-        profile_summary=report.get("result", {}).get("profile_summary"),
-        modules=report.get("result", {}).get("modules"),
-        quality_gates=report.get("result", {}).get("quality_gates"),
-        created_at=report["created_at"],
-        completed_at=report.get("completed_at"),
+    return ReportResult(
+        id=report_id,
+        status=entry["status"],
+        result=entry.get("result"),
+        error=entry.get("error"),
+        created_at=entry["created_at"],
+        updated_at=entry.get("updated_at"),
     )
+
+
+@router.get("/reports/{report_id}/html")
+async def get_report_html(report_id: str) -> HTMLResponse:
+    """Render a completed report as a styled HTML page.
+
+    The HTML is self-contained (inline CSS) and includes a "Save as PDF"
+    button that triggers the browser's native print dialog.
+
+    - **200** — HTML page with report content.
+    - **202** — report is still being generated.
+    - **404** — report_id not found.
+    """
+    if report_id not in report_store:
+        raise HTTPException(status_code=404, detail="Report not found")
+
+    entry = report_store[report_id]
+
+    if entry["status"] in ("queued", "processing"):
+        raise HTTPException(
+            status_code=202,
+            detail=f"Report is {entry['status']}",
+        )
+
+    html_content = render_report_html(entry)
+    return HTMLResponse(content=html_content)

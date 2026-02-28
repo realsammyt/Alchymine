@@ -18,15 +18,12 @@ from __future__ import annotations
 
 import math
 from datetime import date, time
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
-from .aspects import Aspect, AspectType, calculate_aspects
+from .aspects import calculate_aspects
 from .transits import (
     approximate_planet_longitude,
-    get_current_positions,
-    get_transit_overlay,
-    PLANET_ELEMENTS,
 )
 
 # Zodiac sign boundaries (ecliptic longitude ranges)
@@ -66,7 +63,7 @@ SUN_ENTRY_DATES: list[tuple[int, int, str]] = [
 # ─── House Systems ──────────────────────────────────────────────────────
 
 
-class HouseSystem(str, Enum):
+class HouseSystem(StrEnum):
     """Supported astrological house systems."""
 
     PLACIDUS = "placidus"
@@ -206,16 +203,12 @@ def approximate_ascendant(
     t_centuries = days_since_j2000 / 36525.0
     # GMST at 0h UT in degrees
     gmst_0h = (
-        280.46061837
-        + 360.98564736629 * days_since_j2000
-        + 0.000387933 * t_centuries**2
+        280.46061837 + 360.98564736629 * days_since_j2000 + 0.000387933 * t_centuries**2
     ) % 360
 
     # Step 3: Add the birth time contribution
     # Convert birth time to fractional hours
-    birth_hours = (
-        birth_time.hour + birth_time.minute / 60.0 + birth_time.second / 3600.0
-    )
+    birth_hours = birth_time.hour + birth_time.minute / 60.0 + birth_time.second / 3600.0
     # Sidereal time advances ~1.00274 sidereal degrees per solar hour
     # (360 degrees in ~23h 56m 4s)
     gmst = (gmst_0h + birth_hours * 15.04107) % 360
@@ -232,9 +225,8 @@ def approximate_ascendant(
     lat_rad = math.radians(latitude)
 
     numerator = -math.cos(lst_rad)
-    denominator = (
-        math.sin(epsilon_rad) * math.tan(lat_rad)
-        + math.cos(epsilon_rad) * math.sin(lst_rad)
+    denominator = math.sin(epsilon_rad) * math.tan(lat_rad) + math.cos(epsilon_rad) * math.sin(
+        lst_rad
     )
 
     if abs(denominator) < 1e-10:
@@ -319,15 +311,13 @@ def _quadrant_houses(ascendant_degree: float, mc_degree: float) -> list[float]:
     def _trisect(start: float, end: float) -> list[float]:
         """Divide an arc into 3 equal parts."""
         arc = (end - start) % 360
-        return [
-            round((start + arc * i / 3) % 360, 2) for i in range(3)
-        ]
+        return [round((start + arc * i / 3) % 360, 2) for i in range(3)]
 
     cusps: list[float] = []
-    cusps.extend(_trisect(asc, ic))    # Houses 1, 2, 3
-    cusps.extend(_trisect(ic, dsc))    # Houses 4, 5, 6
-    cusps.extend(_trisect(dsc, mc))    # Houses 7, 8, 9
-    cusps.extend(_trisect(mc, asc))    # Houses 10, 11, 12
+    cusps.extend(_trisect(asc, ic))  # Houses 1, 2, 3
+    cusps.extend(_trisect(ic, dsc))  # Houses 4, 5, 6
+    cusps.extend(_trisect(dsc, mc))  # Houses 7, 8, 9
+    cusps.extend(_trisect(mc, asc))  # Houses 10, 11, 12
     return cusps
 
 
@@ -336,8 +326,18 @@ def _approximate_planetary_positions(birth_date: date) -> dict[str, float]:
 
     Uses the mean orbital element approximations from the transits module.
     """
-    planets = ["Sun", "Moon", "Mercury", "Venus", "Mars",
-               "Jupiter", "Saturn", "Uranus", "Neptune", "Pluto"]
+    planets = [
+        "Sun",
+        "Moon",
+        "Mercury",
+        "Venus",
+        "Mars",
+        "Jupiter",
+        "Saturn",
+        "Uranus",
+        "Neptune",
+        "Pluto",
+    ]
     positions: dict[str, float] = {}
     for planet in planets:
         positions[planet] = approximate_planet_longitude(planet, birth_date)
@@ -501,9 +501,7 @@ def calculate_natal_chart(
         )
         base_result["house_system"] = house_system.value
         base_result["house_cusps"] = house_cusps
-        base_result["house_placements"] = _assign_house_placements(
-            planetary_positions, house_cusps
-        )
+        base_result["house_placements"] = _assign_house_placements(planetary_positions, house_cusps)
     else:
         base_result.setdefault("house_system", None)
         base_result.setdefault("house_cusps", None)
@@ -633,7 +631,7 @@ def _calculate_with_swisseph(
 
     Raises ImportError if swisseph is not installed.
     """
-    import swisseph as swe  # type: ignore[import-untyped]
+    import swisseph as swe
 
     # Convert birth date to Julian Day Number
     hour = 12.0  # Default to noon if no birth time

@@ -8,25 +8,23 @@ All calculations are deterministic — no LLM or randomness.
 
 from __future__ import annotations
 
-import math
 from dataclasses import dataclass
-from datetime import date, datetime, timezone
+from datetime import UTC, date, datetime
 
 from .aspects import (
-    Aspect,
-    AspectType,
     DEFAULT_ORBS,
     MAJOR_ASPECTS,
-    angular_separation,
+    Aspect,
+    AspectType,
     find_aspect,
 )
-
 
 # ─── Approximate Planetary Periods and Reference Positions ──────────────
 # Reference epoch: J2000.0 (January 1, 2000, 12:00 TT)
 # These are simplified mean orbital elements for approximate position calculation.
 # Accuracy: within ~1-2 degrees for inner planets, ~1 degree for outer planets
 # over a span of a few decades from J2000.
+
 
 @dataclass(frozen=True)
 class OrbitalElements:
@@ -147,8 +145,7 @@ def approximate_planet_longitude(
     """
     if planet not in PLANET_ELEMENTS:
         raise ValueError(
-            f"Unknown planet: {planet!r}. "
-            f"Valid planets: {', '.join(PLANET_ELEMENTS.keys())}"
+            f"Unknown planet: {planet!r}. Valid planets: {', '.join(PLANET_ELEMENTS.keys())}"
         )
 
     elements = PLANET_ELEMENTS[planet]
@@ -176,7 +173,7 @@ def get_current_positions(
         Mapping of planet name to ecliptic longitude (0-360).
     """
     if target_date is None:
-        target_date = datetime.now(timezone.utc).date()
+        target_date = datetime.now(UTC).date()
 
     if planets is None:
         planets = list(PLANET_ELEMENTS.keys())
@@ -310,10 +307,7 @@ def summarize_transits(
     summary: dict[str, str] = {}
     for ta in transit_aspects:
         key = f"{ta.transit_planet} -> {ta.natal_planet}"
-        value = (
-            f"{ta.aspect.aspect_type.value} "
-            f"(orb {ta.aspect.orb:.1f}\u00b0)"
-        )
+        value = f"{ta.aspect.aspect_type.value} (orb {ta.aspect.orb:.1f}\u00b0)"
         summary[key] = value
     return summary
 
@@ -345,7 +339,7 @@ def get_transit_overlay(
         - "transit_date": the date used for calculation
     """
     if transit_date is None:
-        transit_date = datetime.now(timezone.utc).date()
+        transit_date = datetime.now(UTC).date()
 
     current_positions = get_current_positions(target_date=transit_date)
 

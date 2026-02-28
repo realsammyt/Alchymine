@@ -9,13 +9,12 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass, field
-from enum import Enum
-
+from enum import StrEnum
 
 # ─── System intent enum ──────────────────────────────────────────────
 
 
-class SystemIntent(str, Enum):
+class SystemIntent(StrEnum):
     """The target system for a user request."""
 
     INTELLIGENCE = "intelligence"
@@ -274,7 +273,9 @@ def classify_intent(user_input: str) -> IntentResult:
         ):
             # Multiple systems detected at similar confidence
             confidence = top_score / total_hits
-            involved_systems = [s for s, sc in ranked if sc > 0 and sc / top_score >= _MULTI_SYSTEM_RATIO_THRESHOLD]
+            involved_systems = [
+                s for s, sc in ranked if sc > 0 and sc / top_score >= _MULTI_SYSTEM_RATIO_THRESHOLD
+            ]
             return IntentResult(
                 intent=SystemIntent.MULTI_SYSTEM,
                 confidence=confidence,

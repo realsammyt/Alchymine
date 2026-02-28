@@ -360,9 +360,7 @@ VALID_CATEGORIES: frozenset[str] = frozenset(
     {"somatic", "contemplative", "expressive", "nature", "relational"}
 )
 
-VALID_EVIDENCE_LEVELS: frozenset[str] = frozenset(
-    {"strong", "moderate", "emerging", "traditional"}
-)
+VALID_EVIDENCE_LEVELS: frozenset[str] = frozenset({"strong", "moderate", "emerging", "traditional"})
 
 
 def get_modalities_by_category(category: str) -> list[ModalityDefinition]:

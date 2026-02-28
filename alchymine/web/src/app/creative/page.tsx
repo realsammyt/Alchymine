@@ -1,4 +1,10 @@
+'use client';
+
+import { useMemo } from 'react';
 import MethodologyPanel from '@/components/shared/MethodologyPanel';
+import ApiStateView from '@/components/shared/ApiStateView';
+import { getCreativeStyle, StyleFingerprintResponse } from '@/lib/api';
+import { useApi, getStoredIntake } from '@/lib/useApi';
 
 const CREATIVE_DIMENSIONS = [
   {
@@ -59,7 +65,32 @@ const PROJECT_TYPES = [
   },
 ];
 
+function ScoreBar({ label, value }: { label: string; value: number }) {
+  return (
+    <div className="flex items-center gap-3">
+      <span className="text-sm text-text/60 w-28 text-right">{label}</span>
+      <div className="flex-1 h-2 bg-surface rounded-full overflow-hidden">
+        <div
+          className="h-full rounded-full bg-gradient-to-r from-secondary-dark to-secondary transition-all duration-700"
+          style={{ width: `${Math.min(value * 100, 100)}%` }}
+        />
+      </div>
+      <span className="text-sm font-mono text-secondary w-10">
+        {Math.round(value * 100)}
+      </span>
+    </div>
+  );
+}
+
 export default function CreativePage() {
+  const intake = useMemo(() => getStoredIntake(), []);
+  const hasIntake = !!intake?.intention;
+
+  const style = useApi<StyleFingerprintResponse>(
+    hasIntake ? () => getCreativeStyle({ intention: intake!.intention }) : null,
+    [intake?.intention],
+  );
+
   return (
     <main className="min-h-screen px-4 sm:px-6 lg:px-8 py-8">
       <div className="max-w-5xl mx-auto">
@@ -73,6 +104,80 @@ export default function CreativePage() {
             style profile, and tools for sustained creative output.
           </p>
         </header>
+
+        {/* Personalized Style Fingerprint */}
+        {hasIntake && (
+          <section className="mb-12" aria-labelledby="your-creative-heading">
+            <h2 id="your-creative-heading" className="text-2xl font-bold mb-6 flex items-center gap-3">
+              <span className="w-10 h-10 rounded-xl bg-secondary/10 flex items-center justify-center text-xl" aria-hidden="true">
+                {'\u{2728}'}
+              </span>
+              Your Creative Fingerprint
+            </h2>
+            <ApiStateView
+              loading={style.loading}
+              error={style.error}
+              empty={!style.data}
+              loadingText="Analyzing your creative profile..."
+              emptyText="Complete the full assessment to discover your Creative DNA and style fingerprint."
+              onRetry={style.refetch}
+            >
+              {style.data && (
+                <div className="card-surface p-6 space-y-6">
+                  <div className="flex items-center gap-4">
+                    <div className="w-16 h-16 rounded-2xl bg-secondary/10 flex items-center justify-center text-3xl">
+                      {STYLE_PROFILES.find(p => p.name.toLowerCase().includes(style.data!.creative_style.toLowerCase()))?.icon ?? '\u{1F3A8}'}
+                    </div>
+                    <div>
+                      <h3 className="text-xl font-bold text-secondary">{style.data.creative_style}</h3>
+                      <p className="text-sm text-text/50">Overall Score: {Math.round(style.data.overall_score * 100)}%</p>
+                    </div>
+                  </div>
+
+                  {/* Guilford Scores */}
+                  {style.data.guilford_summary && Object.keys(style.data.guilford_summary).length > 0 && (
+                    <div className="space-y-2">
+                      <h4 className="text-xs uppercase tracking-wider text-text/40 mb-2">Guilford Scores</h4>
+                      {Object.entries(style.data.guilford_summary).map(([key, val]) => (
+                        <ScoreBar key={key} label={key} value={Number(val) || 0} />
+                      ))}
+                    </div>
+                  )}
+
+                  <div className="grid sm:grid-cols-2 gap-4 pt-4 border-t border-white/5">
+                    <div>
+                      <h4 className="text-xs uppercase tracking-wider text-text/40 mb-2">Strengths</h4>
+                      <div className="flex flex-wrap gap-2">
+                        {style.data.strengths.map(s => (
+                          <span key={s} className="px-3 py-1 bg-secondary/10 text-secondary text-xs rounded-full">{s}</span>
+                        ))}
+                      </div>
+                    </div>
+                    <div>
+                      <h4 className="text-xs uppercase tracking-wider text-text/40 mb-2">Growth Areas</h4>
+                      <div className="flex flex-wrap gap-2">
+                        {style.data.growth_areas.map(g => (
+                          <span key={g} className="px-3 py-1 bg-white/5 text-text/50 text-xs rounded-full">{g}</span>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+
+                  {style.data.recommended_mediums.length > 0 && (
+                    <div className="pt-4 border-t border-white/5">
+                      <h4 className="text-xs uppercase tracking-wider text-text/40 mb-2">Recommended Mediums</h4>
+                      <div className="flex flex-wrap gap-2">
+                        {style.data.recommended_mediums.map(m => (
+                          <span key={m} className="px-3 py-1 bg-accent/10 text-accent text-xs rounded-full">{m}</span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </ApiStateView>
+          </section>
+        )}
 
         {/* Creative Assessment Section */}
         <section className="mb-12" aria-labelledby="assessment-heading">
@@ -113,9 +218,9 @@ export default function CreativePage() {
             evidenceLevel="strong"
             calculationType="hybrid"
             sources={[
-              'Guilford, J.P. (1967) \"The Nature of Human Intelligence\" - foundational creativity model',
-              'Torrance, E.P. (1974) \"Torrance Tests of Creative Thinking\" - validated assessment methodology',
-              'Runco, M.A. & Acar, S. (2012) \"Divergent Thinking as an Indicator of Creative Potential\" - meta-analysis',
+              'Guilford, J.P. (1967) "The Nature of Human Intelligence" - foundational creativity model',
+              'Torrance, E.P. (1974) "Torrance Tests of Creative Thinking" - validated assessment methodology',
+              'Runco, M.A. & Acar, S. (2012) "Divergent Thinking as an Indicator of Creative Potential" - meta-analysis',
               'Big Five Openness to Experience as creativity predictor - Kaufman et al. (2016)',
             ]}
           />
@@ -182,7 +287,7 @@ export default function CreativePage() {
             href="/discover/intake"
             className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-secondary-dark to-secondary text-white font-semibold rounded-xl text-sm transition-all duration-300 hover:shadow-[0_0_20px_rgba(123,45,142,0.3)] hover:scale-[1.02] active:scale-100"
           >
-            Discover Your Creative DNA
+            {hasIntake ? 'Update Your Creative Profile' : 'Discover Your Creative DNA'}
             <svg
               className="w-4 h-4"
               viewBox="0 0 24 24"

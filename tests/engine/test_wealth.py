@@ -26,10 +26,8 @@ from alchymine.engine.wealth.archetype import (
 from alchymine.engine.wealth.levers import prioritize_levers
 from alchymine.engine.wealth.plan import (
     ActivationPlan,
-    PlanPhase,
     generate_activation_plan,
 )
-
 
 # ═══════════════════════════════════════════════════════════════════════════
 # Wealth Archetype Mapping Tests
@@ -173,10 +171,14 @@ class TestWealthArchetypeMapping:
     def test_risk_tolerance_affects_scoring(self) -> None:
         """Different risk tolerances produce different scores."""
         scores_conservative = get_wealth_archetype_scores(
-            life_path=1, archetype_primary=ArchetypeType.HERO, risk_tolerance=RiskTolerance.CONSERVATIVE
+            life_path=1,
+            archetype_primary=ArchetypeType.HERO,
+            risk_tolerance=RiskTolerance.CONSERVATIVE,
         )
         scores_aggressive = get_wealth_archetype_scores(
-            life_path=1, archetype_primary=ArchetypeType.HERO, risk_tolerance=RiskTolerance.AGGRESSIVE
+            life_path=1,
+            archetype_primary=ArchetypeType.HERO,
+            risk_tolerance=RiskTolerance.AGGRESSIVE,
         )
         # The Warrior should score higher with aggressive risk tolerance
         assert scores_aggressive["The Warrior"] > scores_conservative["The Warrior"]
@@ -200,8 +202,12 @@ class TestLeverPrioritization:
         """Having dependents boosts PROTECT priority."""
         ctx_no_deps = WealthContext(dependents=0)
         ctx_deps = WealthContext(dependents=2)
-        levers_no_deps = prioritize_levers(ctx_no_deps, RiskTolerance.MODERATE, Intention.CAREER, life_path=1)
-        levers_deps = prioritize_levers(ctx_deps, RiskTolerance.MODERATE, Intention.CAREER, life_path=1)
+        levers_no_deps = prioritize_levers(
+            ctx_no_deps, RiskTolerance.MODERATE, Intention.CAREER, life_path=1
+        )
+        levers_deps = prioritize_levers(
+            ctx_deps, RiskTolerance.MODERATE, Intention.CAREER, life_path=1
+        )
         # PROTECT should be higher priority with dependents
         idx_no_deps = levers_no_deps.index(WealthLever.PROTECT)
         idx_deps = levers_deps.index(WealthLever.PROTECT)
@@ -215,7 +221,9 @@ class TestLeverPrioritization:
 
     def test_family_intention_boosts_protect_and_transfer(self) -> None:
         """Family intention boosts PROTECT and TRANSFER priorities."""
-        levers_family = prioritize_levers(None, RiskTolerance.MODERATE, Intention.FAMILY, life_path=6)
+        levers_family = prioritize_levers(
+            None, RiskTolerance.MODERATE, Intention.FAMILY, life_path=6
+        )
         levers_money = prioritize_levers(None, RiskTolerance.MODERATE, Intention.MONEY, life_path=6)
         # PROTECT should be higher with family intention
         assert levers_family.index(WealthLever.PROTECT) < levers_money.index(WealthLever.PROTECT)
@@ -227,16 +235,26 @@ class TestLeverPrioritization:
 
     def test_aggressive_risk_boosts_grow(self) -> None:
         """Aggressive risk tolerance boosts GROW priority."""
-        levers_conservative = prioritize_levers(None, RiskTolerance.CONSERVATIVE, Intention.MONEY, life_path=7)
-        levers_aggressive = prioritize_levers(None, RiskTolerance.AGGRESSIVE, Intention.MONEY, life_path=7)
-        assert levers_aggressive.index(WealthLever.GROW) <= levers_conservative.index(WealthLever.GROW)
+        levers_conservative = prioritize_levers(
+            None, RiskTolerance.CONSERVATIVE, Intention.MONEY, life_path=7
+        )
+        levers_aggressive = prioritize_levers(
+            None, RiskTolerance.AGGRESSIVE, Intention.MONEY, life_path=7
+        )
+        assert levers_aggressive.index(WealthLever.GROW) <= levers_conservative.index(
+            WealthLever.GROW
+        )
 
     def test_has_business_boosts_earn(self) -> None:
         """Having a business boosts EARN priority."""
         ctx_no_biz = WealthContext(has_business=False)
         ctx_biz = WealthContext(has_business=True)
-        levers_no_biz = prioritize_levers(ctx_no_biz, RiskTolerance.MODERATE, Intention.CAREER, life_path=8)
-        levers_biz = prioritize_levers(ctx_biz, RiskTolerance.MODERATE, Intention.CAREER, life_path=8)
+        levers_no_biz = prioritize_levers(
+            ctx_no_biz, RiskTolerance.MODERATE, Intention.CAREER, life_path=8
+        )
+        levers_biz = prioritize_levers(
+            ctx_biz, RiskTolerance.MODERATE, Intention.CAREER, life_path=8
+        )
         assert levers_biz.index(WealthLever.EARN) <= levers_no_biz.index(WealthLever.EARN)
 
     def test_none_context_uses_defaults(self) -> None:
@@ -269,7 +287,13 @@ class TestActivationPlan:
         """Helper to generate a plan with defaults."""
         archetype = WEALTH_ARCHETYPES[archetype_name]
         if levers is None:
-            levers = [WealthLever.EARN, WealthLever.GROW, WealthLever.KEEP, WealthLever.PROTECT, WealthLever.TRANSFER]
+            levers = [
+                WealthLever.EARN,
+                WealthLever.GROW,
+                WealthLever.KEEP,
+                WealthLever.PROTECT,
+                WealthLever.TRANSFER,
+            ]
         return generate_activation_plan(archetype, levers, risk)
 
     def test_plan_has_3_phases(self) -> None:
@@ -297,7 +321,13 @@ class TestActivationPlan:
 
     def test_phases_focus_on_top_3_levers(self) -> None:
         """Each phase focuses on the corresponding lever priority."""
-        levers = [WealthLever.PROTECT, WealthLever.TRANSFER, WealthLever.EARN, WealthLever.GROW, WealthLever.KEEP]
+        levers = [
+            WealthLever.PROTECT,
+            WealthLever.TRANSFER,
+            WealthLever.EARN,
+            WealthLever.GROW,
+            WealthLever.KEEP,
+        ]
         plan = self._make_plan(levers=levers)
         assert plan.phases[0].focus_lever == WealthLever.PROTECT
         assert plan.phases[1].focus_lever == WealthLever.TRANSFER

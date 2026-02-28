@@ -30,9 +30,7 @@ def normalize_name(name: str) -> str:
     # NFKD decomposition strips accents (e.g. e-acute -> e + combining acute)
     decomposed = unicodedata.normalize("NFKD", name)
     # Keep only ASCII letters and spaces
-    ascii_only = "".join(
-        ch for ch in decomposed if ch.isascii() and (ch.isalpha() or ch == " ")
-    )
+    ascii_only = "".join(ch for ch in decomposed if ch.isascii() and (ch.isalpha() or ch == " "))
     return ascii_only.upper().strip()
 
 

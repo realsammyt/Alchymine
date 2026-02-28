@@ -6,18 +6,21 @@ a PostgreSQL server.  A fresh database is created for each test function.
 
 from __future__ import annotations
 
-import os
-from typing import AsyncGenerator
+from collections.abc import AsyncGenerator
 
 import pytest
 import pytest_asyncio
 from cryptography.fernet import Fernet
-from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker, create_async_engine
-
-from alchymine.db.base import Base
+from sqlalchemy.ext.asyncio import (
+    AsyncEngine,
+    AsyncSession,
+    async_sessionmaker,
+    create_async_engine,
+)
 
 # Import all models so that Base.metadata is populated
 import alchymine.db.models  # noqa: F401
+from alchymine.db.base import Base
 
 
 @pytest.fixture(autouse=True)

@@ -13,7 +13,6 @@ from __future__ import annotations
 
 import pytest
 
-from alchymine.engine.profile import KeganStage
 from alchymine.engine.perspective import (
     COGNITIVE_BIASES,
     assess_kegan_stage,
@@ -29,7 +28,7 @@ from alchymine.engine.perspective import (
     suggest_debiasing,
     weighted_decision_matrix,
 )
-
+from alchymine.engine.profile import KeganStage
 
 # ═══════════════════════════════════════════════════════════════════════════
 # Decision Frameworks
@@ -172,9 +171,7 @@ class TestSixThinkingHats:
 
     def test_partial_coverage(self):
         """Two hats gives 2/6 coverage."""
-        result = six_thinking_hats(
-            "Problem", {"white": "facts", "red": "feelings"}
-        )
+        result = six_thinking_hats("Problem", {"white": "facts", "red": "feelings"})
         assert abs(result["coverage_score"] - 2 / 6) < 0.001
         assert len(result["missing_hats"]) == 4
 
@@ -217,7 +214,7 @@ class TestSecondOrderEffects:
         )
         assert len(result["first_order"]) == 2
         assert len(result["second_order"]) == 4  # 2 per first-order
-        assert len(result["third_order"]) == 4   # 1 per second-order
+        assert len(result["third_order"]) == 4  # 1 per second-order
         assert result["total_effects_mapped"] == 10
 
     def test_empty_effects_list(self):
@@ -312,10 +309,7 @@ class TestBiasDetection:
 
     def test_results_sorted_by_confidence(self):
         """Results are sorted by confidence descending."""
-        text = (
-            "I knew it. Proves my point. As I expected. "
-            "Recently there was something."
-        )
+        text = "I knew it. Proves my point. As I expected. Recently there was something."
         results = detect_biases(text)
         if len(results) >= 2:
             confidences = [r["confidence"] for r in results]
@@ -407,9 +401,7 @@ class TestModelScenarios:
 
     def test_methodology_present(self):
         """Each scenario includes methodology."""
-        result = model_scenarios(
-            "Test", [{"name": "x", "best": 10, "worst": 1, "likely": 5}]
-        )
+        result = model_scenarios("Test", [{"name": "x", "best": 10, "worst": 1, "likely": 5}])
         for s in result:
             assert "Royal Dutch Shell" in s["methodology"]
 
@@ -419,16 +411,10 @@ class TestProbabilityAssessment:
 
     def test_likely_gets_highest_probability(self):
         """Most-likely scenario gets highest probability midpoint."""
-        scenarios = model_scenarios(
-            "Test", [{"name": "x", "best": 100, "worst": 10, "likely": 50}]
-        )
+        scenarios = model_scenarios("Test", [{"name": "x", "best": 100, "worst": 10, "likely": 50}])
         result = probability_assessment(scenarios)
-        likely_assessment = next(
-            a for a in result["assessments"] if a["scenario_type"] == "likely"
-        )
-        other_assessments = [
-            a for a in result["assessments"] if a["scenario_type"] != "likely"
-        ]
+        likely_assessment = next(a for a in result["assessments"] if a["scenario_type"] == "likely")
+        other_assessments = [a for a in result["assessments"] if a["scenario_type"] != "likely"]
         for other in other_assessments:
             assert likely_assessment["probability_midpoint"] > other["probability_midpoint"]
 
@@ -439,9 +425,7 @@ class TestProbabilityAssessment:
 
     def test_methodology_present(self):
         """Result includes methodology."""
-        scenarios = model_scenarios(
-            "Test", [{"name": "x", "best": 10, "worst": 1, "likely": 5}]
-        )
+        scenarios = model_scenarios("Test", [{"name": "x", "best": 10, "worst": 1, "likely": 5}])
         result = probability_assessment(scenarios)
         assert "Triangular" in result["methodology"]
 
@@ -500,9 +484,7 @@ class TestSensitivityAnalysis:
 
     def test_methodology_present(self):
         """Result includes methodology."""
-        result = sensitivity_analysis(
-            [{"name": "x", "best": 10, "worst": 1, "likely": 5}]
-        )
+        result = sensitivity_analysis([{"name": "x", "best": 10, "worst": 1, "likely": 5}])
         assert "OAT" in result["methodology"]
 
 
@@ -516,51 +498,61 @@ class TestKeganAssessment:
 
     def test_stage_1_impulsive(self):
         """Low scores across dimensions map to impulsive stage."""
-        result = assess_kegan_stage({
-            "self_awareness": 1,
-            "perspective_taking": 1,
-            "conflict_tolerance": 1,
-        })
+        result = assess_kegan_stage(
+            {
+                "self_awareness": 1,
+                "perspective_taking": 1,
+                "conflict_tolerance": 1,
+            }
+        )
         assert result == KeganStage.IMPULSIVE
 
     def test_stage_3_socialized(self):
         """Mid-range scores mapping to socialized stage."""
-        result = assess_kegan_stage({
-            "self_awareness": 3,
-            "perspective_taking": 3,
-            "relationship_to_authority": 3.5,
-            "conflict_tolerance": 2.5,
-            "systems_thinking": 2.5,
-        })
+        result = assess_kegan_stage(
+            {
+                "self_awareness": 3,
+                "perspective_taking": 3,
+                "relationship_to_authority": 3.5,
+                "conflict_tolerance": 2.5,
+                "systems_thinking": 2.5,
+            }
+        )
         assert result == KeganStage.SOCIALIZED
 
     def test_stage_4_self_authoring(self):
         """Higher scores map to self-authoring stage."""
-        result = assess_kegan_stage({
-            "self_awareness": 4,
-            "perspective_taking": 4,
-            "relationship_to_authority": 4.5,
-            "conflict_tolerance": 4,
-            "systems_thinking": 3.5,
-        })
+        result = assess_kegan_stage(
+            {
+                "self_awareness": 4,
+                "perspective_taking": 4,
+                "relationship_to_authority": 4.5,
+                "conflict_tolerance": 4,
+                "systems_thinking": 3.5,
+            }
+        )
         assert result == KeganStage.SELF_AUTHORING
 
     def test_stage_5_self_transforming(self):
         """Maximum scores map to self-transforming stage."""
-        result = assess_kegan_stage({
-            "self_awareness": 5,
-            "perspective_taking": 5,
-            "conflict_tolerance": 5,
-            "systems_thinking": 5,
-        })
+        result = assess_kegan_stage(
+            {
+                "self_awareness": 5,
+                "perspective_taking": 5,
+                "conflict_tolerance": 5,
+                "systems_thinking": 5,
+            }
+        )
         assert result == KeganStage.SELF_TRANSFORMING
 
     def test_returns_kegan_stage_enum(self):
         """Result is always a KeganStage enum value."""
-        result = assess_kegan_stage({
-            "self_awareness": 3,
-            "perspective_taking": 3,
-        })
+        result = assess_kegan_stage(
+            {
+                "self_awareness": 3,
+                "perspective_taking": 3,
+            }
+        )
         assert isinstance(result, KeganStage)
 
     def test_too_few_dimensions_raises(self):
@@ -575,11 +567,13 @@ class TestKeganAssessment:
 
     def test_invalid_dimension_ignored(self):
         """Invalid dimension keys are silently ignored."""
-        result = assess_kegan_stage({
-            "self_awareness": 3,
-            "perspective_taking": 3,
-            "bogus_dimension": 5,
-        })
+        result = assess_kegan_stage(
+            {
+                "self_awareness": 3,
+                "perspective_taking": 3,
+                "bogus_dimension": 5,
+            }
+        )
         assert isinstance(result, KeganStage)
 
 
@@ -611,16 +605,18 @@ class TestStageDescription:
     def test_no_fatalistic_language(self):
         """Descriptions do not contain fatalistic or limiting language."""
         fatalistic_terms = [
-            "you will never", "cannot grow", "stuck at",
-            "doomed", "hopeless", "permanently",
+            "you will never",
+            "cannot grow",
+            "stuck at",
+            "doomed",
+            "hopeless",
+            "permanently",
         ]
         for stage in KeganStage:
             result = stage_description(stage)
             desc = result["description"].lower()
             for term in fatalistic_terms:
-                assert term not in desc, (
-                    f"Fatalistic term '{term}' found in {stage} description"
-                )
+                assert term not in desc, f"Fatalistic term '{term}' found in {stage} description"
 
 
 class TestGrowthPathway:
@@ -678,9 +674,8 @@ class TestPerspectiveImports:
 
     def test_import_all_public_api(self):
         """All items in __all__ are importable."""
-        from alchymine.engine.perspective import __all__ as exports
-
         import alchymine.engine.perspective as perspective
+        from alchymine.engine.perspective import __all__ as exports
 
         for name in exports:
             assert hasattr(perspective, name), f"{name} not found in perspective package"

@@ -93,10 +93,18 @@ class TestNumerologyResponseSchema:
         )
         data = response.json()
         required_fields = {
-            "life_path", "expression", "soul_urge", "personality",
-            "personal_year", "personal_month", "maturity",
-            "is_master_number", "chaldean_name", "system",
-            "name_used", "birth_date",
+            "life_path",
+            "expression",
+            "soul_urge",
+            "personality",
+            "personal_year",
+            "personal_month",
+            "maturity",
+            "is_master_number",
+            "chaldean_name",
+            "system",
+            "name_used",
+            "birth_date",
         }
         assert required_fields.issubset(set(data.keys()))
 
@@ -107,8 +115,15 @@ class TestNumerologyResponseSchema:
             params={"birth_date": "1990-03-15"},
         )
         data = response.json()
-        for field in ["life_path", "expression", "soul_urge", "personality",
-                      "personal_year", "personal_month", "maturity"]:
+        for field in [
+            "life_path",
+            "expression",
+            "soul_urge",
+            "personality",
+            "personal_year",
+            "personal_month",
+            "maturity",
+        ]:
             assert isinstance(data[field], int), f"{field} should be int"
 
     def test_is_master_number_is_bool(self, client: TestClient) -> None:

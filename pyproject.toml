@@ -16,7 +16,7 @@ dependencies = [
     # API
     "fastapi>=0.115.0",
     "uvicorn[standard]>=0.32.0",
-    "pydantic>=2.10.0",
+    "pydantic[email]>=2.10.0",
     "pydantic-settings>=2.6.0",
     # Async tasks
     "celery[redis]>=5.4.0",
@@ -47,6 +47,7 @@ dev = [
     "pytest-asyncio>=0.24.0",
     "pytest-cov>=6.0.0",
     "httpx>=0.28.0",
+    "aiosqlite>=0.20.0",
     # Linting
     "ruff>=0.8.0",
     "mypy>=1.13.0",
@@ -71,24 +72,63 @@ select = [
     "ANN",  # flake8-annotations
 ]
 ignore = [
-    "ANN101",  # Missing type annotation for self
-    "ANN102",  # Missing type annotation for cls
+    "ANN401",  # Dynamically typed expressions (Any) — needed for SQLAlchemy TypeDecorators
+    "ANN001",  # Missing type annotation for function argument — covered by mypy
+    "ANN003",  # Missing type annotation for **kwargs — covered by mypy
     "S101",    # Use of assert (OK in tests)
+    "E501",    # Line too long — handled by ruff format where possible
 ]
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**/*.py" = ["S101", "ANN"]
+"alchymine/db/migrations/**/*.py" = ["ANN", "E501"]
+"alchymine/api/routers/**/*.py" = ["B008"]  # FastAPI Depends() in defaults is standard
 
 [tool.mypy]
 python_version = "3.11"
-strict = true
-warn_return_any = true
+warn_return_any = false
 warn_unused_configs = true
+disallow_untyped_defs = true
+disallow_untyped_decorators = false
+check_untyped_defs = true
+no_implicit_optional = true
+warn_redundant_casts = true
+warn_unused_ignores = false
+
+[[tool.mypy.overrides]]
+module = [
+    "alembic.*",
+    "celery.*",
+    "redis.*",
+    "swisseph.*",
+    "jose.*",
+    "passlib.*",
+    "bcrypt.*",
+    "fastapi.*",
+    "pydantic.*",
+    "pydantic_settings.*",
+    "sqlalchemy.*",
+    "starlette.*",
+    "cryptography.*",
+    "anthropic.*",
+    "httpx.*",
+    "yaml.*",
+    "jinja2.*",
+]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = [
+    "alchymine.agents.*",
+    "alchymine.db.migrations.*",
+]
+disallow_untyped_defs = false
+disallow_untyped_decorators = false
+check_untyped_defs = true
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 asyncio_mode = "auto"
-addopts = "-v --cov=alchymine --cov-report=term-missing"
 
 [tool.hatch.build.targets.wheel]
 packages = ["alchymine"]

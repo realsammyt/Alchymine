@@ -14,12 +14,18 @@ from __future__ import annotations
 
 import pytest
 
-from alchymine.engine.profile import CreativeDNA, GuilfordScores
-
 from alchymine.engine.creative.assessment import (
     assess_creative_dna,
     assess_guilford,
     derive_creative_orientation,
+)
+from alchymine.engine.creative.collaboration import (
+    compatibility_score,
+    complementary_strengths,
+)
+from alchymine.engine.creative.projects import (
+    estimate_project_scope,
+    suggest_projects,
 )
 from alchymine.engine.creative.style import (
     generate_style_fingerprint,
@@ -27,15 +33,7 @@ from alchymine.engine.creative.style import (
     identify_strengths,
     suggest_mediums,
 )
-from alchymine.engine.creative.projects import (
-    estimate_project_scope,
-    suggest_projects,
-)
-from alchymine.engine.creative.collaboration import (
-    compatibility_score,
-    complementary_strengths,
-)
-
+from alchymine.engine.profile import CreativeDNA, GuilfordScores
 
 # ═══════════════════════════════════════════════════════════════════════════
 # Guilford Assessment Tests
@@ -127,15 +125,27 @@ class TestAssessGuilford:
 
     def test_clamping_above_100(self) -> None:
         """Scores above 100 are clamped to 100."""
-        responses = {"fluency": 150, "flexibility": 0, "originality": 0,
-                     "elaboration": 0, "sensitivity": 0, "redefinition": 0}
+        responses = {
+            "fluency": 150,
+            "flexibility": 0,
+            "originality": 0,
+            "elaboration": 0,
+            "sensitivity": 0,
+            "redefinition": 0,
+        }
         result = assess_guilford(responses)
         assert result.fluency == 100.0
 
     def test_clamping_below_0(self) -> None:
         """Scores below 0 are clamped to 0."""
-        responses = {"fluency": -10, "flexibility": 0, "originality": 0,
-                     "elaboration": 0, "sensitivity": 0, "redefinition": 0}
+        responses = {
+            "fluency": -10,
+            "flexibility": 0,
+            "originality": 0,
+            "elaboration": 0,
+            "sensitivity": 0,
+            "redefinition": 0,
+        }
         result = assess_guilford(responses)
         assert result.fluency == 0.0
 
@@ -152,8 +162,14 @@ class TestAssessGuilford:
 
     def test_deterministic_same_inputs(self) -> None:
         """Same inputs produce identical outputs."""
-        responses = {"fluency": 75, "flexibility": 50, "originality": 80,
-                     "elaboration": 60, "sensitivity": 40, "redefinition": 55}
+        responses = {
+            "fluency": 75,
+            "flexibility": 50,
+            "originality": 80,
+            "elaboration": 60,
+            "sensitivity": 40,
+            "redefinition": 55,
+        }
         r1 = assess_guilford(responses)
         r2 = assess_guilford(responses)
         assert r1 == r2
@@ -288,13 +304,25 @@ class TestStyleAnalysis:
 
     @pytest.fixture()
     def high_fluency_guilford(self) -> GuilfordScores:
-        return GuilfordScores(fluency=90, flexibility=70, originality=80,
-                              elaboration=40, sensitivity=30, redefinition=20)
+        return GuilfordScores(
+            fluency=90,
+            flexibility=70,
+            originality=80,
+            elaboration=40,
+            sensitivity=30,
+            redefinition=20,
+        )
 
     @pytest.fixture()
     def balanced_guilford(self) -> GuilfordScores:
-        return GuilfordScores(fluency=50, flexibility=50, originality=50,
-                              elaboration=50, sensitivity=50, redefinition=50)
+        return GuilfordScores(
+            fluency=50,
+            flexibility=50,
+            originality=50,
+            elaboration=50,
+            sensitivity=50,
+            redefinition=50,
+        )
 
     @pytest.fixture()
     def visual_dna(self) -> CreativeDNA:
@@ -306,7 +334,9 @@ class TestStyleAnalysis:
             creative_peak="morning",
         )
 
-    def test_fingerprint_has_required_keys(self, high_fluency_guilford: GuilfordScores, visual_dna: CreativeDNA) -> None:
+    def test_fingerprint_has_required_keys(
+        self, high_fluency_guilford: GuilfordScores, visual_dna: CreativeDNA
+    ) -> None:
         """Style fingerprint contains all required top-level keys."""
         fp = generate_style_fingerprint(high_fluency_guilford, visual_dna)
         assert "guilford_summary" in fp
@@ -315,14 +345,18 @@ class TestStyleAnalysis:
         assert "creative_style" in fp
         assert "overall_score" in fp
 
-    def test_fingerprint_dominant_components_ordered(self, high_fluency_guilford: GuilfordScores, visual_dna: CreativeDNA) -> None:
+    def test_fingerprint_dominant_components_ordered(
+        self, high_fluency_guilford: GuilfordScores, visual_dna: CreativeDNA
+    ) -> None:
         """Dominant components are ordered by score descending."""
         fp = generate_style_fingerprint(high_fluency_guilford, visual_dna)
         assert fp["dominant_components"][0] == "fluency"
         assert fp["dominant_components"][1] == "originality"
         assert fp["dominant_components"][2] == "flexibility"
 
-    def test_fingerprint_overall_score(self, balanced_guilford: GuilfordScores, visual_dna: CreativeDNA) -> None:
+    def test_fingerprint_overall_score(
+        self, balanced_guilford: GuilfordScores, visual_dna: CreativeDNA
+    ) -> None:
         """Overall score is the average of Guilford scores."""
         fp = generate_style_fingerprint(balanced_guilford, visual_dna)
         assert fp["overall_score"] == 50.0
@@ -339,13 +373,17 @@ class TestStyleAnalysis:
         assert len(areas) == 3
         assert "Repurposing Ability (Redefinition)" in areas[0]
 
-    def test_suggest_mediums_returns_nonempty(self, visual_dna: CreativeDNA, high_fluency_guilford: GuilfordScores) -> None:
+    def test_suggest_mediums_returns_nonempty(
+        self, visual_dna: CreativeDNA, high_fluency_guilford: GuilfordScores
+    ) -> None:
         """suggest_mediums returns at least one recommendation."""
         mediums = suggest_mediums(visual_dna, high_fluency_guilford)
         assert len(mediums) >= 1
         assert all(isinstance(m, str) for m in mediums)
 
-    def test_suggest_mediums_no_duplicates(self, visual_dna: CreativeDNA, high_fluency_guilford: GuilfordScores) -> None:
+    def test_suggest_mediums_no_duplicates(
+        self, visual_dna: CreativeDNA, high_fluency_guilford: GuilfordScores
+    ) -> None:
         """suggest_mediums returns no duplicates."""
         mediums = suggest_mediums(visual_dna, high_fluency_guilford)
         assert len(mediums) == len(set(mediums))
@@ -353,11 +391,19 @@ class TestStyleAnalysis:
     def test_suggest_mediums_structured_preference(self) -> None:
         """Highly structured DNA includes structured medium recommendation."""
         dna = CreativeDNA(structure_vs_improvisation=0.1, primary_sensory_mode="visual")
-        guilford = GuilfordScores(fluency=50, flexibility=50, originality=50,
-                                  elaboration=50, sensitivity=50, redefinition=50)
+        guilford = GuilfordScores(
+            fluency=50,
+            flexibility=50,
+            originality=50,
+            elaboration=50,
+            sensitivity=50,
+            redefinition=50,
+        )
         mediums = suggest_mediums(dna, guilford)
-        assert any("architectural" in m.lower() or "classical" in m.lower() or "technical" in m.lower()
-                    for m in mediums)
+        assert any(
+            "architectural" in m.lower() or "classical" in m.lower() or "technical" in m.lower()
+            for m in mediums
+        )
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -460,7 +506,9 @@ class TestCollaboration:
             creative_peak="morning",
         )
 
-    def test_compatibility_score_range(self, dna_structured_collab: CreativeDNA, dna_improv_solitary: CreativeDNA) -> None:
+    def test_compatibility_score_range(
+        self, dna_structured_collab: CreativeDNA, dna_improv_solitary: CreativeDNA
+    ) -> None:
         """Compatibility score is between 0 and 1."""
         score = compatibility_score(dna_structured_collab, dna_improv_solitary)
         assert 0.0 <= score <= 1.0
@@ -481,7 +529,9 @@ class TestCollaboration:
         poor = compatibility_score(dna_structured_collab, dna_improv_solitary)
         assert good > poor
 
-    def test_compatibility_deterministic(self, dna_structured_collab: CreativeDNA, dna_improv_solitary: CreativeDNA) -> None:
+    def test_compatibility_deterministic(
+        self, dna_structured_collab: CreativeDNA, dna_improv_solitary: CreativeDNA
+    ) -> None:
         """Same inputs produce same compatibility score."""
         s1 = compatibility_score(dna_structured_collab, dna_improv_solitary)
         s2 = compatibility_score(dna_structured_collab, dna_improv_solitary)
@@ -489,10 +539,22 @@ class TestCollaboration:
 
     def test_complementary_strengths_has_required_keys(self) -> None:
         """complementary_strengths returns all required keys."""
-        ga = GuilfordScores(fluency=90, flexibility=30, originality=80,
-                            elaboration=20, sensitivity=60, redefinition=40)
-        gb = GuilfordScores(fluency=30, flexibility=90, originality=20,
-                            elaboration=80, sensitivity=40, redefinition=60)
+        ga = GuilfordScores(
+            fluency=90,
+            flexibility=30,
+            originality=80,
+            elaboration=20,
+            sensitivity=60,
+            redefinition=40,
+        )
+        gb = GuilfordScores(
+            fluency=30,
+            flexibility=90,
+            originality=20,
+            elaboration=80,
+            sensitivity=40,
+            redefinition=60,
+        )
         result = complementary_strengths(ga, gb)
         assert "person_a_leads" in result
         assert "person_b_leads" in result
@@ -502,51 +564,117 @@ class TestCollaboration:
 
     def test_complementary_strengths_correct_leads(self) -> None:
         """Person A leads where A is stronger, B leads where B is stronger."""
-        ga = GuilfordScores(fluency=90, flexibility=30, originality=50,
-                            elaboration=50, sensitivity=50, redefinition=50)
-        gb = GuilfordScores(fluency=30, flexibility=90, originality=50,
-                            elaboration=50, sensitivity=50, redefinition=50)
+        ga = GuilfordScores(
+            fluency=90,
+            flexibility=30,
+            originality=50,
+            elaboration=50,
+            sensitivity=50,
+            redefinition=50,
+        )
+        gb = GuilfordScores(
+            fluency=30,
+            flexibility=90,
+            originality=50,
+            elaboration=50,
+            sensitivity=50,
+            redefinition=50,
+        )
         result = complementary_strengths(ga, gb)
         assert "Idea Generation (Fluency)" in result["person_a_leads"]
         assert "Adaptive Thinking (Flexibility)" in result["person_b_leads"]
 
     def test_shared_strengths_both_high(self) -> None:
         """Components where both score >= 60 appear in shared_strengths."""
-        ga = GuilfordScores(fluency=80, flexibility=80, originality=10,
-                            elaboration=10, sensitivity=10, redefinition=10)
-        gb = GuilfordScores(fluency=70, flexibility=90, originality=10,
-                            elaboration=10, sensitivity=10, redefinition=10)
+        ga = GuilfordScores(
+            fluency=80,
+            flexibility=80,
+            originality=10,
+            elaboration=10,
+            sensitivity=10,
+            redefinition=10,
+        )
+        gb = GuilfordScores(
+            fluency=70,
+            flexibility=90,
+            originality=10,
+            elaboration=10,
+            sensitivity=10,
+            redefinition=10,
+        )
         result = complementary_strengths(ga, gb)
         assert "Idea Generation (Fluency)" in result["shared_strengths"]
         assert "Adaptive Thinking (Flexibility)" in result["shared_strengths"]
 
     def test_shared_growth_both_low(self) -> None:
         """Components where both score < 40 appear in shared_growth."""
-        ga = GuilfordScores(fluency=10, flexibility=10, originality=80,
-                            elaboration=80, sensitivity=80, redefinition=80)
-        gb = GuilfordScores(fluency=20, flexibility=30, originality=90,
-                            elaboration=70, sensitivity=60, redefinition=90)
+        ga = GuilfordScores(
+            fluency=10,
+            flexibility=10,
+            originality=80,
+            elaboration=80,
+            sensitivity=80,
+            redefinition=80,
+        )
+        gb = GuilfordScores(
+            fluency=20,
+            flexibility=30,
+            originality=90,
+            elaboration=70,
+            sensitivity=60,
+            redefinition=90,
+        )
         result = complementary_strengths(ga, gb)
         assert "Idea Generation (Fluency)" in result["shared_growth"]
         assert "Adaptive Thinking (Flexibility)" in result["shared_growth"]
 
     def test_synergy_score_range(self) -> None:
         """Synergy score is between 0 and 1."""
-        ga = GuilfordScores(fluency=50, flexibility=50, originality=50,
-                            elaboration=50, sensitivity=50, redefinition=50)
-        gb = GuilfordScores(fluency=50, flexibility=50, originality=50,
-                            elaboration=50, sensitivity=50, redefinition=50)
+        ga = GuilfordScores(
+            fluency=50,
+            flexibility=50,
+            originality=50,
+            elaboration=50,
+            sensitivity=50,
+            redefinition=50,
+        )
+        gb = GuilfordScores(
+            fluency=50,
+            flexibility=50,
+            originality=50,
+            elaboration=50,
+            sensitivity=50,
+            redefinition=50,
+        )
         result = complementary_strengths(ga, gb)
         assert 0.0 <= result["synergy_score"] <= 1.0
 
     def test_high_synergy_when_complementary(self) -> None:
         """Complementary pair has higher synergy than identical low pair."""
-        ga = GuilfordScores(fluency=90, flexibility=20, originality=90,
-                            elaboration=20, sensitivity=90, redefinition=20)
-        gb = GuilfordScores(fluency=20, flexibility=90, originality=20,
-                            elaboration=90, sensitivity=20, redefinition=90)
-        gc = GuilfordScores(fluency=30, flexibility=30, originality=30,
-                            elaboration=30, sensitivity=30, redefinition=30)
+        ga = GuilfordScores(
+            fluency=90,
+            flexibility=20,
+            originality=90,
+            elaboration=20,
+            sensitivity=90,
+            redefinition=20,
+        )
+        gb = GuilfordScores(
+            fluency=20,
+            flexibility=90,
+            originality=20,
+            elaboration=90,
+            sensitivity=20,
+            redefinition=90,
+        )
+        gc = GuilfordScores(
+            fluency=30,
+            flexibility=30,
+            originality=30,
+            elaboration=30,
+            sensitivity=30,
+            redefinition=30,
+        )
         result_comp = complementary_strengths(ga, gb)
         result_low = complementary_strengths(gc, gc)
         assert result_comp["synergy_score"] > result_low["synergy_score"]

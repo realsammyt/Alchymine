@@ -96,7 +96,7 @@ async def calculate(request: BiorhythmCalculateRequest) -> BiorhythmCalculateRes
     try:
         result = calculate_biorhythm(request.birth_date, request.target_date)
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     return BiorhythmCalculateResponse(result=result)
 
@@ -115,7 +115,7 @@ async def range_calculation(request: BiorhythmRangeRequest) -> BiorhythmRangeRes
             request.days,
         )
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     return BiorhythmRangeResponse(
         results=results,
@@ -139,7 +139,7 @@ async def compatibility(
             request.target_date,
         )
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     return BiorhythmCompatibilityResponse(
         person_a=result["person_a"],

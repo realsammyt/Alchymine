@@ -2,18 +2,24 @@
 
 from __future__ import annotations
 
-from datetime import date, datetime, time
+import os
+
+# Enable Celery eager mode before any Celery imports — tasks execute
+# synchronously in-process so tests never need a running Redis broker.
+os.environ.setdefault("CELERY_ALWAYS_EAGER", "true")
+
+from datetime import date, time
 
 import pytest
 
 from alchymine.engine.profile import (
     AstrologyProfile,
+    AttachmentStyle,
     BigFiveScores,
     IntakeData,
     Intention,
     NumerologyProfile,
     PersonalityProfile,
-    AttachmentStyle,
     WealthContext,
 )
 
@@ -28,13 +34,33 @@ def sample_intake() -> IntakeData:
         birth_city="Mexico City",
         intention=Intention.FAMILY,
         assessment_responses={
-            "big_five_1": 4, "big_five_2": 2, "big_five_3": 3, "big_five_4": 2,
-            "big_five_5": 4, "big_five_6": 2, "big_five_7": 5, "big_five_8": 1,
-            "big_five_9": 3, "big_five_10": 3, "big_five_11": 4, "big_five_12": 2,
-            "big_five_13": 3, "big_five_14": 3, "big_five_15": 4, "big_five_16": 2,
-            "big_five_17": 4, "big_five_18": 2, "big_five_19": 2, "big_five_20": 2,
-            "attachment_1": 4, "attachment_2": 3, "attachment_3": 4, "attachment_4": 2,
-            "risk_1": 3, "risk_2": 3, "risk_3": 2,
+            "big_five_1": 4,
+            "big_five_2": 2,
+            "big_five_3": 3,
+            "big_five_4": 2,
+            "big_five_5": 4,
+            "big_five_6": 2,
+            "big_five_7": 5,
+            "big_five_8": 1,
+            "big_five_9": 3,
+            "big_five_10": 3,
+            "big_five_11": 4,
+            "big_five_12": 2,
+            "big_five_13": 3,
+            "big_five_14": 3,
+            "big_five_15": 4,
+            "big_five_16": 2,
+            "big_five_17": 4,
+            "big_five_18": 2,
+            "big_five_19": 2,
+            "big_five_20": 2,
+            "attachment_1": 4,
+            "attachment_2": 3,
+            "attachment_3": 4,
+            "attachment_4": 2,
+            "risk_1": 3,
+            "risk_2": 3,
+            "risk_3": 2,
         },
         wealth_context=WealthContext(
             income_range="$50k-$75k",

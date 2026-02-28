@@ -7,8 +7,6 @@ disclaimer generation, and integration with the modality matcher.
 
 from __future__ import annotations
 
-import pytest
-
 from alchymine.engine.healing.assessment import (
     _derive_max_difficulty,
     _extract_free_text,
@@ -22,7 +20,6 @@ from alchymine.engine.profile import (
     Intention,
     PracticeDifficulty,
 )
-
 
 # ─── Helpers ─────────────────────────────────────────────────────────
 
@@ -71,12 +68,14 @@ class TestDifficultyDerivation:
 
     def test_high_experience_returns_advanced_or_higher(self) -> None:
         """High experience should return ADVANCED or INTENSIVE."""
-        result = _derive_max_difficulty({
-            "healing_experience": 5,
-            "meditation_experience": 5,
-            "body_awareness": 5,
-            "comfort_with_intensity": 5,
-        })
+        result = _derive_max_difficulty(
+            {
+                "healing_experience": 5,
+                "meditation_experience": 5,
+                "body_awareness": 5,
+                "comfort_with_intensity": 5,
+            }
+        )
         assert result in (PracticeDifficulty.ADVANCED, PracticeDifficulty.INTENSIVE)
 
 
@@ -141,30 +140,36 @@ class TestProcessAssessment:
 
     def test_no_crisis_flag_for_normal_responses(self) -> None:
         """Normal responses should not set crisis_flag."""
-        result = process_assessment(responses={
-            "mood": 4,
-            "energy": 3,
-            "open_response": "I want to learn meditation and improve my sleep quality.",
-        })
+        result = process_assessment(
+            responses={
+                "mood": 4,
+                "energy": 3,
+                "open_response": "I want to learn meditation and improve my sleep quality.",
+            }
+        )
         assert result["crisis_flag"] is False
         assert result["crisis_response"] is None
 
     def test_crisis_flag_set_for_crisis_keywords(self) -> None:
         """Responses with crisis keywords should set crisis_flag."""
-        result = process_assessment(responses={
-            "open_response": "I have been feeling suicidal and don't want to live anymore.",
-        })
+        result = process_assessment(
+            responses={
+                "open_response": "I have been feeling suicidal and don't want to live anymore.",
+            }
+        )
         assert result["crisis_flag"] is True
         assert result["crisis_response"] is not None
         assert result["crisis_response"].severity == CrisisSeverity.EMERGENCY
 
     def test_emergency_crisis_caps_difficulty_at_foundation(self) -> None:
         """Emergency crisis should cap max_difficulty at FOUNDATION."""
-        result = process_assessment(responses={
-            "healing_experience": 5,
-            "meditation_experience": 5,
-            "open_response": "I keep thinking about suicide",
-        })
+        result = process_assessment(
+            responses={
+                "healing_experience": 5,
+                "meditation_experience": 5,
+                "open_response": "I keep thinking about suicide",
+            }
+        )
         assert result["crisis_flag"] is True
         assert result["max_difficulty"] == PracticeDifficulty.FOUNDATION
 
@@ -173,14 +178,18 @@ class TestProcessAssessment:
         result = process_assessment(responses={"mood": 3})
         assert len(result["disclaimers"]) >= 1
         # First disclaimer should be the healing disclaimer
-        assert "not medical advice" in result["disclaimers"][0].lower() or \
-               "personal growth" in result["disclaimers"][0].lower()
+        assert (
+            "not medical advice" in result["disclaimers"][0].lower()
+            or "personal growth" in result["disclaimers"][0].lower()
+        )
 
     def test_crisis_adds_crisis_disclaimer(self) -> None:
         """Crisis detection should add a crisis-specific disclaimer."""
-        result = process_assessment(responses={
-            "open_response": "I feel suicidal",
-        })
+        result = process_assessment(
+            responses={
+                "open_response": "I feel suicidal",
+            }
+        )
         all_disclaimers = " ".join(result["disclaimers"]).lower()
         assert "crisis" in all_disclaimers
 
@@ -220,12 +229,10 @@ class TestProcessAssessment:
         hero_top = result_hero["recommended_modalities"][0].modality
         # At least the scores should differ
         sage_scores = {
-            m.modality: m.preference_score
-            for m in result_sage["recommended_modalities"]
+            m.modality: m.preference_score for m in result_sage["recommended_modalities"]
         }
         hero_scores = {
-            m.modality: m.preference_score
-            for m in result_hero["recommended_modalities"]
+            m.modality: m.preference_score for m in result_hero["recommended_modalities"]
         }
         assert sage_scores != hero_scores
 
@@ -236,8 +243,10 @@ class TestProcessAssessment:
 
     def test_max_difficulty_derived_from_responses(self) -> None:
         """max_difficulty should be derived from assessment responses."""
-        result = process_assessment(responses={
-            "healing_experience": 1,
-            "meditation_experience": 1,
-        })
+        result = process_assessment(
+            responses={
+                "healing_experience": 1,
+                "meditation_experience": 1,
+            }
+        )
         assert result["max_difficulty"] == PracticeDifficulty.FOUNDATION

@@ -45,8 +45,8 @@ def _get_fernet() -> Fernet:
             f"Encryption key not set. "
             f"Export {_ENV_KEY} with a Fernet-compatible key. "
             f"Generate one with: "
-            f"python -c \"from cryptography.fernet import Fernet; "
-            f"print(Fernet.generate_key().decode())\""
+            f'python -c "from cryptography.fernet import Fernet; '
+            f'print(Fernet.generate_key().decode())"'
         )
     return Fernet(raw_key.encode())
 

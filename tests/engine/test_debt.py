@@ -31,7 +31,6 @@ from alchymine.engine.wealth.debt import (
     compare_strategies,
 )
 
-
 # ═══════════════════════════════════════════════════════════════════════════
 # Fixtures / Helpers
 # ═══════════════════════════════════════════════════════════════════════════
@@ -510,9 +509,7 @@ class TestCompareStrategies:
         """Months difference matches actual payoff difference."""
         debts = _standard_two_debts()
         comp = compare_strategies(debts, Decimal("100.00"))
-        expected_diff = abs(
-            comp.snowball.months_to_payoff - comp.avalanche.months_to_payoff
-        )
+        expected_diff = abs(comp.snowball.months_to_payoff - comp.avalanche.months_to_payoff)
         assert comp.months_difference == expected_diff
 
 
@@ -542,7 +539,9 @@ class TestEdgeCases:
         """A debt with zero balance is filtered out."""
         debts = [
             _make_debt(name="Zero", balance="0.00", minimum_payment="50.00"),
-            _make_debt(name="Real", balance="500.00", interest_rate="10.00", minimum_payment="50.00"),
+            _make_debt(
+                name="Real", balance="500.00", interest_rate="10.00", minimum_payment="50.00"
+            ),
         ]
         result = calculate_snowball(debts)
         # Only the non-zero debt should have a schedule
@@ -614,9 +613,7 @@ class TestDecimalPrecision:
         # No entry should have more than 2 decimal places
         for schedule in result.schedules:
             for entry in schedule.entries:
-                assert entry.remaining_balance == entry.remaining_balance.quantize(
-                    Decimal("0.01")
-                )
+                assert entry.remaining_balance == entry.remaining_balance.quantize(Decimal("0.01"))
 
     def test_interest_calculation_precision(self) -> None:
         """Interest calculation rounds to 2 decimal places."""

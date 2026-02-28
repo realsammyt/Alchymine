@@ -7,8 +7,6 @@ breathwork selector function.
 
 from __future__ import annotations
 
-import pytest
-
 from alchymine.engine.healing import (
     BREATHWORK_PATTERNS,
     MODALITY_REGISTRY,
@@ -38,7 +36,6 @@ from alchymine.engine.profile import (
     Intention,
     PracticeDifficulty,
 )
-
 
 # ─── Helpers ─────────────────────────────────────────────────────────
 
@@ -141,9 +138,7 @@ class TestModalityRegistry:
     def test_all_modalities_have_at_least_one_tradition(self) -> None:
         """Every modality must list at least one cultural tradition."""
         for definition in MODALITY_REGISTRY.values():
-            assert len(definition.traditions) >= 1, (
-                f"{definition.name} has no traditions listed"
-            )
+            assert len(definition.traditions) >= 1, f"{definition.name} has no traditions listed"
 
     def test_contraindications_are_tuples(self) -> None:
         """Contraindications must be tuples (immutable)."""
@@ -157,8 +152,12 @@ class TestModalityRegistry:
         somatic = get_modalities_by_category("somatic")
         somatic_names = {m.name for m in somatic}
         expected_somatic = {
-            "breathwork", "resilience_training", "sound_healing",
-            "somatic_practice", "sleep_healing", "pni_mapping",
+            "breathwork",
+            "resilience_training",
+            "sound_healing",
+            "somatic_practice",
+            "sleep_healing",
+            "pni_mapping",
         }
         assert somatic_names == expected_somatic
 
@@ -358,6 +357,7 @@ class TestMatchModalities:
             intention=Intention.HEALTH,
             max_difficulty=PracticeDifficulty.ADVANCED,
         )
+
         # Get contemplative scores
         def _contemplative_total(results: list[HealingPreference]) -> float:
             return sum(
@@ -382,8 +382,7 @@ class TestMatchModalities:
         modality_names = [r.modality for r in results[:3]]
         # Relational modalities should not dominate the top 3 for introverts
         relational_in_top3 = sum(
-            1 for name in modality_names
-            if MODALITY_REGISTRY[name].category == "relational"
+            1 for name in modality_names if MODALITY_REGISTRY[name].category == "relational"
         )
         assert relational_in_top3 <= 1
 
@@ -441,9 +440,7 @@ class TestMatchModalities:
                     intention=intention,
                     max_difficulty=PracticeDifficulty.ADVANCED,
                 )
-                assert len(results) > 0, (
-                    f"No results for {archetype}/{intention}"
-                )
+                assert len(results) > 0, f"No results for {archetype}/{intention}"
 
 
 # ═══════════════════════════════════════════════════════════════════════
@@ -497,9 +494,7 @@ class TestBreathworkPatterns:
     def test_all_patterns_have_reasonable_cycles(self) -> None:
         """Cycle count must be between 1 and 50."""
         for name, pattern in BREATHWORK_PATTERNS.items():
-            assert 1 <= pattern.cycles <= 50, (
-                f"{name} has unreasonable cycles: {pattern.cycles}"
-            )
+            assert 1 <= pattern.cycles <= 50, f"{name} has unreasonable cycles: {pattern.cycles}"
 
     def test_all_patterns_are_frozen_dataclass_instances(self) -> None:
         """Each pattern is a BreathworkPattern instance."""

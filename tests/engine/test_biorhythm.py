@@ -24,7 +24,6 @@ from alchymine.engine.biorhythm import (
     INTELLECTUAL_CYCLE,
     METHODOLOGY_NOTE,
     PHYSICAL_CYCLE,
-    BiorhythmResult,
     biorhythm_compatibility,
     calculate_biorhythm,
     calculate_range,
@@ -32,7 +31,6 @@ from alchymine.engine.biorhythm import (
     find_peak_days,
     sync_percentage,
 )
-
 
 # ─── Fixtures ─────────────────────────────────────────────────────────
 
@@ -221,7 +219,9 @@ class TestRangeCalculations:
         peaks = find_peak_days(BIRTH_DATE, BIRTH_DATE, 30)
         assert isinstance(peaks, list)
         # Day 7 emotional peak (value=1.0) should be found
-        emotional_peaks = [p for p in peaks if p["cycle"] == "emotional" and p["peak_type"] == "high"]
+        emotional_peaks = [
+            p for p in peaks if p["cycle"] == "emotional" and p["peak_type"] == "high"
+        ]
         assert len(emotional_peaks) >= 1
 
     def test_find_peak_days_returns_correct_keys(self) -> None:
@@ -253,9 +253,14 @@ class TestCompatibility:
         target = date(2020, 1, 1)
         result = biorhythm_compatibility(BIRTH_DATE, date(1991, 6, 15), target)
         expected_keys = {
-            "person_a", "person_b",
-            "physical_similarity", "emotional_similarity", "intellectual_similarity",
-            "overall_sync", "evidence_rating", "methodology_note",
+            "person_a",
+            "person_b",
+            "physical_similarity",
+            "emotional_similarity",
+            "intellectual_similarity",
+            "overall_sync",
+            "evidence_rating",
+            "methodology_note",
         }
         assert set(result.keys()) == expected_keys
 
@@ -272,6 +277,7 @@ class TestCompatibility:
 
         # Emotional similarity should be 0% (1.0 vs -1.0)
         from alchymine.engine.biorhythm.compatibility import _cycle_similarity
+
         assert _cycle_similarity(result_peak.emotional, result_trough.emotional) == 0.0
 
     def test_compatibility_different_birth_dates(self) -> None:

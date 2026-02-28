@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
-from enum import Enum
+from enum import StrEnum
 
 logger = logging.getLogger(__name__)
 
@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 # ─── Coordinator status ──────────────────────────────────────────────
 
 
-class CoordinatorStatus(str, Enum):
+class CoordinatorStatus(StrEnum):
     """Status of a coordinator's processing result."""
 
     SUCCESS = "success"
@@ -97,9 +97,7 @@ class BaseCoordinator:
             if not quality_result:
                 if result.status == CoordinatorStatus.SUCCESS.value:
                     result.status = CoordinatorStatus.DEGRADED.value
-                result.errors.append(
-                    f"Quality gate validation failed for {self.system_name}"
-                )
+                result.errors.append(f"Quality gate validation failed for {self.system_name}")
 
             return result
 
@@ -139,9 +137,7 @@ class BaseCoordinator:
         CoordinatorResult
             The processing result before quality gate validation.
         """
-        raise NotImplementedError(
-            f"{self.__class__.__name__} must implement _execute"
-        )
+        raise NotImplementedError(f"{self.__class__.__name__} must implement _execute")
 
     def _run_quality_gate(self, output: dict) -> bool:
         """Run the quality gate for this system's output.
@@ -168,9 +164,7 @@ class BaseCoordinator:
             # No quality gate registered for this system — pass by default
             return True
         except Exception as exc:
-            logger.warning(
-                "Quality gate error for %s: %s", self.system_name, exc
-            )
+            logger.warning("Quality gate error for %s: %s", self.system_name, exc)
             return True
 
 
@@ -214,9 +208,7 @@ class IntelligenceCoordinator(BaseCoordinator):
                     "personal_month": profile.personal_month,
                 }
             else:
-                errors.append(
-                    "Intelligence: missing full_name or birth_date for numerology"
-                )
+                errors.append("Intelligence: missing full_name or birth_date for numerology")
         except ImportError:
             errors.append("Intelligence: numerology engine not available")
         except Exception as exc:
@@ -225,8 +217,8 @@ class IntelligenceCoordinator(BaseCoordinator):
         # Astrology
         try:
             from alchymine.engine.astrology import (
-                approximate_sun_sign,
                 approximate_sun_degree,
+                approximate_sun_sign,
             )
 
             birth_date = request_data.get("birth_date")
@@ -290,13 +282,12 @@ class HealingCoordinator(BaseCoordinator):
             user_text = request_data.get("text", "")
             if user_text:
                 crisis = detect_crisis(user_text)
-                data["crisis_flag"] = crisis.is_crisis
-                if crisis.is_crisis:
+                data["crisis_flag"] = crisis is not None
+                if crisis is not None:
                     data["crisis_response"] = {
-                        "severity": crisis.severity.value if crisis.severity else None,
+                        "severity": crisis.severity.value,
                         "resources": [
-                            {"name": r.name, "contact": r.contact}
-                            for r in (crisis.resources or [])
+                            {"name": r.name, "contact": r.contact} for r in crisis.resources
                         ],
                     }
         except ImportError:
@@ -309,11 +300,17 @@ class HealingCoordinator(BaseCoordinator):
             from alchymine.engine.healing import match_modalities
 
             archetype = request_data.get("archetype")
-            attachment = request_data.get("attachment_style")
             intention = request_data.get("intention")
+            archetype_secondary = request_data.get("archetype_secondary")
+            big_five = request_data.get("big_five")
 
-            if archetype and attachment and intention:
-                modalities = match_modalities(archetype, attachment, intention)
+            if archetype and big_five and intention:
+                modalities = match_modalities(
+                    archetype,
+                    archetype_secondary,
+                    big_five,
+                    intention,
+                )
                 data["recommended_modalities"] = [
                     {
                         "modality": m.modality,
@@ -377,8 +374,14 @@ class WealthCoordinator(BaseCoordinator):
             life_path = request_data.get("life_path")
             risk_tolerance = request_data.get("risk_tolerance", "moderate")
 
-            if life_path is not None:
-                archetype = map_wealth_archetype(life_path, risk_tolerance)
+            archetype_primary = request_data.get("archetype_primary")
+
+            if life_path is not None and archetype_primary:
+                archetype = map_wealth_archetype(
+                    life_path,
+                    archetype_primary,
+                    risk_tolerance,
+                )
                 data["wealth_archetype"] = {
                     "name": archetype.name,
                     "description": archetype.description,
@@ -396,11 +399,17 @@ class WealthCoordinator(BaseCoordinator):
             risk_tolerance = request_data.get("risk_tolerance", "moderate")
             intention = request_data.get("intention")
 
+            wealth_context = request_data.get("wealth_context")
+
             if life_path is not None and intention:
-                levers = prioritize_levers(life_path, risk_tolerance, intention)
+                levers = prioritize_levers(
+                    wealth_context,
+                    risk_tolerance,
+                    intention,
+                    life_path,
+                )
                 data["lever_priorities"] = [
-                    lev.value if hasattr(lev, "value") else str(lev)
-                    for lev in levers
+                    lev.value if hasattr(lev, "value") else str(lev) for lev in levers
                 ]
         except ImportError:
             errors.append("Wealth: lever engine not available")

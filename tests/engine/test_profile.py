@@ -12,7 +12,6 @@ from alchymine.engine.profile import (
     BigFiveScores,
     CreativeLayer,
     GuilfordScores,
-    HealingLayer,
     IdentityLayer,
     IntakeData,
     Intention,
@@ -20,7 +19,6 @@ from alchymine.engine.profile import (
     PersonalityProfile,
     PerspectiveLayer,
     UserProfile,
-    WealthLayer,
 )
 
 

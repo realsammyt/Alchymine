@@ -140,15 +140,11 @@ class MasterOrchestrator:
             synthesis = synthesize_results(coordinator_results)
 
         # Overall quality check
-        quality_passed = all(
-            cr.quality_passed for cr in coordinator_results
-        )
+        quality_passed = all(cr.quality_passed for cr in coordinator_results)
 
         # Run ethics check on synthesis text if present
         if synthesis:
-            quality_passed = quality_passed and self._validate_synthesis(
-                synthesis
-            )
+            quality_passed = quality_passed and self._validate_synthesis(synthesis)
 
         return OrchestratorResult(
             request_id=request_id,
@@ -226,9 +222,7 @@ def synthesize_results(
             synthesis["errors"].extend(result.errors)
 
     # Determine overall status
-    if has_error and all(
-        r.status == CoordinatorStatus.ERROR.value for r in results
-    ):
+    if has_error and all(r.status == CoordinatorStatus.ERROR.value for r in results):
         synthesis["overall_status"] = CoordinatorStatus.ERROR.value
     elif has_error or has_degraded:
         synthesis["overall_status"] = CoordinatorStatus.DEGRADED.value

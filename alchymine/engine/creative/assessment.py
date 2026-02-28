@@ -182,10 +182,7 @@ def derive_creative_orientation(life_path: int) -> str:
     if life_path in _LIFE_PATH_ORIENTATION:
         return _LIFE_PATH_ORIENTATION[life_path]
 
-    raise ValueError(
-        f"Invalid life_path {life_path}. "
-        f"Must be 1-9, 11, 22, or 33."
-    )
+    raise ValueError(f"Invalid life_path {life_path}. Must be 1-9, 11, 22, or 33.")
 
 
 # ─── Helpers ──────────────────────────────────────────────────────────────

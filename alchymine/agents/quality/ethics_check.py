@@ -10,14 +10,13 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
-from enum import Enum
-
+from datetime import UTC, datetime
+from enum import StrEnum
 
 # ─── Violation severity ─────────────────────────────────────────────
 
 
-class ViolationSeverity(str, Enum):
+class ViolationSeverity(StrEnum):
     """Severity levels for ethics violations."""
 
     WARNING = "warning"
@@ -28,7 +27,7 @@ class ViolationSeverity(str, Enum):
 # ─── Violation categories ───────────────────────────────────────────
 
 
-class ViolationCategory(str, Enum):
+class ViolationCategory(StrEnum):
     """Categories of ethics violations."""
 
     FATALISTIC_LANGUAGE = "fatalistic_language"
@@ -59,7 +58,7 @@ class EthicsCheckResult:
 
     passed: bool
     violations: list[EthicsViolation] = field(default_factory=list)
-    checked_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    checked_at: datetime = field(default_factory=lambda: datetime.now(UTC))
 
 
 # ─── Pattern definitions ────────────────────────────────────────────
@@ -283,17 +282,34 @@ def _check_missing_disclaimer(
     violations: list[EthicsViolation] = []
 
     healing_keywords = [
-        "healing", "modality", "breathwork", "meditation",
-        "somatic", "energy", "chakra", "wellness practice",
+        "healing",
+        "modality",
+        "breathwork",
+        "meditation",
+        "somatic",
+        "energy",
+        "chakra",
+        "wellness practice",
     ]
     financial_keywords = [
-        "wealth", "investment", "financial", "portfolio",
-        "savings", "retirement", "income", "lever",
+        "wealth",
+        "investment",
+        "financial",
+        "portfolio",
+        "savings",
+        "retirement",
+        "income",
+        "lever",
     ]
     disclaimer_indicators = [
-        "not a substitute", "not medical advice", "consult a",
-        "professional", "disclaimer", "not financial advice",
-        "for informational purposes", "for educational purposes",
+        "not a substitute",
+        "not medical advice",
+        "consult a",
+        "professional",
+        "disclaimer",
+        "not financial advice",
+        "for informational purposes",
+        "for educational purposes",
     ]
 
     text_lower = text.lower()

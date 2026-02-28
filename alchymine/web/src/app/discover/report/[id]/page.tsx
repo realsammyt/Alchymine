@@ -482,9 +482,11 @@ export default function ReportPage() {
           <Button
             variant="ghost"
             onClick={() => {
-              // PDF export placeholder
-              alert(
-                'PDF export is not yet implemented. This feature will be available in a future release.',
+              const apiUrl =
+                process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+              window.open(
+                `${apiUrl}/api/v1/reports/${reportId}/html`,
+                '_blank',
               );
             }}
           >

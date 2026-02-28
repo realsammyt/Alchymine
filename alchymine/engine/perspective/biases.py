@@ -18,7 +18,6 @@ from __future__ import annotations
 
 import re
 
-
 # ─── Cognitive Bias Catalog ──────────────────────────────────────────────
 
 COGNITIVE_BIASES: dict[str, dict] = {
@@ -29,9 +28,15 @@ COGNITIVE_BIASES: dict[str, dict] = {
             "that confirms pre-existing beliefs."
         ),
         "keywords": [
-            "i knew it", "proves my point", "as i expected",
-            "i always thought", "confirms what i", "just as i said",
-            "this supports my", "see i was right", "told you so",
+            "i knew it",
+            "proves my point",
+            "as i expected",
+            "i always thought",
+            "confirms what i",
+            "just as i said",
+            "this supports my",
+            "see i was right",
+            "told you so",
             "exactly what i predicted",
         ],
         "source": "Kahneman & Tversky, heuristics and biases research",
@@ -39,13 +44,17 @@ COGNITIVE_BIASES: dict[str, dict] = {
     "anchoring_bias": {
         "name": "Anchoring Bias",
         "description": (
-            "Over-reliance on the first piece of information encountered "
-            "when making decisions."
+            "Over-reliance on the first piece of information encountered when making decisions."
         ),
         "keywords": [
-            "first impression", "initially i thought", "my first instinct",
-            "the original price", "starting point", "baseline was",
-            "originally it was", "compared to the first",
+            "first impression",
+            "initially i thought",
+            "my first instinct",
+            "the original price",
+            "starting point",
+            "baseline was",
+            "originally it was",
+            "compared to the first",
         ],
         "source": "Tversky & Kahneman (1974)",
     },
@@ -56,9 +65,15 @@ COGNITIVE_BIASES: dict[str, dict] = {
             "invested resources rather than future value."
         ),
         "keywords": [
-            "already invested", "too much time", "come this far",
-            "can't give up now", "already spent", "wasted if i stop",
-            "too late to quit", "put so much into", "after all the effort",
+            "already invested",
+            "too much time",
+            "come this far",
+            "can't give up now",
+            "already spent",
+            "wasted if i stop",
+            "too late to quit",
+            "put so much into",
+            "after all the effort",
             "already committed",
         ],
         "source": "Arkes & Blumer (1985)",
@@ -70,9 +85,15 @@ COGNITIVE_BIASES: dict[str, dict] = {
             "often because they are recent or emotionally vivid."
         ),
         "keywords": [
-            "i just saw", "happened recently", "heard about someone",
-            "it's everywhere", "so many people", "everyone is",
-            "in the news", "i keep seeing", "all the time",
+            "i just saw",
+            "happened recently",
+            "heard about someone",
+            "it's everywhere",
+            "so many people",
+            "everyone is",
+            "in the news",
+            "i keep seeing",
+            "all the time",
         ],
         "source": "Tversky & Kahneman (1973)",
     },
@@ -83,35 +104,47 @@ COGNITIVE_BIASES: dict[str, dict] = {
             "limited knowledge or experience."
         ),
         "keywords": [
-            "how hard can it be", "i could do that easily",
-            "it's not that complicated", "anyone could",
-            "simple enough", "obvious solution", "i don't need help",
+            "how hard can it be",
+            "i could do that easily",
+            "it's not that complicated",
+            "anyone could",
+            "simple enough",
+            "obvious solution",
+            "i don't need help",
             "i already know everything",
         ],
         "source": "Kruger & Dunning (1999)",
     },
     "bandwagon_effect": {
         "name": "Bandwagon Effect",
-        "description": (
-            "Adopting beliefs or behaviours because many others do so."
-        ),
+        "description": ("Adopting beliefs or behaviours because many others do so."),
         "keywords": [
-            "everyone is doing", "most people think", "the trend is",
-            "popular opinion", "majority believes", "going with the crowd",
-            "nobody else is worried", "everyone agrees",
+            "everyone is doing",
+            "most people think",
+            "the trend is",
+            "popular opinion",
+            "majority believes",
+            "going with the crowd",
+            "nobody else is worried",
+            "everyone agrees",
         ],
         "source": "Leibenstein (1950)",
     },
     "status_quo_bias": {
         "name": "Status Quo Bias",
         "description": (
-            "Preference for the current state of affairs, even when "
-            "change would be beneficial."
+            "Preference for the current state of affairs, even when change would be beneficial."
         ),
         "keywords": [
-            "why change", "it's always been", "worked before",
-            "if it ain't broke", "comfortable with", "used to this",
-            "no need to change", "things are fine", "better the devil you know",
+            "why change",
+            "it's always been",
+            "worked before",
+            "if it ain't broke",
+            "comfortable with",
+            "used to this",
+            "no need to change",
+            "things are fine",
+            "better the devil you know",
         ],
         "source": "Samuelson & Zeckhauser (1988)",
     },
@@ -122,9 +155,13 @@ COGNITIVE_BIASES: dict[str, dict] = {
             "depending on how it is presented."
         ),
         "keywords": [
-            "depends on how you look", "way it was presented",
-            "sounds better when", "the way they put it",
-            "phrased differently", "framed as", "spin on it",
+            "depends on how you look",
+            "way it was presented",
+            "sounds better when",
+            "the way they put it",
+            "phrased differently",
+            "framed as",
+            "spin on it",
         ],
         "source": "Tversky & Kahneman (1981)",
     },
@@ -135,23 +172,32 @@ COGNITIVE_BIASES: dict[str, dict] = {
             "than positive ones of equal magnitude."
         ),
         "keywords": [
-            "worst case", "what could go wrong", "the problem is",
-            "everything is terrible", "nothing works", "always bad",
-            "can't see anything good", "only see the negative",
-            "doomed", "never going to work",
+            "worst case",
+            "what could go wrong",
+            "the problem is",
+            "everything is terrible",
+            "nothing works",
+            "always bad",
+            "can't see anything good",
+            "only see the negative",
+            "doomed",
+            "never going to work",
         ],
         "source": "Baumeister et al. (2001)",
     },
     "optimism_bias": {
         "name": "Optimism Bias",
         "description": (
-            "Believing that negative events are less likely to happen "
-            "to oneself than to others."
+            "Believing that negative events are less likely to happen to oneself than to others."
         ),
         "keywords": [
-            "that won't happen to me", "i'm different",
-            "it'll work out", "nothing bad will happen",
-            "i'm lucky", "can't fail", "guaranteed success",
+            "that won't happen to me",
+            "i'm different",
+            "it'll work out",
+            "nothing bad will happen",
+            "i'm lucky",
+            "can't fail",
+            "guaranteed success",
             "no risk for me",
         ],
         "source": "Sharot (2011)",
@@ -159,13 +205,17 @@ COGNITIVE_BIASES: dict[str, dict] = {
     "hindsight_bias": {
         "name": "Hindsight Bias",
         "description": (
-            "Believing, after an event, that one would have predicted "
-            "or expected the outcome."
+            "Believing, after an event, that one would have predicted or expected the outcome."
         ),
         "keywords": [
-            "i knew it all along", "saw it coming", "should have known",
-            "was obvious", "predictable", "could have told you",
-            "everyone knew", "hindsight",
+            "i knew it all along",
+            "saw it coming",
+            "should have known",
+            "was obvious",
+            "predictable",
+            "could have told you",
+            "everyone knew",
+            "hindsight",
         ],
         "source": "Fischhoff (1975)",
     },
@@ -176,22 +226,30 @@ COGNITIVE_BIASES: dict[str, dict] = {
             "or product influence judgements about their specific attributes."
         ),
         "keywords": [
-            "they're great so", "can do no wrong", "everything they do is",
-            "because they're successful", "trust them completely",
-            "amazing at everything", "if they say so",
+            "they're great so",
+            "can do no wrong",
+            "everything they do is",
+            "because they're successful",
+            "trust them completely",
+            "amazing at everything",
+            "if they say so",
         ],
         "source": "Thorndike (1920)",
     },
     "loss_aversion": {
         "name": "Loss Aversion",
         "description": (
-            "Feeling losses more intensely than equivalent gains, "
-            "leading to risk-averse behaviour."
+            "Feeling losses more intensely than equivalent gains, leading to risk-averse behaviour."
         ),
         "keywords": [
-            "can't afford to lose", "don't want to risk",
-            "what if i lose", "scared of losing", "too much to lose",
-            "protect what i have", "losing is worse", "rather not risk",
+            "can't afford to lose",
+            "don't want to risk",
+            "what if i lose",
+            "scared of losing",
+            "too much to lose",
+            "protect what i have",
+            "losing is worse",
+            "rather not risk",
         ],
         "source": "Kahneman & Tversky (1979, Prospect Theory)",
     },
@@ -202,9 +260,14 @@ COGNITIVE_BIASES: dict[str, dict] = {
             "while underweighting historical patterns."
         ),
         "keywords": [
-            "just happened", "lately", "recently",
-            "last week", "past few days", "this morning",
-            "just yesterday", "most recent",
+            "just happened",
+            "lately",
+            "recently",
+            "last week",
+            "past few days",
+            "this morning",
+            "just yesterday",
+            "most recent",
         ],
         "source": "Serial position effect research",
     },
@@ -215,9 +278,14 @@ COGNITIVE_BIASES: dict[str, dict] = {
             "attributing one's own behaviour to circumstances."
         ),
         "keywords": [
-            "they're just", "that's who they are", "they always",
-            "typical of them", "it's their nature", "they chose to",
-            "because they're lazy", "they don't care",
+            "they're just",
+            "that's who they are",
+            "they always",
+            "typical of them",
+            "it's their nature",
+            "they chose to",
+            "because they're lazy",
+            "they don't care",
         ],
         "source": "Ross (1977)",
     },
@@ -228,9 +296,14 @@ COGNITIVE_BIASES: dict[str, dict] = {
             "while overestimating their benefits."
         ),
         "keywords": [
-            "should only take", "quick project", "won't take long",
-            "easy to do", "just a few days", "be done in no time",
-            "straightforward", "piece of cake",
+            "should only take",
+            "quick project",
+            "won't take long",
+            "easy to do",
+            "just a few days",
+            "be done in no time",
+            "straightforward",
+            "piece of cake",
         ],
         "source": "Kahneman & Tversky (1979)",
     },
@@ -241,10 +314,14 @@ COGNITIVE_BIASES: dict[str, dict] = {
             "leading to false conclusions about what causes success."
         ),
         "keywords": [
-            "look at the successful", "they made it so",
-            "worked for them", "follow their example",
-            "if they can", "success stories show",
-            "the winners all", "successful people",
+            "look at the successful",
+            "they made it so",
+            "worked for them",
+            "follow their example",
+            "if they can",
+            "success stories show",
+            "the winners all",
+            "successful people",
         ],
         "source": "Wald (1943) — WWII aircraft survivorship analysis",
     },
@@ -255,9 +332,13 @@ COGNITIVE_BIASES: dict[str, dict] = {
             "regardless of the domain or evidence."
         ),
         "keywords": [
-            "the expert said", "according to the authority",
-            "doctor recommended", "professor says", "boss told me",
-            "because they're the expert", "authority on this",
+            "the expert said",
+            "according to the authority",
+            "doctor recommended",
+            "professor says",
+            "boss told me",
+            "because they're the expert",
+            "authority on this",
         ],
         "source": "Milgram (1963)",
     },
@@ -268,9 +349,14 @@ COGNITIVE_BIASES: dict[str, dict] = {
             "options, leading to decision fatigue or avoidance."
         ),
         "keywords": [
-            "too many options", "can't decide", "overwhelmed by choices",
-            "so many possibilities", "paralysed by", "don't know which",
-            "too much to choose", "decision fatigue",
+            "too many options",
+            "can't decide",
+            "overwhelmed by choices",
+            "so many possibilities",
+            "paralysed by",
+            "don't know which",
+            "too much to choose",
+            "decision fatigue",
         ],
         "source": "Iyengar & Lepper (2000)",
     },
@@ -281,9 +367,14 @@ COGNITIVE_BIASES: dict[str, dict] = {
             "achieving a larger overall risk reduction."
         ),
         "keywords": [
-            "completely safe", "zero risk", "no risk at all",
-            "100% guaranteed", "totally eliminate", "absolutely certain",
-            "no chance of failure", "risk free",
+            "completely safe",
+            "zero risk",
+            "no risk at all",
+            "100% guaranteed",
+            "totally eliminate",
+            "absolutely certain",
+            "no chance of failure",
+            "risk free",
         ],
         "source": "Baron et al. (1993)",
     },
@@ -331,14 +422,16 @@ def detect_biases(reasoning_text: str) -> list[dict]:
             confidence = min(len(matched_phrases) / 3.0, 1.0)
             confidence = round(confidence, 2)
 
-            detected.append({
-                "bias_type": bias_key,
-                "bias_name": bias_info["name"],
-                "description": bias_info["description"],
-                "matched_phrases": matched_phrases,
-                "confidence": confidence,
-                "source": bias_info["source"],
-            })
+            detected.append(
+                {
+                    "bias_type": bias_key,
+                    "bias_name": bias_info["name"],
+                    "description": bias_info["description"],
+                    "matched_phrases": matched_phrases,
+                    "confidence": confidence,
+                    "source": bias_info["source"],
+                }
+            )
 
     # Sort by confidence descending
     detected.sort(key=lambda x: x["confidence"], reverse=True)
@@ -594,8 +687,7 @@ def suggest_debiasing(bias_type: str) -> dict:
     """
     if bias_type not in COGNITIVE_BIASES:
         raise ValueError(
-            f"Unknown bias type '{bias_type}'. "
-            f"Valid types: {sorted(COGNITIVE_BIASES.keys())}"
+            f"Unknown bias type '{bias_type}'. Valid types: {sorted(COGNITIVE_BIASES.keys())}"
         )
 
     bias_info = COGNITIVE_BIASES[bias_type]

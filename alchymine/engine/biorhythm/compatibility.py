@@ -8,7 +8,6 @@ Evidence rating: LOW
 
 from __future__ import annotations
 
-import math
 from datetime import date
 
 from alchymine.engine.biorhythm.calculator import (

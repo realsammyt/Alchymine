@@ -7,7 +7,7 @@ The driver is selected automatically based on the DATABASE_URL scheme.
 from __future__ import annotations
 
 import os
-from typing import AsyncGenerator
+from collections.abc import AsyncGenerator
 
 from sqlalchemy.ext.asyncio import (
     AsyncAttrs,
@@ -17,7 +17,6 @@ from sqlalchemy.ext.asyncio import (
     create_async_engine,
 )
 from sqlalchemy.orm import DeclarativeBase
-
 
 # ─── Declarative Base ───────────────────────────────────────────────────
 

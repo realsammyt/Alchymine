@@ -30,30 +30,30 @@ from alchymine.engine.profile import BigFiveScores
 
 _ITEMS: dict[str, tuple[str, bool]] = {
     # Extraversion
-    "bf_e1": ("extraversion", False),   # Am the life of the party
-    "bf_e2": ("extraversion", True),    # Don't talk a lot (R)
-    "bf_e3": ("extraversion", False),   # Talk to a lot of different people
-    "bf_e4": ("extraversion", True),    # Keep in the background (R)
+    "bf_e1": ("extraversion", False),  # Am the life of the party
+    "bf_e2": ("extraversion", True),  # Don't talk a lot (R)
+    "bf_e3": ("extraversion", False),  # Talk to a lot of different people
+    "bf_e4": ("extraversion", True),  # Keep in the background (R)
     # Agreeableness
     "bf_a1": ("agreeableness", False),  # Sympathize with others' feelings
-    "bf_a2": ("agreeableness", True),   # Am not interested in other people's problems (R)
+    "bf_a2": ("agreeableness", True),  # Am not interested in other people's problems (R)
     "bf_a3": ("agreeableness", False),  # Feel others' emotions
-    "bf_a4": ("agreeableness", True),   # Am not really interested in others (R)
+    "bf_a4": ("agreeableness", True),  # Am not really interested in others (R)
     # Conscientiousness
     "bf_c1": ("conscientiousness", False),  # Get chores done right away
-    "bf_c2": ("conscientiousness", True),   # Often forget to put things back (R)
+    "bf_c2": ("conscientiousness", True),  # Often forget to put things back (R)
     "bf_c3": ("conscientiousness", False),  # Like order
-    "bf_c4": ("conscientiousness", True),   # Make a mess of things (R)
+    "bf_c4": ("conscientiousness", True),  # Make a mess of things (R)
     # Neuroticism
-    "bf_n1": ("neuroticism", False),    # Have frequent mood swings
-    "bf_n2": ("neuroticism", True),     # Am relaxed most of the time (R)
-    "bf_n3": ("neuroticism", False),    # Get upset easily
-    "bf_n4": ("neuroticism", True),     # Seldom feel blue (R)
+    "bf_n1": ("neuroticism", False),  # Have frequent mood swings
+    "bf_n2": ("neuroticism", True),  # Am relaxed most of the time (R)
+    "bf_n3": ("neuroticism", False),  # Get upset easily
+    "bf_n4": ("neuroticism", True),  # Seldom feel blue (R)
     # Openness
-    "bf_o1": ("openness", False),       # Have a vivid imagination
-    "bf_o2": ("openness", True),        # Am not interested in abstract ideas (R)
-    "bf_o3": ("openness", True),        # Have difficulty understanding abstract ideas (R)
-    "bf_o4": ("openness", True),        # Do not have a good imagination (R)
+    "bf_o1": ("openness", False),  # Have a vivid imagination
+    "bf_o2": ("openness", True),  # Am not interested in abstract ideas (R)
+    "bf_o3": ("openness", True),  # Have difficulty understanding abstract ideas (R)
+    "bf_o4": ("openness", True),  # Do not have a good imagination (R)
 }
 
 # Minimum and maximum possible raw sums per trait (4 items, each 1-5).
@@ -74,9 +74,7 @@ def _validate_responses(responses: dict[str, int]) -> None:
     for qid in _ITEMS:
         val = responses[qid]
         if not isinstance(val, int) or val < 1 or val > 5:
-            raise ValueError(
-                f"Item '{qid}' must be an integer 1-5, got {val!r}"
-            )
+            raise ValueError(f"Item '{qid}' must be an integer 1-5, got {val!r}")
 
 
 def _raw_to_100(raw_sum: float) -> float:

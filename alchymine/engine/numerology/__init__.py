@@ -24,7 +24,11 @@ Shared utilities:
 
 from .chaldean import (
     ChaldeanResult,
+)
+from .chaldean import (
     calculate_name_number as chaldean_name_number,
+)
+from .chaldean import (
     name_number as chaldean_name_number_full,
 )
 from .common import (
@@ -35,7 +39,6 @@ from .common import (
 )
 from .pythagorean import (
     PythagoreanProfile,
-    calculate_profile as calculate_pythagorean_profile,
     expression,
     life_path,
     maturity,
@@ -43,6 +46,9 @@ from .pythagorean import (
     personal_year,
     personality,
     soul_urge,
+)
+from .pythagorean import (
+    calculate_profile as calculate_pythagorean_profile,
 )
 
 __all__ = [
