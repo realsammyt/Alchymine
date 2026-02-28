@@ -3,21 +3,37 @@
 Three middleware classes:
 - ErrorHandlerMiddleware: Catches unhandled exceptions, returns structured JSON errors.
 - RequestLoggingMiddleware: Logs method, path, status code, and request duration.
-- RateLimitMiddleware: Simple sliding-window in-memory rate limiter per client IP.
+- RateLimitMiddleware: Redis-backed sliding-window rate limiter per client IP.
 """
 
 from __future__ import annotations
 
 import logging
+import os
 import time
-from collections import defaultdict
 from collections.abc import Callable
+from typing import Any
 
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import JSONResponse, Response
 
 logger = logging.getLogger("alchymine.api")
+
+
+def _get_redis_url() -> str:
+    """Resolve the Redis URL from settings or environment.
+
+    Attempts to import ``get_settings`` from the shared config module (being
+    developed concurrently).  Falls back to the ``REDIS_URL`` environment
+    variable, then to a sensible default.
+    """
+    try:
+        from alchymine.config import get_settings  # type: ignore[import-untyped]
+
+        return str(get_settings().redis_url)
+    except Exception:  # noqa: BLE001
+        return os.environ.get("REDIS_URL", "redis://localhost:6379/0")
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -74,34 +90,80 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
 
 
 # ═══════════════════════════════════════════════════════════════════════════
-# Rate Limit Middleware
+# Rate Limit Middleware — Redis-backed sliding window
 # ═══════════════════════════════════════════════════════════════════════════
+
+# Default per-prefix limits: (max_requests, window_seconds)
+DEFAULT_ROUTE_LIMITS: dict[str, tuple[int, int]] = {
+    "/api/v1/auth/": (20, 60),
+    "/api/v1/": (100, 60),
+}
 
 
 class RateLimitMiddleware(BaseHTTPMiddleware):
-    """Simple sliding-window in-memory rate limiter.
+    """Redis-backed sliding-window rate limiter.
 
     Limits requests per client IP within a configurable time window.
-    Not suitable for production multi-process deployments (use Redis-based
-    rate limiting for that); this provides a foundation and works well
-    for single-process development and testing.
+    Supports per-route-prefix limits via ``route_limits``.
+
+    Uses Redis ``INCR`` + ``EXPIRE`` for atomic, multi-process-safe counting.
+    If Redis is unavailable, logs a warning and allows traffic through
+    (graceful degradation — never block users due to infrastructure issues).
 
     Parameters
     ----------
     app : ASGIApp
         The ASGI application.
     max_requests : int
-        Maximum requests allowed per window (default: 100).
+        Default maximum requests allowed per window (default: 100).
     window_seconds : int
-        Length of the sliding window in seconds (default: 60).
+        Default length of the sliding window in seconds (default: 60).
+    redis_url : str | None
+        Redis connection URL.  If ``None``, resolved from settings / env var.
+    route_limits : dict[str, tuple[int, int]] | None
+        Mapping of route prefix to ``(max_requests, window_seconds)``.
+        The first matching prefix wins (checked in insertion order).
+        If ``None``, uses :data:`DEFAULT_ROUTE_LIMITS`.
     """
 
-    def __init__(self, app, max_requests: int = 100, window_seconds: int = 60, **kwargs) -> None:  # type: ignore[no-untyped-def]
+    def __init__(  # type: ignore[no-untyped-def]
+        self,
+        app,
+        max_requests: int = 100,
+        window_seconds: int = 60,
+        redis_url: str | None = None,
+        route_limits: dict[str, tuple[int, int]] | None = None,
+        **kwargs,
+    ) -> None:
         super().__init__(app, **kwargs)
         self.max_requests = max_requests
         self.window_seconds = window_seconds
-        # Map of client_ip -> list of request timestamps
-        self._requests: dict[str, list[float]] = defaultdict(list)
+        self._redis_url = redis_url
+        self.route_limits = route_limits if route_limits is not None else DEFAULT_ROUTE_LIMITS
+        self._redis: Any = None
+        self._redis_failed = False
+
+    async def _get_redis(self) -> Any:
+        """Lazily connect to Redis.  Returns ``None`` if unavailable."""
+        if self._redis is not None:
+            return self._redis
+        if self._redis_failed:
+            return None
+        try:
+            import redis.asyncio as aioredis
+
+            url = self._redis_url or _get_redis_url()
+            self._redis = aioredis.from_url(url, decode_responses=True)
+            # Quick connectivity check
+            await self._redis.ping()
+            return self._redis
+        except Exception:  # noqa: BLE001
+            logger.warning(
+                "Redis unavailable for rate limiting — falling back to allowing all traffic"
+            )
+            self._redis_failed = True
+            self._redis = None
+            return None
 
     def _get_client_ip(self, request: Request) -> str:
         """Extract client IP from the request."""
@@ -111,35 +173,61 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
             return forwarded.split(",")[0].strip()
         return request.client.host if request.client else "unknown"
 
-    def _clean_old_requests(self, ip: str, now: float) -> None:
-        """Remove timestamps older than the sliding window."""
-        cutoff = now - self.window_seconds
-        self._requests[ip] = [t for t in self._requests[ip] if t > cutoff]
+    def _resolve_limits(self, path: str) -> tuple[int, int]:
+        """Return ``(max_requests, window_seconds)`` for a given request path.
+
+        Checks ``route_limits`` prefixes in order; falls back to the instance
+        defaults.
+        """
+        for prefix, limits in self.route_limits.items():
+            if path.startswith(prefix):
+                return limits
+        return (self.max_requests, self.window_seconds)
 
     async def dispatch(self, request: Request, call_next: Callable) -> Response:
         client_ip = self._get_client_ip(request)
-        now = time.monotonic()
+        path = request.url.path
+        max_req, window = self._resolve_limits(path)
 
-        self._clean_old_requests(client_ip, now)
+        redis_conn = await self._get_redis()
+        if redis_conn is None:
+            # Graceful fallback — Redis unavailable, allow traffic
+            return await call_next(request)
 
-        if len(self._requests[client_ip]) >= self.max_requests:
-            logger.warning(
-                "Rate limit exceeded for %s on %s %s",
-                client_ip,
-                request.method,
-                request.url.path,
-            )
-            return JSONResponse(
-                status_code=429,
-                content={
-                    "detail": "Rate limit exceeded. Please try again later.",
-                    "status_code": 429,
-                },
-                headers={
-                    "Retry-After": str(self.window_seconds),
-                },
-            )
+        key = f"rate_limit:{client_ip}:{window}"
+        try:
+            current_count: int = await redis_conn.incr(key)
+            if current_count == 1:
+                # First request in this window — set expiry
+                await redis_conn.expire(key, window)
 
-        self._requests[client_ip].append(now)
+            if current_count > max_req:
+                ttl: int = await redis_conn.ttl(key)
+                retry_after = ttl if ttl > 0 else window
+                logger.warning(
+                    "Rate limit exceeded for %s on %s %s (%d/%d)",
+                    client_ip,
+                    request.method,
+                    path,
+                    current_count,
+                    max_req,
+                )
+                return JSONResponse(
+                    status_code=429,
+                    content={
+                        "detail": "Rate limit exceeded. Please try again later.",
+                        "status_code": 429,
+                    },
+                    headers={
+                        "Retry-After": str(retry_after),
+                    },
+                )
+        except Exception:  # noqa: BLE001
+            # Redis error mid-request — allow traffic and reset connection on next attempt
+            logger.warning("Redis error during rate limiting — allowing request through")
+            self._redis = None
+            self._redis_failed = False
+            return await call_next(request)
+
         response = await call_next(request)
         return response

@@ -34,6 +34,8 @@ dependencies = [
     # LLM
     "anthropic>=0.40.0",
     "httpx>=0.28.0",
+    # Agents / Graphs
+    "langgraph>=0.2.0",
     # Utilities
     "pyyaml>=6.0.0",
     "python-multipart>=0.0.12",
@@ -41,6 +43,12 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+mcp = [
+    "mcp>=1.0.0",
+]
+pdf = [
+    "playwright>=1.40.0",
+]
 dev = [
     # Testing
     "pytest>=8.3.0",
@@ -51,6 +59,8 @@ dev = [
     # Linting
     "ruff>=0.8.0",
     "mypy>=1.13.0",
+    # Mocks / fakes
+    "fakeredis[lua]>=2.25.0",
     # Type stubs
     "types-pyyaml>=6.0.0",
     "types-redis>=4.6.0",
@@ -82,6 +92,7 @@ ignore = [
 [tool.ruff.lint.per-file-ignores]
 "tests/**/*.py" = ["S101", "ANN"]
 "alchymine/db/migrations/**/*.py" = ["ANN", "E501"]
+"alchymine/config.py" = ["S105"]  # dev-default secrets are intentional
 "alchymine/api/routers/**/*.py" = ["B008"]  # FastAPI Depends() in defaults is standard
 
 [tool.mypy]
@@ -114,6 +125,8 @@ module = [
     "httpx.*",
     "yaml.*",
     "jinja2.*",
+    "playwright.*",
+    "langgraph.*",
 ]
 ignore_missing_imports = true
 

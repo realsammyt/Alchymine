@@ -1,6 +1,14 @@
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
 import './globals.css';
 import Navigation from '@/components/shared/Navigation';
+
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 5,
+  viewportFit: 'cover',
+  themeColor: '#8b5cf6',
+};
 
 export const metadata: Metadata = {
   title: 'Alchymine — Personal Transformation Operating System',
@@ -16,11 +24,13 @@ export const metadata: Metadata = {
     'big five',
   ],
   manifest: '/manifest.json',
-  themeColor: '#DAA520',
   appleWebApp: {
     capable: true,
     statusBarStyle: 'black-translucent',
     title: 'Alchymine',
+  },
+  other: {
+    'mobile-web-app-capable': 'yes',
   },
 };
 
@@ -31,6 +41,10 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
+      <head>
+        {/* PWA: Apple touch icon (placeholder — replace with real asset) */}
+        <link rel="apple-touch-icon" href="/icon-192.png" />
+      </head>
       <body className="font-sans bg-bg text-text min-h-screen antialiased">
         <Navigation />
         {/* Main content area: offset for sidebar on desktop, top bar + bottom nav on mobile */}

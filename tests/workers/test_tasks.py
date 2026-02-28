@@ -1,7 +1,8 @@
 """Tests for Celery worker tasks and configuration.
 
 All tests run with ``CELERY_ALWAYS_EAGER=true`` so that tasks execute
-synchronously in the test process — no Redis broker required.
+synchronously in the test process -- no Redis broker required.
+Report data is persisted to an in-memory SQLite database.
 """
 
 from __future__ import annotations
@@ -15,29 +16,74 @@ import importlib  # noqa: E402
 from unittest.mock import AsyncMock, patch  # noqa: E402
 
 import pytest  # noqa: E402
+import pytest_asyncio  # noqa: E402
+from cryptography.fernet import Fernet  # noqa: E402
+from sqlalchemy.ext.asyncio import (  # noqa: E402
+    AsyncEngine,
+    AsyncSession,
+    async_sessionmaker,
+    create_async_engine,
+)
+
+# Import models so Base.metadata is populated
+import alchymine.db.models  # noqa: F401,E402
 
 # Re-import celery_app so it picks up the env var
 import alchymine.workers.celery_app as celery_app_mod  # noqa: E402
 
 importlib.reload(celery_app_mod)
 
+from alchymine.db.base import Base  # noqa: E402
+from alchymine.db.repository import get_report  # noqa: E402
 from alchymine.workers.celery_app import celery_app  # noqa: E402
 from alchymine.workers.tasks import (  # noqa: E402
     _now_iso,
+    _run_async,
     _serialise_orchestrator_result,
+    _set_task_engine,
     generate_report,
-    report_store,
 )
+
 
 # ── Fixtures ─────────────────────────────────────────────────────────────
 
 
 @pytest.fixture(autouse=True)
-def _clear_store():
-    """Clear the in-memory report store between tests."""
-    report_store.clear()
-    yield
-    report_store.clear()
+def _set_encryption_key(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Ensure a valid Fernet key is available."""
+    key = Fernet.generate_key().decode()
+    monkeypatch.setenv("ALCHYMINE_ENCRYPTION_KEY", key)
+
+
+@pytest_asyncio.fixture
+async def engine() -> AsyncEngine:
+    """Create an in-memory SQLite async engine and initialise the schema."""
+    eng = create_async_engine(
+        "sqlite+aiosqlite://",
+        connect_args={"check_same_thread": False},
+        echo=False,
+    )
+    async with eng.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+
+    # Wire up the task engine so Celery tasks use this DB
+    _set_task_engine(eng)
+
+    yield eng
+
+    _set_task_engine(None)
+
+    async with eng.begin() as conn:
+        await conn.run_sync(Base.metadata.drop_all)
+    await eng.dispose()
+
+
+@pytest_asyncio.fixture
+async def session(engine: AsyncEngine) -> AsyncSession:
+    """Provide an async session for verifying DB state in tests."""
+    factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+    async with factory() as sess:
+        yield sess
 
 
 @pytest.fixture
@@ -185,8 +231,8 @@ class TestHelpers:
 class TestGenerateReportTask:
     """Tests for the generate_report Celery task execution."""
 
-    def test_successful_report_generation(self, mock_orchestrator_result):
-        """Task should complete successfully and store result."""
+    def test_successful_report_generation(self, engine, mock_orchestrator_result):
+        """Task should complete successfully and persist result to DB."""
         with patch("alchymine.workers.tasks.MasterOrchestrator") as MockOrch:
             instance = MockOrch.return_value
             instance.process_request = AsyncMock(return_value=mock_orchestrator_result)
@@ -195,41 +241,29 @@ class TestGenerateReportTask:
 
             assert isinstance(result, dict)
             assert result["request_id"] == "fake-request-id"
-            assert report_store["test-report-1"]["status"] == "complete"
 
-    def test_status_transitions_queued_to_complete(self, mock_orchestrator_result):
-        """Task should transition status: queued -> processing -> complete."""
-        statuses_seen = []
+            # Verify DB state
+            report = _run_async(
+                _get_report_from_db(engine, "test-report-1")
+            )
+            assert report is not None
+            assert report.status == "complete"
 
-        original_update = dict.__setitem__
-
-        def track_status(d, key, value):
-            if key == "status" and isinstance(value, str):
-                statuses_seen.append(value)
-            original_update(d, key, value)
-
+    def test_status_transitions_to_complete(self, engine, mock_orchestrator_result):
+        """Task should transition status to complete in DB."""
         with patch("alchymine.workers.tasks.MasterOrchestrator") as MockOrch:
             instance = MockOrch.return_value
             instance.process_request = AsyncMock(return_value=mock_orchestrator_result)
 
-            # Pre-seed the store as the API would
-            report_store["test-transitions"] = {
-                "report_id": "test-transitions",
-                "status": "queued",
-                "user_input": "test",
-                "user_profile": None,
-                "result": None,
-                "error": None,
-                "created_at": _now_iso(),
-                "updated_at": _now_iso(),
-            }
-
             generate_report.apply(args=["test-transitions", "test input"]).get()
 
-            entry = report_store["test-transitions"]
-            assert entry["status"] == "complete"
+            report = _run_async(
+                _get_report_from_db(engine, "test-transitions")
+            )
+            assert report is not None
+            assert report.status == "complete"
 
-    def test_failed_task_stores_error(self):
+    def test_failed_task_stores_error(self, engine):
         """Task should record error message on non-transient failure."""
         with patch("alchymine.workers.tasks.MasterOrchestrator") as MockOrch:
             instance = MockOrch.return_value
@@ -237,24 +271,29 @@ class TestGenerateReportTask:
 
             result = generate_report.apply(args=["test-fail-1", "bad input"]).get()
 
-            assert report_store["test-fail-1"]["status"] == "failed"
-            assert "Something went wrong" in report_store["test-fail-1"]["error"]
+            report = _run_async(
+                _get_report_from_db(engine, "test-fail-1")
+            )
+            assert report is not None
+            assert report.status == "failed"
+            assert "Something went wrong" in report.error
             assert result["status"] == "failed"
 
-    def test_store_entry_created_if_missing(self, mock_orchestrator_result):
-        """Task should create a store entry if one is not pre-seeded."""
+    def test_report_created_if_missing(self, engine, mock_orchestrator_result):
+        """Task should create a DB row if one is not pre-seeded."""
         with patch("alchymine.workers.tasks.MasterOrchestrator") as MockOrch:
             instance = MockOrch.return_value
             instance.process_request = AsyncMock(return_value=mock_orchestrator_result)
 
-            assert "new-report" not in report_store
-
             generate_report.apply(args=["new-report", "test input"]).get()
 
-            assert "new-report" in report_store
-            assert report_store["new-report"]["status"] == "complete"
+            report = _run_async(
+                _get_report_from_db(engine, "new-report")
+            )
+            assert report is not None
+            assert report.status == "complete"
 
-    def test_result_stored_on_success(self, mock_orchestrator_result):
+    def test_result_stored_on_success(self, engine, mock_orchestrator_result):
         """Completed report should contain orchestrator result data."""
         with patch("alchymine.workers.tasks.MasterOrchestrator") as MockOrch:
             instance = MockOrch.return_value
@@ -262,12 +301,15 @@ class TestGenerateReportTask:
 
             generate_report.apply(args=["test-result-stored", "numerology please"]).get()
 
-            entry = report_store["test-result-stored"]
-            assert entry["result"] is not None
-            assert entry["result"]["request_id"] == "fake-request-id"
-            assert entry["error"] is None
+            report = _run_async(
+                _get_report_from_db(engine, "test-result-stored")
+            )
+            assert report is not None
+            assert report.result is not None
+            assert report.result["request_id"] == "fake-request-id"
+            assert report.error is None
 
-    def test_user_profile_forwarded_to_orchestrator(self, mock_orchestrator_result):
+    def test_user_profile_forwarded_to_orchestrator(self, engine, mock_orchestrator_result):
         """User profile dict should be forwarded to orchestrator.process_request."""
         profile = {"id": "user-123", "name": "Test User"}
 
@@ -279,19 +321,7 @@ class TestGenerateReportTask:
 
             instance.process_request.assert_called_once_with("test", profile)
 
-    def test_updated_at_set_on_completion(self, mock_orchestrator_result):
-        """The updated_at field should be refreshed on completion."""
-        with patch("alchymine.workers.tasks.MasterOrchestrator") as MockOrch:
-            instance = MockOrch.return_value
-            instance.process_request = AsyncMock(return_value=mock_orchestrator_result)
-
-            generate_report.apply(args=["test-timestamps", "test"]).get()
-
-            entry = report_store["test-timestamps"]
-            assert entry["updated_at"] is not None
-            assert "T" in entry["updated_at"]
-
-    def test_connection_error_marks_failed(self):
+    def test_connection_error_marks_failed(self, engine):
         """ConnectionError should mark the report as failed."""
         with patch("alchymine.workers.tasks.MasterOrchestrator") as MockOrch:
             instance = MockOrch.return_value
@@ -302,9 +332,13 @@ class TestGenerateReportTask:
             with pytest.raises(Exception):
                 generate_report.apply(args=["test-conn-err", "test"]).get()
 
-            assert report_store["test-conn-err"]["status"] == "failed"
+            report = _run_async(
+                _get_report_from_db(engine, "test-conn-err")
+            )
+            assert report is not None
+            assert report.status == "failed"
 
-    def test_timeout_error_marks_failed(self):
+    def test_timeout_error_marks_failed(self, engine):
         """TimeoutError should mark the report as failed."""
         with patch("alchymine.workers.tasks.MasterOrchestrator") as MockOrch:
             instance = MockOrch.return_value
@@ -313,9 +347,13 @@ class TestGenerateReportTask:
             with pytest.raises(Exception):
                 generate_report.apply(args=["test-timeout", "test"]).get()
 
-            assert report_store["test-timeout"]["status"] == "failed"
+            report = _run_async(
+                _get_report_from_db(engine, "test-timeout")
+            )
+            assert report is not None
+            assert report.status == "failed"
 
-    def test_multiple_reports_independent(self, mock_orchestrator_result):
+    def test_multiple_reports_independent(self, engine, mock_orchestrator_result):
         """Multiple reports should not interfere with each other."""
         with patch("alchymine.workers.tasks.MasterOrchestrator") as MockOrch:
             instance = MockOrch.return_value
@@ -324,7 +362,27 @@ class TestGenerateReportTask:
             generate_report.apply(args=["report-a", "input a"]).get()
             generate_report.apply(args=["report-b", "input b"]).get()
 
-            assert report_store["report-a"]["status"] == "complete"
-            assert report_store["report-b"]["status"] == "complete"
-            assert report_store["report-a"]["user_input"] == "input a"
-            assert report_store["report-b"]["user_input"] == "input b"
+            report_a = _run_async(_get_report_from_db(engine, "report-a"))
+            report_b = _run_async(_get_report_from_db(engine, "report-b"))
+
+            assert report_a is not None
+            assert report_b is not None
+            assert report_a.status == "complete"
+            assert report_b.status == "complete"
+            assert report_a.user_input == "input a"
+            assert report_b.user_input == "input b"
+
+
+# ── DB helper for test assertions ────────────────────────────────────────
+
+
+async def _get_report_from_db(engine, report_id: str):
+    """Fetch a report from the test DB for assertion purposes."""
+    from alchymine.db.base import get_async_session_factory
+
+    factory = get_async_session_factory(engine)
+    async with factory() as session:
+        report = await get_report(session, report_id)
+        if report is not None:
+            await session.refresh(report)
+        return report

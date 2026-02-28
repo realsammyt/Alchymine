@@ -16,6 +16,7 @@ from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
 
 # Import all models so that Base.metadata is fully populated
 import alchymine.db.models  # noqa: F401
+from alchymine.config import get_settings
 from alchymine.db.base import Base, get_async_engine, get_async_session_factory
 
 logger = logging.getLogger(__name__)
@@ -33,9 +34,9 @@ def get_db_engine() -> AsyncEngine:
     """
     global _engine
     if _engine is None:
-        url = os.environ.get("DATABASE_URL")
+        url = get_settings().database_url
         _engine = get_async_engine(url)
-        logger.info("Database engine created (url=%s)", url or "default")
+        logger.info("Database engine created (url=%s)", url)
     return _engine
 
 

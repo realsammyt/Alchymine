@@ -33,7 +33,11 @@ def _clear_rate_limit_state(obj: object) -> None:
     from alchymine.api.middleware import RateLimitMiddleware
 
     if isinstance(obj, RateLimitMiddleware):
-        obj._requests.clear()
+        # The rate limiter may use an in-memory dict or Redis.
+        # Clear the in-memory store if present; otherwise skip.
+        requests_dict = getattr(obj, "_requests", None)
+        if requests_dict is not None:
+            requests_dict.clear()
         return
 
     # BaseHTTPMiddleware stores the next app in .app
