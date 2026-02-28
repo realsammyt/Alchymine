@@ -30,6 +30,7 @@ from alchymine.api.routers import (
     perspective,
     profile,
     reports,
+    spiral,
     wealth,
 )
 
@@ -85,3 +86,4 @@ app.include_router(perspective.router, prefix="/api/v1", tags=["perspective"])
 app.include_router(personality.router, prefix="/api/v1", tags=["personality"])
 app.include_router(journal.router, prefix="/api/v1", tags=["journal"])
 app.include_router(outcomes.router, prefix="/api/v1", tags=["outcomes"])
+app.include_router(spiral.router, prefix="/api/v1", tags=["spiral"])
