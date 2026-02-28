@@ -5,6 +5,11 @@ right calculations, runs quality gate validation, and returns a
 uniform CoordinatorResult. Coordinators handle ImportError and
 runtime exceptions gracefully so the orchestrator can continue with
 the remaining systems when one is unavailable (degraded mode).
+
+Since issue #27 the five concrete coordinators delegate their
+``_execute`` logic to LangGraph StateGraphs defined in
+``alchymine.agents.orchestrator.graphs``. The public ``process()``
+contract (via ``BaseCoordinator``) is unchanged.
 """
 
 from __future__ import annotations
@@ -12,6 +17,16 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass, field
 from enum import StrEnum
+from typing import Any
+
+from .graphs import (
+    CoordinatorState,
+    build_creative_graph,
+    build_healing_graph,
+    build_intelligence_graph,
+    build_perspective_graph,
+    build_wealth_graph,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -168,400 +183,156 @@ class BaseCoordinator:
             return True
 
 
+# ─── Graph-based coordinator mixin ──────────────────────────────────
+
+
+class _GraphCoordinatorMixin:
+    """Shared helper for graph-backed coordinators.
+
+    Builds a ``CoordinatorState`` from the public API arguments,
+    invokes the compiled graph, and converts the final state back
+    to a ``CoordinatorResult``.
+    """
+
+    _graph: Any  # CompiledStateGraph or _SequentialGraph
+
+    def _invoke_graph(
+        self,
+        user_id: str,
+        request_data: dict,
+    ) -> CoordinatorResult:
+        """Run the system graph and return a CoordinatorResult."""
+        initial_state: CoordinatorState = {
+            "user_id": user_id,
+            "request_data": request_data,
+            "results": {},
+            "errors": [],
+            "status": "success",
+            "quality_passed": True,
+        }
+        final_state = self._graph.invoke(initial_state)
+        return CoordinatorResult(
+            system=getattr(self, "system_name", "unknown"),
+            status=final_state.get("status", "success"),
+            data=final_state.get("results", {}),
+            errors=list(final_state.get("errors", [])),
+            quality_passed=final_state.get("quality_passed", True),
+        )
+
+
 # ─── Intelligence coordinator ────────────────────────────────────────
 
 
-class IntelligenceCoordinator(BaseCoordinator):
+class IntelligenceCoordinator(_GraphCoordinatorMixin, BaseCoordinator):
     """Coordinator for the Personalized Intelligence system.
 
     Handles numerology, astrology, archetype, and personality
-    calculations.
+    calculations. Delegates processing to an Intelligence StateGraph.
     """
 
     system_name = "intelligence"
+
+    def __init__(self) -> None:
+        self._graph = build_intelligence_graph(include_quality_gate=False)
 
     async def _execute(
         self,
         user_id: str,
         request_data: dict,
     ) -> CoordinatorResult:
-        errors: list[str] = []
-        data: dict = {}
-
-        # Numerology
-        try:
-            from alchymine.engine.numerology import (
-                calculate_pythagorean_profile,
-            )
-
-            full_name = request_data.get("full_name", "")
-            birth_date = request_data.get("birth_date")
-
-            if full_name and birth_date:
-                profile = calculate_pythagorean_profile(full_name, birth_date)
-                data["numerology"] = {
-                    "life_path": profile.life_path,
-                    "expression": profile.expression,
-                    "soul_urge": profile.soul_urge,
-                    "personality": profile.personality,
-                    "personal_year": profile.personal_year,
-                    "personal_month": profile.personal_month,
-                }
-            else:
-                errors.append("Intelligence: missing full_name or birth_date for numerology")
-        except ImportError:
-            errors.append("Intelligence: numerology engine not available")
-        except Exception as exc:
-            errors.append(f"Intelligence: numerology error — {exc!s}")
-
-        # Astrology
-        try:
-            from alchymine.engine.astrology import (
-                approximate_sun_degree,
-                approximate_sun_sign,
-            )
-
-            birth_date = request_data.get("birth_date")
-            if birth_date:
-                sun_sign = approximate_sun_sign(birth_date)
-                sun_degree = approximate_sun_degree(birth_date)
-                data["astrology"] = {
-                    "sun_sign": sun_sign,
-                    "sun_degree": sun_degree,
-                }
-            else:
-                errors.append("Intelligence: missing birth_date for astrology")
-        except ImportError:
-            errors.append("Intelligence: astrology engine not available")
-        except Exception as exc:
-            errors.append(f"Intelligence: astrology error — {exc!s}")
-
-        status = CoordinatorStatus.SUCCESS.value
-        if errors and not data:
-            status = CoordinatorStatus.ERROR.value
-        elif errors:
-            status = CoordinatorStatus.DEGRADED.value
-
-        return CoordinatorResult(
-            system=self.system_name,
-            status=status,
-            data=data,
-            errors=errors,
-        )
+        return self._invoke_graph(user_id, request_data)
 
 
 # ─── Healing coordinator ─────────────────────────────────────────────
 
 
-class HealingCoordinator(BaseCoordinator):
+class HealingCoordinator(_GraphCoordinatorMixin, BaseCoordinator):
     """Coordinator for the Ethical Healing system.
 
     Handles modality matching, breathwork patterns, and crisis
-    detection.
+    detection. Delegates processing to a Healing StateGraph.
     """
 
     system_name = "healing"
+
+    def __init__(self) -> None:
+        self._graph = build_healing_graph(include_quality_gate=False)
 
     async def _execute(
         self,
         user_id: str,
         request_data: dict,
     ) -> CoordinatorResult:
-        errors: list[str] = []
-        data: dict = {
-            "disclaimers": [
-                "This is not medical advice. Please consult a qualified "
-                "healthcare professional for medical concerns."
-            ],
-        }
-
-        # Crisis detection
-        try:
-            from alchymine.engine.healing import detect_crisis
-
-            user_text = request_data.get("text", "")
-            if user_text:
-                crisis = detect_crisis(user_text)
-                data["crisis_flag"] = crisis is not None
-                if crisis is not None:
-                    data["crisis_response"] = {
-                        "severity": crisis.severity.value,
-                        "resources": [
-                            {"name": r.name, "contact": r.contact} for r in crisis.resources
-                        ],
-                    }
-        except ImportError:
-            errors.append("Healing: crisis detection not available")
-        except Exception as exc:
-            errors.append(f"Healing: crisis detection error — {exc!s}")
-
-        # Modality matching
-        try:
-            from alchymine.engine.healing import match_modalities
-
-            archetype = request_data.get("archetype")
-            intention = request_data.get("intention")
-            archetype_secondary = request_data.get("archetype_secondary")
-            big_five = request_data.get("big_five")
-
-            if archetype and big_five and intention:
-                modalities = match_modalities(
-                    archetype,
-                    archetype_secondary,
-                    big_five,
-                    intention,
-                )
-                data["recommended_modalities"] = [
-                    {
-                        "modality": m.modality,
-                        "skill_trigger": m.skill_trigger,
-                        "preference_score": m.preference_score,
-                        "difficulty_level": m.difficulty_level.value
-                        if hasattr(m.difficulty_level, "value")
-                        else str(m.difficulty_level),
-                    }
-                    for m in modalities
-                ]
-        except ImportError:
-            errors.append("Healing: modality engine not available")
-        except Exception as exc:
-            errors.append(f"Healing: modality matching error — {exc!s}")
-
-        status = CoordinatorStatus.SUCCESS.value
-        if errors and len(data) <= 1:  # Only disclaimers
-            status = CoordinatorStatus.DEGRADED.value
-        elif errors:
-            status = CoordinatorStatus.DEGRADED.value
-
-        return CoordinatorResult(
-            system=self.system_name,
-            status=status,
-            data=data,
-            errors=errors,
-        )
+        return self._invoke_graph(user_id, request_data)
 
 
 # ─── Wealth coordinator ──────────────────────────────────────────────
 
 
-class WealthCoordinator(BaseCoordinator):
+class WealthCoordinator(_GraphCoordinatorMixin, BaseCoordinator):
     """Coordinator for the Generational Wealth system.
 
     Handles wealth archetype mapping, lever prioritisation, debt
     strategies, and activation plans. All calculations are
-    deterministic.
+    deterministic. Delegates processing to a Wealth StateGraph.
     """
 
     system_name = "wealth"
+
+    def __init__(self) -> None:
+        self._graph = build_wealth_graph(include_quality_gate=False)
 
     async def _execute(
         self,
         user_id: str,
         request_data: dict,
     ) -> CoordinatorResult:
-        errors: list[str] = []
-        data: dict = {
-            "disclaimers": [
-                "This is not financial advice. Please consult a qualified "
-                "financial advisor for personalised recommendations."
-            ],
-        }
-
-        # Wealth archetype
-        try:
-            from alchymine.engine.wealth import map_wealth_archetype
-
-            life_path = request_data.get("life_path")
-            risk_tolerance = request_data.get("risk_tolerance", "moderate")
-
-            archetype_primary = request_data.get("archetype_primary")
-
-            if life_path is not None and archetype_primary:
-                archetype = map_wealth_archetype(
-                    life_path,
-                    archetype_primary,
-                    risk_tolerance,
-                )
-                data["wealth_archetype"] = {
-                    "name": archetype.name,
-                    "description": archetype.description,
-                }
-        except ImportError:
-            errors.append("Wealth: archetype engine not available")
-        except Exception as exc:
-            errors.append(f"Wealth: archetype error — {exc!s}")
-
-        # Lever prioritisation
-        try:
-            from alchymine.engine.wealth import prioritize_levers
-
-            life_path = request_data.get("life_path")
-            risk_tolerance = request_data.get("risk_tolerance", "moderate")
-            intention = request_data.get("intention")
-
-            wealth_context = request_data.get("wealth_context")
-
-            if life_path is not None and intention:
-                levers = prioritize_levers(
-                    wealth_context,
-                    risk_tolerance,
-                    intention,
-                    life_path,
-                )
-                data["lever_priorities"] = [
-                    lev.value if hasattr(lev, "value") else str(lev) for lev in levers
-                ]
-        except ImportError:
-            errors.append("Wealth: lever engine not available")
-        except Exception as exc:
-            errors.append(f"Wealth: lever prioritisation error — {exc!s}")
-
-        data["calculations"] = {}
-
-        status = CoordinatorStatus.SUCCESS.value
-        if errors and len(data) <= 2:  # Only disclaimers + empty calculations
-            status = CoordinatorStatus.DEGRADED.value
-        elif errors:
-            status = CoordinatorStatus.DEGRADED.value
-
-        return CoordinatorResult(
-            system=self.system_name,
-            status=status,
-            data=data,
-            errors=errors,
-        )
+        return self._invoke_graph(user_id, request_data)
 
 
 # ─── Creative coordinator ────────────────────────────────────────────
 
 
-class CreativeCoordinator(BaseCoordinator):
+class CreativeCoordinator(_GraphCoordinatorMixin, BaseCoordinator):
     """Coordinator for the Creative Development system.
 
     Handles Guilford assessment, Creative DNA, style analysis,
-    and project suggestions.
+    and project suggestions. Delegates processing to a Creative
+    StateGraph.
     """
 
     system_name = "creative"
+
+    def __init__(self) -> None:
+        self._graph = build_creative_graph(include_quality_gate=False)
 
     async def _execute(
         self,
         user_id: str,
         request_data: dict,
     ) -> CoordinatorResult:
-        errors: list[str] = []
-        data: dict = {}
-
-        # Creative orientation from life path
-        try:
-            from alchymine.engine.creative import derive_creative_orientation
-
-            life_path = request_data.get("life_path")
-            if life_path is not None:
-                orientation = derive_creative_orientation(life_path)
-                data["creative_orientation"] = orientation
-        except ImportError:
-            errors.append("Creative: orientation engine not available")
-        except Exception as exc:
-            errors.append(f"Creative: orientation error — {exc!s}")
-
-        # Style analysis
-        try:
-            from alchymine.engine.creative import identify_strengths
-
-            guilford_scores = request_data.get("guilford_scores")
-            if guilford_scores:
-                strengths = identify_strengths(guilford_scores)
-                data["strengths"] = strengths
-        except ImportError:
-            errors.append("Creative: style engine not available")
-        except Exception as exc:
-            errors.append(f"Creative: style analysis error — {exc!s}")
-
-        status = CoordinatorStatus.SUCCESS.value
-        if errors and not data:
-            status = CoordinatorStatus.ERROR.value
-        elif errors:
-            status = CoordinatorStatus.DEGRADED.value
-
-        return CoordinatorResult(
-            system=self.system_name,
-            status=status,
-            data=data,
-            errors=errors,
-        )
+        return self._invoke_graph(user_id, request_data)
 
 
 # ─── Perspective coordinator ─────────────────────────────────────────
 
 
-class PerspectiveCoordinator(BaseCoordinator):
+class PerspectiveCoordinator(_GraphCoordinatorMixin, BaseCoordinator):
     """Coordinator for the Perspective Enhancement system.
 
     Handles decision frameworks, bias detection, Kegan stage
-    assessment, and scenario modelling.
+    assessment, and scenario modelling. Delegates processing to a
+    Perspective StateGraph.
     """
 
     system_name = "perspective"
+
+    def __init__(self) -> None:
+        self._graph = build_perspective_graph(include_quality_gate=False)
 
     async def _execute(
         self,
         user_id: str,
         request_data: dict,
     ) -> CoordinatorResult:
-        errors: list[str] = []
-        data: dict = {}
-
-        # Bias detection
-        try:
-            from alchymine.engine.perspective import detect_biases
-
-            reasoning_text = request_data.get("text", "")
-            if reasoning_text:
-                biases = detect_biases(reasoning_text)
-                data["detected_biases"] = biases
-        except ImportError:
-            errors.append("Perspective: bias engine not available")
-        except Exception as exc:
-            errors.append(f"Perspective: bias detection error — {exc!s}")
-
-        # Kegan assessment
-        try:
-            from alchymine.engine.perspective import assess_kegan_stage
-
-            responses = request_data.get("kegan_responses")
-            if responses:
-                stage = assess_kegan_stage(responses)
-                data["kegan_stage"] = stage
-        except ImportError:
-            errors.append("Perspective: kegan engine not available")
-        except Exception as exc:
-            errors.append(f"Perspective: kegan assessment error — {exc!s}")
-
-        # Decision framework
-        try:
-            from alchymine.engine.perspective import pros_cons_analysis
-
-            decision = request_data.get("decision")
-            pros = request_data.get("pros", [])
-            cons = request_data.get("cons", [])
-            if decision:
-                analysis = pros_cons_analysis(decision, pros, cons)
-                data["decision_analysis"] = analysis
-        except ImportError:
-            errors.append("Perspective: framework engine not available")
-        except Exception as exc:
-            errors.append(f"Perspective: framework error — {exc!s}")
-
-        status = CoordinatorStatus.SUCCESS.value
-        if errors and not data:
-            status = CoordinatorStatus.ERROR.value
-        elif errors:
-            status = CoordinatorStatus.DEGRADED.value
-
-        return CoordinatorResult(
-            system=self.system_name,
-            status=status,
-            data=data,
-            errors=errors,
-        )
+        return self._invoke_graph(user_id, request_data)

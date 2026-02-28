@@ -80,6 +80,8 @@ class MasterOrchestrator:
         self,
         user_input: str,
         user_profile: dict | None = None,
+        *,
+        intention: str | None = None,
     ) -> OrchestratorResult:
         """Process a user request end-to-end.
 
@@ -95,6 +97,12 @@ class MasterOrchestrator:
         user_profile:
             Optional user profile data dict to pass along to
             coordinators as context.
+        intention:
+            Optional user intention string for guided synthesis.
+            When provided and multiple systems respond, the synthesis
+            workflow will prioritize systems aligned with this
+            intention. Backward-compatible: omitting this parameter
+            falls back to full-profile synthesis.
 
         Returns
         -------
@@ -137,7 +145,10 @@ class MasterOrchestrator:
         # Synthesize if multi-system
         synthesis = None
         if len(coordinator_results) > 1:
-            synthesis = synthesize_results(coordinator_results)
+            synthesis = self._run_synthesis(
+                coordinator_results,
+                intention=intention,
+            )
 
         # Overall quality check
         quality_passed = all(cr.quality_passed for cr in coordinator_results)
@@ -153,6 +164,57 @@ class MasterOrchestrator:
             synthesis=synthesis,
             quality_passed=quality_passed,
         )
+
+    def _run_synthesis(
+        self,
+        coordinator_results: list[CoordinatorResult],
+        *,
+        intention: str | None = None,
+    ) -> dict:
+        """Run the synthesis workflow on multi-system results.
+
+        Uses the structured synthesis module when available, falling
+        back to the simple ``synthesize_results()`` function for
+        backward compatibility.
+
+        Parameters
+        ----------
+        coordinator_results:
+            Results from the coordinators that were invoked.
+        intention:
+            Optional user intention for guided synthesis.
+
+        Returns
+        -------
+        dict
+            The synthesized output dictionary.
+        """
+        try:
+            from .synthesis import synthesize_full_profile, synthesize_guided_session
+
+            if intention:
+                synthesis_result = synthesize_guided_session(
+                    coordinator_results,
+                    intention,
+                )
+            else:
+                synthesis_result = synthesize_full_profile(coordinator_results)
+
+            # Convert SynthesisResult to dict for backward compatibility
+            # while adding the richer structure
+            base = synthesize_results(coordinator_results)
+            base["synthesis_detail"] = {
+                "unified_insights": synthesis_result.unified_insights,
+                "cross_system_connections": synthesis_result.cross_system_connections,
+                "conflicts": synthesis_result.conflicts,
+                "evidence_ratings": synthesis_result.evidence_ratings,
+                "overall_coherence": synthesis_result.overall_coherence,
+            }
+            return base
+
+        except Exception as exc:
+            logger.warning("Structured synthesis unavailable: %s — falling back", exc)
+            return synthesize_results(coordinator_results)
 
     def _validate_synthesis(self, synthesis: dict) -> bool:
         """Run ethics validation on synthesis output.

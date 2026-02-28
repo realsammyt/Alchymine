@@ -34,6 +34,13 @@ from .orchestrator import (
     MasterOrchestrator,
     OrchestratorResult,
 )
+from .synthesis import (
+    SynthesisResult,
+    aggregate_evidence,
+    detect_conflicts,
+    synthesize_full_profile,
+    synthesize_guided_session,
+)
 
 __all__ = [
     # Intent
@@ -51,4 +58,10 @@ __all__ = [
     # Orchestrator
     "MasterOrchestrator",
     "OrchestratorResult",
+    # Synthesis
+    "SynthesisResult",
+    "synthesize_full_profile",
+    "synthesize_guided_session",
+    "detect_conflicts",
+    "aggregate_evidence",
 ]

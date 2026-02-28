@@ -34,6 +34,8 @@ dependencies = [
     # LLM
     "anthropic>=0.40.0",
     "httpx>=0.28.0",
+    # Agents / Graphs
+    "langgraph>=0.2.0",
     # Utilities
     "pyyaml>=6.0.0",
     "python-multipart>=0.0.12",
@@ -121,6 +123,7 @@ module = [
     "yaml.*",
     "jinja2.*",
     "playwright.*",
+    "langgraph.*",
 ]
 ignore_missing_imports = true
 
