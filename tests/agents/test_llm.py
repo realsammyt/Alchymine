@@ -88,11 +88,19 @@ class TestLLMClientClaude:
             client = LLMClient()
 
         mock_create = AsyncMock(return_value=mock_claude_response)
-        mock_anthropic = type("anthropic", (), {
-            "AsyncAnthropic": lambda *a, **kw: type("Client", (), {
-                "messages": type("Messages", (), {"create": mock_create})(),
-            })(),
-        })()
+        mock_anthropic = type(
+            "anthropic",
+            (),
+            {
+                "AsyncAnthropic": lambda *a, **kw: type(
+                    "Client",
+                    (),
+                    {
+                        "messages": type("Messages", (), {"create": mock_create})(),
+                    },
+                )(),
+            },
+        )()
         with patch.dict("sys.modules", {"anthropic": mock_anthropic}):
             result = await client._generate_claude("system", "user", 2048, 0.7)
 

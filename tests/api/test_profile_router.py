@@ -6,22 +6,23 @@ a test session into all endpoints that depend on ``get_db_session``.
 
 from __future__ import annotations
 
-import os
-from typing import AsyncGenerator
+from collections.abc import AsyncGenerator
 
 import pytest
 import pytest_asyncio
 from cryptography.fernet import Fernet
 from httpx import ASGITransport, AsyncClient
-from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker, create_async_engine
-
-from alchymine.db.base import Base
+from sqlalchemy.ext.asyncio import (
+    AsyncEngine,
+    AsyncSession,
+    async_sessionmaker,
+    create_async_engine,
+)
 
 # Import all models so Base.metadata is populated
 import alchymine.db.models  # noqa: F401
-
 from alchymine.api.deps import get_db_session
-
+from alchymine.db.base import Base
 
 # ─── Test fixtures ─────────────────────────────────────────────────────
 
@@ -132,31 +133,40 @@ async def test_create_profile_full(client: AsyncClient) -> None:
 @pytest.mark.asyncio
 async def test_create_profile_validation_missing_name(client: AsyncClient) -> None:
     """POST without full_name returns 422 validation error."""
-    resp = await client.post("/api/v1/profile", json={
-        "birth_date": "1992-03-15",
-        "intention": "family",
-    })
+    resp = await client.post(
+        "/api/v1/profile",
+        json={
+            "birth_date": "1992-03-15",
+            "intention": "family",
+        },
+    )
     assert resp.status_code == 422
 
 
 @pytest.mark.asyncio
 async def test_create_profile_validation_missing_birth_date(client: AsyncClient) -> None:
     """POST without birth_date returns 422 validation error."""
-    resp = await client.post("/api/v1/profile", json={
-        "full_name": "Test User",
-        "intention": "career",
-    })
+    resp = await client.post(
+        "/api/v1/profile",
+        json={
+            "full_name": "Test User",
+            "intention": "career",
+        },
+    )
     assert resp.status_code == 422
 
 
 @pytest.mark.asyncio
 async def test_create_profile_validation_short_name(client: AsyncClient) -> None:
     """POST with name shorter than 2 chars returns 422."""
-    resp = await client.post("/api/v1/profile", json={
-        "full_name": "X",
-        "birth_date": "1992-03-15",
-        "intention": "career",
-    })
+    resp = await client.post(
+        "/api/v1/profile",
+        json={
+            "full_name": "X",
+            "birth_date": "1992-03-15",
+            "intention": "career",
+        },
+    )
     assert resp.status_code == 422
 
 
@@ -201,11 +211,14 @@ async def test_list_profiles_empty(client: AsyncClient) -> None:
 async def test_list_profiles_populated(client: AsyncClient) -> None:
     """GET /profiles returns all created profiles."""
     for i in range(3):
-        await client.post("/api/v1/profile", json={
-            "full_name": f"User {i}",
-            "birth_date": "2000-01-01",
-            "intention": "career",
-        })
+        await client.post(
+            "/api/v1/profile",
+            json={
+                "full_name": f"User {i}",
+                "birth_date": "2000-01-01",
+                "intention": "career",
+            },
+        )
 
     resp = await client.get("/api/v1/profiles")
     assert resp.status_code == 200
@@ -218,11 +231,14 @@ async def test_list_profiles_populated(client: AsyncClient) -> None:
 async def test_list_profiles_pagination(client: AsyncClient) -> None:
     """GET /profiles with offset and limit paginates correctly."""
     for i in range(5):
-        await client.post("/api/v1/profile", json={
-            "full_name": f"User {i}",
-            "birth_date": "2000-01-01",
-            "intention": "career",
-        })
+        await client.post(
+            "/api/v1/profile",
+            json={
+                "full_name": f"User {i}",
+                "birth_date": "2000-01-01",
+                "intention": "career",
+            },
+        )
 
     resp = await client.get("/api/v1/profiles?offset=2&limit=2")
     assert resp.status_code == 200
@@ -243,10 +259,12 @@ async def test_update_layer_identity(client: AsyncClient) -> None:
 
     resp = await client.put(
         f"/api/v1/profile/{user_id}/identity",
-        json={"data": {
-            "numerology": {"life_path": 7, "expression": 3},
-            "astrology": {"sun_sign": "Pisces"},
-        }},
+        json={
+            "data": {
+                "numerology": {"life_path": 7, "expression": 3},
+                "astrology": {"sun_sign": "Pisces"},
+            }
+        },
     )
     assert resp.status_code == 200
     data = resp.json()
@@ -263,10 +281,12 @@ async def test_update_layer_healing(client: AsyncClient) -> None:
 
     resp = await client.put(
         f"/api/v1/profile/{user_id}/healing",
-        json={"data": {
-            "selected_modalities": [{"modality": "breathwork"}],
-            "max_difficulty": "developing",
-        }},
+        json={
+            "data": {
+                "selected_modalities": [{"modality": "breathwork"}],
+                "max_difficulty": "developing",
+            }
+        },
     )
     assert resp.status_code == 200
     data = resp.json()
@@ -343,10 +363,12 @@ async def test_full_crud_lifecycle(client: AsyncClient) -> None:
     # 3. Update identity layer
     put_resp = await client.put(
         f"/api/v1/profile/{user_id}/identity",
-        json={"data": {
-            "numerology": {"life_path": 3, "expression": 6},
-            "astrology": {"sun_sign": "Pisces", "moon_sign": "Scorpio"},
-        }},
+        json={
+            "data": {
+                "numerology": {"life_path": 3, "expression": 6},
+                "astrology": {"sun_sign": "Pisces", "moon_sign": "Scorpio"},
+            }
+        },
     )
     assert put_resp.status_code == 200
     assert put_resp.json()["identity"]["numerology"]["life_path"] == 3
@@ -354,10 +376,12 @@ async def test_full_crud_lifecycle(client: AsyncClient) -> None:
     # 4. Update healing layer
     put_resp2 = await client.put(
         f"/api/v1/profile/{user_id}/healing",
-        json={"data": {
-            "selected_modalities": [{"modality": "breathwork"}],
-            "max_difficulty": "developing",
-        }},
+        json={
+            "data": {
+                "selected_modalities": [{"modality": "breathwork"}],
+                "max_difficulty": "developing",
+            }
+        },
     )
     assert put_resp2.status_code == 200
 
@@ -382,13 +406,16 @@ async def test_full_crud_lifecycle(client: AsyncClient) -> None:
 @pytest.mark.asyncio
 async def test_reports_post_with_db(client: AsyncClient) -> None:
     """POST /reports creates a report in the database."""
-    resp = await client.post("/api/v1/reports", json={
-        "intake": {
-            "full_name": "Maria Elena Vasquez",
-            "birth_date": "1992-03-15",
-            "intention": "family",
+    resp = await client.post(
+        "/api/v1/reports",
+        json={
+            "intake": {
+                "full_name": "Maria Elena Vasquez",
+                "birth_date": "1992-03-15",
+                "intention": "family",
+            },
         },
-    })
+    )
     assert resp.status_code == 202
     data = resp.json()
     assert data["status"] == "queued"

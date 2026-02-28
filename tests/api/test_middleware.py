@@ -14,8 +14,11 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from alchymine.api.middleware import ErrorHandlerMiddleware, RateLimitMiddleware, RequestLoggingMiddleware
-
+from alchymine.api.middleware import (
+    ErrorHandlerMiddleware,
+    RateLimitMiddleware,
+    RequestLoggingMiddleware,
+)
 
 # ═══════════════════════════════════════════════════════════════════════════
 # Helpers — minimal FastAPI apps for isolated middleware testing
@@ -53,7 +56,9 @@ def _make_logging_app() -> FastAPI:
 def _make_rate_limit_app(max_requests: int = 5, window_seconds: int = 60) -> FastAPI:
     """Create a minimal app with RateLimitMiddleware (low limit for testing)."""
     app = FastAPI()
-    app.add_middleware(RateLimitMiddleware, max_requests=max_requests, window_seconds=window_seconds)
+    app.add_middleware(
+        RateLimitMiddleware, max_requests=max_requests, window_seconds=window_seconds
+    )
 
     @app.get("/ping")
     async def ping() -> dict:
@@ -112,13 +117,17 @@ class TestRequestLoggingMiddleware:
     def client(self) -> TestClient:
         return TestClient(_make_logging_app())
 
-    def test_request_produces_log_entry(self, client: TestClient, caplog: pytest.LogCaptureFixture) -> None:
+    def test_request_produces_log_entry(
+        self, client: TestClient, caplog: pytest.LogCaptureFixture
+    ) -> None:
         """Each request generates a log message."""
         with caplog.at_level(logging.INFO, logger="alchymine.api"):
             client.get("/hello")
         assert len(caplog.records) >= 1
 
-    def test_log_contains_method(self, client: TestClient, caplog: pytest.LogCaptureFixture) -> None:
+    def test_log_contains_method(
+        self, client: TestClient, caplog: pytest.LogCaptureFixture
+    ) -> None:
         """Log message includes the HTTP method."""
         with caplog.at_level(logging.INFO, logger="alchymine.api"):
             client.get("/hello")
@@ -132,14 +141,18 @@ class TestRequestLoggingMiddleware:
         log_messages = [r.message for r in caplog.records]
         assert any("/hello" in msg for msg in log_messages)
 
-    def test_log_contains_status_code(self, client: TestClient, caplog: pytest.LogCaptureFixture) -> None:
+    def test_log_contains_status_code(
+        self, client: TestClient, caplog: pytest.LogCaptureFixture
+    ) -> None:
         """Log message includes the response status code."""
         with caplog.at_level(logging.INFO, logger="alchymine.api"):
             client.get("/hello")
         log_messages = [r.message for r in caplog.records]
         assert any("200" in msg for msg in log_messages)
 
-    def test_log_contains_duration(self, client: TestClient, caplog: pytest.LogCaptureFixture) -> None:
+    def test_log_contains_duration(
+        self, client: TestClient, caplog: pytest.LogCaptureFixture
+    ) -> None:
         """Log message includes duration in milliseconds."""
         with caplog.at_level(logging.INFO, logger="alchymine.api"):
             client.get("/hello")

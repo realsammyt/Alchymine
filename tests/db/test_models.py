@@ -26,7 +26,6 @@ from alchymine.db.models import (
     WealthProfile,
 )
 
-
 # ─── User ───────────────────────────────────────────────────────────────
 
 
@@ -93,9 +92,7 @@ async def test_intake_creation(session: AsyncSession) -> None:
     session.add(intake)
     await session.flush()
 
-    result = await session.execute(
-        select(IntakeData).where(IntakeData.user_id == user.id)
-    )
+    result = await session.execute(select(IntakeData).where(IntakeData.user_id == user.id))
     fetched = result.scalar_one()
     assert fetched.full_name == "Maria Elena Vasquez"
     assert fetched.birth_date == date(1992, 3, 15)
@@ -208,9 +205,7 @@ async def test_healing_profile(session: AsyncSession) -> None:
     session.add(healing)
     await session.flush()
 
-    result = await session.execute(
-        select(HealingProfile).where(HealingProfile.user_id == user.id)
-    )
+    result = await session.execute(select(HealingProfile).where(HealingProfile.user_id == user.id))
     fetched = result.scalar_one()
     assert len(fetched.selected_modalities) == 2
     assert fetched.practice_history["breathwork"] == 5
@@ -246,9 +241,7 @@ async def test_wealth_encryption_roundtrip(session: AsyncSession) -> None:
     await session.flush()
 
     # Read back via ORM — should be decrypted transparently
-    result = await session.execute(
-        select(WealthProfile).where(WealthProfile.user_id == user.id)
-    )
+    result = await session.execute(select(WealthProfile).where(WealthProfile.user_id == user.id))
     fetched = result.scalar_one()
     assert fetched.income_range == "$50k-$75k"
     assert fetched.debt_level == "low"
@@ -295,9 +288,7 @@ async def test_wealth_null_encrypted_fields(session: AsyncSession) -> None:
     session.add(wealth)
     await session.flush()
 
-    result = await session.execute(
-        select(WealthProfile).where(WealthProfile.user_id == user.id)
-    )
+    result = await session.execute(select(WealthProfile).where(WealthProfile.user_id == user.id))
     fetched = result.scalar_one()
     assert fetched.income_range is None
     assert fetched.debt_level is None
@@ -456,9 +447,7 @@ async def test_cascade_delete(session: AsyncSession) -> None:
     await session.flush()
 
     # Verify child rows are gone
-    intake_result = await session.execute(
-        select(IntakeData).where(IntakeData.user_id == user_id)
-    )
+    intake_result = await session.execute(select(IntakeData).where(IntakeData.user_id == user_id))
     assert intake_result.scalar_one_or_none() is None
 
     healing_result = await session.execute(

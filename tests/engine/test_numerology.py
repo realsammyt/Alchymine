@@ -27,6 +27,16 @@ from alchymine.engine.numerology import (
     reduce_to_single_digit,
     soul_urge,
 )
+from alchymine.engine.numerology.chaldean import (
+    CHALDEAN_MAP,
+    COMPOUND_MEANINGS,
+)
+from alchymine.engine.numerology.chaldean import (
+    letter_value as chal_letter_value,
+)
+from alchymine.engine.numerology.chaldean import (
+    sum_letters as chal_sum_letters,
+)
 from alchymine.engine.numerology.common import (
     digit_sum,
     extract_consonants,
@@ -34,16 +44,13 @@ from alchymine.engine.numerology.common import (
 )
 from alchymine.engine.numerology.pythagorean import (
     PYTHAGOREAN_MAP,
+)
+from alchymine.engine.numerology.pythagorean import (
     letter_value as pyth_letter_value,
+)
+from alchymine.engine.numerology.pythagorean import (
     sum_letters as pyth_sum_letters,
 )
-from alchymine.engine.numerology.chaldean import (
-    CHALDEAN_MAP,
-    COMPOUND_MEANINGS,
-    letter_value as chal_letter_value,
-    sum_letters as chal_sum_letters,
-)
-
 
 # ═══════════════════════════════════════════════════════════════════════════
 # 1. Shared utilities (common.py)
@@ -358,8 +365,18 @@ class TestPersonalMonth:
     @pytest.mark.parametrize(
         "month, expected",
         [
-            (1, 2), (2, 3), (3, 4), (4, 5), (5, 6), (6, 7),
-            (7, 8), (8, 9), (9, 1), (10, 2), (11, 3), (12, 4),
+            (1, 2),
+            (2, 3),
+            (3, 4),
+            (4, 5),
+            (5, 6),
+            (6, 7),
+            (7, 8),
+            (8, 9),
+            (9, 1),
+            (10, 2),
+            (11, 3),
+            (12, 4),
         ],
     )
     def test_john_smith_2026_all_twelve_months(self, month: int, expected: int) -> None:
@@ -450,8 +467,14 @@ class TestFullPythagoreanProfile:
             "Maria Elena Vasquez", date(1992, 3, 15), current_year=2026, current_month=2
         )
         for attr in (
-            "life_path", "expression", "soul_urge", "personality",
-            "personal_year", "personal_month", "maturity", "is_master_number",
+            "life_path",
+            "expression",
+            "soul_urge",
+            "personality",
+            "personal_year",
+            "personal_month",
+            "maturity",
+            "is_master_number",
         ):
             assert hasattr(p, attr), f"Missing attribute: {attr}"
 
@@ -467,7 +490,10 @@ class TestFullPythagoreanProfile:
             "Yolanda Torres", date(1990, 1, 1), current_year=2026, current_month=1
         )
         p_y_vowel = calculate_pythagorean_profile(
-            "Yolanda Torres", date(1990, 1, 1), current_year=2026, current_month=1,
+            "Yolanda Torres",
+            date(1990, 1, 1),
+            current_year=2026,
+            current_month=1,
             y_as_vowel=True,
         )
         assert p_default.soul_urge != p_y_vowel.soul_urge
@@ -504,10 +530,32 @@ class TestChaldeanLetterMapping:
 
     def test_all_specific_values(self) -> None:
         expected = {
-            "A": 1, "B": 2, "C": 3, "D": 4, "E": 5, "F": 8, "G": 3, "H": 5,
-            "I": 1, "J": 1, "K": 2, "L": 3, "M": 4, "N": 5, "O": 7, "P": 8,
-            "Q": 1, "R": 2, "S": 3, "T": 4, "U": 6, "V": 6, "W": 6, "X": 5,
-            "Y": 1, "Z": 7,
+            "A": 1,
+            "B": 2,
+            "C": 3,
+            "D": 4,
+            "E": 5,
+            "F": 8,
+            "G": 3,
+            "H": 5,
+            "I": 1,
+            "J": 1,
+            "K": 2,
+            "L": 3,
+            "M": 4,
+            "N": 5,
+            "O": 7,
+            "P": 8,
+            "Q": 1,
+            "R": 2,
+            "S": 3,
+            "T": 4,
+            "U": 6,
+            "V": 6,
+            "W": 6,
+            "X": 5,
+            "Y": 1,
+            "Z": 7,
         }
         for letter, value in expected.items():
             assert chal_letter_value(letter) == value, f"Chaldean {letter} should be {value}"

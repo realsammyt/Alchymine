@@ -148,23 +148,17 @@ class TestHtmlRenderer:
 class TestHtmlExportEndpoint:
     """Tests for GET /api/v1/reports/{report_id}/html"""
 
-    def test_html_export_returns_200(
-        self, client: TestClient, sample_report_data: dict
-    ) -> None:
+    def test_html_export_returns_200(self, client: TestClient, sample_report_data: dict) -> None:
         report_store["test-123"] = sample_report_data
         response = client.get("/api/v1/reports/test-123/html")
         assert response.status_code == 200
 
-    def test_html_export_content_type(
-        self, client: TestClient, sample_report_data: dict
-    ) -> None:
+    def test_html_export_content_type(self, client: TestClient, sample_report_data: dict) -> None:
         report_store["test-123"] = sample_report_data
         response = client.get("/api/v1/reports/test-123/html")
         assert "text/html" in response.headers["content-type"]
 
-    def test_html_export_contains_html(
-        self, client: TestClient, sample_report_data: dict
-    ) -> None:
+    def test_html_export_contains_html(self, client: TestClient, sample_report_data: dict) -> None:
         report_store["test-123"] = sample_report_data
         response = client.get("/api/v1/reports/test-123/html")
         assert "<!DOCTYPE html>" in response.text

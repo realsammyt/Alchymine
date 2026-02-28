@@ -21,11 +21,10 @@ from datetime import date, time
 import pytest
 
 from alchymine.engine.astrology import (
+    MAJOR_ASPECTS,
     Aspect,
     AspectType,
     HouseSystem,
-    MAJOR_ASPECTS,
-    MINOR_ASPECTS,
     TransitAspect,
     angular_separation,
     approximate_ascendant,
@@ -44,9 +43,7 @@ from alchymine.engine.astrology import (
     normalize_angle,
     summarize_transits,
 )
-from alchymine.engine.astrology.aspects import DEFAULT_ORBS
 from alchymine.engine.astrology.transits import PLANET_ELEMENTS
-
 
 # ═══════════════════════════════════════════════════════════════════════════
 # Sun Sign Tests
@@ -457,7 +454,7 @@ class TestCalculateAspects:
         positions = {
             "Sun": 0.0,
             "Moon": 120.0,  # trine to Sun
-            "Mars": 90.0,   # square to Sun, semi-square to Moon (120-90=30 -> semi-sextile)
+            "Mars": 90.0,  # square to Sun, semi-square to Moon (120-90=30 -> semi-sextile)
         }
         aspects = calculate_aspects(positions)
         assert len(aspects) > 0
@@ -466,7 +463,7 @@ class TestCalculateAspects:
         positions = {
             "Sun": 0.0,
             "Moon": 120.5,  # trine to Sun (0.5 orb)
-            "Mars": 92.0,   # square to Sun (2.0 orb)
+            "Mars": 92.0,  # square to Sun (2.0 orb)
         }
         aspects = calculate_aspects(positions)
         orbs = [a.orb for a in aspects]
@@ -581,21 +578,27 @@ class TestRisingSign:
     """Tests for approximate ascendant calculation."""
 
     def test_returns_sign_and_degree(self) -> None:
-        sign, degree = approximate_ascendant(
-            date(1992, 3, 15), time(14, 30), 40.7128, -74.0060
-        )
+        sign, degree = approximate_ascendant(date(1992, 3, 15), time(14, 30), 40.7128, -74.0060)
         assert isinstance(sign, str)
         assert isinstance(degree, float)
         assert 0 <= degree < 360
 
     def test_rising_sign_is_valid_zodiac(self) -> None:
         valid_signs = {
-            "Aries", "Taurus", "Gemini", "Cancer", "Leo", "Virgo",
-            "Libra", "Scorpio", "Sagittarius", "Capricorn", "Aquarius", "Pisces",
+            "Aries",
+            "Taurus",
+            "Gemini",
+            "Cancer",
+            "Leo",
+            "Virgo",
+            "Libra",
+            "Scorpio",
+            "Sagittarius",
+            "Capricorn",
+            "Aquarius",
+            "Pisces",
         }
-        sign, _ = approximate_ascendant(
-            date(2000, 6, 21), time(6, 0), 51.5074, -0.1278
-        )
+        sign, _ = approximate_ascendant(date(2000, 6, 21), time(6, 0), 51.5074, -0.1278)
         assert sign in valid_signs
 
     def test_rising_deterministic(self) -> None:
@@ -611,50 +614,56 @@ class TestRisingSign:
 
     def test_midnight_birth(self) -> None:
         """Midnight birth should not crash."""
-        sign, degree = approximate_ascendant(
-            date(2000, 1, 1), time(0, 0), 40.7128, -74.0060
-        )
+        sign, degree = approximate_ascendant(date(2000, 1, 1), time(0, 0), 40.7128, -74.0060)
         assert isinstance(sign, str)
         assert 0 <= degree < 360
 
     def test_noon_birth(self) -> None:
         """Noon birth should not crash."""
-        sign, degree = approximate_ascendant(
-            date(2000, 1, 1), time(12, 0), 40.7128, -74.0060
-        )
+        sign, degree = approximate_ascendant(date(2000, 1, 1), time(12, 0), 40.7128, -74.0060)
         assert isinstance(sign, str)
         assert 0 <= degree < 360
 
     def test_southern_hemisphere(self) -> None:
         """Southern hemisphere (negative latitude) should work."""
         sign, degree = approximate_ascendant(
-            date(2000, 6, 21), time(8, 0), -33.8688, 151.2093  # Sydney
+            date(2000, 6, 21),
+            time(8, 0),
+            -33.8688,
+            151.2093,  # Sydney
         )
         assert isinstance(sign, str)
         assert 0 <= degree < 360
 
     def test_equator(self) -> None:
         """Birth near the equator should work."""
-        sign, degree = approximate_ascendant(
-            date(2000, 6, 21), time(6, 0), 0.0, 0.0
-        )
+        sign, degree = approximate_ascendant(date(2000, 6, 21), time(6, 0), 0.0, 0.0)
         assert isinstance(sign, str)
         assert 0 <= degree < 360
 
     def test_rising_changes_with_location(self) -> None:
         """Different locations at same time should give different ascendants."""
         _, d1 = approximate_ascendant(
-            date(2000, 6, 21), time(12, 0), 40.7128, -74.0060  # New York
+            date(2000, 6, 21),
+            time(12, 0),
+            40.7128,
+            -74.0060,  # New York
         )
         _, d2 = approximate_ascendant(
-            date(2000, 6, 21), time(12, 0), 35.6762, 139.6503  # Tokyo
+            date(2000, 6, 21),
+            time(12, 0),
+            35.6762,
+            139.6503,  # Tokyo
         )
         assert d1 != d2
 
     def test_high_latitude(self) -> None:
         """High latitude (e.g., Stockholm) should not crash."""
         sign, degree = approximate_ascendant(
-            date(2000, 6, 21), time(12, 0), 59.3293, 18.0686  # Stockholm
+            date(2000, 6, 21),
+            time(12, 0),
+            59.3293,
+            18.0686,  # Stockholm
         )
         assert isinstance(sign, str)
         assert 0 <= degree < 360
@@ -694,7 +703,7 @@ class TestHouseSystems:
         for system in HouseSystem:
             cusps = calculate_house_cusps(200.0, system)
             for i, cusp in enumerate(cusps):
-                assert 0 <= cusp < 360, f"{system.value} cusp {i+1} = {cusp}"
+                assert 0 <= cusp < 360, f"{system.value} cusp {i + 1} = {cusp}"
 
     def test_placidus_first_cusp_is_ascendant(self) -> None:
         """Placidus first cusp should be the Ascendant."""
@@ -722,8 +731,18 @@ class TestPlanetaryPositions:
 
     def test_all_planets_available(self) -> None:
         """All major planets should be in PLANET_ELEMENTS."""
-        expected = ["Sun", "Moon", "Mercury", "Venus", "Mars",
-                     "Jupiter", "Saturn", "Uranus", "Neptune", "Pluto"]
+        expected = [
+            "Sun",
+            "Moon",
+            "Mercury",
+            "Venus",
+            "Mars",
+            "Jupiter",
+            "Saturn",
+            "Uranus",
+            "Neptune",
+            "Pluto",
+        ]
         for planet in expected:
             assert planet in PLANET_ELEMENTS
 
@@ -777,16 +796,12 @@ class TestTransitAspects:
 
     def test_transit_aspects_returns_list(self) -> None:
         natal = {"Sun": 0.0, "Moon": 120.0}
-        aspects = calculate_transit_aspects(
-            natal, transit_date=date(2024, 6, 21)
-        )
+        aspects = calculate_transit_aspects(natal, transit_date=date(2024, 6, 21))
         assert isinstance(aspects, list)
 
     def test_transit_aspect_structure(self) -> None:
         natal = {"Sun": 0.0, "Moon": 120.0, "Mars": 90.0}
-        aspects = calculate_transit_aspects(
-            natal, transit_date=date(2024, 1, 15)
-        )
+        aspects = calculate_transit_aspects(natal, transit_date=date(2024, 1, 15))
         for ta in aspects:
             assert isinstance(ta, TransitAspect)
             assert isinstance(ta.transit_planet, str)
@@ -796,9 +811,7 @@ class TestTransitAspects:
 
     def test_transit_aspects_sorted_by_orb(self) -> None:
         natal = {"Sun": 0.0, "Moon": 90.0, "Venus": 180.0}
-        aspects = calculate_transit_aspects(
-            natal, transit_date=date(2024, 3, 20)
-        )
+        aspects = calculate_transit_aspects(natal, transit_date=date(2024, 3, 20))
         orbs = [ta.aspect.orb for ta in aspects]
         assert orbs == sorted(orbs)
 
@@ -838,8 +851,12 @@ class TestSummarizeTransits:
                 transit_degree=120.0,
                 natal_degree=0.0,
                 aspect=Aspect(
-                    "T.Jupiter", "N.Sun",
-                    AspectType.TRINE, 120.0, 120.0, 0.5,
+                    "T.Jupiter",
+                    "N.Sun",
+                    AspectType.TRINE,
+                    120.0,
+                    120.0,
+                    0.5,
                 ),
             ),
         ]

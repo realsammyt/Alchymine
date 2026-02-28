@@ -6,17 +6,13 @@ disclaimer presence, edge cases, and integration with the healing engine.
 
 from __future__ import annotations
 
-import pytest
-
 from alchymine.engine.healing.crisis import (
     CRISIS_KEYWORDS,
     CrisisResource,
-    CrisisResponse,
     CrisisSeverity,
     detect_crisis,
     get_crisis_resources,
 )
-
 
 # ═══════════════════════════════════════════════════════════════════════
 # Section 1: Crisis keyword list integrity
@@ -141,9 +137,7 @@ class TestCrisisDetection:
 
     def test_highest_severity_wins_with_mixed_keywords(self) -> None:
         """When multiple severities are matched, the highest should win."""
-        result = detect_crisis(
-            "I feel hopeless and have been thinking about suicide"
-        )
+        result = detect_crisis("I feel hopeless and have been thinking about suicide")
         assert result is not None
         assert result.severity == CrisisSeverity.EMERGENCY
 

@@ -188,7 +188,9 @@ class TestBiasDetection:
         """Text with sunk cost keywords is detected."""
         response = client.post(
             "/api/v1/perspective/biases/detect",
-            json={"text": "I've already invested too much time, can't give up now after all the effort."},
+            json={
+                "text": "I've already invested too much time, can't give up now after all the effort."
+            },
         )
         data = response.json()
         bias_types = [b["bias_type"] for b in data["biases_detected"]]

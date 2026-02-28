@@ -61,9 +61,7 @@ class TestListModalities:
 
     def test_filter_by_evidence_level(self, client: TestClient) -> None:
         """Filter by evidence_level returns only matching modalities."""
-        response = client.get(
-            "/api/v1/healing/modalities", params={"evidence_level": "strong"}
-        )
+        response = client.get("/api/v1/healing/modalities", params={"evidence_level": "strong"})
         assert response.status_code == 200
         data = response.json()
         assert data["total"] > 0
@@ -84,9 +82,7 @@ class TestListModalities:
 
     def test_invalid_category_returns_400(self, client: TestClient) -> None:
         """Invalid category returns 400."""
-        response = client.get(
-            "/api/v1/healing/modalities", params={"category": "nonexistent"}
-        )
+        response = client.get("/api/v1/healing/modalities", params={"category": "nonexistent"})
         assert response.status_code == 400
 
 

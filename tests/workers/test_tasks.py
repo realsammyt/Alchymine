@@ -12,7 +12,7 @@ import os
 os.environ["CELERY_ALWAYS_EAGER"] = "true"
 
 import importlib  # noqa: E402
-from unittest.mock import AsyncMock, MagicMock, patch  # noqa: E402
+from unittest.mock import AsyncMock, patch  # noqa: E402
 
 import pytest  # noqa: E402
 
@@ -28,7 +28,6 @@ from alchymine.workers.tasks import (  # noqa: E402
     generate_report,
     report_store,
 )
-
 
 # ── Fixtures ─────────────────────────────────────────────────────────────
 
@@ -65,9 +64,7 @@ def mock_orchestrator_result():
     class FakeOrchestratorResult:
         request_id: str = "fake-request-id"
         intent: FakeIntentResult = field(default_factory=FakeIntentResult)
-        coordinator_results: list = field(
-            default_factory=lambda: [FakeCoordinatorResult()]
-        )
+        coordinator_results: list = field(default_factory=lambda: [FakeCoordinatorResult()])
         synthesis: dict | None = None
         quality_passed: bool = True
 
@@ -190,17 +187,11 @@ class TestGenerateReportTask:
 
     def test_successful_report_generation(self, mock_orchestrator_result):
         """Task should complete successfully and store result."""
-        with patch(
-            "alchymine.workers.tasks.MasterOrchestrator"
-        ) as MockOrch:
+        with patch("alchymine.workers.tasks.MasterOrchestrator") as MockOrch:
             instance = MockOrch.return_value
-            instance.process_request = AsyncMock(
-                return_value=mock_orchestrator_result
-            )
+            instance.process_request = AsyncMock(return_value=mock_orchestrator_result)
 
-            result = generate_report.apply(
-                args=["test-report-1", "Tell me about numerology"]
-            ).get()
+            result = generate_report.apply(args=["test-report-1", "Tell me about numerology"]).get()
 
             assert isinstance(result, dict)
             assert result["request_id"] == "fake-request-id"
@@ -217,13 +208,9 @@ class TestGenerateReportTask:
                 statuses_seen.append(value)
             original_update(d, key, value)
 
-        with patch(
-            "alchymine.workers.tasks.MasterOrchestrator"
-        ) as MockOrch:
+        with patch("alchymine.workers.tasks.MasterOrchestrator") as MockOrch:
             instance = MockOrch.return_value
-            instance.process_request = AsyncMock(
-                return_value=mock_orchestrator_result
-            )
+            instance.process_request = AsyncMock(return_value=mock_orchestrator_result)
 
             # Pre-seed the store as the API would
             report_store["test-transitions"] = {
@@ -237,26 +224,18 @@ class TestGenerateReportTask:
                 "updated_at": _now_iso(),
             }
 
-            generate_report.apply(
-                args=["test-transitions", "test input"]
-            ).get()
+            generate_report.apply(args=["test-transitions", "test input"]).get()
 
             entry = report_store["test-transitions"]
             assert entry["status"] == "complete"
 
     def test_failed_task_stores_error(self):
         """Task should record error message on non-transient failure."""
-        with patch(
-            "alchymine.workers.tasks.MasterOrchestrator"
-        ) as MockOrch:
+        with patch("alchymine.workers.tasks.MasterOrchestrator") as MockOrch:
             instance = MockOrch.return_value
-            instance.process_request = AsyncMock(
-                side_effect=ValueError("Something went wrong")
-            )
+            instance.process_request = AsyncMock(side_effect=ValueError("Something went wrong"))
 
-            result = generate_report.apply(
-                args=["test-fail-1", "bad input"]
-            ).get()
+            result = generate_report.apply(args=["test-fail-1", "bad input"]).get()
 
             assert report_store["test-fail-1"]["status"] == "failed"
             assert "Something went wrong" in report_store["test-fail-1"]["error"]
@@ -264,36 +243,24 @@ class TestGenerateReportTask:
 
     def test_store_entry_created_if_missing(self, mock_orchestrator_result):
         """Task should create a store entry if one is not pre-seeded."""
-        with patch(
-            "alchymine.workers.tasks.MasterOrchestrator"
-        ) as MockOrch:
+        with patch("alchymine.workers.tasks.MasterOrchestrator") as MockOrch:
             instance = MockOrch.return_value
-            instance.process_request = AsyncMock(
-                return_value=mock_orchestrator_result
-            )
+            instance.process_request = AsyncMock(return_value=mock_orchestrator_result)
 
             assert "new-report" not in report_store
 
-            generate_report.apply(
-                args=["new-report", "test input"]
-            ).get()
+            generate_report.apply(args=["new-report", "test input"]).get()
 
             assert "new-report" in report_store
             assert report_store["new-report"]["status"] == "complete"
 
     def test_result_stored_on_success(self, mock_orchestrator_result):
         """Completed report should contain orchestrator result data."""
-        with patch(
-            "alchymine.workers.tasks.MasterOrchestrator"
-        ) as MockOrch:
+        with patch("alchymine.workers.tasks.MasterOrchestrator") as MockOrch:
             instance = MockOrch.return_value
-            instance.process_request = AsyncMock(
-                return_value=mock_orchestrator_result
-            )
+            instance.process_request = AsyncMock(return_value=mock_orchestrator_result)
 
-            generate_report.apply(
-                args=["test-result-stored", "numerology please"]
-            ).get()
+            generate_report.apply(args=["test-result-stored", "numerology please"]).get()
 
             entry = report_store["test-result-stored"]
             assert entry["result"] is not None
@@ -304,33 +271,21 @@ class TestGenerateReportTask:
         """User profile dict should be forwarded to orchestrator.process_request."""
         profile = {"id": "user-123", "name": "Test User"}
 
-        with patch(
-            "alchymine.workers.tasks.MasterOrchestrator"
-        ) as MockOrch:
+        with patch("alchymine.workers.tasks.MasterOrchestrator") as MockOrch:
             instance = MockOrch.return_value
-            instance.process_request = AsyncMock(
-                return_value=mock_orchestrator_result
-            )
+            instance.process_request = AsyncMock(return_value=mock_orchestrator_result)
 
-            generate_report.apply(
-                args=["test-profile", "test", profile]
-            ).get()
+            generate_report.apply(args=["test-profile", "test", profile]).get()
 
             instance.process_request.assert_called_once_with("test", profile)
 
     def test_updated_at_set_on_completion(self, mock_orchestrator_result):
         """The updated_at field should be refreshed on completion."""
-        with patch(
-            "alchymine.workers.tasks.MasterOrchestrator"
-        ) as MockOrch:
+        with patch("alchymine.workers.tasks.MasterOrchestrator") as MockOrch:
             instance = MockOrch.return_value
-            instance.process_request = AsyncMock(
-                return_value=mock_orchestrator_result
-            )
+            instance.process_request = AsyncMock(return_value=mock_orchestrator_result)
 
-            generate_report.apply(
-                args=["test-timestamps", "test"]
-            ).get()
+            generate_report.apply(args=["test-timestamps", "test"]).get()
 
             entry = report_store["test-timestamps"]
             assert entry["updated_at"] is not None
@@ -338,49 +293,33 @@ class TestGenerateReportTask:
 
     def test_connection_error_marks_failed(self):
         """ConnectionError should mark the report as failed."""
-        with patch(
-            "alchymine.workers.tasks.MasterOrchestrator"
-        ) as MockOrch:
+        with patch("alchymine.workers.tasks.MasterOrchestrator") as MockOrch:
             instance = MockOrch.return_value
-            instance.process_request = AsyncMock(
-                side_effect=ConnectionError("Redis down")
-            )
+            instance.process_request = AsyncMock(side_effect=ConnectionError("Redis down"))
 
             # In eager mode with task_eager_propagates=True, autoretry_for
             # causes Celery to raise a Retry exception which propagates.
             with pytest.raises(Exception):
-                generate_report.apply(
-                    args=["test-conn-err", "test"]
-                ).get()
+                generate_report.apply(args=["test-conn-err", "test"]).get()
 
             assert report_store["test-conn-err"]["status"] == "failed"
 
     def test_timeout_error_marks_failed(self):
         """TimeoutError should mark the report as failed."""
-        with patch(
-            "alchymine.workers.tasks.MasterOrchestrator"
-        ) as MockOrch:
+        with patch("alchymine.workers.tasks.MasterOrchestrator") as MockOrch:
             instance = MockOrch.return_value
-            instance.process_request = AsyncMock(
-                side_effect=TimeoutError("Operation timed out")
-            )
+            instance.process_request = AsyncMock(side_effect=TimeoutError("Operation timed out"))
 
             with pytest.raises(Exception):
-                generate_report.apply(
-                    args=["test-timeout", "test"]
-                ).get()
+                generate_report.apply(args=["test-timeout", "test"]).get()
 
             assert report_store["test-timeout"]["status"] == "failed"
 
     def test_multiple_reports_independent(self, mock_orchestrator_result):
         """Multiple reports should not interfere with each other."""
-        with patch(
-            "alchymine.workers.tasks.MasterOrchestrator"
-        ) as MockOrch:
+        with patch("alchymine.workers.tasks.MasterOrchestrator") as MockOrch:
             instance = MockOrch.return_value
-            instance.process_request = AsyncMock(
-                return_value=mock_orchestrator_result
-            )
+            instance.process_request = AsyncMock(return_value=mock_orchestrator_result)
 
             generate_report.apply(args=["report-a", "input a"]).get()
             generate_report.apply(args=["report-b", "input b"]).get()

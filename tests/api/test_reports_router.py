@@ -24,7 +24,6 @@ importlib.reload(celery_app_mod)
 from alchymine.api.main import app  # noqa: E402
 from alchymine.workers.tasks import report_store  # noqa: E402
 
-
 # ── Fixtures ─────────────────────────────────────────────────────────────
 
 
@@ -265,9 +264,7 @@ class TestGetReport:
             synthesis: dict | None = None
             quality_passed: bool = True
 
-        with patch(
-            "alchymine.workers.tasks.MasterOrchestrator"
-        ) as MockOrch:
+        with patch("alchymine.workers.tasks.MasterOrchestrator") as MockOrch:
             instance = MockOrch.return_value
             instance.process_request = AsyncMock(return_value=FakeResult())
 

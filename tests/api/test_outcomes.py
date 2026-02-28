@@ -100,9 +100,7 @@ class TestMilestoneEndpoints:
             json={"user_id": "user-1", "system": "wealth", "name": "Wealth ms"},
         )
 
-        response = client.get(
-            "/api/v1/outcomes/milestones?user_id=user-1&system=healing"
-        )
+        response = client.get("/api/v1/outcomes/milestones?user_id=user-1&system=healing")
         data = response.json()
         assert data["total"] == 1
         assert data["milestones"][0]["system"] == "healing"
@@ -233,9 +231,7 @@ class TestOutcomeSummary:
             },
         )
 
-        response = client.get(
-            "/api/v1/outcomes/summary/user-1?active_plan_day=45"
-        )
+        response = client.get("/api/v1/outcomes/summary/user-1?active_plan_day=45")
         assert response.json()["active_plan_day"] == 45
 
 

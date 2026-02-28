@@ -5,13 +5,12 @@ Uses an in-memory SQLite database so no external services are needed.
 
 from __future__ import annotations
 
-import time
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import pytest
 from fastapi.testclient import TestClient
 from jose import jwt
-from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from alchymine.api.auth import (
     JWT_ALGORITHM,
@@ -25,7 +24,6 @@ from alchymine.api.auth import (
 from alchymine.api.main import app
 from alchymine.api.routers.auth import get_db
 from alchymine.db.base import Base
-
 
 # ─── Fixtures ─────────────────────────────────────────────────────────────
 
@@ -125,8 +123,8 @@ class TestTokens:
             expires_delta=timedelta(minutes=5),
         )
         payload = jwt.decode(token, JWT_SECRET_KEY, algorithms=[JWT_ALGORITHM])
-        exp = datetime.fromtimestamp(payload["exp"], tz=timezone.utc)
-        now = datetime.now(timezone.utc)
+        exp = datetime.fromtimestamp(payload["exp"], tz=UTC)
+        now = datetime.now(UTC)
         # Should expire within ~5 minutes from now (with 10s tolerance)
         delta = exp - now
         assert timedelta(minutes=4, seconds=50) < delta < timedelta(minutes=5, seconds=10)
@@ -156,7 +154,7 @@ class TestTokens:
     def test_decode_token_wrong_secret(self):
         """decode_token should reject a token signed with a different secret."""
         token = jwt.encode(
-            {"sub": "user-123", "exp": datetime.now(timezone.utc) + timedelta(hours=1)},
+            {"sub": "user-123", "exp": datetime.now(UTC) + timedelta(hours=1)},
             "different-secret",
             algorithm=JWT_ALGORITHM,
         )

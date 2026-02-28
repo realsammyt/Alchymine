@@ -42,12 +42,24 @@ class TestGuilfordAssessment:
     def _question_level_responses(self) -> dict:
         return {
             "responses": {
-                "fluency_1": 80, "fluency_2": 70, "fluency_3": 75,
-                "flexibility_1": 60, "flexibility_2": 55, "flexibility_3": 65,
-                "originality_1": 90, "originality_2": 80, "originality_3": 85,
-                "elaboration_1": 50, "elaboration_2": 45, "elaboration_3": 55,
-                "sensitivity_1": 70, "sensitivity_2": 65, "sensitivity_3": 75,
-                "redefinition_1": 50, "redefinition_2": 55, "redefinition_3": 60,
+                "fluency_1": 80,
+                "fluency_2": 70,
+                "fluency_3": 75,
+                "flexibility_1": 60,
+                "flexibility_2": 55,
+                "flexibility_3": 65,
+                "originality_1": 90,
+                "originality_2": 80,
+                "originality_3": 85,
+                "elaboration_1": 50,
+                "elaboration_2": 45,
+                "elaboration_3": 55,
+                "sensitivity_1": 70,
+                "sensitivity_2": 65,
+                "sensitivity_3": 75,
+                "redefinition_1": 50,
+                "redefinition_2": 55,
+                "redefinition_3": 60,
             }
         }
 
@@ -97,8 +109,16 @@ class TestGuilfordAssessment:
         """Scores exceeding 100 are clamped."""
         response = client.post(
             "/api/v1/creative/assessment",
-            json={"responses": {"fluency": 150, "flexibility": 60, "originality": 85,
-                                "elaboration": 50, "sensitivity": 70, "redefinition": 55}},
+            json={
+                "responses": {
+                    "fluency": 150,
+                    "flexibility": 60,
+                    "originality": 85,
+                    "elaboration": 50,
+                    "sensitivity": 70,
+                    "redefinition": 55,
+                }
+            },
         )
         data = response.json()
         assert data["fluency"] == 100.0
@@ -135,16 +155,12 @@ class TestStyleFingerprint:
 
     def test_style_returns_200(self, client: TestClient) -> None:
         """POST /creative/style returns 200 with valid input."""
-        response = client.post(
-            "/api/v1/creative/style", json=self._style_payload()
-        )
+        response = client.post("/api/v1/creative/style", json=self._style_payload())
         assert response.status_code == 200
 
     def test_style_contains_summary(self, client: TestClient) -> None:
         """Response includes guilford_summary and dna_summary."""
-        response = client.post(
-            "/api/v1/creative/style", json=self._style_payload()
-        )
+        response = client.post("/api/v1/creative/style", json=self._style_payload())
         data = response.json()
         assert "guilford_summary" in data
         assert "dna_summary" in data
@@ -154,9 +170,7 @@ class TestStyleFingerprint:
 
     def test_style_includes_strengths(self, client: TestClient) -> None:
         """Response includes strengths and growth areas."""
-        response = client.post(
-            "/api/v1/creative/style", json=self._style_payload()
-        )
+        response = client.post("/api/v1/creative/style", json=self._style_payload())
         data = response.json()
         assert isinstance(data["strengths"], list)
         assert len(data["strengths"]) > 0
@@ -165,18 +179,14 @@ class TestStyleFingerprint:
 
     def test_style_includes_mediums(self, client: TestClient) -> None:
         """Response includes recommended creative mediums."""
-        response = client.post(
-            "/api/v1/creative/style", json=self._style_payload()
-        )
+        response = client.post("/api/v1/creative/style", json=self._style_payload())
         data = response.json()
         assert isinstance(data["recommended_mediums"], list)
         assert len(data["recommended_mediums"]) > 0
 
     def test_style_dominant_components_top3(self, client: TestClient) -> None:
         """Dominant components returns top 3 Guilford components."""
-        response = client.post(
-            "/api/v1/creative/style", json=self._style_payload()
-        )
+        response = client.post("/api/v1/creative/style", json=self._style_payload())
         data = response.json()
         dominant = data["dominant_components"]
         assert len(dominant) == 3

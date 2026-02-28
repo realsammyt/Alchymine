@@ -113,7 +113,10 @@ class TestAstrologyResponseSchema:
         response = client.get("/api/v1/astrology/1992-03-15")
         data = response.json()
         required_fields = {
-            "sun_sign", "sun_degree", "moon_sign", "moon_degree",
+            "sun_sign",
+            "sun_degree",
+            "moon_sign",
+            "moon_degree",
             "birth_date",
         }
         assert required_fields.issubset(set(data.keys()))
@@ -150,8 +153,18 @@ class TestAstrologyResponseSchema:
     def test_sun_sign_is_valid_zodiac(self, client: TestClient) -> None:
         """sun_sign is one of the 12 zodiac signs."""
         valid_signs = {
-            "Aries", "Taurus", "Gemini", "Cancer", "Leo", "Virgo",
-            "Libra", "Scorpio", "Sagittarius", "Capricorn", "Aquarius", "Pisces",
+            "Aries",
+            "Taurus",
+            "Gemini",
+            "Cancer",
+            "Leo",
+            "Virgo",
+            "Libra",
+            "Scorpio",
+            "Sagittarius",
+            "Capricorn",
+            "Aquarius",
+            "Pisces",
         }
         response = client.get("/api/v1/astrology/1992-03-15")
         data = response.json()

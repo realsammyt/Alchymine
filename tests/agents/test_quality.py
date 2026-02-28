@@ -11,10 +11,7 @@ from __future__ import annotations
 import pytest
 
 from alchymine.agents.quality.ethics_check import (
-    EthicsCheckResult,
-    EthicsViolation,
     ViolationCategory,
-    ViolationSeverity,
     check_prompt,
     check_text,
     validate_output,
@@ -22,11 +19,9 @@ from alchymine.agents.quality.ethics_check import (
 from alchymine.agents.quality.validators import (
     QualityGateResult,
     run_quality_gate,
-    validate_creative_output,
     validate_healing_output,
     validate_wealth_output,
 )
-
 
 # ═══════════════════════════════════════════════════════════════════════
 # Section 1: Ethics check — fatalistic language
@@ -330,9 +325,7 @@ class TestHealingQualityGate:
         output = {
             "crisis_flag": True,
             "crisis_response": None,
-            "disclaimers": [
-                "This is not a substitute for professional help."
-            ],
+            "disclaimers": ["This is not a substitute for professional help."],
         }
         result = validate_healing_output(output)
         assert result.passed is False
@@ -341,9 +334,7 @@ class TestHealingQualityGate:
     def test_healing_gate_has_timestamp(self) -> None:
         """Quality gate result should have a timestamp."""
         output = {
-            "disclaimers": [
-                "This is not medical advice."
-            ],
+            "disclaimers": ["This is not medical advice."],
         }
         result = validate_healing_output(output)
         assert result.timestamp is not None
@@ -361,9 +352,7 @@ class TestWealthQualityGate:
         """A well-formed wealth output should pass."""
         output = {
             "text": "Your wealth archetype suggests focusing on the EARN lever.",
-            "disclaimers": [
-                "This is not financial advice. Consult a qualified financial advisor."
-            ],
+            "disclaimers": ["This is not financial advice. Consult a qualified financial advisor."],
             "calculations": {"monthly_savings": 500.0, "annual_projection": 6000.0},
         }
         result = validate_wealth_output(output)
@@ -412,9 +401,7 @@ class TestQualityGateDispatcher:
     def test_routes_to_healing(self) -> None:
         """Dispatcher should route 'healing' to validate_healing_output."""
         output = {
-            "disclaimers": [
-                "This is not a substitute for professional help."
-            ],
+            "disclaimers": ["This is not a substitute for professional help."],
         }
         result = run_quality_gate(output, system="healing")
         assert result.gate_name == "healing_quality_gate"

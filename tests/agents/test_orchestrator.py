@@ -33,7 +33,6 @@ from alchymine.agents.orchestrator.orchestrator import (
     synthesize_results,
 )
 
-
 # ═══════════════════════════════════════════════════════════════════════
 # Section 1: Intent Classification — per-system keyword detection
 # ═══════════════════════════════════════════════════════════════════════
@@ -216,15 +215,19 @@ class TestCoordinatorSuccessMode:
         mock_profile.personal_year = 7
         mock_profile.personal_month = 3
 
-        with patch(
-            "alchymine.engine.numerology.calculate_pythagorean_profile",
-            return_value=mock_profile,
-        ), patch(
-            "alchymine.engine.astrology.approximate_sun_sign",
-            return_value="Pisces",
-        ), patch(
-            "alchymine.engine.astrology.approximate_sun_degree",
-            return_value=354.5,
+        with (
+            patch(
+                "alchymine.engine.numerology.calculate_pythagorean_profile",
+                return_value=mock_profile,
+            ),
+            patch(
+                "alchymine.engine.astrology.approximate_sun_sign",
+                return_value="Pisces",
+            ),
+            patch(
+                "alchymine.engine.astrology.approximate_sun_degree",
+                return_value=354.5,
+            ),
         ):
             from datetime import date
 
@@ -259,12 +262,15 @@ class TestCoordinatorSuccessMode:
         mock_archetype.name = "Builder"
         mock_archetype.description = "Steady wealth builder"
 
-        with patch(
-            "alchymine.engine.wealth.map_wealth_archetype",
-            return_value=mock_archetype,
-        ), patch(
-            "alchymine.engine.wealth.prioritize_levers",
-            return_value=[],
+        with (
+            patch(
+                "alchymine.engine.wealth.map_wealth_archetype",
+                return_value=mock_archetype,
+            ),
+            patch(
+                "alchymine.engine.wealth.prioritize_levers",
+                return_value=[],
+            ),
         ):
             result = await coordinator.process(
                 "user-1",
@@ -314,12 +320,15 @@ class TestCoordinatorDegradedMode:
         mock_profile.personal_year = 7
         mock_profile.personal_month = 3
 
-        with patch(
-            "alchymine.engine.numerology.calculate_pythagorean_profile",
-            return_value=mock_profile,
-        ), patch(
-            "alchymine.engine.astrology.approximate_sun_sign",
-            side_effect=ImportError("swisseph not installed"),
+        with (
+            patch(
+                "alchymine.engine.numerology.calculate_pythagorean_profile",
+                return_value=mock_profile,
+            ),
+            patch(
+                "alchymine.engine.astrology.approximate_sun_sign",
+                side_effect=ImportError("swisseph not installed"),
+            ),
         ):
             from datetime import date
 
@@ -539,9 +548,7 @@ class TestMultiSystemProcessing:
                 detected_keywords=["healing", "numerology"],
             ),
         ):
-            result = await orchestrator.process_request(
-                "healing numerology breathwork astrology"
-            )
+            result = await orchestrator.process_request("healing numerology breathwork astrology")
 
         assert len(result.coordinator_results) == 2
         assert result.synthesis is not None
@@ -782,8 +789,12 @@ class TestOrchestratorInit:
 
     def test_coordinators_are_correct_types(self) -> None:
         orchestrator = MasterOrchestrator()
-        assert isinstance(orchestrator._coordinators[SystemIntent.INTELLIGENCE], IntelligenceCoordinator)
+        assert isinstance(
+            orchestrator._coordinators[SystemIntent.INTELLIGENCE], IntelligenceCoordinator
+        )
         assert isinstance(orchestrator._coordinators[SystemIntent.HEALING], HealingCoordinator)
         assert isinstance(orchestrator._coordinators[SystemIntent.WEALTH], WealthCoordinator)
         assert isinstance(orchestrator._coordinators[SystemIntent.CREATIVE], CreativeCoordinator)
-        assert isinstance(orchestrator._coordinators[SystemIntent.PERSPECTIVE], PerspectiveCoordinator)
+        assert isinstance(
+            orchestrator._coordinators[SystemIntent.PERSPECTIVE], PerspectiveCoordinator
+        )

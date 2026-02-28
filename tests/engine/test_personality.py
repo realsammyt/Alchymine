@@ -11,19 +11,18 @@ from __future__ import annotations
 
 import pytest
 
-from alchymine.engine.personality.big_five import score_big_five
 from alchymine.engine.personality.attachment import score_attachment
+from alchymine.engine.personality.big_five import score_big_five
 from alchymine.engine.personality.enneagram import (
+    ENNEAGRAM_TYPES,
     score_enneagram,
     score_risk_tolerance,
-    ENNEAGRAM_TYPES,
 )
 from alchymine.engine.profile import (
     AttachmentStyle,
     BigFiveScores,
     RiskTolerance,
 )
-
 
 # ═══════════════════════════════════════════════════════════════════════
 # Helpers
@@ -32,11 +31,7 @@ from alchymine.engine.profile import (
 
 def _bf_all(value: int) -> dict[str, int]:
     """Build a Big Five response dict where every item is the same value."""
-    keys = [
-        f"bf_{trait}{i}"
-        for trait in ("e", "a", "c", "n", "o")
-        for i in range(1, 5)
-    ]
+    keys = [f"bf_{trait}{i}" for trait in ("e", "a", "c", "n", "o") for i in range(1, 5)]
     return {k: value for k in keys}
 
 
@@ -166,7 +161,13 @@ class TestBigFive:
     def test_returns_float_scores(self) -> None:
         """Scores should be floats on 0-100 scale."""
         result = score_big_five(_bf_all(3))
-        for field in ("openness", "conscientiousness", "extraversion", "agreeableness", "neuroticism"):
+        for field in (
+            "openness",
+            "conscientiousness",
+            "extraversion",
+            "agreeableness",
+            "neuroticism",
+        ):
             val = getattr(result, field)
             assert isinstance(val, float)
             assert 0.0 <= val <= 100.0
@@ -182,104 +183,124 @@ class TestAttachment:
 
     def test_secure(self) -> None:
         """High closeness + Low abandonment + High trust = Secure."""
-        result = score_attachment({
-            "att_closeness": 5,
-            "att_abandonment": 1,
-            "att_trust": 5,
-            "att_self_reliance": 2,
-        })
+        result = score_attachment(
+            {
+                "att_closeness": 5,
+                "att_abandonment": 1,
+                "att_trust": 5,
+                "att_self_reliance": 2,
+            }
+        )
         assert result == AttachmentStyle.SECURE
 
     def test_anxious(self) -> None:
         """High closeness + High abandonment (+ high trust to avoid disorganized) = Anxious."""
-        result = score_attachment({
-            "att_closeness": 5,
-            "att_abandonment": 5,
-            "att_trust": 4,
-            "att_self_reliance": 2,
-        })
+        result = score_attachment(
+            {
+                "att_closeness": 5,
+                "att_abandonment": 5,
+                "att_trust": 4,
+                "att_self_reliance": 2,
+            }
+        )
         assert result == AttachmentStyle.ANXIOUS
 
     def test_avoidant(self) -> None:
         """Low closeness + Low abandonment + High self-reliance = Avoidant."""
-        result = score_attachment({
-            "att_closeness": 1,
-            "att_abandonment": 1,
-            "att_trust": 3,
-            "att_self_reliance": 5,
-        })
+        result = score_attachment(
+            {
+                "att_closeness": 1,
+                "att_abandonment": 1,
+                "att_trust": 3,
+                "att_self_reliance": 5,
+            }
+        )
         assert result == AttachmentStyle.AVOIDANT
 
     def test_disorganized(self) -> None:
         """High closeness + High abandonment + Low trust = Disorganized."""
-        result = score_attachment({
-            "att_closeness": 5,
-            "att_abandonment": 5,
-            "att_trust": 1,
-            "att_self_reliance": 3,
-        })
+        result = score_attachment(
+            {
+                "att_closeness": 5,
+                "att_abandonment": 5,
+                "att_trust": 1,
+                "att_self_reliance": 3,
+            }
+        )
         assert result == AttachmentStyle.DISORGANIZED
 
     def test_anxious_secure_blend(self) -> None:
         """Moderate signals leaning anxious-secure blend."""
-        result = score_attachment({
-            "att_closeness": 3,
-            "att_abandonment": 3,
-            "att_trust": 3,
-            "att_self_reliance": 2,
-        })
+        result = score_attachment(
+            {
+                "att_closeness": 3,
+                "att_abandonment": 3,
+                "att_trust": 3,
+                "att_self_reliance": 2,
+            }
+        )
         assert result == AttachmentStyle.ANXIOUS_SECURE
 
     def test_avoidant_secure_blend(self) -> None:
         """Low-moderate closeness + moderate self-reliance + low abandonment."""
-        result = score_attachment({
-            "att_closeness": 2,
-            "att_abandonment": 2,
-            "att_trust": 3,
-            "att_self_reliance": 3,
-        })
+        result = score_attachment(
+            {
+                "att_closeness": 2,
+                "att_abandonment": 2,
+                "att_trust": 3,
+                "att_self_reliance": 3,
+            }
+        )
         assert result == AttachmentStyle.AVOIDANT_SECURE
 
     def test_missing_item_raises(self) -> None:
         """Missing attachment item should raise ValueError."""
         with pytest.raises(ValueError, match="Missing attachment items"):
-            score_attachment({
-                "att_closeness": 3,
-                "att_abandonment": 3,
-                "att_trust": 3,
-            })
+            score_attachment(
+                {
+                    "att_closeness": 3,
+                    "att_abandonment": 3,
+                    "att_trust": 3,
+                }
+            )
 
     def test_out_of_range_raises(self) -> None:
         """Score out of 1-5 range should raise ValueError."""
         with pytest.raises(ValueError, match="must be an integer 1-5"):
-            score_attachment({
-                "att_closeness": 7,
-                "att_abandonment": 3,
-                "att_trust": 3,
-                "att_self_reliance": 3,
-            })
+            score_attachment(
+                {
+                    "att_closeness": 7,
+                    "att_abandonment": 3,
+                    "att_trust": 3,
+                    "att_self_reliance": 3,
+                }
+            )
 
     def test_all_high_is_disorganized(self) -> None:
         """All 5s: high closeness + high abandonment + low trust check fails
         (trust=5 is high), so falls to anxious (high closeness + high abandonment)."""
-        result = score_attachment({
-            "att_closeness": 5,
-            "att_abandonment": 5,
-            "att_trust": 5,
-            "att_self_reliance": 5,
-        })
+        result = score_attachment(
+            {
+                "att_closeness": 5,
+                "att_abandonment": 5,
+                "att_trust": 5,
+                "att_self_reliance": 5,
+            }
+        )
         assert result == AttachmentStyle.ANXIOUS
 
     def test_all_low_fallback(self) -> None:
         """All 1s: low closeness, low abandonment, low self-reliance, low trust.
         Avoidant requires high self-reliance, secure requires high closeness+trust.
         Falls through to fallback logic."""
-        result = score_attachment({
-            "att_closeness": 1,
-            "att_abandonment": 1,
-            "att_trust": 1,
-            "att_self_reliance": 1,
-        })
+        result = score_attachment(
+            {
+                "att_closeness": 1,
+                "att_abandonment": 1,
+                "att_trust": 1,
+                "att_self_reliance": 1,
+            }
+        )
         # avoidance_signal = self_reliance - closeness = 0
         # anxiety_signal = abandonment - trust = 0
         # Default fallback is secure.
@@ -441,12 +462,13 @@ class TestImports:
     def test_package_imports(self) -> None:
         """All public scorers should be importable from the package."""
         from alchymine.engine.personality import (
-            score_big_five,
+            ENNEAGRAM_TYPES,
             score_attachment,
+            score_big_five,
             score_enneagram,
             score_risk_tolerance,
-            ENNEAGRAM_TYPES,
         )
+
         assert callable(score_big_five)
         assert callable(score_attachment)
         assert callable(score_enneagram)

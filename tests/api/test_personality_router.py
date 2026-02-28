@@ -39,11 +39,26 @@ class TestBigFiveAssessment:
         """Create a realistic mixed response set."""
         return {
             "responses": {
-                "bf_e1": 4, "bf_e2": 2, "bf_e3": 5, "bf_e4": 2,  # Extraversion: high
-                "bf_a1": 4, "bf_a2": 2, "bf_a3": 4, "bf_a4": 1,  # Agreeableness: high
-                "bf_c1": 3, "bf_c2": 3, "bf_c3": 3, "bf_c4": 3,  # Conscientiousness: moderate
-                "bf_n1": 2, "bf_n2": 4, "bf_n3": 2, "bf_n4": 4,  # Neuroticism: low
-                "bf_o1": 5, "bf_o2": 1, "bf_o3": 1, "bf_o4": 1,  # Openness: high
+                "bf_e1": 4,
+                "bf_e2": 2,
+                "bf_e3": 5,
+                "bf_e4": 2,  # Extraversion: high
+                "bf_a1": 4,
+                "bf_a2": 2,
+                "bf_a3": 4,
+                "bf_a4": 1,  # Agreeableness: high
+                "bf_c1": 3,
+                "bf_c2": 3,
+                "bf_c3": 3,
+                "bf_c4": 3,  # Conscientiousness: moderate
+                "bf_n1": 2,
+                "bf_n2": 4,
+                "bf_n3": 2,
+                "bf_n4": 4,  # Neuroticism: low
+                "bf_o1": 5,
+                "bf_o2": 1,
+                "bf_o3": 1,
+                "bf_o4": 1,  # Openness: high
             }
         }
 
@@ -75,7 +90,13 @@ class TestBigFiveAssessment:
             json=self._mixed_responses(),
         )
         data = response.json()
-        for trait in ["openness", "conscientiousness", "extraversion", "agreeableness", "neuroticism"]:
+        for trait in [
+            "openness",
+            "conscientiousness",
+            "extraversion",
+            "agreeableness",
+            "neuroticism",
+        ]:
             assert 0 <= data[trait] <= 100
 
     def test_big_five_all_ones_low_scores(self, client: TestClient) -> None:
@@ -88,7 +109,13 @@ class TestBigFiveAssessment:
         # With all 1s: forward-scored items sum=4, reverse-scored items sum=4*5=20
         # For extraversion: 2 forward (1+1=2) + 2 reverse (5+5=10) = 12
         # So it is not necessarily 0; this just verifies the endpoint works
-        for trait in ["openness", "conscientiousness", "extraversion", "agreeableness", "neuroticism"]:
+        for trait in [
+            "openness",
+            "conscientiousness",
+            "extraversion",
+            "agreeableness",
+            "neuroticism",
+        ]:
             assert 0 <= data[trait] <= 100
 
     def test_big_five_missing_items_returns_400(self, client: TestClient) -> None:

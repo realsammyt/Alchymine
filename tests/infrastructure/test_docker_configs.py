@@ -12,9 +12,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import yaml
 import pytest
-
+import yaml
 
 # ─── Paths ────────────────────────────────────────────────────────────────────
 
@@ -218,8 +217,7 @@ class TestDockerfiles:
         assert "USER " in content, "Dockerfile.api should switch to non-root USER"
         # Verify the USER directive is not root
         user_lines = [
-            line.strip() for line in content.splitlines()
-            if line.strip().startswith("USER ")
+            line.strip() for line in content.splitlines() if line.strip().startswith("USER ")
         ]
         assert user_lines, "No USER directive found"
         for line in user_lines:
@@ -231,8 +229,7 @@ class TestDockerfiles:
         content = (INFRA_DIR / "Dockerfile.web").read_text()
         assert "USER " in content, "Dockerfile.web should switch to non-root USER"
         user_lines = [
-            line.strip() for line in content.splitlines()
-            if line.strip().startswith("USER ")
+            line.strip() for line in content.splitlines() if line.strip().startswith("USER ")
         ]
         assert user_lines, "No USER directive found"
         for line in user_lines:
@@ -299,7 +296,14 @@ class TestCIWorkflow:
     def test_required_jobs_present(self) -> None:
         """CI has all required job types: lint, type-check, test-python, test-frontend, ethics-check, security."""
         jobs = set(self.ci["jobs"].keys())
-        required = {"lint", "type-check", "test-python", "test-frontend", "ethics-check", "security"}
+        required = {
+            "lint",
+            "type-check",
+            "test-python",
+            "test-frontend",
+            "ethics-check",
+            "security",
+        }
         missing = required - jobs
         assert not missing, f"CI missing required jobs: {missing}"
 

@@ -93,9 +93,7 @@ class TestSpiralRouter:
 
     def test_systems_engaged_encourages_breadth(self) -> None:
         result_fresh = route_user(intention="money")
-        result_engaged = route_user(
-            intention="money", systems_engaged=["wealth"]
-        )
+        result_engaged = route_user(intention="money", systems_engaged=["wealth"])
 
         wealth_fresh = next(r for r in result_fresh.recommendations if r.system == "wealth")
         wealth_engaged = next(r for r in result_engaged.recommendations if r.system == "wealth")

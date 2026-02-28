@@ -11,11 +11,6 @@ from datetime import date, time
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from alchymine.db.models import (
-    HealingProfile,
-    IdentityProfile,
-    WealthProfile,
-)
 from alchymine.db.repository import (
     create_profile,
     delete_profile,
@@ -23,7 +18,6 @@ from alchymine.db.repository import (
     list_profiles,
     update_layer,
 )
-
 
 # ─── create_profile ────────────────────────────────────────────────────
 
@@ -134,10 +128,15 @@ async def test_update_layer_identity_create(session: AsyncSession) -> None:
         intention="purpose",
     )
 
-    updated = await update_layer(session, user.id, "identity", {
-        "numerology": {"life_path": 7, "expression": 3},
-        "astrology": {"sun_sign": "Pisces"},
-    })
+    updated = await update_layer(
+        session,
+        user.id,
+        "identity",
+        {
+            "numerology": {"life_path": 7, "expression": 3},
+            "astrology": {"sun_sign": "Pisces"},
+        },
+    )
 
     assert updated.identity is not None
     assert updated.identity.numerology["life_path"] == 7
@@ -155,15 +154,25 @@ async def test_update_layer_identity_update(session: AsyncSession) -> None:
     )
 
     # Create
-    await update_layer(session, user.id, "identity", {
-        "numerology": {"life_path": 7},
-    })
+    await update_layer(
+        session,
+        user.id,
+        "identity",
+        {
+            "numerology": {"life_path": 7},
+        },
+    )
 
     # Update
-    updated = await update_layer(session, user.id, "identity", {
-        "numerology": {"life_path": 7, "expression": 3},
-        "strengths_map": ["creativity", "empathy"],
-    })
+    updated = await update_layer(
+        session,
+        user.id,
+        "identity",
+        {
+            "numerology": {"life_path": 7, "expression": 3},
+            "strengths_map": ["creativity", "empathy"],
+        },
+    )
 
     assert updated.identity.numerology["expression"] == 3
     assert updated.identity.strengths_map == ["creativity", "empathy"]
@@ -179,14 +188,19 @@ async def test_update_layer_healing(session: AsyncSession) -> None:
         intention="health",
     )
 
-    updated = await update_layer(session, user.id, "healing", {
-        "selected_modalities": [
-            {"modality": "breathwork", "preference_score": 0.8},
-        ],
-        "practice_history": {"breathwork": 3},
-        "max_difficulty": "developing",
-        "crisis_protocol_active": False,
-    })
+    updated = await update_layer(
+        session,
+        user.id,
+        "healing",
+        {
+            "selected_modalities": [
+                {"modality": "breathwork", "preference_score": 0.8},
+            ],
+            "practice_history": {"breathwork": 3},
+            "max_difficulty": "developing",
+            "crisis_protocol_active": False,
+        },
+    )
 
     assert updated.healing is not None
     assert len(updated.healing.selected_modalities) == 1
@@ -203,13 +217,18 @@ async def test_update_layer_wealth_encrypted(session: AsyncSession) -> None:
         intention="money",
     )
 
-    updated = await update_layer(session, user.id, "wealth", {
-        "risk_tolerance": "aggressive",
-        "income_range": "$100k-$150k",  # SENSITIVE — encrypted
-        "debt_level": "moderate",  # SENSITIVE — encrypted
-        "wealth_context": {"has_investments": True},  # SENSITIVE — encrypted
-        "lever_priorities": ["EARN", "GROW"],
-    })
+    updated = await update_layer(
+        session,
+        user.id,
+        "wealth",
+        {
+            "risk_tolerance": "aggressive",
+            "income_range": "$100k-$150k",  # SENSITIVE — encrypted
+            "debt_level": "moderate",  # SENSITIVE — encrypted
+            "wealth_context": {"has_investments": True},  # SENSITIVE — encrypted
+            "lever_priorities": ["EARN", "GROW"],
+        },
+    )
 
     assert updated.wealth is not None
     assert updated.wealth.risk_tolerance == "aggressive"
@@ -228,11 +247,16 @@ async def test_update_layer_creative(session: AsyncSession) -> None:
         intention="purpose",
     )
 
-    updated = await update_layer(session, user.id, "creative", {
-        "guilford_scores": {"fluency": 72.0, "originality": 80.0},
-        "creative_orientation": "expressive-intuitive",
-        "active_projects": 3,
-    })
+    updated = await update_layer(
+        session,
+        user.id,
+        "creative",
+        {
+            "guilford_scores": {"fluency": 72.0, "originality": 80.0},
+            "creative_orientation": "expressive-intuitive",
+            "active_projects": 3,
+        },
+    )
 
     assert updated.creative is not None
     assert updated.creative.guilford_scores["fluency"] == 72.0
@@ -249,12 +273,17 @@ async def test_update_layer_perspective(session: AsyncSession) -> None:
         intention="purpose",
     )
 
-    updated = await update_layer(session, user.id, "perspective", {
-        "kegan_stage": "self-authoring",
-        "mental_models_applied": ["inversion", "second-order thinking"],
-        "reframes_completed": 10,
-        "strategic_clarity_score": 85.0,
-    })
+    updated = await update_layer(
+        session,
+        user.id,
+        "perspective",
+        {
+            "kegan_stage": "self-authoring",
+            "mental_models_applied": ["inversion", "second-order thinking"],
+            "reframes_completed": 10,
+            "strategic_clarity_score": 85.0,
+        },
+    )
 
     assert updated.perspective is not None
     assert updated.perspective.kegan_stage == "self-authoring"
@@ -271,10 +300,15 @@ async def test_update_layer_intake(session: AsyncSession) -> None:
         intention="career",
     )
 
-    updated = await update_layer(session, user.id, "intake", {
-        "full_name": "Updated Name",
-        "birth_city": "Toronto",
-    })
+    updated = await update_layer(
+        session,
+        user.id,
+        "intake",
+        {
+            "full_name": "Updated Name",
+            "birth_city": "Toronto",
+        },
+    )
 
     assert updated.intake.full_name == "Updated Name"
     assert updated.intake.birth_city == "Toronto"
@@ -351,40 +385,65 @@ async def test_full_lifecycle(session: AsyncSession) -> None:
     user_id = user.id
 
     # 2. Populate identity
-    await update_layer(session, user_id, "identity", {
-        "numerology": {"life_path": 3, "expression": 6},
-        "astrology": {"sun_sign": "Pisces", "moon_sign": "Scorpio"},
-        "archetype": {"primary": "creator", "shadow": "Perfectionism"},
-        "personality": {
-            "big_five": {"openness": 75.0},
-            "attachment_style": "anxious-secure",
+    await update_layer(
+        session,
+        user_id,
+        "identity",
+        {
+            "numerology": {"life_path": 3, "expression": 6},
+            "astrology": {"sun_sign": "Pisces", "moon_sign": "Scorpio"},
+            "archetype": {"primary": "creator", "shadow": "Perfectionism"},
+            "personality": {
+                "big_five": {"openness": 75.0},
+                "attachment_style": "anxious-secure",
+            },
         },
-    })
+    )
 
     # 3. Populate healing
-    await update_layer(session, user_id, "healing", {
-        "selected_modalities": [{"modality": "breathwork"}],
-        "max_difficulty": "developing",
-    })
+    await update_layer(
+        session,
+        user_id,
+        "healing",
+        {
+            "selected_modalities": [{"modality": "breathwork"}],
+            "max_difficulty": "developing",
+        },
+    )
 
     # 4. Populate wealth (encrypted)
-    await update_layer(session, user_id, "wealth", {
-        "risk_tolerance": "moderate",
-        "income_range": "$50k-$75k",
-        "wealth_context": {"dependents": 1},
-    })
+    await update_layer(
+        session,
+        user_id,
+        "wealth",
+        {
+            "risk_tolerance": "moderate",
+            "income_range": "$50k-$75k",
+            "wealth_context": {"dependents": 1},
+        },
+    )
 
     # 5. Populate creative
-    await update_layer(session, user_id, "creative", {
-        "guilford_scores": {"fluency": 72.0},
-        "creative_orientation": "expressive",
-    })
+    await update_layer(
+        session,
+        user_id,
+        "creative",
+        {
+            "guilford_scores": {"fluency": 72.0},
+            "creative_orientation": "expressive",
+        },
+    )
 
     # 6. Populate perspective
-    await update_layer(session, user_id, "perspective", {
-        "kegan_stage": "socialized",
-        "reframes_completed": 0,
-    })
+    await update_layer(
+        session,
+        user_id,
+        "perspective",
+        {
+            "kegan_stage": "socialized",
+            "reframes_completed": 0,
+        },
+    )
 
     # 7. Read full profile
     full = await get_profile(session, user_id)
@@ -397,10 +456,15 @@ async def test_full_lifecycle(session: AsyncSession) -> None:
     assert full.perspective.kegan_stage == "socialized"
 
     # 8. Update a layer
-    await update_layer(session, user_id, "perspective", {
-        "kegan_stage": "self-authoring",
-        "reframes_completed": 5,
-    })
+    await update_layer(
+        session,
+        user_id,
+        "perspective",
+        {
+            "kegan_stage": "self-authoring",
+            "reframes_completed": 5,
+        },
+    )
     refreshed = await get_profile(session, user_id)
     assert refreshed.perspective.kegan_stage == "self-authoring"
     assert refreshed.perspective.reframes_completed == 5
