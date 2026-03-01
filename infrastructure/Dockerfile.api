@@ -85,7 +85,7 @@ WORKDIR /app
 
 # Copy application code
 COPY alchymine/ ./alchymine/
-COPY pyproject.toml ./
+COPY pyproject.toml README.md ./
 
 # Install the project in the venv (editable-like, just the package reference)
 RUN pip install --no-cache-dir --no-deps -e .
