@@ -80,7 +80,7 @@ WORKDIR /app
 
 # Copy application code
 COPY alchymine/ ./alchymine/
-COPY pyproject.toml ./
+COPY pyproject.toml README.md ./
 
 # Install the project package
 RUN pip install --no-cache-dir --no-deps -e .
