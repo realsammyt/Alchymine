@@ -149,11 +149,11 @@ ufw default deny incoming
 ufw default allow outgoing
 
 # SSH — rate limit to slow brute force
-ufw limit 22/tcp comment "SSH (rate limited)"
+ufw limit 22/tcp
 
 # HTTP + HTTPS — required for web traffic and Let's Encrypt
-ufw allow 80/tcp comment "HTTP (Let's Encrypt + redirect)"
-ufw allow 443/tcp comment "HTTPS"
+ufw allow 80/tcp
+ufw allow 443/tcp
 
 # Enable firewall
 ufw --force enable
