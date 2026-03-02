@@ -1,0 +1,132 @@
+# Alchymine — Prepare Release
+# On merge to main: auto-detect version bump from commit messages,
+# generate changelog, and create a draft GitHub Release for review.
+
+name: Prepare Release
+
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - "docs/**"
+      - "*.md"
+      - "LICENSE"
+
+concurrency:
+  group: prepare-release
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+
+jobs:
+  prepare-release:
+    name: "Create draft release"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Determine next version
+        id: version
+        run: |
+          # Get the latest tag, default to v0.0.0 if none exist
+          LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
+          echo "Latest tag: $LATEST_TAG"
+
+          # Parse current version
+          VERSION="${LATEST_TAG#v}"
+          IFS='.' read -r MAJOR MINOR PATCH <<< "$VERSION"
+
+          # Scan commits since last tag for conventional commit prefixes
+          if [[ "$LATEST_TAG" == "v0.0.0" ]]; then
+            RANGE="HEAD"
+          else
+            RANGE="${LATEST_TAG}..HEAD"
+          fi
+
+          COMMITS=$(git log "$RANGE" --pretty=format:"%s" 2>/dev/null || echo "")
+
+          if echo "$COMMITS" | grep -qi "BREAKING CHANGE"; then
+            MAJOR=$((MAJOR + 1))
+            MINOR=0
+            PATCH=0
+          elif echo "$COMMITS" | grep -q "^feat"; then
+            MINOR=$((MINOR + 1))
+            PATCH=0
+          elif echo "$COMMITS" | grep -q "^fix"; then
+            PATCH=$((PATCH + 1))
+          else
+            # Default: bump patch for any other changes
+            PATCH=$((PATCH + 1))
+          fi
+
+          NEXT_VERSION="${MAJOR}.${MINOR}.${PATCH}"
+
+          # If no tags exist yet, start at v0.1.0
+          if [[ "$LATEST_TAG" == "v0.0.0" ]]; then
+            NEXT_VERSION="0.1.0"
+          fi
+
+          echo "next_version=${NEXT_VERSION}" >> "$GITHUB_OUTPUT"
+          echo "previous_tag=${LATEST_TAG}" >> "$GITHUB_OUTPUT"
+          echo "Next version: v${NEXT_VERSION}"
+
+      - name: Generate changelog
+        id: changelog
+        run: |
+          PREV_TAG="${{ steps.version.outputs.previous_tag }}"
+          VERSION="${{ steps.version.outputs.next_version }}"
+
+          if [[ "$PREV_TAG" == "v0.0.0" ]]; then
+            RANGE="HEAD"
+          else
+            RANGE="${PREV_TAG}..HEAD"
+          fi
+
+          {
+            echo "## What's Changed in v${VERSION}"
+            echo ""
+
+            FEATURES=$(git log "$RANGE" --pretty=format:"%s" --grep="^feat" | sed 's/^feat[(:]*/- /' | sed 's/): /: /')
+            if [[ -n "$FEATURES" ]]; then
+              echo "### New Features"
+              echo "$FEATURES"
+              echo ""
+            fi
+
+            FIXES=$(git log "$RANGE" --pretty=format:"%s" --grep="^fix" | sed 's/^fix[(:]*/- /' | sed 's/): /: /')
+            if [[ -n "$FIXES" ]]; then
+              echo "### Bug Fixes"
+              echo "$FIXES"
+              echo ""
+            fi
+
+            OTHER=$(git log "$RANGE" --pretty=format:"%s" \
+              --grep="^feat" --grep="^fix" --invert-grep \
+              | head -20 \
+              | sed 's/^/- /')
+            if [[ -n "$OTHER" ]]; then
+              echo "### Other Changes"
+              echo "$OTHER"
+              echo ""
+            fi
+
+            echo "**Full Changelog**: https://github.com/${{ github.repository }}/compare/${PREV_TAG}...v${VERSION}"
+          } > changelog.md
+
+          cat changelog.md
+
+      - name: Create draft release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.version.outputs.next_version }}
+          name: "Alchymine v${{ steps.version.outputs.next_version }}"
+          body_path: changelog.md
+          draft: true
+          prerelease: false
+          generate_release_notes: false
+          target_commitish: ${{ github.sha }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

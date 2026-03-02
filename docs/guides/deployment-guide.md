@@ -83,15 +83,15 @@ Copy the output — you'll paste it into DigitalOcean.
 1. Go to **Create → Droplets**
 2. Configure:
 
-| Setting | Value |
-|---------|-------|
-| **Region** | Choose closest to your users (e.g., NYC1, SFO3, LON1) |
-| **Image** | Ubuntu 22.04 (LTS) x64 |
-| **Size** | **Basic → Regular** (shared CPU) |
-| **Plan** | **$24/mo** (4 GB RAM / 2 vCPUs / 80 GB SSD) — recommended |
-| | Or $12/mo (2 GB / 1 vCPU / 50 GB) to start, upgrade later |
-| **Authentication** | SSH keys → paste your public key from above |
-| **Hostname** | `alchymine` |
+| Setting            | Value                                                     |
+| ------------------ | --------------------------------------------------------- |
+| **Region**         | Choose closest to your users (e.g., NYC1, SFO3, LON1)     |
+| **Image**          | Ubuntu 22.04 (LTS) x64                                    |
+| **Size**           | **Basic → Regular** (shared CPU)                          |
+| **Plan**           | **$24/mo** (4 GB RAM / 2 vCPUs / 80 GB SSD) — recommended |
+|                    | Or $12/mo (2 GB / 1 vCPU / 50 GB) to start, upgrade later |
+| **Authentication** | SSH keys → paste your public key from above               |
+| **Hostname**       | `alchymine`                                               |
 
 3. Click **Create Droplet**
 4. **Copy the IP address** shown after creation (e.g., `164.92.xxx.xxx`)
@@ -173,10 +173,10 @@ In Cloudflare, go to **DNS → Records** and add these records.
 
 Replace `164.92.xxx.xxx` with your actual DigitalOcean droplet IP.
 
-| Type | Name | Content | Proxy | TTL |
-|------|------|---------|-------|-----|
-| A | `@` | `164.92.xxx.xxx` | Proxied (orange cloud) | Auto |
-| A | `www` | `164.92.xxx.xxx` | Proxied (orange cloud) | Auto |
+| Type | Name  | Content          | Proxy                  | TTL  |
+| ---- | ----- | ---------------- | ---------------------- | ---- |
+| A    | `@`   | `164.92.xxx.xxx` | Proxied (orange cloud) | Auto |
+| A    | `www` | `164.92.xxx.xxx` | Proxied (orange cloud) | Auto |
 
 ### What "Proxied" means
 
@@ -260,18 +260,18 @@ Enter your Anthropic API key (sk-ant-...): sk-ant-api03-your-key-here
 
 ### What the script does (10 steps)
 
-| Step | What | Time |
-|------|------|------|
-| 1/10 | Updates Ubuntu packages | ~1 min |
-| 2/10 | Installs Docker Engine + Compose | ~2 min |
-| 3/10 | Configures UFW firewall (SSH + HTTP + HTTPS only) | ~10 sec |
-| 4/10 | Sets up fail2ban (SSH brute force protection) | ~10 sec |
-| 5/10 | Creates non-root deploy user + clones repo | ~30 sec |
-| 6/10 | Generates cryptographic secrets (.env.production) | ~5 sec |
-| 7/10 | Obtains Let's Encrypt SSL certificate | ~1 min |
-| 8/10 | Builds Docker images + starts all services | ~10-20 min |
-| 9/10 | Configures daily automated database backups (3 AM) | ~5 sec |
-| 10/10 | Enables unattended security updates | ~10 sec |
+| Step  | What                                               | Time       |
+| ----- | -------------------------------------------------- | ---------- |
+| 1/10  | Updates Ubuntu packages                            | ~1 min     |
+| 2/10  | Installs Docker Engine + Compose                   | ~2 min     |
+| 3/10  | Configures UFW firewall (SSH + HTTP + HTTPS only)  | ~10 sec    |
+| 4/10  | Sets up fail2ban (SSH brute force protection)      | ~10 sec    |
+| 5/10  | Creates non-root deploy user + clones repo         | ~30 sec    |
+| 6/10  | Generates cryptographic secrets (.env.production)  | ~5 sec     |
+| 7/10  | Obtains Let's Encrypt SSL certificate              | ~1 min     |
+| 8/10  | Builds Docker images + starts all services         | ~10-20 min |
+| 9/10  | Configures daily automated database backups (3 AM) | ~5 sec     |
+| 10/10 | Enables unattended security updates                | ~10 sec    |
 
 When complete, you'll see a full summary of everything that's running.
 
@@ -437,6 +437,7 @@ Run through this checklist after your first successful deployment.
 - [ ] Automated database backup cron running (`crontab -l` as alchymine user)
 - [ ] DigitalOcean weekly snapshots enabled
 - [ ] Test a backup/restore cycle:
+
   ```bash
   # Create manual backup
   bash infrastructure/scripts/backup-db.sh ./backups
@@ -449,9 +450,56 @@ Run through this checklist after your first successful deployment.
 
 ## Ongoing Maintenance
 
-### Deploying Updates
+### Automated Release Pipeline
 
-When you push new code to the repo:
+Alchymine uses a GitHub-based release pipeline for deployments. No manual SSH
+is required for routine deploys.
+
+#### How it works
+
+```
+Merge PR to main
+  → CI runs (lint, test, build) ✅
+  → prepare-release.yml auto-creates a DRAFT GitHub Release
+      - Version bump detected from commit messages (feat → minor, fix → patch)
+      - Changelog generated from conventional commits
+  → You review the draft release on GitHub
+  → You click "Publish release"
+  → release.yml fires:
+      - Builds Docker images (api, web)
+      - Pushes to GHCR with semver tags
+      - SSHs into DigitalOcean droplet
+      - Pulls new images, restarts containers
+      - Verifies health endpoints
+  → Production updated ✅
+```
+
+#### Required GitHub Secrets
+
+Go to **GitHub → Settings → Secrets and variables → Actions → New repository secret**
+and add these three secrets:
+
+| Secret | Value | How to get it |
+|--------|-------|---------------|
+| `DEPLOY_HOST` | Droplet IP address (e.g., `164.92.xxx.xxx`) | DigitalOcean dashboard → Droplets |
+| `DEPLOY_USER` | `alchymine` | The deploy user created by `deploy-digitalocean.sh` |
+| `DEPLOY_SSH_KEY` | Private SSH key (full PEM content) | Generate with `ssh-keygen -t ed25519`, add public key to droplet's `~alchymine/.ssh/authorized_keys` |
+
+#### GitHub Environment (optional)
+
+If you want an extra approval gate before deployment (beyond just publishing the
+release), create a GitHub Environment:
+
+1. Go to **GitHub → Settings → Environments → New environment**
+2. Name it `production`
+3. Enable **Required reviewers** (adds a manual approval step in the workflow)
+
+The deploy job references `environment: production` — if the environment doesn't
+exist, GitHub creates it automatically with no protection rules.
+
+### Manual Deployment
+
+For emergency fixes or when the pipeline isn't available:
 
 ```bash
 # SSH in and switch to deploy user
@@ -459,13 +507,14 @@ ssh root@your-server-ip
 su - alchymine
 cd ~/Alchymine
 
-# Pull latest code
-git pull origin main
+# Fetch and checkout the release tag
+git fetch --tags
+git checkout v<version>
 
-# Rebuild and restart (zero-downtime for most changes)
+# Pull images and restart
 cd infrastructure
-docker compose -f docker-compose.yml -f docker-compose.prod.yml build
-docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+docker compose -f docker-compose.yml -f docker-compose.prod.yml pull
+docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --remove-orphans
 
 # Watch logs to make sure everything starts clean
 docker compose -f docker-compose.yml -f docker-compose.prod.yml logs -f --tail=20
@@ -631,12 +680,12 @@ du -sh ~/Alchymine/backups/
 
 ### When to upgrade
 
-| Symptom | Fix |
-|---------|-----|
-| API responses > 500ms | Upgrade droplet (more CPU) or add API workers |
-| Memory usage > 85% consistently | Upgrade to next droplet size |
-| Disk > 80% | Resize disk or clean old backups/images |
-| 1000+ concurrent users | Move to managed Kubernetes (DOKS) |
+| Symptom                         | Fix                                           |
+| ------------------------------- | --------------------------------------------- |
+| API responses > 500ms           | Upgrade droplet (more CPU) or add API workers |
+| Memory usage > 85% consistently | Upgrade to next droplet size                  |
+| Disk > 80%                      | Resize disk or clean old backups/images       |
+| 1000+ concurrent users          | Move to managed Kubernetes (DOKS)             |
 
 ### Horizontal scaling path
 

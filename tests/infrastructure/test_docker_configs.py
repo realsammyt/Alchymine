@@ -179,43 +179,44 @@ class TestDockerComposeDevYml:
 class TestDockerfiles:
     """Validate that Dockerfiles exist and contain required directives."""
 
+    DOCKER_DIR = INFRA_DIR / "docker"
+
     def test_dockerfile_api_exists(self) -> None:
         """Dockerfile.api exists."""
-        path = INFRA_DIR / "Dockerfile.api"
+        path = self.DOCKER_DIR / "Dockerfile.api"
         assert path.exists(), f"Dockerfile.api not found at {path}"
 
     def test_dockerfile_web_exists(self) -> None:
         """Dockerfile.web exists."""
-        path = INFRA_DIR / "Dockerfile.web"
+        path = self.DOCKER_DIR / "Dockerfile.web"
         assert path.exists(), f"Dockerfile.web not found at {path}"
 
     def test_dockerfile_api_is_multistage(self) -> None:
         """Dockerfile.api uses multi-stage build (multiple FROM instructions)."""
-        content = (INFRA_DIR / "Dockerfile.api").read_text()
+        content = (self.DOCKER_DIR / "Dockerfile.api").read_text()
         from_count = sum(1 for line in content.splitlines() if line.strip().startswith("FROM "))
         assert from_count >= 2, f"Expected multi-stage (>=2 FROM), got {from_count}"
 
     def test_dockerfile_web_is_multistage(self) -> None:
         """Dockerfile.web uses multi-stage build (multiple FROM instructions)."""
-        content = (INFRA_DIR / "Dockerfile.web").read_text()
+        content = (self.DOCKER_DIR / "Dockerfile.web").read_text()
         from_count = sum(1 for line in content.splitlines() if line.strip().startswith("FROM "))
         assert from_count >= 2, f"Expected multi-stage (>=2 FROM), got {from_count}"
 
     def test_dockerfile_api_base_python311(self) -> None:
         """Dockerfile.api uses python:3.11-slim as base."""
-        content = (INFRA_DIR / "Dockerfile.api").read_text()
+        content = (self.DOCKER_DIR / "Dockerfile.api").read_text()
         assert "python:3.11-slim" in content, "Dockerfile.api should use python:3.11-slim"
 
     def test_dockerfile_web_base_node20(self) -> None:
         """Dockerfile.web uses node:20-alpine as base."""
-        content = (INFRA_DIR / "Dockerfile.web").read_text()
+        content = (self.DOCKER_DIR / "Dockerfile.web").read_text()
         assert "node:20-alpine" in content, "Dockerfile.web should use node:20-alpine"
 
     def test_dockerfile_api_non_root_user(self) -> None:
         """Dockerfile.api runs as non-root user."""
-        content = (INFRA_DIR / "Dockerfile.api").read_text()
+        content = (self.DOCKER_DIR / "Dockerfile.api").read_text()
         assert "USER " in content, "Dockerfile.api should switch to non-root USER"
-        # Verify the USER directive is not root
         user_lines = [
             line.strip() for line in content.splitlines() if line.strip().startswith("USER ")
         ]
@@ -226,7 +227,7 @@ class TestDockerfiles:
 
     def test_dockerfile_web_non_root_user(self) -> None:
         """Dockerfile.web runs as non-root user."""
-        content = (INFRA_DIR / "Dockerfile.web").read_text()
+        content = (self.DOCKER_DIR / "Dockerfile.web").read_text()
         assert "USER " in content, "Dockerfile.web should switch to non-root USER"
         user_lines = [
             line.strip() for line in content.splitlines() if line.strip().startswith("USER ")
@@ -238,24 +239,24 @@ class TestDockerfiles:
 
     def test_dockerfile_api_healthcheck(self) -> None:
         """Dockerfile.api has a HEALTHCHECK instruction."""
-        content = (INFRA_DIR / "Dockerfile.api").read_text()
+        content = (self.DOCKER_DIR / "Dockerfile.api").read_text()
         assert "HEALTHCHECK" in content, "Dockerfile.api should have HEALTHCHECK"
         assert "8000" in content, "Dockerfile.api HEALTHCHECK should reference port 8000"
 
     def test_dockerfile_web_healthcheck(self) -> None:
         """Dockerfile.web has a HEALTHCHECK instruction."""
-        content = (INFRA_DIR / "Dockerfile.web").read_text()
+        content = (self.DOCKER_DIR / "Dockerfile.web").read_text()
         assert "HEALTHCHECK" in content, "Dockerfile.web should have HEALTHCHECK"
         assert "3000" in content, "Dockerfile.web HEALTHCHECK should reference port 3000"
 
     def test_dockerfile_api_exposes_8000(self) -> None:
         """Dockerfile.api EXPOSEs port 8000."""
-        content = (INFRA_DIR / "Dockerfile.api").read_text()
+        content = (self.DOCKER_DIR / "Dockerfile.api").read_text()
         assert "EXPOSE 8000" in content, "Dockerfile.api should EXPOSE 8000"
 
     def test_dockerfile_web_exposes_3000(self) -> None:
         """Dockerfile.web EXPOSEs port 3000."""
-        content = (INFRA_DIR / "Dockerfile.web").read_text()
+        content = (self.DOCKER_DIR / "Dockerfile.web").read_text()
         assert "EXPOSE 3000" in content, "Dockerfile.web should EXPOSE 3000"
 
 
@@ -379,14 +380,12 @@ class TestReleaseWorkflow:
         """release.yml parses as valid YAML."""
         assert self.release is not None
 
-    def test_triggers_on_tags(self) -> None:
-        """Release triggers on version tags (v*)."""
+    def test_triggers_on_release_published(self) -> None:
+        """Release triggers when a GitHub Release is published."""
         on = self.release.get("on", self.release.get(True, {}))
-        push = on.get("push", {})
-        tags = push.get("tags", [])
-        assert len(tags) > 0, "Release should trigger on tags"
-        tag_str = " ".join(tags)
-        assert "v" in tag_str, "Release tags should match v* pattern"
+        release = on.get("release", {})
+        types = release.get("types", [])
+        assert "published" in types, f"Release should trigger on release published, got: {types}"
 
     def test_has_build_job(self) -> None:
         """Release has a build/push job for Docker images."""
@@ -394,14 +393,46 @@ class TestReleaseWorkflow:
         build_jobs = [k for k in jobs if "build" in k.lower() or "push" in k.lower()]
         assert build_jobs, "Release should have a build/push job"
 
-    def test_has_github_release_job(self) -> None:
-        """Release has a job to create a GitHub Release."""
+    def test_has_deploy_job(self) -> None:
+        """Release has a deploy job for production deployment."""
+        jobs = self.release["jobs"]
+        deploy_jobs = [k for k in jobs if "deploy" in k.lower()]
+        assert deploy_jobs, "Release should have a deploy job"
+
+    def test_has_release_update_job(self) -> None:
+        """Release has a job to update the GitHub Release with Docker image info."""
         jobs = self.release["jobs"]
         release_jobs = [k for k in jobs if "release" in k.lower()]
-        assert release_jobs, "Release should have a GitHub Release creation job"
+        assert release_jobs, "Release should have a release update job"
 
-    def test_has_changelog_generation(self) -> None:
-        """Release generates a changelog."""
-        jobs = self.release["jobs"]
-        jobs_yaml = yaml.dump(jobs)
-        assert "changelog" in jobs_yaml.lower(), "Release should include changelog generation"
+
+# ─── Prepare Release Workflow ────────────────────────────────────────────────
+
+
+class TestPrepareReleaseWorkflow:
+    """Validate the GitHub Actions prepare-release workflow."""
+
+    @pytest.fixture(autouse=True)
+    def _load(self) -> None:
+        self.workflow = load_yaml(GITHUB_DIR / "workflows" / "prepare-release.yml")
+
+    def test_is_valid_yaml(self) -> None:
+        """prepare-release.yml parses as valid YAML."""
+        assert self.workflow is not None
+
+    def test_triggers_on_push_to_main(self) -> None:
+        """Prepare-release triggers on push to main."""
+        on = self.workflow.get("on", self.workflow.get(True, {}))
+        push = on.get("push", {})
+        branches = push.get("branches", [])
+        assert "main" in branches, f"Should trigger on push to main, got: {branches}"
+
+    def test_creates_draft_release(self) -> None:
+        """Prepare-release creates a draft GitHub Release."""
+        jobs_yaml = yaml.dump(self.workflow.get("jobs", {}))
+        assert "draft" in jobs_yaml.lower(), "Should create a draft release"
+
+    def test_generates_changelog(self) -> None:
+        """Prepare-release generates a changelog."""
+        jobs_yaml = yaml.dump(self.workflow.get("jobs", {}))
+        assert "changelog" in jobs_yaml.lower(), "Should include changelog generation"
