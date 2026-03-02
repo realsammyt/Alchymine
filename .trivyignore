@@ -1,0 +1,5 @@
+# ecdsa CVE-2024-23342: Minerva timing attack on P-256 curve
+# python-ecdsa maintainer considers side-channel attacks out of scope; no fix planned.
+# This is a transitive dep of python-jose[cryptography]. We use HMAC (HS256) for JWT,
+# not ECDSA signatures, so this vulnerability does not affect our application.
+CVE-2024-23342

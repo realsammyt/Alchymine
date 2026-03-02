@@ -60,11 +60,14 @@ jobs:
           pip-audit \
             --desc \
             --skip-editable \
+            --ignore-vuln CVE-2024-23342 \
             --format json \
             --output pip-audit-results.json || true
 
           # Display results in human-readable form
-          pip-audit --desc --skip-editable
+          # CVE-2024-23342: ecdsa Minerva timing attack — no fix planned by maintainer;
+          # we use HMAC (HS256) for JWT, not ECDSA, so this is not exploitable.
+          pip-audit --desc --skip-editable --ignore-vuln CVE-2024-23342
 
       - name: Upload pip-audit results
         if: always()
@@ -276,6 +279,7 @@ jobs:
           exit-code: 1
           severity: CRITICAL,HIGH
           ignore-unfixed: true
+          trivyignores: .trivyignore
           timeout: 10m
 
       - name: Run Trivy (SARIF output)
