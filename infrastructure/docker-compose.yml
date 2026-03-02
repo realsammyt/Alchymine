@@ -25,7 +25,7 @@ services:
       - ENVIRONMENT=${ENVIRONMENT:-production}
       - LOG_LEVEL=${LOG_LEVEL:-WARNING}
       - API_SECRET_KEY=${API_SECRET_KEY:-changeme_generate_with_openssl_rand_hex_32}
-      - API_CORS_ORIGINS=${API_CORS_ORIGINS:-["http://localhost:3000"]}
+      - ALLOWED_ORIGINS=${ALLOWED_ORIGINS:-["http://localhost:3000"]}
     depends_on:
       db:
         condition: service_healthy

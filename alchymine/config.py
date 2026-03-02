@@ -63,6 +63,14 @@ class Settings(BaseSettings):
 
     # ── Validators ───────────────────────────────────────────────────────
 
+    @field_validator("allowed_origins", mode="before")
+    @classmethod
+    def parse_allowed_origins(cls, v: object) -> object:
+        """Accept a bare string (e.g. ``https://example.com``) and wrap it in a list."""
+        if isinstance(v, str) and not v.startswith("["):
+            return [origin.strip() for origin in v.split(",") if origin.strip()]
+        return v
+
     @field_validator("jwt_secret_key")
     @classmethod
     def validate_jwt_secret(cls, v: str, info: object) -> str:  # noqa: ANN001
