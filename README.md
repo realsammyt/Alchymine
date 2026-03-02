@@ -123,6 +123,7 @@ Set these in **GitHub → Settings → Secrets and variables → Actions**:
 | `DEPLOY_HOST` | DigitalOcean droplet IP address |
 | `DEPLOY_USER` | `alchymine` (deploy user) |
 | `DEPLOY_SSH_KEY` | Private SSH key (full PEM content) |
+| `DEPLOY_SSH_PASSPHRASE` | Passphrase for the SSH key (if password-protected) |
 
 ### Manual deployment
 
