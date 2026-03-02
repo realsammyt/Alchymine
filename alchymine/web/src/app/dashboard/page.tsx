@@ -1,16 +1,17 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import Link from 'next/link';
-import Card from '@/components/shared/Card';
-import Button from '@/components/shared/Button';
-import { useApi, getStoredIntake } from '@/lib/useApi';
+import { useState } from "react";
+import Link from "next/link";
+import Card from "@/components/shared/Card";
+import Button from "@/components/shared/Button";
+import ProtectedRoute from "@/components/shared/ProtectedRoute";
+import { useApi, getStoredIntake } from "@/lib/useApi";
 import {
   getOutcomeSummary,
   getJournalStats,
   OutcomeSummary,
   JournalStatsResponse,
-} from '@/lib/api';
+} from "@/lib/api";
 
 // ─── Helper components ──────────────────────────────────────────────
 
@@ -81,26 +82,26 @@ function SystemCard({
   activeDays: number;
 }) {
   const systemLabels: Record<string, string> = {
-    identity: 'Personal Intelligence',
-    healing: 'Ethical Healing',
-    wealth: 'Generational Wealth',
-    creative: 'Creative Forge',
-    perspective: 'Perspective Prism',
+    identity: "Personal Intelligence",
+    healing: "Ethical Healing",
+    wealth: "Generational Wealth",
+    creative: "Creative Forge",
+    perspective: "Perspective Prism",
   };
 
   const systemColors: Record<string, string> = {
-    identity: 'text-primary',
-    healing: 'text-green-400',
-    wealth: 'text-yellow-400',
-    creative: 'text-purple-400',
-    perspective: 'text-blue-400',
+    identity: "text-primary",
+    healing: "text-green-400",
+    wealth: "text-yellow-400",
+    creative: "text-purple-400",
+    perspective: "text-blue-400",
   };
 
   return (
     <div className="bg-surface/50 border border-white/5 rounded-xl p-4">
       <div className="flex items-center justify-between mb-3">
         <h4
-          className={`font-semibold capitalize ${systemColors[system] || 'text-text'}`}
+          className={`font-semibold capitalize ${systemColors[system] || "text-text"}`}
         >
           {systemLabels[system] || system}
         </h4>
@@ -136,16 +137,20 @@ function SystemCard({
 
 export default function DashboardPage() {
   const intake = getStoredIntake();
-  const userId = intake ? 'current-user' : null;
-  const [activeTab, setActiveTab] = useState<'overview' | 'journal'>('overview');
+  const userId = intake ? "current-user" : null;
+  const [activeTab, setActiveTab] = useState<"overview" | "journal">(
+    "overview",
+  );
 
   const outcomes = useApi<OutcomeSummary>(
-    () => (userId ? getOutcomeSummary(userId) : Promise.reject(new Error('No user'))),
+    () =>
+      userId ? getOutcomeSummary(userId) : Promise.reject(new Error("No user")),
     [userId],
   );
 
   const journalStats = useApi<JournalStatsResponse>(
-    () => (userId ? getJournalStats(userId) : Promise.reject(new Error('No user'))),
+    () =>
+      userId ? getJournalStats(userId) : Promise.reject(new Error("No user")),
     [userId],
   );
 
@@ -160,8 +165,8 @@ export default function DashboardPage() {
             <span className="text-gradient-gold">Your Progress</span>
           </h1>
           <p className="text-text/50 max-w-xl mx-auto mb-8">
-            Complete your intake assessment to start tracking your journey across
-            all five Alchymine systems.
+            Complete your intake assessment to start tracking your journey
+            across all five Alchymine systems.
           </p>
           <Link href="/discover/intake">
             <Button>Start Your Journey</Button>
@@ -172,6 +177,7 @@ export default function DashboardPage() {
   }
 
   return (
+    <ProtectedRoute>
     <div className="flex-1 px-6 py-12">
       <div className="max-w-4xl mx-auto">
         {/* Header */}
@@ -190,28 +196,28 @@ export default function DashboardPage() {
         {/* Tab navigation */}
         <div className="flex items-center justify-center gap-4 mb-8">
           <button
-            onClick={() => setActiveTab('overview')}
+            onClick={() => setActiveTab("overview")}
             className={`px-4 py-2 rounded-lg text-sm font-medium transition ${
-              activeTab === 'overview'
-                ? 'bg-primary/20 text-primary border border-primary/30'
-                : 'text-text/50 hover:text-text/70'
+              activeTab === "overview"
+                ? "bg-primary/20 text-primary border border-primary/30"
+                : "text-text/50 hover:text-text/70"
             }`}
           >
             Overview
           </button>
           <button
-            onClick={() => setActiveTab('journal')}
+            onClick={() => setActiveTab("journal")}
             className={`px-4 py-2 rounded-lg text-sm font-medium transition ${
-              activeTab === 'journal'
-                ? 'bg-primary/20 text-primary border border-primary/30'
-                : 'text-text/50 hover:text-text/70'
+              activeTab === "journal"
+                ? "bg-primary/20 text-primary border border-primary/30"
+                : "text-text/50 hover:text-text/70"
             }`}
           >
             Journal Stats
           </button>
         </div>
 
-        {activeTab === 'overview' && (
+        {activeTab === "overview" && (
           <div className="space-y-6">
             {/* Overall Score */}
             <Card title="Overall Progress">
@@ -251,7 +257,9 @@ export default function DashboardPage() {
                       <div className="text-2xl font-bold text-primary">
                         {outcomes.data.total_milestones}
                       </div>
-                      <div className="text-xs text-text/50">Total Milestones</div>
+                      <div className="text-xs text-text/50">
+                        Total Milestones
+                      </div>
                     </div>
                     <div>
                       <div className="text-2xl font-bold text-primary">
@@ -261,7 +269,7 @@ export default function DashboardPage() {
                     </div>
                     <div>
                       <div className="text-2xl font-bold text-primary">
-                        {outcomes.data.active_plan_day ?? '—'}
+                        {outcomes.data.active_plan_day ?? "—"}
                       </div>
                       <div className="text-xs text-text/50">Plan Day</div>
                     </div>
@@ -323,7 +331,7 @@ export default function DashboardPage() {
           </div>
         )}
 
-        {activeTab === 'journal' && (
+        {activeTab === "journal" && (
           <div className="space-y-6">
             <Card title="Journal Overview">
               {journalStats.loading ? (
@@ -359,7 +367,7 @@ export default function DashboardPage() {
                       <div className="text-2xl font-bold text-primary">
                         {journalStats.data.average_mood
                           ? journalStats.data.average_mood.toFixed(1)
-                          : '—'}
+                          : "—"}
                       </div>
                       <div className="text-xs text-text/50">Avg Mood</div>
                     </div>
@@ -397,16 +405,16 @@ export default function DashboardPage() {
                     <div className="mb-4">
                       <h4 className="text-sm text-text/50 mb-2">By Type</h4>
                       <div className="flex flex-wrap gap-2">
-                        {Object.entries(
-                          journalStats.data.entries_by_type,
-                        ).map(([type, count]) => (
-                          <span
-                            key={type}
-                            className="px-3 py-1 bg-secondary/10 border border-secondary/20 rounded-full text-xs text-secondary"
-                          >
-                            {type}: {count}
-                          </span>
-                        ))}
+                        {Object.entries(journalStats.data.entries_by_type).map(
+                          ([type, count]) => (
+                            <span
+                              key={type}
+                              className="px-3 py-1 bg-secondary/10 border border-secondary/20 rounded-full text-xs text-secondary"
+                            >
+                              {type}: {count}
+                            </span>
+                          ),
+                        )}
                       </div>
                     </div>
                   )}
@@ -434,5 +442,6 @@ export default function DashboardPage() {
         )}
       </div>
     </div>
+    </ProtectedRoute>
   );
 }

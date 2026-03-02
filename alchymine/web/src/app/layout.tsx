@@ -1,36 +1,37 @@
-import type { Metadata, Viewport } from 'next';
-import './globals.css';
-import Navigation from '@/components/shared/Navigation';
+import type { Metadata, Viewport } from "next";
+import "./globals.css";
+import Navigation from "@/components/shared/Navigation";
+import { Providers } from "./providers";
 
 export const viewport: Viewport = {
-  width: 'device-width',
+  width: "device-width",
   initialScale: 1,
   maximumScale: 5,
-  viewportFit: 'cover',
-  themeColor: '#8b5cf6',
+  viewportFit: "cover",
+  themeColor: "#8b5cf6",
 };
 
 export const metadata: Metadata = {
-  title: 'Alchymine — Personal Transformation Operating System',
+  title: "Alchymine — Personal Transformation Operating System",
   description:
-    'Discover who you truly are through five integrated systems: Intelligence, Healing, Wealth, Creative, and Perspective. Open-source, AI-powered personal transformation.',
+    "Discover who you truly are through five integrated systems: Intelligence, Healing, Wealth, Creative, and Perspective. Open-source, AI-powered personal transformation.",
   keywords: [
-    'personal transformation',
-    'numerology',
-    'astrology',
-    'personality assessment',
-    'self-discovery',
-    'archetype',
-    'big five',
+    "personal transformation",
+    "numerology",
+    "astrology",
+    "personality assessment",
+    "self-discovery",
+    "archetype",
+    "big five",
   ],
-  manifest: '/manifest.json',
+  manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
-    statusBarStyle: 'black-translucent',
-    title: 'Alchymine',
+    statusBarStyle: "black-translucent",
+    title: "Alchymine",
   },
   other: {
-    'mobile-web-app-capable': 'yes',
+    "mobile-web-app-capable": "yes",
   },
 };
 
@@ -46,11 +47,13 @@ export default function RootLayout({
         <link rel="apple-touch-icon" href="/icon-192.png" />
       </head>
       <body className="font-sans bg-bg text-text min-h-screen antialiased">
-        <Navigation />
-        {/* Main content area: offset for sidebar on desktop, top bar + bottom nav on mobile */}
-        <div className="lg:ml-64 pt-14 pb-16 lg:pt-0 lg:pb-0 min-h-screen">
-          {children}
-        </div>
+        <Providers>
+          <Navigation />
+          {/* Main content area: offset for sidebar on desktop, top bar + bottom nav on mobile */}
+          <div className="lg:ml-64 pt-14 pb-16 lg:pt-0 lg:pb-0 min-h-screen">
+            {children}
+          </div>
+        </Providers>
       </body>
     </html>
   );

@@ -59,7 +59,11 @@ def registered_user(client: TestClient) -> dict:
     """Register a test user and return the response data including tokens."""
     response = client.post(
         "/api/v1/auth/register",
-        json={"email": "test@example.com", "password": "securepassword123"},
+        json={
+            "email": "test@example.com",
+            "password": "securepassword123",
+            "promo_code": "alchyours",
+        },
     )
     assert response.status_code == 201
     return response.json()
@@ -173,7 +177,7 @@ class TestRegister:
         """Registering a new user should return 201 with access and refresh tokens."""
         response = client.post(
             "/api/v1/auth/register",
-            json={"email": "new@example.com", "password": "password123"},
+            json={"email": "new@example.com", "password": "password123", "promo_code": "alchyours"},
         )
         assert response.status_code == 201
         data = response.json()
@@ -183,7 +187,7 @@ class TestRegister:
 
     def test_register_duplicate_email(self, client: TestClient):
         """Registering with an already-used email should return 409."""
-        payload = {"email": "dup@example.com", "password": "password123"}
+        payload = {"email": "dup@example.com", "password": "password123", "promo_code": "alchyours"}
         response1 = client.post("/api/v1/auth/register", json=payload)
         assert response1.status_code == 201
 
@@ -195,7 +199,7 @@ class TestRegister:
         """Registering with a password shorter than 8 characters should return 422."""
         response = client.post(
             "/api/v1/auth/register",
-            json={"email": "short@example.com", "password": "abc"},
+            json={"email": "short@example.com", "password": "abc", "promo_code": "alchyours"},
         )
         assert response.status_code == 422
 
@@ -203,13 +207,34 @@ class TestRegister:
         """Registering with an invalid email should return 422."""
         response = client.post(
             "/api/v1/auth/register",
-            json={"email": "not-an-email", "password": "password123"},
+            json={"email": "not-an-email", "password": "password123", "promo_code": "alchyours"},
         )
         assert response.status_code == 422
 
     def test_register_missing_fields(self, client: TestClient):
         """Registering with missing fields should return 422."""
         response = client.post("/api/v1/auth/register", json={})
+        assert response.status_code == 422
+
+    def test_register_invalid_promo_code(self, client: TestClient):
+        """Registering with a wrong promo code should return 403."""
+        response = client.post(
+            "/api/v1/auth/register",
+            json={
+                "email": "promo@example.com",
+                "password": "password123",
+                "promo_code": "wrongcode",
+            },
+        )
+        assert response.status_code == 403
+        assert "invalid promo code" in response.json()["detail"].lower()
+
+    def test_register_missing_promo_code(self, client: TestClient):
+        """Registering without a promo code should return 422."""
+        response = client.post(
+            "/api/v1/auth/register",
+            json={"email": "nopromo@example.com", "password": "password123"},
+        )
         assert response.status_code == 422
 
 
