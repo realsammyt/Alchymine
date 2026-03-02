@@ -72,12 +72,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     tini \
     && rm -rf /var/lib/apt/lists/*
 
+# Upgrade system-level setuptools/wheel to fix vendored vulnerabilities
+# (must run BEFORE venv copy so pip targets /usr/local/lib, not the venv)
+RUN pip install --no-cache-dir --upgrade pip setuptools wheel
+
 # Copy virtual environment from builder
 COPY --from=builder /opt/venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
-
-# Upgrade system-level setuptools/wheel to fix vendored vulnerabilities
-RUN pip install --no-cache-dir --upgrade pip setuptools wheel
 
 # Set up Swiss Ephemeris data directory
 # pyswisseph ships with bundled data; create the expected directory
