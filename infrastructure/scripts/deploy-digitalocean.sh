@@ -258,7 +258,7 @@ SSL_EMAIL=${SSL_EMAIL}
 # ── Application ──────────────────────────────────────────────────────────────
 ENVIRONMENT=production
 LOG_LEVEL=WARNING
-ALLOWED_ORIGINS=https://${DOMAIN}
+ALLOWED_ORIGINS=["https://${DOMAIN}","https://www.${DOMAIN}"]
 
 # ── API Security ─────────────────────────────────────────────────────────────
 API_SECRET_KEY=${API_SECRET}
@@ -266,7 +266,6 @@ JWT_SECRET_KEY=${JWT_SECRET}
 JWT_ALGORITHM=HS256
 ACCESS_TOKEN_EXPIRE_MINUTES=30
 REFRESH_TOKEN_EXPIRE_DAYS=7
-API_CORS_ORIGINS=["https://${DOMAIN}","https://www.${DOMAIN}"]
 
 # ── Data Encryption ──────────────────────────────────────────────────────────
 ENCRYPTION_KEY=${ENCRYPTION_KEY}
