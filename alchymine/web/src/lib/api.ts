@@ -2,7 +2,10 @@
  * Alchymine API client — typed fetch wrappers for the FastAPI backend.
  */
 
-const API_URL = process.env.API_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+const API_URL =
+  process.env.API_URL ||
+  process.env.NEXT_PUBLIC_API_URL ||
+  "http://localhost:8000";
 const BASE = `${API_URL}/api/v1`;
 
 // ─── Shared types ────────────────────────────────────────────────────
@@ -24,7 +27,7 @@ export interface ReportRequest {
 
 export interface ReportStatus {
   id: string;
-  status: 'queued' | 'generating' | 'completed' | 'failed';
+  status: "queued" | "generating" | "completed" | "failed";
   progress: number;
   created_at: string;
   completed_at: string | null;
@@ -274,15 +277,22 @@ class ApiError extends Error {
     message: string,
   ) {
     super(message);
-    this.name = 'ApiError';
+    this.name = "ApiError";
   }
+}
+
+function getAuthHeaders(): Record<string, string> {
+  if (typeof window === "undefined") return {};
+  const token = localStorage.getItem("access_token");
+  return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
 async function request<T>(url: string, options?: RequestInit): Promise<T> {
   const res = await fetch(url, {
     ...options,
     headers: {
-      'Content-Type': 'application/json',
+      "Content-Type": "application/json",
+      ...getAuthHeaders(),
       ...options?.headers,
     },
   });
@@ -290,11 +300,46 @@ async function request<T>(url: string, options?: RequestInit): Promise<T> {
   // 202 is used for "still generating" status — we handle it differently
   if (res.status === 202) {
     const body = await res.json();
-    throw new ApiError(202, body.detail || 'Still processing');
+    throw new ApiError(202, body.detail || "Still processing");
+  }
+
+  // Attempt token refresh on 401
+  if (res.status === 401 && typeof window !== "undefined") {
+    const refreshToken = localStorage.getItem("refresh_token");
+    if (refreshToken) {
+      try {
+        const refreshRes = await fetch(`${BASE}/auth/refresh`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ refresh_token: refreshToken }),
+        });
+        if (refreshRes.ok) {
+          const tokens = await refreshRes.json();
+          localStorage.setItem("access_token", tokens.access_token);
+          localStorage.setItem("refresh_token", tokens.refresh_token);
+          // Retry the original request with new token
+          const retryRes = await fetch(url, {
+            ...options,
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${tokens.access_token}`,
+              ...options?.headers,
+            },
+          });
+          if (retryRes.ok) return retryRes.json();
+        }
+        // Refresh failed — clear tokens
+        localStorage.removeItem("access_token");
+        localStorage.removeItem("refresh_token");
+      } catch {
+        localStorage.removeItem("access_token");
+        localStorage.removeItem("refresh_token");
+      }
+    }
   }
 
   if (!res.ok) {
-    const body = await res.json().catch(() => ({ detail: 'Unknown error' }));
+    const body = await res.json().catch(() => ({ detail: "Unknown error" }));
     throw new ApiError(res.status, body.detail || `HTTP ${res.status}`);
   }
 
@@ -305,11 +350,11 @@ async function request<T>(url: string, options?: RequestInit): Promise<T> {
 
 export async function createReport(
   intake: IntakePayload,
-  modules: string[] = ['full'],
-  tone: string = 'balanced',
+  modules: string[] = ["full"],
+  tone: string = "balanced",
 ): Promise<ReportStatus> {
   return request<ReportStatus>(`${BASE}/reports`, {
-    method: 'POST',
+    method: "POST",
     body: JSON.stringify({ intake, modules, tone }),
   });
 }
@@ -323,14 +368,14 @@ export async function getReport(id: string): Promise<ReportResponse> {
 export async function getNumerology(
   name: string,
   birthDate?: string,
-  system: string = 'pythagorean',
+  system: string = "pythagorean",
 ): Promise<NumerologyResponse> {
   const params = new URLSearchParams();
-  if (birthDate) params.set('birth_date', birthDate);
-  if (system !== 'pythagorean') params.set('system', system);
+  if (birthDate) params.set("birth_date", birthDate);
+  if (system !== "pythagorean") params.set("system", system);
   const query = params.toString();
   return request<NumerologyResponse>(
-    `${BASE}/numerology/${encodeURIComponent(name)}${query ? `?${query}` : ''}`,
+    `${BASE}/numerology/${encodeURIComponent(name)}${query ? `?${query}` : ""}`,
   );
 }
 
@@ -342,11 +387,11 @@ export async function getAstrology(
   birthCity?: string,
 ): Promise<AstrologyResponse> {
   const params = new URLSearchParams();
-  if (birthTime) params.set('birth_time', birthTime);
-  if (birthCity) params.set('birth_city', birthCity);
+  if (birthTime) params.set("birth_time", birthTime);
+  if (birthCity) params.set("birth_city", birthCity);
   const query = params.toString();
   return request<AstrologyResponse>(
-    `${BASE}/astrology/${birthDate}${query ? `?${query}` : ''}`,
+    `${BASE}/astrology/${birthDate}${query ? `?${query}` : ""}`,
   );
 }
 
@@ -360,7 +405,7 @@ export async function getHealingMatch(
   profile: Record<string, unknown>,
 ): Promise<HealingMatchListResponse> {
   return request<HealingMatchListResponse>(`${BASE}/healing/match`, {
-    method: 'POST',
+    method: "POST",
     body: JSON.stringify(profile),
   });
 }
@@ -379,7 +424,7 @@ export async function getWealthProfile(
   data: Record<string, unknown>,
 ): Promise<WealthProfileResponse> {
   return request<WealthProfileResponse>(`${BASE}/wealth/profile`, {
-    method: 'POST',
+    method: "POST",
     body: JSON.stringify(data),
   });
 }
@@ -388,7 +433,7 @@ export async function getWealthPlan(
   data: Record<string, unknown>,
 ): Promise<WealthPlanResponse> {
   return request<WealthPlanResponse>(`${BASE}/wealth/plan`, {
-    method: 'POST',
+    method: "POST",
     body: JSON.stringify(data),
   });
 }
@@ -397,7 +442,7 @@ export async function getWealthLevers(
   data: Record<string, unknown>,
 ): Promise<LeverResponse> {
   return request<LeverResponse>(`${BASE}/wealth/levers`, {
-    method: 'POST',
+    method: "POST",
     body: JSON.stringify(data),
   });
 }
@@ -408,7 +453,7 @@ export async function getCreativeAssessment(
   responses: Record<string, number>,
 ): Promise<GuilfordScoresResponse> {
   return request<GuilfordScoresResponse>(`${BASE}/creative/assessment`, {
-    method: 'POST',
+    method: "POST",
     body: JSON.stringify({ responses }),
   });
 }
@@ -417,7 +462,7 @@ export async function getCreativeStyle(
   data: Record<string, unknown>,
 ): Promise<StyleFingerprintResponse> {
   return request<StyleFingerprintResponse>(`${BASE}/creative/style`, {
-    method: 'POST',
+    method: "POST",
     body: JSON.stringify(data),
   });
 }
@@ -426,18 +471,16 @@ export async function getCreativeProjects(
   data: Record<string, unknown>,
 ): Promise<ProjectListResponse> {
   return request<ProjectListResponse>(`${BASE}/creative/projects`, {
-    method: 'POST',
+    method: "POST",
     body: JSON.stringify(data),
   });
 }
 
 // ─── Perspective ────────────────────────────────────────────────────
 
-export async function detectBiases(
-  text: string,
-): Promise<BiasDetectResponse> {
+export async function detectBiases(text: string): Promise<BiasDetectResponse> {
   return request<BiasDetectResponse>(`${BASE}/perspective/biases/detect`, {
-    method: 'POST',
+    method: "POST",
     body: JSON.stringify({ text }),
   });
 }
@@ -446,7 +489,7 @@ export async function getKeganAssessment(
   responses: Record<string, unknown>,
 ): Promise<KeganAssessResponse> {
   return request<KeganAssessResponse>(`${BASE}/perspective/kegan/assess`, {
-    method: 'POST',
+    method: "POST",
     body: JSON.stringify(responses),
   });
 }
@@ -486,20 +529,25 @@ export async function createJournalEntry(
   data: Record<string, unknown>,
 ): Promise<JournalEntry> {
   return request<JournalEntry>(`${BASE}/journal`, {
-    method: 'POST',
+    method: "POST",
     body: JSON.stringify(data),
   });
 }
 
 export async function getJournalEntries(
   userId: string,
-  opts?: { system?: string; entryType?: string; page?: number; perPage?: number },
+  opts?: {
+    system?: string;
+    entryType?: string;
+    page?: number;
+    perPage?: number;
+  },
 ): Promise<JournalListResponse> {
   const params = new URLSearchParams({ user_id: userId });
-  if (opts?.system) params.set('system', opts.system);
-  if (opts?.entryType) params.set('entry_type', opts.entryType);
-  if (opts?.page) params.set('page', String(opts.page));
-  if (opts?.perPage) params.set('per_page', String(opts.perPage));
+  if (opts?.system) params.set("system", opts.system);
+  if (opts?.entryType) params.set("entry_type", opts.entryType);
+  if (opts?.page) params.set("page", String(opts.page));
+  if (opts?.perPage) params.set("per_page", String(opts.perPage));
   return request<JournalListResponse>(`${BASE}/journal?${params}`);
 }
 
@@ -537,10 +585,11 @@ export async function getOutcomeSummary(
   journalCount?: number,
 ): Promise<OutcomeSummary> {
   const params = new URLSearchParams();
-  if (journalCount !== undefined) params.set('journal_count', String(journalCount));
+  if (journalCount !== undefined)
+    params.set("journal_count", String(journalCount));
   const query = params.toString();
   return request<OutcomeSummary>(
-    `${BASE}/outcomes/summary/${userId}${query ? `?${query}` : ''}`,
+    `${BASE}/outcomes/summary/${userId}${query ? `?${query}` : ""}`,
   );
 }
 
@@ -548,7 +597,7 @@ export async function createMilestone(
   data: Record<string, unknown>,
 ): Promise<Record<string, unknown>> {
   return request<Record<string, unknown>>(`${BASE}/outcomes/milestones`, {
-    method: 'POST',
+    method: "POST",
     body: JSON.stringify(data),
   });
 }
@@ -557,9 +606,49 @@ export async function logActivity(
   data: Record<string, unknown>,
 ): Promise<Record<string, unknown>> {
   return request<Record<string, unknown>>(`${BASE}/outcomes/activity`, {
-    method: 'POST',
+    method: "POST",
     body: JSON.stringify(data),
   });
+}
+
+// ─── Auth ──────────────────────────────────────────────────────────
+
+export interface TokenResponse {
+  access_token: string;
+  refresh_token: string;
+  token_type: string;
+}
+
+export interface AuthUser {
+  id: string;
+  email: string;
+  version: string;
+  created_at: string;
+}
+
+export async function registerUser(
+  email: string,
+  password: string,
+  promoCode: string,
+): Promise<TokenResponse> {
+  return request<TokenResponse>(`${BASE}/auth/register`, {
+    method: "POST",
+    body: JSON.stringify({ email, password, promo_code: promoCode }),
+  });
+}
+
+export async function loginUser(
+  email: string,
+  password: string,
+): Promise<TokenResponse> {
+  return request<TokenResponse>(`${BASE}/auth/login`, {
+    method: "POST",
+    body: JSON.stringify({ email, password }),
+  });
+}
+
+export async function getMe(): Promise<AuthUser> {
+  return request<AuthUser>(`${BASE}/auth/me`);
 }
 
 export { ApiError };

@@ -24,6 +24,7 @@ from alchymine.api.auth import (
     hash_password,
     verify_password,
 )
+from alchymine.config import get_settings
 from alchymine.db.base import Base, get_async_engine, get_async_session_factory
 from alchymine.db.models import User
 
@@ -37,6 +38,7 @@ class RegisterRequest(BaseModel):
 
     email: EmailStr
     password: str = Field(..., min_length=8, description="Password (min 8 characters)")
+    promo_code: str = Field(..., description="Invitation code required for signup")
 
 
 class LoginRequest(BaseModel):
@@ -104,8 +106,17 @@ async def register(
     Creates the user in the database, hashes the password, and returns
     an access token + refresh token pair.
 
+    Returns 403 if the promo code is invalid.
     Returns 409 if the email is already registered.
     """
+    # Validate promo code
+    settings = get_settings()
+    if body.promo_code != settings.signup_promo_code:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Invalid promo code",
+        )
+
     # Check for existing user
     result = await db.execute(select(User).where(User.email == body.email))
     existing = result.scalar_one_or_none()
