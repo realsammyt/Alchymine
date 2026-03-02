@@ -1,0 +1,12 @@
+# ecdsa CVE-2024-23342: Minerva timing attack on P-256 curve
+# python-ecdsa maintainer considers side-channel attacks out of scope; no fix planned.
+# This is a transitive dep of python-jose[cryptography]. We use HMAC (HS256) for JWT,
+# not ECDSA signatures, so this vulnerability does not affect our application.
+CVE-2024-23342
+
+# minimatch CVE-2026-27903 and CVE-2026-27904: DoS via glob pattern backtracking
+# These exist in the system npm's internal dependencies (/usr/local/lib/node_modules/npm/).
+# Our web container only runs `node server.js` and never invokes npm at runtime,
+# so these are not exploitable in our deployment context.
+CVE-2026-27903
+CVE-2026-27904

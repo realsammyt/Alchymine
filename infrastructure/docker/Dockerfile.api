@@ -28,6 +28,10 @@ COPY pyproject.toml ./
 RUN python -m venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
 
+# Upgrade build tools to fix vendored vulnerabilities
+# (jaraco.context CVE-2026-23949, wheel CVE-2026-24049)
+RUN pip install --no-cache-dir --upgrade pip setuptools wheel
+
 # Install the project dependencies (without the project itself yet)
 RUN pip install --no-cache-dir . 2>/dev/null || \
     pip install --no-cache-dir \
@@ -67,6 +71,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     tini \
     && rm -rf /var/lib/apt/lists/*
+
+# Upgrade system-level setuptools/wheel to fix vendored vulnerabilities
+# (must run BEFORE venv copy so pip targets /usr/local/lib, not the venv)
+RUN pip install --no-cache-dir --upgrade pip setuptools wheel
 
 # Copy virtual environment from builder
 COPY --from=builder /opt/venv /opt/venv
