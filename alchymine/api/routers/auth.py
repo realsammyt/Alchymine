@@ -1,15 +1,21 @@
-"""Authentication router — register, login, refresh, and user info endpoints.
+"""Authentication router — register, login, refresh, password reset, and user info endpoints.
 
 Endpoints:
-- ``POST /auth/register`` — Create a new user and return tokens.
-- ``POST /auth/login``    — Authenticate and return tokens.
-- ``POST /auth/refresh``  — Exchange a refresh token for a new access token.
-- ``GET  /auth/me``       — Return current user info (protected).
+- ``POST /auth/register``        — Create a new user and return tokens.
+- ``POST /auth/login``           — Authenticate and return tokens.
+- ``POST /auth/refresh``         — Exchange a refresh token for a new access token.
+- ``GET  /auth/me``              — Return current user info (protected).
+- ``POST /auth/forgot-password`` — Request a password reset token.
+- ``POST /auth/reset-password``  — Reset password using a valid token.
 """
 
 from __future__ import annotations
 
+import hashlib
+import logging
+import secrets
 from collections.abc import AsyncGenerator
+from datetime import UTC, datetime, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, EmailStr, Field
@@ -27,6 +33,8 @@ from alchymine.api.auth import (
 from alchymine.config import get_settings
 from alchymine.db.base import Base, get_async_engine, get_async_session_factory
 from alchymine.db.models import User
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/auth")
 
@@ -60,6 +68,25 @@ class TokenResponse(BaseModel):
     access_token: str
     refresh_token: str
     token_type: str = "bearer"  # noqa: S105
+
+
+class ForgotPasswordRequest(BaseModel):
+    """Request body for password reset request."""
+
+    email: EmailStr
+
+
+class ResetPasswordRequest(BaseModel):
+    """Request body for password reset."""
+
+    token: str
+    new_password: str = Field(..., min_length=8, description="New password (min 8 characters)")
+
+
+class MessageResponse(BaseModel):
+    """Generic message response."""
+
+    message: str
 
 
 class UserResponse(BaseModel):
@@ -257,3 +284,96 @@ async def get_me(
         version=user.version,
         created_at=str(user.created_at),
     )
+
+
+# ─── Password Reset ──────────────────────────────────────────────────────
+
+RESET_TOKEN_EXPIRE_MINUTES = 60
+
+
+def _hash_reset_token(token: str) -> str:
+    """Hash a reset token for storage (prevents DB leak → account takeover)."""
+    return hashlib.sha256(token.encode()).hexdigest()
+
+
+@router.post("/forgot-password", response_model=MessageResponse)
+async def forgot_password(
+    body: ForgotPasswordRequest,
+    db: AsyncSession = Depends(get_db),
+) -> MessageResponse:
+    """Request a password reset.
+
+    Always returns a success message regardless of whether the email exists
+    (prevents email enumeration). If the email exists, a reset token is
+    generated and logged server-side.
+
+    In production, integrate an email service to deliver the reset link.
+    """
+    result = await db.execute(select(User).where(User.email == body.email))
+    user = result.scalar_one_or_none()
+
+    if user is not None:
+        # Generate a secure token
+        raw_token = secrets.token_urlsafe(32)
+        user.password_reset_token = _hash_reset_token(raw_token)
+        user.password_reset_expires = datetime.now(UTC) + timedelta(
+            minutes=RESET_TOKEN_EXPIRE_MINUTES,
+        )
+        await db.commit()
+
+        # Log the reset URL (replace with email delivery in production)
+        logger.info(
+            "Password reset requested for %s — token: %s (expires in %d min)",
+            body.email,
+            raw_token,
+            RESET_TOKEN_EXPIRE_MINUTES,
+        )
+
+    return MessageResponse(
+        message="If an account exists with that email, password reset instructions have been sent.",
+    )
+
+
+@router.post("/reset-password", response_model=MessageResponse)
+async def reset_password(
+    body: ResetPasswordRequest,
+    db: AsyncSession = Depends(get_db),
+) -> MessageResponse:
+    """Reset a password using a valid reset token.
+
+    Validates the token, checks expiry, and updates the password.
+    The token is single-use and cleared after a successful reset.
+    """
+    token_hash = _hash_reset_token(body.token)
+
+    result = await db.execute(select(User).where(User.password_reset_token == token_hash))
+    user = result.scalar_one_or_none()
+
+    if user is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid or expired reset token",
+        )
+
+    # Compare expiry — handle both tz-aware and naive datetimes (SQLite returns naive)
+    now = datetime.now(UTC)
+    expires = user.password_reset_expires
+    if expires is not None and expires.tzinfo is None:
+        expires = expires.replace(tzinfo=UTC)
+    if expires is None or expires < now:
+        # Clear the expired token
+        user.password_reset_token = None
+        user.password_reset_expires = None
+        await db.commit()
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid or expired reset token",
+        )
+
+    # Update password and clear the token
+    user.password_hash = hash_password(body.new_password)
+    user.password_reset_token = None
+    user.password_reset_expires = None
+    await db.commit()
+
+    return MessageResponse(message="Password has been reset successfully.")

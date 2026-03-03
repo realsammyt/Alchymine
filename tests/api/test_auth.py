@@ -372,3 +372,123 @@ class TestRefresh:
         )
         assert me_resp.status_code == 200
         assert me_resp.json()["email"] == "test@example.com"
+
+
+# ─── Forgot Password Tests ──────────────────────────────────────────────
+
+
+class TestForgotPassword:
+    """Tests for POST /api/v1/auth/forgot-password."""
+
+    def test_forgot_password_existing_email(self, client: TestClient, registered_user: dict):
+        """Requesting a reset for an existing email should return 200 with a message."""
+        response = client.post(
+            "/api/v1/auth/forgot-password",
+            json={"email": "test@example.com"},
+        )
+        assert response.status_code == 200
+        assert "message" in response.json()
+
+    def test_forgot_password_nonexistent_email(self, client: TestClient):
+        """Requesting a reset for a non-existent email should still return 200 (no enumeration)."""
+        response = client.post(
+            "/api/v1/auth/forgot-password",
+            json={"email": "nobody@example.com"},
+        )
+        assert response.status_code == 200
+        assert "message" in response.json()
+
+    def test_forgot_password_invalid_email(self, client: TestClient):
+        """Requesting a reset with an invalid email should return 422."""
+        response = client.post(
+            "/api/v1/auth/forgot-password",
+            json={"email": "not-an-email"},
+        )
+        assert response.status_code == 422
+
+
+# ─── Reset Password Tests ───────────────────────────────────────────────
+
+
+class TestResetPassword:
+    """Tests for POST /api/v1/auth/reset-password."""
+
+    def test_reset_password_invalid_token(self, client: TestClient):
+        """Resetting with a bad token should return 400."""
+        response = client.post(
+            "/api/v1/auth/reset-password",
+            json={"token": "bad-token", "new_password": "newpassword123"},
+        )
+        assert response.status_code == 400
+        assert "invalid" in response.json()["detail"].lower()
+
+    def test_reset_password_short_password(self, client: TestClient):
+        """Resetting with a password shorter than 8 characters should return 422."""
+        response = client.post(
+            "/api/v1/auth/reset-password",
+            json={"token": "some-token", "new_password": "abc"},
+        )
+        assert response.status_code == 422
+
+    def test_forgot_then_reset_flow(self, client: TestClient, registered_user: dict):
+        """Full flow: forgot → set known token in DB → reset → login with new password."""
+        import secrets
+
+        from sqlalchemy import select
+
+        from alchymine.api.routers.auth import _hash_reset_token, get_db
+        from alchymine.db.models import User
+
+        # Step 1: Request reset (creates a token in the DB)
+        response = client.post(
+            "/api/v1/auth/forgot-password",
+            json={"email": "test@example.com"},
+        )
+        assert response.status_code == 200
+
+        # Step 2: Generate a known token and inject it into the DB
+        # (we can't intercept the server-logged token)
+        raw_token = secrets.token_urlsafe(32)
+        token_hash = _hash_reset_token(raw_token)
+
+        # Use the overridden get_db dependency to access the same in-memory DB
+        import asyncio
+
+        async def _set_token() -> None:
+            async for db in app.dependency_overrides[get_db]():
+                result = await db.execute(select(User).where(User.email == "test@example.com"))
+                user = result.scalar_one()
+                user.password_reset_token = token_hash
+                user.password_reset_expires = datetime.now(UTC) + timedelta(hours=1)
+                await db.commit()
+
+        asyncio.get_event_loop().run_until_complete(_set_token())
+
+        # Step 3: Reset the password
+        reset_resp = client.post(
+            "/api/v1/auth/reset-password",
+            json={"token": raw_token, "new_password": "brand-new-password"},
+        )
+        assert reset_resp.status_code == 200
+
+        # Step 4: Login with the new password
+        login_resp = client.post(
+            "/api/v1/auth/login",
+            json={"email": "test@example.com", "password": "brand-new-password"},
+        )
+        assert login_resp.status_code == 200
+        assert "access_token" in login_resp.json()
+
+        # Step 5: Old password no longer works
+        old_login = client.post(
+            "/api/v1/auth/login",
+            json={"email": "test@example.com", "password": "securepassword123"},
+        )
+        assert old_login.status_code == 401
+
+        # Step 6: Token is single-use — reusing it fails
+        reuse_resp = client.post(
+            "/api/v1/auth/reset-password",
+            json={"token": raw_token, "new_password": "another-password"},
+        )
+        assert reuse_resp.status_code == 400
