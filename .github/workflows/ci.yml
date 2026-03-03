@@ -250,7 +250,8 @@ jobs:
       - name: Run pip-audit (Python deps)
         run: |
           pip-audit --desc \
-            --skip-editable
+            --skip-editable \
+            --ignore-vuln CVE-2024-23342  # ecdsa timing attack — no fix available, upstream wontfix
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
