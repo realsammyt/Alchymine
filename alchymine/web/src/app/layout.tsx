@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import Navigation from "@/components/shared/Navigation";
+import ContentWrapper from "@/components/shared/ContentWrapper";
 import { Providers } from "./providers";
 
 export const viewport: Viewport = {
@@ -49,13 +50,7 @@ export default function RootLayout({
       <body className="font-sans bg-bg text-text min-h-screen antialiased">
         <Providers>
           <Navigation />
-          {/* Main content area: offset for sidebar on desktop, top bar + bottom nav on mobile */}
-          <div className="lg:ml-64 pt-14 pb-16 lg:pt-0 lg:pb-0 min-h-screen">
-            {children}
-          </div>
-          <footer className="lg:ml-64 pb-16 lg:pb-0 text-center py-2 text-xs text-text/30">
-            v{process.env.NEXT_PUBLIC_APP_VERSION}
-          </footer>
+          <ContentWrapper>{children}</ContentWrapper>
         </Providers>
       </body>
     </html>

@@ -3,8 +3,6 @@
 <!-- Provide a clear and concise description of the changes in this PR. -->
 <!-- Include the motivation, context, and any relevant background. -->
 
-
-
 ### Related Issues
 
 <!-- Link related issues using "Closes #123" or "Relates to #456". -->
@@ -59,17 +57,17 @@
 
 ### Ethics and Safety
 
-- [ ] **Ethics review** — Outputs reviewed for harm prevention ("First, Do No Harm") *
-- [ ] **Cultural sensitivity review** — Content reviewed for proper attribution and cultural respect *
-- [ ] **Emotional safety check** — No toxic positivity, no calming design masking real problems *
+- [ ] **Ethics review** — Outputs reviewed for harm prevention ("First, Do No Harm") \*
+- [ ] **Cultural sensitivity review** — Content reviewed for proper attribution and cultural respect \*
+- [ ] **Emotional safety check** — No toxic positivity, no calming design masking real problems \*
 
 ### Domain-Specific
 
-- [ ] **Financial accuracy** — All financial calculations are deterministic and verified against test vectors *
-- [ ] **Financial data isolation** — No financial data sent to LLM; encrypted at rest *
-- [ ] **Disclaimer validation** — Required disclaimers present on financial/health outputs *
-- [ ] **Accessibility check** — WCAG 2.1 AA compliance verified (UI changes) *
-- [ ] **Evidence-level labeling** — Evidence ratings present on methodology claims *
+- [ ] **Financial accuracy** — All financial calculations are deterministic and verified against test vectors \*
+- [ ] **Financial data isolation** — No financial data sent to LLM; encrypted at rest \*
+- [ ] **Disclaimer validation** — Required disclaimers present on financial/health outputs \*
+- [ ] **Accessibility check** — WCAG 2.1 AA compliance verified (UI changes) \*
+- [ ] **Evidence-level labeling** — Evidence ratings present on methodology claims \*
 
 <!-- * = Required only when the PR touches the relevant system or output type. -->
 
@@ -79,12 +77,12 @@
 
 <!-- Report the status of quality gate checks. -->
 
-| Gate | Status | Notes |
-|------|--------|-------|
-| Prompt validation (`python -m alchymine.prompts.validate`) | :white_circle: Not run / :green_circle: Pass / :red_circle: Fail | |
-| Ethics check (`python -m alchymine.agents.quality.ethics_check`) | :white_circle: Not run / :green_circle: Pass / :red_circle: Fail | |
-| Quality Swarm regression (`pytest tests/agents/ -v`) | :white_circle: Not run / :green_circle: Pass / :red_circle: Fail | |
-| Docker build (`docker compose build`) | :white_circle: Not run / :green_circle: Pass / :red_circle: Fail | |
+| Gate                                                             | Status                                                           | Notes |
+| ---------------------------------------------------------------- | ---------------------------------------------------------------- | ----- |
+| Prompt validation (`python -m alchymine.prompts.validate`)       | :white_circle: Not run / :green_circle: Pass / :red_circle: Fail |       |
+| Ethics check (`python -m alchymine.agents.quality.ethics_check`) | :white_circle: Not run / :green_circle: Pass / :red_circle: Fail |       |
+| Quality Swarm regression (`pytest tests/agents/ -v`)             | :white_circle: Not run / :green_circle: Pass / :red_circle: Fail |       |
+| Docker build (`docker compose build`)                            | :white_circle: Not run / :green_circle: Pass / :red_circle: Fail |       |
 
 ---
 
@@ -105,16 +103,12 @@
 <!-- If applicable, add screenshots, GIFs, or screen recordings. -->
 <!-- Redact any personal, financial, or health data. -->
 
-
-
 ---
 
 ## Reviewer Notes
 
 <!-- Any specific areas where you would like reviewer attention? -->
 <!-- Any known limitations or follow-up work needed? -->
-
-
 
 ---
 

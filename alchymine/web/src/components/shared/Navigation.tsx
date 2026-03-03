@@ -176,8 +176,15 @@ export default function Navigation() {
   const { user, isLoading, logout } = useAuth();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
-  // Hide navigation on login/signup pages
-  if (pathname === "/login" || pathname === "/signup") {
+  // Hide navigation on public pages (landing, auth)
+  const publicPages = [
+    "/",
+    "/login",
+    "/signup",
+    "/forgot-password",
+    "/reset-password",
+  ];
+  if (publicPages.includes(pathname)) {
     return null;
   }
 

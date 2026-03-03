@@ -1,32 +1,38 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import EvidenceRatingBadge, { type EvidenceLevel } from './EvidenceRatingBadge';
+import { useState } from "react";
+import EvidenceRatingBadge, { type EvidenceLevel } from "./EvidenceRatingBadge";
 
 interface MethodologyPanelProps {
   title: string;
   methodology: string;
   evidenceLevel: EvidenceLevel;
-  calculationType: 'deterministic' | 'ai-assisted' | 'hybrid';
+  calculationType: "deterministic" | "ai-assisted" | "hybrid";
   sources?: string[];
   defaultExpanded?: boolean;
 }
 
-const calculationTypeConfig: Record<string, { label: string; description: string; className: string }> = {
+const calculationTypeConfig: Record<
+  string,
+  { label: string; description: string; className: string }
+> = {
   deterministic: {
-    label: 'Deterministic',
-    description: 'Results are calculated using fixed mathematical formulas. No AI interpretation involved.',
-    className: 'bg-accent/10 text-accent border-accent/20',
+    label: "Deterministic",
+    description:
+      "Results are calculated using fixed mathematical formulas. No AI interpretation involved.",
+    className: "bg-accent/10 text-accent border-accent/20",
   },
-  'ai-assisted': {
-    label: 'AI-Assisted',
-    description: 'Results use AI interpretation guided by validated frameworks and safety protocols.',
-    className: 'bg-secondary/10 text-secondary border-secondary/20',
+  "ai-assisted": {
+    label: "AI-Assisted",
+    description:
+      "Results use AI interpretation guided by validated frameworks and safety protocols.",
+    className: "bg-secondary/10 text-secondary border-secondary/20",
   },
   hybrid: {
-    label: 'Hybrid',
-    description: 'Deterministic calculations enhanced with AI-generated narrative and context.',
-    className: 'bg-primary/10 text-primary border-primary/20',
+    label: "Hybrid",
+    description:
+      "Deterministic calculations enhanced with AI-generated narrative and context.",
+    className: "bg-primary/10 text-primary border-primary/20",
   },
 };
 
@@ -47,7 +53,7 @@ export default function MethodologyPanel({
         onClick={() => setExpanded(!expanded)}
         className="w-full flex items-center justify-between p-4 text-left hover:bg-white/[0.02] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary"
         aria-expanded={expanded}
-        aria-controls={`methodology-content-${title.replace(/\s+/g, '-').toLowerCase()}`}
+        aria-controls={`methodology-content-${title.replace(/\s+/g, "-").toLowerCase()}`}
       >
         <div className="flex items-center gap-3">
           <svg
@@ -69,7 +75,7 @@ export default function MethodologyPanel({
           </span>
         </div>
         <svg
-          className={`w-4 h-4 text-text/40 transition-transform duration-200 ${expanded ? 'rotate-180' : ''}`}
+          className={`w-4 h-4 text-text/40 transition-transform duration-200 ${expanded ? "rotate-180" : ""}`}
           viewBox="0 0 24 24"
           fill="none"
           stroke="currentColor"
@@ -84,7 +90,7 @@ export default function MethodologyPanel({
 
       {expanded && (
         <div
-          id={`methodology-content-${title.replace(/\s+/g, '-').toLowerCase()}`}
+          id={`methodology-content-${title.replace(/\s+/g, "-").toLowerCase()}`}
           className="px-4 pb-4 animate-fade-in"
           role="region"
           aria-label={`${title} methodology details`}
@@ -106,13 +112,13 @@ export default function MethodologyPanel({
                   strokeLinejoin="round"
                   aria-hidden="true"
                 >
-                  {calculationType === 'deterministic' ? (
+                  {calculationType === "deterministic" ? (
                     <>
                       <rect x="4" y="4" width="16" height="16" rx="2" />
                       <path d="M8 10h8" />
                       <path d="M8 14h4" />
                     </>
-                  ) : calculationType === 'ai-assisted' ? (
+                  ) : calculationType === "ai-assisted" ? (
                     <>
                       <path d="M12 2a4 4 0 0 0-4 4v1a4 4 0 0 0-4 4c0 1.5.8 2.8 2 3.4V18a4 4 0 0 0 4 4h4a4 4 0 0 0 4-4v-3.6c1.2-.6 2-1.9 2-3.4a4 4 0 0 0-4-4V6a4 4 0 0 0-4-4z" />
                     </>
@@ -128,9 +134,7 @@ export default function MethodologyPanel({
             </div>
 
             {/* Calculation type explanation */}
-            <p className="text-xs text-text/40">
-              {calcConfig.description}
-            </p>
+            <p className="text-xs text-text/40">{calcConfig.description}</p>
 
             {/* Methodology text */}
             <div>
@@ -150,8 +154,16 @@ export default function MethodologyPanel({
                 </h4>
                 <ul className="space-y-1">
                   {sources.map((source, i) => (
-                    <li key={i} className="text-xs text-text/40 flex items-start gap-2">
-                      <span className="text-primary/50 mt-0.5" aria-hidden="true">[{i + 1}]</span>
+                    <li
+                      key={i}
+                      className="text-xs text-text/40 flex items-start gap-2"
+                    >
+                      <span
+                        className="text-primary/50 mt-0.5"
+                        aria-hidden="true"
+                      >
+                        [{i + 1}]
+                      </span>
                       {source}
                     </li>
                   ))}

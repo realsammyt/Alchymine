@@ -43,14 +43,22 @@ jest.mock("next/link", () => {
 
 describe("Navigation", () => {
   it("renders without crashing", () => {
-    render(<AuthProvider><Navigation /></AuthProvider>);
+    render(
+      <AuthProvider>
+        <Navigation />
+      </AuthProvider>,
+    );
     // Should render the Alchymine brand text (appears in both desktop sidebar and mobile top bar)
     const brandElements = screen.getAllByText("Alchymine");
     expect(brandElements.length).toBeGreaterThan(0);
   });
 
   it("renders all system navigation links", () => {
-    render(<AuthProvider><Navigation /></AuthProvider>);
+    render(
+      <AuthProvider>
+        <Navigation />
+      </AuthProvider>,
+    );
     // Each link appears in desktop sidebar, mobile dropdown, and mobile bottom nav
     expect(screen.getAllByText("Dashboard").length).toBeGreaterThanOrEqual(1);
     expect(screen.getAllByText("Intelligence").length).toBeGreaterThanOrEqual(
@@ -63,7 +71,11 @@ describe("Navigation", () => {
   });
 
   it("contains links to all five system pages", () => {
-    render(<AuthProvider><Navigation /></AuthProvider>);
+    render(
+      <AuthProvider>
+        <Navigation />
+      </AuthProvider>,
+    );
     const links = screen.getAllByRole("link");
     const hrefs = links.map((link) => link.getAttribute("href"));
     expect(hrefs).toContain("/dashboard");
@@ -75,13 +87,21 @@ describe("Navigation", () => {
   });
 
   it("has navigation landmark roles", () => {
-    render(<AuthProvider><Navigation /></AuthProvider>);
+    render(
+      <AuthProvider>
+        <Navigation />
+      </AuthProvider>,
+    );
     const navs = screen.getAllByRole("navigation");
     expect(navs.length).toBeGreaterThanOrEqual(1);
   });
 
   it("has accessible labels on navigation landmarks", () => {
-    render(<AuthProvider><Navigation /></AuthProvider>);
+    render(
+      <AuthProvider>
+        <Navigation />
+      </AuthProvider>,
+    );
     const navs = screen.getAllByRole("navigation");
     navs.forEach((nav) => {
       expect(nav).toHaveAttribute("aria-label");
@@ -89,13 +109,21 @@ describe("Navigation", () => {
   });
 
   it("has a mobile menu toggle button", () => {
-    render(<AuthProvider><Navigation /></AuthProvider>);
+    render(
+      <AuthProvider>
+        <Navigation />
+      </AuthProvider>,
+    );
     const toggleButton = screen.getByLabelText("Open navigation menu");
     expect(toggleButton).toBeInTheDocument();
   });
 
   it("toggles mobile menu when button is clicked", () => {
-    render(<AuthProvider><Navigation /></AuthProvider>);
+    render(
+      <AuthProvider>
+        <Navigation />
+      </AuthProvider>,
+    );
     const toggleButton = screen.getByLabelText("Open navigation menu");
     fireEvent.click(toggleButton);
     // After opening, the label should change
@@ -103,7 +131,11 @@ describe("Navigation", () => {
   });
 
   it("has a sign in link in the desktop sidebar when not authenticated", () => {
-    render(<AuthProvider><Navigation /></AuthProvider>);
+    render(
+      <AuthProvider>
+        <Navigation />
+      </AuthProvider>,
+    );
     const signInLinks = screen.getAllByText("Sign In");
     expect(signInLinks.length).toBeGreaterThanOrEqual(1);
   });

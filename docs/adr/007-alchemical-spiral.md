@@ -22,12 +22,14 @@ The user journey is restructured from a linear 4-Act model to a hub-and-spoke **
 ## Consequences
 
 **Positive:**
+
 - Users engage with the most relevant system immediately, reducing time-to-value.
 - Non-linear progression accommodates diverse starting points and learning styles.
 - Progressive disclosure prevents cognitive overload for new users.
 - Spiral model encourages cross-system exploration organically.
 
 **Negative:**
+
 - Adaptive routing requires robust assessment logic that must be validated.
 - The alchemical narrative metaphor is harder to maintain in a non-linear structure.
 - Three depth layers multiply the content and testing surface for each system.

@@ -1,97 +1,117 @@
-'use client';
+"use client";
 
-import { useMemo } from 'react';
-import MethodologyPanel from '@/components/shared/MethodologyPanel';
-import ApiStateView from '@/components/shared/ApiStateView';
-import { getKeganAssessment, KeganAssessResponse } from '@/lib/api';
-import { useApi, getStoredIntake } from '@/lib/useApi';
+import { useMemo } from "react";
+import MethodologyPanel from "@/components/shared/MethodologyPanel";
+import ApiStateView from "@/components/shared/ApiStateView";
+import { getKeganAssessment, KeganAssessResponse } from "@/lib/api";
+import { useApi, getStoredIntake } from "@/lib/useApi";
 
 const KEGAN_STAGES = [
   {
     stage: 2,
-    name: 'Imperial Mind',
-    description: 'Self-focused perspective. Needs and interests drive decision-making. Relationships are transactional.',
-    focus: 'Personal advantage and concrete reciprocity',
+    name: "Imperial Mind",
+    description:
+      "Self-focused perspective. Needs and interests drive decision-making. Relationships are transactional.",
+    focus: "Personal advantage and concrete reciprocity",
   },
   {
     stage: 3,
-    name: 'Socialized Mind',
-    description: 'Defined by relationships and social roles. Values loyalty and belonging. Seeks external validation.',
-    focus: 'Social acceptance and shared norms',
+    name: "Socialized Mind",
+    description:
+      "Defined by relationships and social roles. Values loyalty and belonging. Seeks external validation.",
+    focus: "Social acceptance and shared norms",
   },
   {
     stage: 4,
-    name: 'Self-Authoring Mind',
-    description: 'Self-directed perspective. Creates own value system. Can evaluate and manage relationships from a personal framework.',
-    focus: 'Internal standards and self-authored identity',
+    name: "Self-Authoring Mind",
+    description:
+      "Self-directed perspective. Creates own value system. Can evaluate and manage relationships from a personal framework.",
+    focus: "Internal standards and self-authored identity",
   },
   {
     stage: 5,
-    name: 'Self-Transforming Mind',
-    description: 'Holds multiple frameworks simultaneously. Sees limitations of any single system. Embraces paradox and complexity.',
-    focus: 'Interconnection and dialectical thinking',
+    name: "Self-Transforming Mind",
+    description:
+      "Holds multiple frameworks simultaneously. Sees limitations of any single system. Embraces paradox and complexity.",
+    focus: "Interconnection and dialectical thinking",
   },
 ];
 
 const COGNITIVE_BIASES = [
   {
-    name: 'Confirmation Bias',
-    description: 'Tendency to seek and interpret information that confirms existing beliefs.',
-    mitigation: 'Actively seek disconfirming evidence. Practice steel-manning opposing views.',
-    category: 'Information Processing',
+    name: "Confirmation Bias",
+    description:
+      "Tendency to seek and interpret information that confirms existing beliefs.",
+    mitigation:
+      "Actively seek disconfirming evidence. Practice steel-manning opposing views.",
+    category: "Information Processing",
   },
   {
-    name: 'Anchoring Effect',
-    description: 'Over-reliance on the first piece of information encountered when making decisions.',
-    mitigation: 'Generate multiple reference points. Consider the decision from different starting conditions.',
-    category: 'Decision Making',
+    name: "Anchoring Effect",
+    description:
+      "Over-reliance on the first piece of information encountered when making decisions.",
+    mitigation:
+      "Generate multiple reference points. Consider the decision from different starting conditions.",
+    category: "Decision Making",
   },
   {
-    name: 'Availability Heuristic',
-    description: 'Judging probability based on how easily examples come to mind rather than actual frequency.',
-    mitigation: 'Check base rates. Consult data rather than relying on memorable anecdotes.',
-    category: 'Probability Assessment',
+    name: "Availability Heuristic",
+    description:
+      "Judging probability based on how easily examples come to mind rather than actual frequency.",
+    mitigation:
+      "Check base rates. Consult data rather than relying on memorable anecdotes.",
+    category: "Probability Assessment",
   },
   {
-    name: 'Sunk Cost Fallacy',
-    description: 'Continuing to invest in something because of previously invested resources, not future value.',
-    mitigation: 'Evaluate decisions based only on future costs and benefits. Practice the "fresh start" reframe.',
-    category: 'Decision Making',
+    name: "Sunk Cost Fallacy",
+    description:
+      "Continuing to invest in something because of previously invested resources, not future value.",
+    mitigation:
+      'Evaluate decisions based only on future costs and benefits. Practice the "fresh start" reframe.',
+    category: "Decision Making",
   },
   {
-    name: 'Dunning-Kruger Effect',
-    description: 'Overestimating competence in areas of low expertise while underestimating it in areas of high expertise.',
-    mitigation: 'Seek calibrated feedback. Compare self-assessment with objective measures.',
-    category: 'Self-Assessment',
+    name: "Dunning-Kruger Effect",
+    description:
+      "Overestimating competence in areas of low expertise while underestimating it in areas of high expertise.",
+    mitigation:
+      "Seek calibrated feedback. Compare self-assessment with objective measures.",
+    category: "Self-Assessment",
   },
   {
-    name: 'Framing Effect',
-    description: 'Different conclusions from the same information depending on how it is presented.',
-    mitigation: 'Restate the problem in multiple frames. Ask: "How would I see this if presented differently?"',
-    category: 'Information Processing',
+    name: "Framing Effect",
+    description:
+      "Different conclusions from the same information depending on how it is presented.",
+    mitigation:
+      'Restate the problem in multiple frames. Ask: "How would I see this if presented differently?"',
+    category: "Information Processing",
   },
 ];
 
 const SCENARIO_TYPES = [
   {
-    name: 'Pre-Mortem Analysis',
-    description: 'Imagine a decision has failed. Work backward to identify what went wrong and how to prevent it.',
-    icon: '\u{1F50D}',
+    name: "Pre-Mortem Analysis",
+    description:
+      "Imagine a decision has failed. Work backward to identify what went wrong and how to prevent it.",
+    icon: "\u{1F50D}",
   },
   {
-    name: 'Best/Worst/Most Likely',
-    description: 'Map three scenarios for any decision to calibrate expectations and prepare contingencies.',
-    icon: '\u{1F4CA}',
+    name: "Best/Worst/Most Likely",
+    description:
+      "Map three scenarios for any decision to calibrate expectations and prepare contingencies.",
+    icon: "\u{1F4CA}",
   },
   {
-    name: 'Second-Order Effects',
-    description: 'Trace the consequences of consequences. What happens after the immediate outcome?',
-    icon: '\u{1F300}',
+    name: "Second-Order Effects",
+    description:
+      "Trace the consequences of consequences. What happens after the immediate outcome?",
+    icon: "\u{1F300}",
   },
   {
-    name: 'Inversion Thinking',
-    description: 'Instead of asking how to succeed, ask what would guarantee failure — then avoid those things.',
-    icon: '\u{1F504}',
+    name: "Inversion Thinking",
+    description:
+      "Instead of asking how to succeed, ask what would guarantee failure — then avoid those things.",
+    icon: "\u{1F504}",
   },
 ];
 
@@ -100,7 +120,9 @@ export default function PerspectivePage() {
   const hasIntake = !!intake?.intention;
 
   const kegan = useApi<KeganAssessResponse>(
-    hasIntake ? () => getKeganAssessment({ intention: intake!.intention }) : null,
+    hasIntake
+      ? () => getKeganAssessment({ intention: intake!.intention })
+      : null,
     [intake?.intention],
   );
 
@@ -121,9 +143,15 @@ export default function PerspectivePage() {
         {/* Personalized Kegan Assessment */}
         {hasIntake && (
           <section className="mb-12" aria-labelledby="your-perspective-heading">
-            <h2 id="your-perspective-heading" className="text-2xl font-bold mb-6 flex items-center gap-3">
-              <span className="w-10 h-10 rounded-xl bg-accent/10 flex items-center justify-center text-xl" aria-hidden="true">
-                {'\u{2728}'}
+            <h2
+              id="your-perspective-heading"
+              className="text-2xl font-bold mb-6 flex items-center gap-3"
+            >
+              <span
+                className="w-10 h-10 rounded-xl bg-accent/10 flex items-center justify-center text-xl"
+                aria-hidden="true"
+              >
+                {"\u{2728}"}
               </span>
               Your Developmental Stage
             </h2>
@@ -139,28 +167,48 @@ export default function PerspectivePage() {
                 <div className="card-surface p-6 space-y-4">
                   <div className="flex items-center gap-4">
                     <div className="w-16 h-16 rounded-2xl bg-accent/10 flex items-center justify-center">
-                      <span className="text-2xl font-bold text-accent">{kegan.data.stage_number}</span>
+                      <span className="text-2xl font-bold text-accent">
+                        {kegan.data.stage_number}
+                      </span>
                     </div>
                     <div>
-                      <h3 className="text-xl font-bold text-accent">{kegan.data.name}</h3>
-                      <p className="text-sm text-text/50">{kegan.data.description}</p>
+                      <h3 className="text-xl font-bold text-accent">
+                        {kegan.data.name}
+                      </h3>
+                      <p className="text-sm text-text/50">
+                        {kegan.data.description}
+                      </p>
                     </div>
                   </div>
 
                   <div className="grid sm:grid-cols-2 gap-4 pt-4 border-t border-white/5">
                     <div>
-                      <h4 className="text-xs uppercase tracking-wider text-text/40 mb-2">Strengths</h4>
+                      <h4 className="text-xs uppercase tracking-wider text-text/40 mb-2">
+                        Strengths
+                      </h4>
                       <div className="flex flex-wrap gap-2">
-                        {kegan.data.strengths.map(s => (
-                          <span key={s} className="px-3 py-1 bg-accent/10 text-accent text-xs rounded-full">{s}</span>
+                        {kegan.data.strengths.map((s) => (
+                          <span
+                            key={s}
+                            className="px-3 py-1 bg-accent/10 text-accent text-xs rounded-full"
+                          >
+                            {s}
+                          </span>
                         ))}
                       </div>
                     </div>
                     <div>
-                      <h4 className="text-xs uppercase tracking-wider text-text/40 mb-2">Growth Edges</h4>
+                      <h4 className="text-xs uppercase tracking-wider text-text/40 mb-2">
+                        Growth Edges
+                      </h4>
                       <div className="flex flex-wrap gap-2">
-                        {kegan.data.growth_edges.map(g => (
-                          <span key={g} className="px-3 py-1 bg-white/5 text-text/50 text-xs rounded-full">{g}</span>
+                        {kegan.data.growth_edges.map((g) => (
+                          <span
+                            key={g}
+                            className="px-3 py-1 bg-white/5 text-text/50 text-xs rounded-full"
+                          >
+                            {g}
+                          </span>
                         ))}
                       </div>
                     </div>
@@ -168,10 +216,15 @@ export default function PerspectivePage() {
 
                   {kegan.data.growth_practices.length > 0 && (
                     <div className="pt-4 border-t border-white/5">
-                      <h4 className="text-xs uppercase tracking-wider text-text/40 mb-2">Growth Practices</h4>
+                      <h4 className="text-xs uppercase tracking-wider text-text/40 mb-2">
+                        Growth Practices
+                      </h4>
                       <ul className="space-y-1">
-                        {kegan.data.growth_practices.map(p => (
-                          <li key={p} className="text-sm text-text/60 flex items-start gap-2">
+                        {kegan.data.growth_practices.map((p) => (
+                          <li
+                            key={p}
+                            className="text-sm text-text/60 flex items-start gap-2"
+                          >
                             <span className="w-1.5 h-1.5 rounded-full bg-accent mt-2 flex-shrink-0" />
                             {p}
                           </li>
@@ -181,7 +234,9 @@ export default function PerspectivePage() {
                   )}
 
                   <div className="bg-accent/5 rounded-xl p-4 mt-4">
-                    <p className="text-sm text-text/60 italic">{kegan.data.encouragement}</p>
+                    <p className="text-sm text-text/60 italic">
+                      {kegan.data.encouragement}
+                    </p>
                   </div>
                 </div>
               )}
@@ -191,23 +246,29 @@ export default function PerspectivePage() {
 
         {/* Developmental Frameworks Section */}
         <section className="mb-12" aria-labelledby="frameworks-heading">
-          <h2 id="frameworks-heading" className="text-2xl font-bold mb-6 flex items-center gap-3">
-            <span className="w-10 h-10 rounded-xl bg-accent/10 flex items-center justify-center text-xl" aria-hidden="true">
-              {'\u{1F4D0}'}
+          <h2
+            id="frameworks-heading"
+            className="text-2xl font-bold mb-6 flex items-center gap-3"
+          >
+            <span
+              className="w-10 h-10 rounded-xl bg-accent/10 flex items-center justify-center text-xl"
+              aria-hidden="true"
+            >
+              {"\u{1F4D0}"}
             </span>
             Developmental Frameworks
           </h2>
           <p className="text-text/50 text-sm mb-6">
-            Robert Kegan&apos;s constructive-developmental theory maps how adults make
-            meaning of their experiences. Each stage represents a qualitatively different
-            way of understanding self and world.
+            Robert Kegan&apos;s constructive-developmental theory maps how
+            adults make meaning of their experiences. Each stage represents a
+            qualitatively different way of understanding self and world.
           </p>
 
           <div className="space-y-4 mb-4">
             {KEGAN_STAGES.map((stage) => (
               <div
                 key={stage.stage}
-                className={`card-surface p-5 ${kegan.data?.stage_number === stage.stage ? 'ring-1 ring-accent/30 glow-gold' : ''}`}
+                className={`card-surface p-5 ${kegan.data?.stage_number === stage.stage ? "ring-1 ring-accent/30 glow-gold" : ""}`}
               >
                 <div className="flex items-center gap-3 mb-2">
                   <span className="w-8 h-8 rounded-full bg-accent/10 text-accent text-sm font-bold flex items-center justify-center flex-shrink-0">
@@ -216,13 +277,18 @@ export default function PerspectivePage() {
                   <h3 className="text-sm font-semibold text-text">
                     {stage.name}
                     {kegan.data?.stage_number === stage.stage && (
-                      <span className="ml-2 text-accent text-xs">(Your stage)</span>
+                      <span className="ml-2 text-accent text-xs">
+                        (Your stage)
+                      </span>
                     )}
                   </h3>
                 </div>
-                <p className="text-sm text-text/50 leading-relaxed mb-2 ml-11">{stage.description}</p>
+                <p className="text-sm text-text/50 leading-relaxed mb-2 ml-11">
+                  {stage.description}
+                </p>
                 <p className="text-xs text-text/30 ml-11">
-                  <span className="font-medium text-text/40">Focus:</span> {stage.focus}
+                  <span className="font-medium text-text/40">Focus:</span>{" "}
+                  {stage.focus}
                 </p>
               </div>
             ))}
@@ -236,7 +302,7 @@ export default function PerspectivePage() {
             sources={[
               'Kegan, R. (1982) "The Evolving Self" - foundational developmental theory',
               'Kegan, R. (1994) "In Over Our Heads" - application to modern life complexity',
-              'Lahey et al. (2011) Subject-Object Interview scoring manual and reliability studies',
+              "Lahey et al. (2011) Subject-Object Interview scoring manual and reliability studies",
               'Cook-Greuter, S. (2013) "Nine Levels of Increasing Embrace" - complementary ego development model',
             ]}
           />
@@ -244,30 +310,41 @@ export default function PerspectivePage() {
 
         {/* Cognitive Biases Section */}
         <section className="mb-12" aria-labelledby="biases-heading">
-          <h2 id="biases-heading" className="text-2xl font-bold mb-6 flex items-center gap-3">
-            <span className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center text-xl" aria-hidden="true">
-              {'\u{1F9E0}'}
+          <h2
+            id="biases-heading"
+            className="text-2xl font-bold mb-6 flex items-center gap-3"
+          >
+            <span
+              className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center text-xl"
+              aria-hidden="true"
+            >
+              {"\u{1F9E0}"}
             </span>
             Cognitive Bias Awareness
           </h2>
           <p className="text-text/50 text-sm mb-6">
-            Understanding your cognitive biases is the first step toward clearer thinking.
-            Each bias includes a practical mitigation strategy.
+            Understanding your cognitive biases is the first step toward clearer
+            thinking. Each bias includes a practical mitigation strategy.
           </p>
 
           <div className="grid sm:grid-cols-2 gap-4">
             {COGNITIVE_BIASES.map((bias) => (
               <div key={bias.name} className="card-surface p-5">
                 <div className="flex items-center justify-between mb-2">
-                  <h3 className="text-sm font-semibold text-primary">{bias.name}</h3>
+                  <h3 className="text-sm font-semibold text-primary">
+                    {bias.name}
+                  </h3>
                   <span className="px-2 py-0.5 bg-white/5 text-text/30 text-[10px] font-medium rounded-full">
                     {bias.category}
                   </span>
                 </div>
-                <p className="text-sm text-text/50 leading-relaxed mb-3">{bias.description}</p>
+                <p className="text-sm text-text/50 leading-relaxed mb-3">
+                  {bias.description}
+                </p>
                 <div className="bg-bg/50 rounded-lg px-3 py-2">
                   <p className="text-xs text-accent/70">
-                    <span className="font-medium">Mitigation:</span> {bias.mitigation}
+                    <span className="font-medium">Mitigation:</span>{" "}
+                    {bias.mitigation}
                   </p>
                 </div>
               </div>
@@ -277,9 +354,15 @@ export default function PerspectivePage() {
 
         {/* Scenario Planning Section */}
         <section className="mb-12" aria-labelledby="scenarios-heading">
-          <h2 id="scenarios-heading" className="text-2xl font-bold mb-6 flex items-center gap-3">
-            <span className="w-10 h-10 rounded-xl bg-secondary/10 flex items-center justify-center text-xl" aria-hidden="true">
-              {'\u{1F52D}'}
+          <h2
+            id="scenarios-heading"
+            className="text-2xl font-bold mb-6 flex items-center gap-3"
+          >
+            <span
+              className="w-10 h-10 rounded-xl bg-secondary/10 flex items-center justify-center text-xl"
+              aria-hidden="true"
+            >
+              {"\u{1F52D}"}
             </span>
             Scenario Planning
           </h2>
@@ -292,10 +375,16 @@ export default function PerspectivePage() {
             {SCENARIO_TYPES.map((scenario) => (
               <div key={scenario.name} className="card-surface p-5">
                 <div className="flex items-center gap-3 mb-3">
-                  <span className="text-2xl" aria-hidden="true">{scenario.icon}</span>
-                  <h3 className="text-sm font-semibold text-text">{scenario.name}</h3>
+                  <span className="text-2xl" aria-hidden="true">
+                    {scenario.icon}
+                  </span>
+                  <h3 className="text-sm font-semibold text-text">
+                    {scenario.name}
+                  </h3>
                 </div>
-                <p className="text-sm text-text/50 leading-relaxed">{scenario.description}</p>
+                <p className="text-sm text-text/50 leading-relaxed">
+                  {scenario.description}
+                </p>
               </div>
             ))}
           </div>
@@ -307,7 +396,9 @@ export default function PerspectivePage() {
             href="/discover/intake"
             className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-accent-dark to-accent text-bg font-semibold rounded-xl text-sm transition-all duration-300 hover:shadow-[0_0_20px_rgba(32,178,170,0.3)] hover:scale-[1.02] active:scale-100"
           >
-            {hasIntake ? 'Update Your Perspective Profile' : 'Map Your Perspective'}
+            {hasIntake
+              ? "Update Your Perspective Profile"
+              : "Map Your Perspective"}
             <svg
               className="w-4 h-4"
               viewBox="0 0 24 24"

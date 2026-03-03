@@ -479,12 +479,12 @@ Merge PR to main
 Go to **GitHub → Settings → Secrets and variables → Actions → New repository secret**
 and add these three secrets:
 
-| Secret | Value | How to get it |
-|--------|-------|---------------|
-| `DEPLOY_HOST` | Droplet IP address (e.g., `164.92.xxx.xxx`) | DigitalOcean dashboard → Droplets |
-| `DEPLOY_USER` | `alchymine` | The deploy user created by `deploy-digitalocean.sh` |
-| `DEPLOY_SSH_KEY` | Private SSH key (full PEM content) | Generate with `ssh-keygen -t ed25519`, add public key to droplet's `~alchymine/.ssh/authorized_keys` |
-| `DEPLOY_SSH_PASSPHRASE` | Passphrase for the SSH key | The password you set when generating the key (if any) |
+| Secret                  | Value                                       | How to get it                                                                                        |
+| ----------------------- | ------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| `DEPLOY_HOST`           | Droplet IP address (e.g., `164.92.xxx.xxx`) | DigitalOcean dashboard → Droplets                                                                    |
+| `DEPLOY_USER`           | `alchymine`                                 | The deploy user created by `deploy-digitalocean.sh`                                                  |
+| `DEPLOY_SSH_KEY`        | Private SSH key (full PEM content)          | Generate with `ssh-keygen -t ed25519`, add public key to droplet's `~alchymine/.ssh/authorized_keys` |
+| `DEPLOY_SSH_PASSPHRASE` | Passphrase for the SSH key                  | The password you set when generating the key (if any)                                                |
 
 #### GitHub Environment (optional)
 

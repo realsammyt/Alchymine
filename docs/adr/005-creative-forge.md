@@ -22,11 +22,13 @@ The Creative Forge covers 7 creative domains: writing, visual arts, music, movem
 ## Consequences
 
 **Positive:**
+
 - Neuroscience grounding provides credible, evidence-based creative development.
 - 7-domain coverage supports diverse creative interests within a unified framework.
 - Quality gates prevent the system from replacing human creativity with AI output.
 
 **Negative:**
+
 - 7 domains require broad domain expertise for skill authoring and review.
 - DMN-ECN framework may oversimplify the neuroscience for practical application.
 - Originality verification is inherently difficult and may produce false positives.

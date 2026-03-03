@@ -23,12 +23,14 @@ The Wealth Engine operates as a peer system alongside Expanded Healing, with the
 ## Consequences
 
 **Positive:**
+
 - Deterministic math eliminates LLM hallucination risk for financial figures.
 - Data isolation prevents accidental exposure of financial details to other systems.
 - Quality gates enforce disclaimers and regulatory compliance consistently.
 - Export capability supports user trust through independent verification.
 
 **Negative:**
+
 - Dual-path architecture (deterministic math + LLM framing) adds implementation complexity.
 - Data isolation limits the richness of cross-system wellness insights.
 - Strict no-promotion policy may frustrate users seeking specific product guidance.

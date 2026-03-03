@@ -1,18 +1,18 @@
-'use client';
+"use client";
 
-import { useState, FormEvent } from 'react';
-import { useRouter } from 'next/navigation';
-import Button from '@/components/shared/Button';
+import { useState, FormEvent } from "react";
+import { useRouter } from "next/navigation";
+import Button from "@/components/shared/Button";
 
 const INTENTIONS = [
-  { value: 'career', label: 'Career Growth', icon: '💼' },
-  { value: 'love', label: 'Love & Relationships', icon: '❤️' },
-  { value: 'purpose', label: 'Life Purpose', icon: '🧭' },
-  { value: 'money', label: 'Financial Freedom', icon: '💰' },
-  { value: 'health', label: 'Health & Vitality', icon: '🌿' },
-  { value: 'family', label: 'Family & Legacy', icon: '👨‍👩‍👧‍👦' },
-  { value: 'business', label: 'Business Building', icon: '🚀' },
-  { value: 'legacy', label: 'Legacy & Impact', icon: '🏛️' },
+  { value: "career", label: "Career Growth", icon: "💼" },
+  { value: "love", label: "Love & Relationships", icon: "❤️" },
+  { value: "purpose", label: "Life Purpose", icon: "🧭" },
+  { value: "money", label: "Financial Freedom", icon: "💰" },
+  { value: "health", label: "Health & Vitality", icon: "🌿" },
+  { value: "family", label: "Family & Legacy", icon: "👨‍👩‍👧‍👦" },
+  { value: "business", label: "Business Building", icon: "🚀" },
+  { value: "legacy", label: "Legacy & Impact", icon: "🏛️" },
 ] as const;
 
 interface IntakeFormData {
@@ -26,25 +26,28 @@ interface IntakeFormData {
 export default function IntakePage() {
   const router = useRouter();
   const [formData, setFormData] = useState<IntakeFormData>({
-    fullName: '',
-    birthDate: '',
-    birthTime: '',
-    birthCity: '',
-    intention: '',
+    fullName: "",
+    birthDate: "",
+    birthTime: "",
+    birthCity: "",
+    intention: "",
   });
-  const [errors, setErrors] = useState<Partial<Record<keyof IntakeFormData, string>>>({});
+  const [errors, setErrors] = useState<
+    Partial<Record<keyof IntakeFormData, string>>
+  >({});
 
   function validate(): boolean {
     const newErrors: Partial<Record<keyof IntakeFormData, string>> = {};
 
     if (!formData.fullName.trim() || formData.fullName.trim().length < 2) {
-      newErrors.fullName = 'Please enter your full name (at least 2 characters).';
+      newErrors.fullName =
+        "Please enter your full name (at least 2 characters).";
     }
     if (!formData.birthDate) {
-      newErrors.birthDate = 'Please select your birth date.';
+      newErrors.birthDate = "Please select your birth date.";
     }
     if (!formData.intention) {
-      newErrors.intention = 'Please select your primary intention.';
+      newErrors.intention = "Please select your primary intention.";
     }
 
     setErrors(newErrors);
@@ -56,8 +59,8 @@ export default function IntakePage() {
     if (!validate()) return;
 
     // Store in sessionStorage for the assessment page to pick up
-    sessionStorage.setItem('alchymine_intake', JSON.stringify(formData));
-    router.push('/discover/assessment');
+    sessionStorage.setItem("alchymine_intake", JSON.stringify(formData));
+    router.push("/discover/assessment");
   }
 
   return (
@@ -128,7 +131,7 @@ export default function IntakePage() {
               htmlFor="birthTime"
               className="block text-sm font-medium text-text/80 mb-2"
             >
-              Birth Time{' '}
+              Birth Time{" "}
               <span className="text-text/40 font-normal">
                 (optional — enables Rising sign)
               </span>
@@ -150,7 +153,7 @@ export default function IntakePage() {
               htmlFor="birthCity"
               className="block text-sm font-medium text-text/80 mb-2"
             >
-              Birth City{' '}
+              Birth City{" "}
               <span className="text-text/40 font-normal">
                 (optional — enables house calculations)
               </span>
@@ -185,8 +188,8 @@ export default function IntakePage() {
                   }
                   className={`flex items-center gap-2.5 px-4 py-3 rounded-xl border text-left text-sm transition-all duration-200 ${
                     formData.intention === intent.value
-                      ? 'border-primary/50 bg-primary/10 text-text'
-                      : 'border-white/10 bg-surface text-text/60 hover:border-white/20 hover:bg-surface/80'
+                      ? "border-primary/50 bg-primary/10 text-text"
+                      : "border-white/10 bg-surface text-text/60 hover:border-white/20 hover:bg-surface/80"
                   }`}
                 >
                   <span className="text-lg">{intent.icon}</span>

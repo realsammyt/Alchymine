@@ -186,7 +186,7 @@ class TestHtmlRenderer:
 
     def test_render_is_html(self, sample_report_data: dict) -> None:
         result = render_report_html(sample_report_data)
-        assert "<!DOCTYPE html>" in result
+        assert "<!doctype html>" in result
         assert "<html" in result
         assert "</html>" in result
 
@@ -234,7 +234,7 @@ class TestHtmlRenderer:
     def test_render_empty_report(self) -> None:
         result = render_report_html({"report_id": "empty", "status": "complete"})
         assert isinstance(result, str)
-        assert "<!DOCTYPE html>" in result
+        assert "<!doctype html>" in result
 
 
 class TestHtmlExportEndpoint:
@@ -259,7 +259,7 @@ class TestHtmlExportEndpoint:
     ) -> None:
         _seed_report(engine, "test-123", "complete", sample_result_data)
         response = client.get("/api/v1/reports/test-123/html")
-        assert "<!DOCTYPE html>" in response.text
+        assert "<!doctype html>" in response.text
         assert "Alchymine Report" in response.text
 
     def test_html_export_not_found(self, client: TestClient) -> None:

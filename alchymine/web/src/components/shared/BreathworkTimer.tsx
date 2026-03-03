@@ -1,7 +1,7 @@
-'use client';
+"use client";
 
-import { useState, useEffect, useRef, useCallback } from 'react';
-import Button from '@/components/shared/Button';
+import { useState, useEffect, useRef, useCallback } from "react";
+import Button from "@/components/shared/Button";
 
 // ── Types ─────────────────────────────────────────────────────────
 
@@ -27,21 +27,27 @@ interface BreathworkTimerProps {
 // ── Phase color to CSS hex map ───────────────────────────────────
 
 const COLOR_MAP: Record<string, string> = {
-  'text-accent': '#14b8a6',
-  'text-primary': '#c4a04a',
-  'text-secondary': '#7b2d8e',
+  "text-accent": "#14b8a6",
+  "text-primary": "#c4a04a",
+  "text-secondary": "#7b2d8e",
 };
 
 function getHexColor(colorClass: string): string {
-  return COLOR_MAP[colorClass] || '#c4a04a';
+  return COLOR_MAP[colorClass] || "#c4a04a";
 }
 
 // ── Component ─────────────────────────────────────────────────────
 
-export default function BreathworkTimer({ pattern, onComplete, onStop }: BreathworkTimerProps) {
+export default function BreathworkTimer({
+  pattern,
+  onComplete,
+  onStop,
+}: BreathworkTimerProps) {
   const [isRunning, setIsRunning] = useState(false);
   const [currentPhaseIndex, setCurrentPhaseIndex] = useState(0);
-  const [timeRemaining, setTimeRemaining] = useState(pattern.phases[0].duration);
+  const [timeRemaining, setTimeRemaining] = useState(
+    pattern.phases[0].duration,
+  );
   const [currentCycle, setCurrentCycle] = useState(1);
   const [sessionComplete, setSessionComplete] = useState(false);
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
@@ -104,22 +110,29 @@ export default function BreathworkTimer({ pattern, onComplete, onStop }: Breathw
   const currentPhase = pattern.phases[currentPhaseIndex];
   const phaseColor = getHexColor(currentPhase.color);
   const totalPhaseDuration = currentPhase.duration;
-  const progress = ((totalPhaseDuration - timeRemaining) / totalPhaseDuration) * 100;
+  const progress =
+    ((totalPhaseDuration - timeRemaining) / totalPhaseDuration) * 100;
 
   // Calculate the circle scale based on phase
   const circleScale =
-    currentPhase.label === 'Inhale' ? 0.7 + (progress / 100) * 0.3 :
-    currentPhase.label === 'Exhale' ? 1.0 - (progress / 100) * 0.3 :
-    0.85;
+    currentPhase.label === "Inhale"
+      ? 0.7 + (progress / 100) * 0.3
+      : currentPhase.label === "Exhale"
+        ? 1.0 - (progress / 100) * 0.3
+        : 0.85;
 
   if (sessionComplete) {
     return (
-      <div className="card-surface p-8 text-center" data-testid="breathwork-complete">
-        <div className="text-4xl mb-4">{'\u{2728}'}</div>
+      <div
+        className="card-surface p-8 text-center"
+        data-testid="breathwork-complete"
+      >
+        <div className="text-4xl mb-4">{"\u{2728}"}</div>
         <h2 className="text-2xl font-bold mb-2">Session Complete</h2>
         <p className="text-text/50 mb-2">{pattern.name}</p>
         <p className="text-text/40 text-sm mb-6">
-          {pattern.cycles} cycles completed. Great work nurturing your nervous system.
+          {pattern.cycles} cycles completed. Great work nurturing your nervous
+          system.
         </p>
         <div className="flex gap-3 justify-center">
           <Button variant="primary" onClick={() => startSession()}>
@@ -135,11 +148,17 @@ export default function BreathworkTimer({ pattern, onComplete, onStop }: Breathw
 
   if (!isRunning) {
     return (
-      <div className="card-surface p-8 text-center" data-testid="breathwork-ready">
+      <div
+        className="card-surface p-8 text-center"
+        data-testid="breathwork-ready"
+      >
         <h2 className="text-2xl font-bold mb-2">{pattern.name}</h2>
         <p className="text-text/50 text-sm mb-4">{pattern.description}</p>
         <p className="text-text/40 text-xs mb-6">
-          {pattern.phases.map((ph) => `${ph.label} ${ph.duration}s`).join(' \u2192 ')} {'\u00B7'} {pattern.cycles} cycles
+          {pattern.phases
+            .map((ph) => `${ph.label} ${ph.duration}s`)
+            .join(" \u2192 ")}{" "}
+          {"\u00B7"} {pattern.cycles} cycles
         </p>
         <div className="flex gap-3 justify-center">
           <Button variant="primary" onClick={startSession}>
@@ -154,9 +173,16 @@ export default function BreathworkTimer({ pattern, onComplete, onStop }: Breathw
   }
 
   return (
-    <div className="card-surface p-8 text-center" role="timer" aria-live="polite" data-testid="breathwork-active">
+    <div
+      className="card-surface p-8 text-center"
+      role="timer"
+      aria-live="polite"
+      data-testid="breathwork-active"
+    >
       <h2 className="text-2xl font-bold mb-2">{pattern.name}</h2>
-      <p className="text-text/50 mb-8">Cycle {currentCycle} of {pattern.cycles}</p>
+      <p className="text-text/50 mb-8">
+        Cycle {currentCycle} of {pattern.cycles}
+      </p>
 
       {/* Animated breathing circle */}
       <div className="relative w-52 h-52 mx-auto mb-8">
@@ -165,15 +191,12 @@ export default function BreathworkTimer({ pattern, onComplete, onStop }: Breathw
           className="absolute inset-0 rounded-full"
           style={{
             border: `2px solid ${phaseColor}22`,
-            animation: 'breathPulse 2s ease-in-out infinite',
+            animation: "breathPulse 2s ease-in-out infinite",
           }}
         />
 
         {/* Progress ring (SVG) */}
-        <svg
-          className="absolute inset-0 -rotate-90"
-          viewBox="0 0 208 208"
-        >
+        <svg className="absolute inset-0 -rotate-90" viewBox="0 0 208 208">
           <circle
             cx="104"
             cy="104"
@@ -205,16 +228,13 @@ export default function BreathworkTimer({ pattern, onComplete, onStop }: Breathw
             background: `radial-gradient(circle at center, ${phaseColor}20, ${phaseColor}08)`,
             border: `3px solid ${phaseColor}44`,
             transform: `scale(${circleScale})`,
-            transition: 'transform 0.1s linear',
+            transition: "transform 0.1s linear",
           }}
         />
 
         {/* Center text */}
         <div className="absolute inset-0 flex flex-col items-center justify-center">
-          <span
-            className="text-3xl font-bold"
-            style={{ color: phaseColor }}
-          >
+          <span className="text-3xl font-bold" style={{ color: phaseColor }}>
             {currentPhase.label}
           </span>
           <span className="text-text/60 text-xl mt-2">
@@ -230,9 +250,18 @@ export default function BreathworkTimer({ pattern, onComplete, onStop }: Breathw
             key={idx}
             className="flex items-center gap-1 px-3 py-1 rounded-full text-xs"
             style={{
-              background: idx === currentPhaseIndex ? `${getHexColor(phase.color)}22` : 'transparent',
-              color: idx === currentPhaseIndex ? getHexColor(phase.color) : 'rgba(255,255,255,0.3)',
-              border: idx === currentPhaseIndex ? `1px solid ${getHexColor(phase.color)}44` : '1px solid transparent',
+              background:
+                idx === currentPhaseIndex
+                  ? `${getHexColor(phase.color)}22`
+                  : "transparent",
+              color:
+                idx === currentPhaseIndex
+                  ? getHexColor(phase.color)
+                  : "rgba(255,255,255,0.3)",
+              border:
+                idx === currentPhaseIndex
+                  ? `1px solid ${getHexColor(phase.color)}44`
+                  : "1px solid transparent",
               fontWeight: idx === currentPhaseIndex ? 600 : 400,
             }}
           >
@@ -247,8 +276,15 @@ export default function BreathworkTimer({ pattern, onComplete, onStop }: Breathw
 
       <style jsx>{`
         @keyframes breathPulse {
-          0%, 100% { transform: scale(1); opacity: 0.3; }
-          50% { transform: scale(1.05); opacity: 0.6; }
+          0%,
+          100% {
+            transform: scale(1);
+            opacity: 0.3;
+          }
+          50% {
+            transform: scale(1.05);
+            opacity: 0.6;
+          }
         }
       `}</style>
     </div>

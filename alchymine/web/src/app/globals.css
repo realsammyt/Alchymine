@@ -21,16 +21,16 @@
 
   /* ── Responsive typography scale (mobile-first) ────────────────────────── */
   html {
-    font-size: 14px;          /* Base: mobile */
+    font-size: 14px; /* Base: mobile */
   }
   @media (min-width: 640px) {
     html {
-      font-size: 15px;        /* sm: small tablets */
+      font-size: 15px; /* sm: small tablets */
     }
   }
   @media (min-width: 1024px) {
     html {
-      font-size: 16px;        /* lg: desktop */
+      font-size: 16px; /* lg: desktop */
     }
   }
 
@@ -69,13 +69,19 @@
   /* Gold gradient text */
   .text-gradient-gold {
     @apply bg-clip-text text-transparent;
-    background-image: linear-gradient(135deg, #B8860B, #DAA520, #F0C050, #DAA520);
+    background-image: linear-gradient(
+      135deg,
+      #b8860b,
+      #daa520,
+      #f0c050,
+      #daa520
+    );
   }
 
   /* Purple gradient text */
   .text-gradient-purple {
     @apply bg-clip-text text-transparent;
-    background-image: linear-gradient(135deg, #4A0E4E, #7B2D8E, #9B4DCA);
+    background-image: linear-gradient(135deg, #4a0e4e, #7b2d8e, #9b4dca);
   }
 
   /* Gold shimmer background animation */
@@ -99,23 +105,35 @@
 
   /* Glow effect for interactive elements */
   .glow-gold {
-    box-shadow: 0 0 20px rgba(218, 165, 32, 0.15),
-                0 0 60px rgba(218, 165, 32, 0.05);
+    box-shadow:
+      0 0 20px rgba(218, 165, 32, 0.15),
+      0 0 60px rgba(218, 165, 32, 0.05);
   }
 
   .glow-purple {
-    box-shadow: 0 0 20px rgba(123, 45, 142, 0.15),
-                0 0 60px rgba(123, 45, 142, 0.05);
+    box-shadow:
+      0 0 20px rgba(123, 45, 142, 0.15),
+      0 0 60px rgba(123, 45, 142, 0.05);
   }
 }
 
 @layer utilities {
   /* ── Delay utilities for staggered animations ──────────────────────────── */
-  .animation-delay-100 { animation-delay: 100ms; }
-  .animation-delay-200 { animation-delay: 200ms; }
-  .animation-delay-300 { animation-delay: 300ms; }
-  .animation-delay-400 { animation-delay: 400ms; }
-  .animation-delay-500 { animation-delay: 500ms; }
+  .animation-delay-100 {
+    animation-delay: 100ms;
+  }
+  .animation-delay-200 {
+    animation-delay: 200ms;
+  }
+  .animation-delay-300 {
+    animation-delay: 300ms;
+  }
+  .animation-delay-400 {
+    animation-delay: 400ms;
+  }
+  .animation-delay-500 {
+    animation-delay: 500ms;
+  }
 
   /* ── Touch target utilities ────────────────────────────────────────────── */
   /* WCAG 2.5.8: minimum 44x44 CSS px interactive target size */
@@ -135,10 +153,18 @@
   }
 
   /* ── Safe area inset utilities (notch / home indicator) ────────────────── */
-  .pt-safe { padding-top: env(safe-area-inset-top); }
-  .pb-safe { padding-bottom: env(safe-area-inset-bottom); }
-  .pl-safe { padding-left: env(safe-area-inset-left); }
-  .pr-safe { padding-right: env(safe-area-inset-right); }
+  .pt-safe {
+    padding-top: env(safe-area-inset-top);
+  }
+  .pb-safe {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  .pl-safe {
+    padding-left: env(safe-area-inset-left);
+  }
+  .pr-safe {
+    padding-right: env(safe-area-inset-right);
+  }
   .px-safe {
     padding-left: env(safe-area-inset-left);
     padding-right: env(safe-area-inset-right);
@@ -155,10 +181,18 @@
   }
 
   /* Margin variants */
-  .mt-safe { margin-top: env(safe-area-inset-top); }
-  .mb-safe { margin-bottom: env(safe-area-inset-bottom); }
-  .ml-safe { margin-left: env(safe-area-inset-left); }
-  .mr-safe { margin-right: env(safe-area-inset-right); }
+  .mt-safe {
+    margin-top: env(safe-area-inset-top);
+  }
+  .mb-safe {
+    margin-bottom: env(safe-area-inset-bottom);
+  }
+  .ml-safe {
+    margin-left: env(safe-area-inset-left);
+  }
+  .mr-safe {
+    margin-right: env(safe-area-inset-right);
+  }
 
   /* ── Mobile-first responsive container ─────────────────────────────────── */
   .container-responsive {
@@ -176,18 +210,38 @@
   }
 
   /* ── Responsive text scale utilities ───────────────────────────────────── */
-  .text-responsive-xs  { @apply text-xs sm:text-sm; }
-  .text-responsive-sm  { @apply text-sm sm:text-base; }
-  .text-responsive-base { @apply text-base sm:text-lg; }
-  .text-responsive-lg  { @apply text-lg sm:text-xl lg:text-2xl; }
-  .text-responsive-xl  { @apply text-xl sm:text-2xl lg:text-3xl; }
-  .text-responsive-2xl { @apply text-2xl sm:text-3xl lg:text-4xl; }
-  .text-responsive-3xl { @apply text-3xl sm:text-4xl lg:text-5xl; }
+  .text-responsive-xs {
+    @apply text-xs sm:text-sm;
+  }
+  .text-responsive-sm {
+    @apply text-sm sm:text-base;
+  }
+  .text-responsive-base {
+    @apply text-base sm:text-lg;
+  }
+  .text-responsive-lg {
+    @apply text-lg sm:text-xl lg:text-2xl;
+  }
+  .text-responsive-xl {
+    @apply text-xl sm:text-2xl lg:text-3xl;
+  }
+  .text-responsive-2xl {
+    @apply text-2xl sm:text-3xl lg:text-4xl;
+  }
+  .text-responsive-3xl {
+    @apply text-3xl sm:text-4xl lg:text-5xl;
+  }
 
   /* ── Standalone PWA display mode overrides ──────────────────────────────── */
   @media (display-mode: standalone) {
-    .standalone\:hidden { display: none; }
-    .standalone\:block  { display: block; }
-    .standalone\:pt-safe { padding-top: env(safe-area-inset-top); }
+    .standalone\:hidden {
+      display: none;
+    }
+    .standalone\:block {
+      display: block;
+    }
+    .standalone\:pt-safe {
+      padding-top: env(safe-area-inset-top);
+    }
   }
 }

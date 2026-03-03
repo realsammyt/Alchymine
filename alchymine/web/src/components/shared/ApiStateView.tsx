@@ -1,6 +1,6 @@
-'use client';
+"use client";
 
-import Button from './Button';
+import Button from "./Button";
 
 interface ApiStateViewProps {
   loading: boolean;
@@ -21,15 +21,19 @@ export default function ApiStateView({
   loading,
   error,
   empty = false,
-  loadingText = 'Loading...',
-  emptyText = 'No data available yet. Complete your profile to see personalized results.',
-  emptyIcon = '\u{1F4CB}',
+  loadingText = "Loading...",
+  emptyText = "No data available yet. Complete your profile to see personalized results.",
+  emptyIcon = "\u{1F4CB}",
   onRetry,
   children,
 }: ApiStateViewProps) {
   if (loading) {
     return (
-      <div className="card-surface p-8 text-center" role="status" aria-live="polite">
+      <div
+        className="card-surface p-8 text-center"
+        role="status"
+        aria-live="polite"
+      >
         <div className="w-8 h-8 rounded-full border-2 border-primary border-t-transparent animate-spin mx-auto mb-3" />
         <p className="text-text/50 text-sm">{loadingText}</p>
       </div>
@@ -40,8 +44,11 @@ export default function ApiStateView({
     return (
       <div className="card-surface p-6 border-l-2 border-red-400/30">
         <div className="flex items-start gap-3">
-          <span className="text-red-400 text-lg flex-shrink-0" aria-hidden="true">
-            {'\u26A0\uFE0F'}
+          <span
+            className="text-red-400 text-lg flex-shrink-0"
+            aria-hidden="true"
+          >
+            {"\u26A0\uFE0F"}
           </span>
           <div className="flex-1">
             <p className="text-sm font-medium text-text/80 mb-1">

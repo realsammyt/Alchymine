@@ -15,6 +15,7 @@ Users of personal-development tools are especially privacy-conscious. Any percep
 All user data is stored locally on the user's device or on operator-controlled infrastructure. There is no Alchymine-operated cloud backend that holds user data.
 
 Specific measures:
+
 - **Encryption at rest:** AES-256 encryption for all persisted user data, including SQLite databases and file exports.
 - **Zero telemetry:** No analytics, usage tracking, or crash reporting that transmits user data. Operators may opt into anonymous aggregate metrics on their own infrastructure.
 - **Self-hosted deployment:** The reference deployment uses Docker Compose on operator infrastructure. No managed SaaS offering.
@@ -24,12 +25,14 @@ Specific measures:
 ## Consequences
 
 **Positive:**
+
 - Maximum privacy protection for sensitive personal, financial, and psychological data.
 - No regulatory exposure from holding user data centrally.
 - Users retain full ownership and control of their information.
 - Simplified compliance posture for operators.
 
 **Negative:**
+
 - No cross-device sync without operator-provided infrastructure.
 - Operators bear full responsibility for backups and disaster recovery.
 - Aggregate analytics for product improvement require explicit operator opt-in.
