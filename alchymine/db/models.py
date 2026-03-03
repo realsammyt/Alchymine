@@ -81,6 +81,12 @@ class User(Base):
     email: Mapped[str | None] = mapped_column(String(255), unique=True, index=True, nullable=True)
     password_hash: Mapped[str | None] = mapped_column(String(255), nullable=True)
 
+    # Password reset
+    password_reset_token: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    password_reset_expires: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+
     # Cross-system fields
     active_plan_day: Mapped[int | None] = mapped_column(Integer, nullable=True)
     systems_engaged: Mapped[dict | None] = mapped_column(JSONColumn, nullable=True)
