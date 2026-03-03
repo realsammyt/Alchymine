@@ -53,6 +53,9 @@ export default function RootLayout({
           <div className="lg:ml-64 pt-14 pb-16 lg:pt-0 lg:pb-0 min-h-screen">
             {children}
           </div>
+          <footer className="lg:ml-64 pb-16 lg:pb-0 text-center py-2 text-xs text-text/30">
+            v{process.env.NEXT_PUBLIC_APP_VERSION}
+          </footer>
         </Providers>
       </body>
     </html>
