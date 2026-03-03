@@ -183,7 +183,19 @@ jobs:
             cd /home/alchymine/Alchymine
 
             # Fetch latest code and checkout the release tag
-            git fetch --tags
+            # Retry up to 3 times to handle transient GitHub 500 errors
+            for attempt in 1 2 3; do
+              echo "git fetch --tags (attempt ${attempt}/3)..."
+              if git fetch --tags; then
+                break
+              fi
+              if [ "$attempt" = "3" ]; then
+                echo "ERROR: git fetch failed after 3 attempts"
+                exit 1
+              fi
+              echo "Retrying in 10s..."
+              sleep 10
+            done
             git checkout "${TAG}"
 
             # Verify production env file exists
