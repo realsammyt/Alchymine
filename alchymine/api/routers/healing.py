@@ -6,9 +6,10 @@ selection, and crisis detection. All calculations are deterministic.
 
 from __future__ import annotations
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 
+from alchymine.api.auth import get_current_user
 from alchymine.engine.healing import (
     MODALITY_REGISTRY,
     BreathworkPattern,
@@ -181,6 +182,7 @@ def _crisis_to_response(result: EngineCrisisResponse | None) -> CrisisDetectResp
 async def list_modalities(
     category: str | None = Query(None, description="Filter by category"),
     evidence_level: str | None = Query(None, description="Filter by evidence level"),
+    current_user: dict = Depends(get_current_user),
 ) -> ModalityListResponse:
     """List all healing modalities with optional filters.
 
@@ -223,7 +225,10 @@ async def list_modalities(
 
 
 @router.post("/healing/match")
-async def match_healing_modalities(request: MatchRequest) -> MatchResponse:
+async def match_healing_modalities(
+    request: MatchRequest,
+    current_user: dict = Depends(get_current_user),
+) -> MatchResponse:
     """Match healing modalities for a user profile.
 
     Uses the deterministic matching engine to recommend modalities based
@@ -260,6 +265,7 @@ async def get_breathwork(
         PracticeDifficulty.FOUNDATION,
         description="Maximum difficulty level",
     ),
+    current_user: dict = Depends(get_current_user),
 ) -> BreathworkResponse:
     """Get a breathwork pattern for a given intention and difficulty.
 
@@ -273,7 +279,10 @@ async def get_breathwork(
 
 
 @router.post("/healing/crisis/detect")
-async def detect_crisis_endpoint(request: CrisisDetectRequest) -> CrisisDetectResponse:
+async def detect_crisis_endpoint(
+    request: CrisisDetectRequest,
+    current_user: dict = Depends(get_current_user),
+) -> CrisisDetectResponse:
     """Detect crisis indicators in free-text input.
 
     Scans the provided text for crisis-related keywords and returns

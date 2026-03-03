@@ -7,9 +7,10 @@ systems through deterministic mapping logic.
 
 from __future__ import annotations
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 from pydantic import BaseModel, Field
 
+from alchymine.api.auth import get_current_user
 from alchymine.engine.integration.bridges import (
     BridgeInsight,
     archetype_to_creative_style,
@@ -95,42 +96,60 @@ def _insight_to_response(insight: BridgeInsight) -> BridgeInsightResponse:
 
 
 @router.post("/integration/archetype-creative")
-async def get_archetype_creative(request: ArchetypeCreativeRequest) -> BridgeInsightResponse:
+async def get_archetype_creative(
+    request: ArchetypeCreativeRequest,
+    current_user: dict = Depends(get_current_user),
+) -> BridgeInsightResponse:
     """XS-01: Map archetype to creative style recommendations."""
     insight = archetype_to_creative_style(request.archetype)
     return _insight_to_response(insight)
 
 
 @router.post("/integration/shadow-block")
-async def get_shadow_block(request: ShadowBlockRequest) -> BridgeInsightResponse:
+async def get_shadow_block(
+    request: ShadowBlockRequest,
+    current_user: dict = Depends(get_current_user),
+) -> BridgeInsightResponse:
     """XS-02: Map shadow archetype to creative block patterns."""
     insight = shadow_to_block_mapping(request.shadow_archetype)
     return _insight_to_response(insight)
 
 
 @router.post("/integration/cycle-timing")
-async def get_cycle_timing(request: CycleTimingRequest) -> BridgeInsightResponse:
+async def get_cycle_timing(
+    request: CycleTimingRequest,
+    current_user: dict = Depends(get_current_user),
+) -> BridgeInsightResponse:
     """XS-03: Map numerology cycle to timing recommendations."""
     insight = cycle_to_timing(request.personal_year)
     return _insight_to_response(insight)
 
 
 @router.post("/integration/wealth-creative")
-async def get_wealth_creative(request: WealthCreativeRequest) -> BridgeInsightResponse:
+async def get_wealth_creative(
+    request: WealthCreativeRequest,
+    current_user: dict = Depends(get_current_user),
+) -> BridgeInsightResponse:
     """XS-04: Find wealth-creative alignment."""
     insight = wealth_creative_alignment(request.wealth_archetype, request.creative_style)
     return _insight_to_response(insight)
 
 
 @router.post("/integration/healing-perspective")
-async def get_healing_perspective(request: HealingPerspectiveRequest) -> BridgeInsightResponse:
+async def get_healing_perspective(
+    request: HealingPerspectiveRequest,
+    current_user: dict = Depends(get_current_user),
+) -> BridgeInsightResponse:
     """XS-05: Sequence healing before perspective work."""
     insight = healing_to_perspective_sequence(request.healing_modality, request.kegan_stage)
     return _insight_to_response(insight)
 
 
 @router.post("/integration/coherence")
-async def check_system_coherence(request: CoherenceRequest) -> CoherenceResponse:
+async def check_system_coherence(
+    request: CoherenceRequest,
+    current_user: dict = Depends(get_current_user),
+) -> CoherenceResponse:
     """XS-06: Check coherence across active system recommendations."""
     result = check_coherence(request.active_recommendations)
     return CoherenceResponse(
@@ -142,6 +161,7 @@ async def check_system_coherence(request: CoherenceRequest) -> CoherenceResponse
 @router.post("/integration/synthesize")
 async def synthesize_user_profile(
     request: ProfileSynthesisRequest,
+    current_user: dict = Depends(get_current_user),
 ) -> list[BridgeInsightResponse]:
     """XS-07: Synthesize cross-system insights from user profile."""
     insights = synthesize_profile(

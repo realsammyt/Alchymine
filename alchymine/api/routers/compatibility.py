@@ -9,9 +9,10 @@ from __future__ import annotations
 
 import math
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 from pydantic import BaseModel, Field
 
+from alchymine.api.auth import get_current_user
 from alchymine.engine.profile import ArchetypeType
 
 router = APIRouter()
@@ -311,7 +312,10 @@ def _generate_summary(overall: float, breakdown: CompatibilityBreakdown) -> str:
 
 
 @router.post("/compatibility")
-async def compare_profiles(request: CompatibilityRequest) -> CompatibilityResponse:
+async def compare_profiles(
+    request: CompatibilityRequest,
+    current_user: dict = Depends(get_current_user),
+) -> CompatibilityResponse:
     """Compare two profiles for compatibility.
 
     Analyzes numerology life path compatibility, Jungian archetype alignment,

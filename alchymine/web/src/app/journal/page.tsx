@@ -8,6 +8,7 @@ import {
   JournalEntry,
   JournalStatsResponse,
 } from "@/lib/api";
+import { useAuth } from "@/lib/AuthContext";
 
 const SYSTEMS = [
   "intelligence",
@@ -23,9 +24,8 @@ const ENTRY_TYPES = [
   "intention",
   "freeform",
 ];
-const USER_ID = "default-user";
-
 export default function JournalPage() {
+  const { user } = useAuth();
   const [entries, setEntries] = useState<JournalEntry[]>([]);
   const [stats, setStats] = useState<JournalStatsResponse | null>(null);
   const [loading, setLoading] = useState(true);
@@ -49,14 +49,15 @@ export default function JournalPage() {
   const [selectedEntry, setSelectedEntry] = useState<JournalEntry | null>(null);
 
   const fetchEntries = useCallback(async () => {
+    if (!user?.id) return;
     try {
       setLoading(true);
       const [journalData, statsData] = await Promise.all([
-        getJournalEntries(USER_ID, {
+        getJournalEntries(user.id, {
           system: filterSystem || undefined,
           entryType: filterType || undefined,
         }),
-        getJournalStats(USER_ID),
+        getJournalStats(user.id),
       ]);
       setEntries(journalData.entries);
       setStats(statsData);
@@ -66,7 +67,7 @@ export default function JournalPage() {
     } finally {
       setLoading(false);
     }
-  }, [filterSystem, filterType]);
+  }, [filterSystem, filterType, user?.id]);
 
   useEffect(() => {
     fetchEntries();
@@ -74,12 +75,12 @@ export default function JournalPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formTitle.trim() || !formContent.trim()) return;
+    if (!formTitle.trim() || !formContent.trim() || !user?.id) return;
 
     setSubmitting(true);
     try {
       await createJournalEntry({
-        user_id: USER_ID,
+        user_id: user.id,
         title: formTitle.trim(),
         content: formContent.trim(),
         system: formSystem,
@@ -122,6 +123,10 @@ export default function JournalPage() {
     };
     return colors[system] || "#6b7280";
   };
+
+  if (!user) {
+    return null;
+  }
 
   return (
     <div style={{ maxWidth: 960, margin: "0 auto", padding: "2rem 1rem" }}>

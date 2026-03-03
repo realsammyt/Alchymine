@@ -132,11 +132,11 @@ class TestErrorHandlerMiddleware:
         assert data["status_code"] == 500
         assert "detail" in data
 
-    def test_error_detail_contains_exception_message(self, client):
-        """Error detail includes the exception's message text."""
+    def test_error_detail_is_generic_safe_message(self, client):
+        """Error detail is a generic safe message (never exposes internal exception text)."""
         response = client.get("/crash")
         data = response.json()
-        assert "Something went wrong" in data["detail"]
+        assert "unexpected error" in data["detail"].lower()
 
     def test_error_response_is_json_content_type(self, client):
         """Error response has application/json content type."""
@@ -408,8 +408,8 @@ class TestRateLimitSlidingWindow:
         loop.run_until_complete(_check_ttl())
         loop.close()
 
-    def test_key_format_includes_ip_and_window(self, fake_redis):
-        """Redis keys follow the format rate_limit:{ip}:{window}."""
+    def test_key_format_includes_ip_bucket_and_window(self, fake_redis):
+        """Redis keys follow the format rate_limit:{ip}:{bucket}:{window}."""
         app = _make_rate_limit_app(max_requests=100, window_seconds=60)
         with _patch_redis(fake_redis):
             client = TestClient(app)
@@ -423,8 +423,8 @@ class TestRateLimitSlidingWindow:
             key = keys[0]
             parts = key.split(":")
             assert parts[0] == "rate_limit"
-            # Should have 3 parts: rate_limit, ip, window
-            assert len(parts) == 3
+            # Should have 4 parts: rate_limit, ip, bucket, window
+            assert len(parts) == 4
 
         loop.run_until_complete(_check_key())
         loop.close()

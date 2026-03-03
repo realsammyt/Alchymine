@@ -45,7 +45,8 @@ self.addEventListener("fetch", (event) => {
         .then((response) => {
           const clone = response.clone();
           caches.open(CACHE_NAME).then((cache) => {
-            if (event.request.method === "GET") {
+            // Only cache unauthenticated GET responses
+            if (event.request.method === "GET" && !event.request.headers.get("Authorization")) {
               cache.put(event.request, clone);
             }
           });
@@ -91,15 +92,19 @@ self.addEventListener("push", (event) => {
 // Notification click handler
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
-  const url = event.notification.data?.url || "/";
+  const rawUrl = event.notification.data?.url || "/";
+  // Only allow same-origin URLs
+  const targetUrl = rawUrl.startsWith("/")
+    ? new URL(rawUrl, self.location.origin).href
+    : self.location.origin + "/";
   event.waitUntil(
     self.clients.matchAll({ type: "window" }).then((clients) => {
       for (const client of clients) {
-        if (client.url.includes(url) && "focus" in client) {
+        if (client.url.includes(targetUrl) && "focus" in client) {
           return client.focus();
         }
       }
-      return self.clients.openWindow(url);
+      return self.clients.openWindow(targetUrl);
     }),
   );
 });

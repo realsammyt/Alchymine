@@ -9,9 +9,10 @@ from __future__ import annotations
 
 from collections.abc import AsyncGenerator
 
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Depends, Query
 from fastapi.responses import StreamingResponse
 
+from alchymine.api.auth import get_current_user
 from alchymine.llm.client import LLMClient
 
 router = APIRouter()
@@ -47,6 +48,7 @@ async def _narrative_event_stream(
 async def stream_narrative(
     prompt: str = Query(..., description="The prompt to generate a narrative for"),
     system_prompt: str = Query("", description="Optional system-level instructions"),
+    current_user: dict = Depends(get_current_user),
 ) -> StreamingResponse:
     """Stream a narrative LLM response as Server-Sent Events.
 

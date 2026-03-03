@@ -9,9 +9,10 @@ from __future__ import annotations
 
 from datetime import date
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
+from alchymine.api.auth import get_current_user
 from alchymine.engine.biorhythm import (
     EVIDENCE_RATING,
     METHODOLOGY_NOTE,
@@ -87,7 +88,10 @@ class BiorhythmCompatibilityResponse(BaseModel):
 
 
 @router.post("/biorhythm/calculate", response_model=BiorhythmCalculateResponse)
-async def calculate(request: BiorhythmCalculateRequest) -> BiorhythmCalculateResponse:
+async def calculate(
+    request: BiorhythmCalculateRequest,
+    current_user: dict = Depends(get_current_user),
+) -> BiorhythmCalculateResponse:
     """Calculate biorhythm values for a single day.
 
     Deterministic calculation — no AI involved.
@@ -102,7 +106,10 @@ async def calculate(request: BiorhythmCalculateRequest) -> BiorhythmCalculateRes
 
 
 @router.post("/biorhythm/range", response_model=BiorhythmRangeResponse)
-async def range_calculation(request: BiorhythmRangeRequest) -> BiorhythmRangeResponse:
+async def range_calculation(
+    request: BiorhythmRangeRequest,
+    current_user: dict = Depends(get_current_user),
+) -> BiorhythmRangeResponse:
     """Calculate biorhythm values for a date range (charting).
 
     Deterministic calculation — no AI involved.
@@ -126,6 +133,7 @@ async def range_calculation(request: BiorhythmRangeRequest) -> BiorhythmRangeRes
 @router.post("/biorhythm/compatibility", response_model=BiorhythmCompatibilityResponse)
 async def compatibility(
     request: BiorhythmCompatibilityRequest,
+    current_user: dict = Depends(get_current_user),
 ) -> BiorhythmCompatibilityResponse:
     """Compare two people's biorhythm cycles on a given date.
 

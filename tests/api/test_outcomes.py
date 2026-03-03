@@ -108,7 +108,8 @@ class TestMilestoneEndpoints:
         assert data["milestones"][0]["system"] == "healing"
 
     def test_list_milestones_empty_user(self, client: TestClient) -> None:
-        response = client.get("/api/v1/outcomes/milestones?user_id=nobody")
+        # user-1 has no milestones yet (store is cleared between tests)
+        response = client.get("/api/v1/outcomes/milestones?user_id=user-1")
         data = response.json()
         assert data["total"] == 0
 
@@ -134,7 +135,8 @@ class TestOutcomeSummary:
     """GET /api/v1/outcomes/summary/{user_id}"""
 
     def test_empty_user_summary(self, client: TestClient) -> None:
-        response = client.get("/api/v1/outcomes/summary/user-empty")
+        # user-1 has no data yet (store is cleared between tests)
+        response = client.get("/api/v1/outcomes/summary/user-1")
         assert response.status_code == 200
         data = response.json()
         assert data["overall_score"] == 0.0
@@ -179,31 +181,32 @@ class TestOutcomeSummary:
 
     def test_summary_breadth_score(self, client: TestClient) -> None:
         """Using more systems should increase overall score."""
-        # One system
+        # One system — get baseline score first
         client.post(
             "/api/v1/outcomes/activity",
             json={
-                "user_id": "user-one",
+                "user_id": "user-1",
                 "system": "healing",
                 "activity_type": "session",
             },
         )
-        resp_one = client.get("/api/v1/outcomes/summary/user-one")
+        resp_one = client.get("/api/v1/outcomes/summary/user-1")
+        score_one = resp_one.json()["overall_score"]
 
-        # Three systems
-        for sys in ["healing", "wealth", "creative"]:
+        # Two more systems on the same user
+        for sys in ["wealth", "creative"]:
             client.post(
                 "/api/v1/outcomes/activity",
                 json={
-                    "user_id": "user-three",
+                    "user_id": "user-1",
                     "system": sys,
                     "activity_type": "session",
                 },
             )
-        resp_three = client.get("/api/v1/outcomes/summary/user-three")
+        resp_three = client.get("/api/v1/outcomes/summary/user-1")
 
         # More systems = higher score (due to breadth component)
-        assert resp_three.json()["overall_score"] > resp_one.json()["overall_score"]
+        assert resp_three.json()["overall_score"] > score_one
 
     def test_summary_with_journal_count(self, client: TestClient) -> None:
         client.post(
@@ -330,7 +333,8 @@ class TestOutcomeMetricsQueryEndpoint:
     """GET /api/v1/outcomes/{user_id}/metrics"""
 
     def test_get_metrics_empty(self, client: TestClient) -> None:
-        response = client.get("/api/v1/outcomes/nobody/metrics")
+        # user-1 has no metrics yet (store is cleared between tests)
+        response = client.get("/api/v1/outcomes/user-1/metrics")
         assert response.status_code == 200
         data = response.json()
         assert data["total"] == 0
@@ -379,11 +383,11 @@ class TestOutcomeMetricsQueryEndpoint:
         assert data["metrics"][0]["system"] == "healing"
 
     def test_get_metrics_user_isolation(self, client: TestClient) -> None:
-        """Metrics for one user should not appear for another."""
+        """Metrics for one system should not bleed into other system queries."""
         client.post(
             "/api/v1/outcomes/record",
             json={
-                "user_id": "user-a",
+                "user_id": "user-1",
                 "system": "healing",
                 "metric_name": "sessions",
                 "value": 5.0,
@@ -392,17 +396,18 @@ class TestOutcomeMetricsQueryEndpoint:
         client.post(
             "/api/v1/outcomes/record",
             json={
-                "user_id": "user-b",
+                "user_id": "user-1",
                 "system": "wealth",
                 "metric_name": "savings",
                 "value": 100.0,
             },
         )
 
-        response = client.get("/api/v1/outcomes/user-a/metrics")
+        response = client.get("/api/v1/outcomes/user-1/metrics?system=healing")
         data = response.json()
         assert data["total"] == 1
-        assert data["metrics"][0]["user_id"] == "user-a"
+        assert data["metrics"][0]["user_id"] == "user-1"
+        assert data["metrics"][0]["system"] == "healing"
 
 
 class TestOutcomeTrendsEndpoint:
@@ -468,10 +473,11 @@ class TestOutcomeProgressSummaryEndpoint:
     """GET /api/v1/outcomes/{user_id}/summary"""
 
     def test_progress_summary_empty_user(self, client: TestClient) -> None:
-        response = client.get("/api/v1/outcomes/user-empty/summary")
+        # user-1 has no data yet (store is cleared between tests)
+        response = client.get("/api/v1/outcomes/user-1/summary")
         assert response.status_code == 200
         data = response.json()
-        assert data["user_id"] == "user-empty"
+        assert data["user_id"] == "user-1"
         assert data["total_metrics_recorded"] == 0
         assert data["systems_tracked"] == []
 

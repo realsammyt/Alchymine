@@ -6,9 +6,10 @@ generation, and project suggestions. All calculations are deterministic.
 
 from __future__ import annotations
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
+from alchymine.api.auth import get_current_user
 from alchymine.engine.creative import (
     assess_guilford,
     generate_style_fingerprint,
@@ -115,7 +116,10 @@ class ProjectListResponse(BaseModel):
 
 
 @router.post("/creative/assessment")
-async def run_guilford_assessment(request: GuilfordAssessmentRequest) -> GuilfordScoresResponse:
+async def run_guilford_assessment(
+    request: GuilfordAssessmentRequest,
+    current_user: dict = Depends(get_current_user),
+) -> GuilfordScoresResponse:
     """Run a Guilford divergent thinking assessment.
 
     Scores six components of divergent thinking from assessment responses.
@@ -137,7 +141,10 @@ async def run_guilford_assessment(request: GuilfordAssessmentRequest) -> Guilfor
 
 
 @router.post("/creative/style")
-async def get_style_fingerprint(request: StyleFingerprintRequest) -> StyleFingerprintResponse:
+async def get_style_fingerprint(
+    request: StyleFingerprintRequest,
+    current_user: dict = Depends(get_current_user),
+) -> StyleFingerprintResponse:
     """Generate a combined creative style fingerprint.
 
     Merges Guilford scores and Creative DNA into a unified style profile
@@ -168,7 +175,10 @@ async def get_style_fingerprint(request: StyleFingerprintRequest) -> StyleFinger
 
 
 @router.post("/creative/projects")
-async def suggest_creative_projects(request: ProjectSuggestRequest) -> ProjectListResponse:
+async def suggest_creative_projects(
+    request: ProjectSuggestRequest,
+    current_user: dict = Depends(get_current_user),
+) -> ProjectListResponse:
     """Suggest creative projects based on style and skill level.
 
     Uses the dominant Guilford components and skill level to generate

@@ -45,7 +45,7 @@ class Settings(BaseSettings):
     jwt_algorithm: str = "HS256"
     access_token_expire_minutes: int = 30
     refresh_token_expire_days: int = 7
-    signup_promo_code: str = "alchyours"
+    signup_promo_code: str = ""
 
     # ── Database ─────────────────────────────────────────────────────────
     database_url: str = "postgresql+asyncpg://alchymine:alchymine@localhost:5432/alchymine"
@@ -62,6 +62,9 @@ class Settings(BaseSettings):
     celery_result_backend: str = "redis://localhost:6379/2"
     celery_always_eager: bool = False
 
+    # ── Encryption ───────────────────────────────────────────────────────
+    alchymine_encryption_key: str = ""
+
     # ── Validators ───────────────────────────────────────────────────────
 
     @field_validator("allowed_origins", mode="before")
@@ -75,12 +78,33 @@ class Settings(BaseSettings):
     @field_validator("jwt_secret_key")
     @classmethod
     def validate_jwt_secret(cls, v: str, info: object) -> str:  # noqa: ANN001
-        """Reject the default dev secret when running in production."""
-        # ``info.data`` contains previously-validated fields.  ``environment``
-        # is declared before ``jwt_secret_key`` so it will be present.
-        data: dict = getattr(info, "data", {})  # type: ignore[assignment]
-        if data.get("environment") == "production" and v == "dev-secret-key-change-in-production":
-            raise ValueError("JWT_SECRET_KEY must be changed from the default value in production")
+        """Reject the default dev secret and require a minimum length in all environments."""
+        if v == "dev-secret-key-change-in-production" or len(v) < 32:
+            raise ValueError(
+                "JWT_SECRET_KEY must be set to a secure value (min 32 chars). "
+                "Generate one with: openssl rand -hex 32"
+            )
+        return v
+
+    @field_validator("signup_promo_code")
+    @classmethod
+    def validate_promo_code(cls, v: str) -> str:
+        """Require a non-empty promo code of at least 6 characters."""
+        if not v or len(v) < 6:
+            raise ValueError("SIGNUP_PROMO_CODE must be set to a value of at least 6 characters")
+        return v
+
+    @field_validator("alchymine_encryption_key")
+    @classmethod
+    def validate_encryption_key(cls, v: str, info: object) -> str:
+        """Require encryption key in production."""
+        data: dict = getattr(info, "data", {})
+        env = data.get("environment", "development")
+        if env == "production" and not v:
+            raise ValueError(
+                "ALCHYMINE_ENCRYPTION_KEY must be set in production. "
+                "Generate one with: python -c 'from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())'"
+            )
         return v
 
 

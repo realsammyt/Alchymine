@@ -9,9 +9,10 @@ from __future__ import annotations
 
 from typing import Any
 
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 
+from alchymine.api.auth import get_current_user
 from alchymine.outcomes.tracker import (
     MilestoneRecord,
     OutcomeSummary,
@@ -113,12 +114,17 @@ class ProgressSummaryResponse(BaseModel):
 
 
 @router.post("/outcomes/milestones", status_code=201)
-async def create_milestone(req: MilestoneRequest) -> MilestoneRecord:
+async def create_milestone(
+    req: MilestoneRequest,
+    current_user: dict = Depends(get_current_user),
+) -> MilestoneRecord:
     """Record a milestone completion or creation.
 
     Milestones represent significant achievements within any of the
     five Alchymine systems. They contribute to the overall progress score.
     """
+    if current_user["sub"] != req.user_id:
+        raise HTTPException(status_code=403, detail="Access denied")
     return record_milestone(
         user_id=req.user_id,
         system=req.system,
@@ -132,19 +138,27 @@ async def create_milestone(req: MilestoneRequest) -> MilestoneRecord:
 async def list_milestones(
     user_id: str = Query(..., description="User ID"),
     system: str | None = Query(None, description="Optional system filter"),
+    current_user: dict = Depends(get_current_user),
 ) -> MilestoneListResponse:
     """List milestones for a user, optionally filtered by system."""
+    if current_user["sub"] != user_id:
+        raise HTTPException(status_code=403, detail="Access denied")
     records = get_milestones(user_id, system)
     return MilestoneListResponse(milestones=records, total=len(records))
 
 
 @router.post("/outcomes/activity", status_code=201)
-async def log_activity(req: ActivityRequest) -> dict[str, str]:
+async def log_activity(
+    req: ActivityRequest,
+    current_user: dict = Depends(get_current_user),
+) -> dict[str, str]:
     """Log a user activity event for engagement tracking.
 
     Activities are lightweight events (sessions, assessments, practices)
     that contribute to the user's engagement score in their outcome summary.
     """
+    if current_user["sub"] != req.user_id:
+        raise HTTPException(status_code=403, detail="Access denied")
     record_activity(
         user_id=req.user_id,
         system=req.system,
@@ -159,6 +173,7 @@ async def get_outcome_summary(
     user_id: str,
     journal_count: int = Query(0, ge=0, description="Number of journal entries"),
     active_plan_day: int | None = Query(None, ge=0, le=90, description="Current plan day"),
+    current_user: dict = Depends(get_current_user),
 ) -> OutcomeSummary:
     """Calculate a cross-system outcome summary for a user.
 
@@ -170,6 +185,8 @@ async def get_outcome_summary(
 
     All calculations are deterministic and auditable.
     """
+    if current_user["sub"] != user_id:
+        raise HTTPException(status_code=403, detail="Access denied")
     return calculate_outcome_summary(
         user_id=user_id,
         journal_count=journal_count,
@@ -181,7 +198,10 @@ async def get_outcome_summary(
 
 
 @router.post("/outcomes/record", status_code=201)
-async def record_outcome_metric(req: MetricRecordRequest) -> MetricResponse:
+async def record_outcome_metric(
+    req: MetricRecordRequest,
+    current_user: dict = Depends(get_current_user),
+) -> MetricResponse:
     """Record an outcome metric measurement.
 
     Metrics are quantitative data points that track user progress
@@ -190,6 +210,8 @@ async def record_outcome_metric(req: MetricRecordRequest) -> MetricResponse:
 
     All metric data is deterministic and auditable.
     """
+    if current_user["sub"] != req.user_id:
+        raise HTTPException(status_code=403, detail="Access denied")
     tracker = get_outcome_tracker()
     metric = tracker.record_metric(
         user_id=req.user_id,
@@ -214,12 +236,15 @@ async def get_user_metrics(
     system: str | None = Query(None, description="Optional system filter"),
     start_date: str | None = Query(None, description="Start date (ISO format)"),
     end_date: str | None = Query(None, description="End date (ISO format)"),
+    current_user: dict = Depends(get_current_user),
 ) -> MetricsListResponse:
     """Query outcome metrics for a user.
 
     Supports optional filtering by system and date range.
     Returns metrics sorted by timestamp (ascending).
     """
+    if current_user["sub"] != user_id:
+        raise HTTPException(status_code=403, detail="Access denied")
     tracker = get_outcome_tracker()
     metrics = tracker.get_metrics(
         user_id=user_id,
@@ -247,6 +272,7 @@ async def get_user_metrics(
 async def get_user_trends(
     user_id: str,
     system: str = Query(..., description="System to analyze"),
+    current_user: dict = Depends(get_current_user),
 ) -> TrendResponse:
     """Calculate trend analysis for a user's metrics in a specific system.
 
@@ -255,6 +281,8 @@ async def get_user_trends(
 
     All calculations are deterministic and auditable.
     """
+    if current_user["sub"] != user_id:
+        raise HTTPException(status_code=403, detail="Access denied")
     tracker = get_outcome_tracker()
     trend = tracker.calculate_trends(user_id=user_id, system=system)
     return TrendResponse(
@@ -270,6 +298,7 @@ async def get_user_progress_summary(
     user_id: str,
     journal_count: int = Query(0, ge=0, description="Number of journal entries"),
     active_plan_day: int | None = Query(None, ge=0, le=90, description="Current plan day"),
+    current_user: dict = Depends(get_current_user),
 ) -> ProgressSummaryResponse:
     """Generate a comprehensive progress summary across all systems.
 
@@ -278,6 +307,8 @@ async def get_user_progress_summary(
 
     All calculations are deterministic and auditable.
     """
+    if current_user["sub"] != user_id:
+        raise HTTPException(status_code=403, detail="Access denied")
     tracker = get_outcome_tracker()
     summary = tracker.get_progress_summary(
         user_id=user_id,

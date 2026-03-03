@@ -262,7 +262,7 @@ class TestListUserReports:
 
     def test_list_empty(self, client: TestClient) -> None:
         """Listing reports for a user with none should return empty list."""
-        response = client.get("/api/v1/reports/user/no-such-user")
+        response = client.get("/api/v1/reports/user/user-1")
         assert response.status_code == 200
         data = response.json()
         assert data["reports"] == []
@@ -270,7 +270,7 @@ class TestListUserReports:
 
     def test_list_with_pagination_params(self, client: TestClient) -> None:
         """Pagination params should be reflected in the response."""
-        response = client.get("/api/v1/reports/user/some-user?skip=5&limit=10")
+        response = client.get("/api/v1/reports/user/user-1?skip=5&limit=10")
         assert response.status_code == 200
         data = response.json()
         assert data["skip"] == 5

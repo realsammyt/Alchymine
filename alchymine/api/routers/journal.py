@@ -11,8 +11,10 @@ import uuid
 from datetime import UTC, datetime
 from typing import Any
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
+
+from alchymine.api.auth import get_current_user
 
 router = APIRouter()
 
@@ -91,12 +93,17 @@ class JournalStatsResponse(BaseModel):
 
 
 @router.post("/journal", status_code=201)
-async def create_journal_entry(entry: JournalEntryCreate) -> JournalEntryResponse:
+async def create_journal_entry(
+    entry: JournalEntryCreate,
+    current_user: dict = Depends(get_current_user),
+) -> JournalEntryResponse:
     """Create a new journal entry.
 
     Supports reflections, cognitive reframes, gratitude notes,
     milestone celebrations, and system-specific insights.
     """
+    if current_user["sub"] != entry.user_id:
+        raise HTTPException(status_code=403, detail="Access denied")
     now = datetime.now(UTC).isoformat()
     entry_id = str(uuid.uuid4())
 
@@ -119,21 +126,33 @@ async def create_journal_entry(entry: JournalEntryCreate) -> JournalEntryRespons
 
 
 @router.get("/journal/{entry_id}")
-async def get_journal_entry(entry_id: str) -> JournalEntryResponse:
+async def get_journal_entry(
+    entry_id: str,
+    current_user: dict = Depends(get_current_user),
+) -> JournalEntryResponse:
     """Retrieve a single journal entry by ID."""
     if entry_id not in _journal_store:
         raise HTTPException(status_code=404, detail="Journal entry not found")
 
-    return JournalEntryResponse(**_journal_store[entry_id])
+    entry = _journal_store[entry_id]
+    if current_user["sub"] != entry["user_id"]:
+        raise HTTPException(status_code=403, detail="Access denied")
+    return JournalEntryResponse(**entry)
 
 
 @router.put("/journal/{entry_id}")
-async def update_journal_entry(entry_id: str, update: JournalEntryUpdate) -> JournalEntryResponse:
+async def update_journal_entry(
+    entry_id: str,
+    update: JournalEntryUpdate,
+    current_user: dict = Depends(get_current_user),
+) -> JournalEntryResponse:
     """Update an existing journal entry."""
     if entry_id not in _journal_store:
         raise HTTPException(status_code=404, detail="Journal entry not found")
 
     record = _journal_store[entry_id]
+    if current_user["sub"] != record["user_id"]:
+        raise HTTPException(status_code=403, detail="Access denied")
 
     if update.title is not None:
         record["title"] = update.title
@@ -150,11 +169,17 @@ async def update_journal_entry(entry_id: str, update: JournalEntryUpdate) -> Jou
 
 
 @router.delete("/journal/{entry_id}", status_code=204)
-async def delete_journal_entry(entry_id: str) -> None:
+async def delete_journal_entry(
+    entry_id: str,
+    current_user: dict = Depends(get_current_user),
+) -> None:
     """Delete a journal entry."""
     if entry_id not in _journal_store:
         raise HTTPException(status_code=404, detail="Journal entry not found")
 
+    record = _journal_store[entry_id]
+    if current_user["sub"] != record["user_id"]:
+        raise HTTPException(status_code=403, detail="Access denied")
     del _journal_store[entry_id]
 
 
@@ -165,12 +190,15 @@ async def list_journal_entries(
     entry_type: str | None = Query(None, description="Filter by entry type"),
     page: int = Query(1, ge=1, description="Page number"),
     per_page: int = Query(20, ge=1, le=100, description="Items per page"),
+    current_user: dict = Depends(get_current_user),
 ) -> JournalListResponse:
     """List journal entries for a user with optional filters.
 
     Supports filtering by system, entry type, and pagination.
     Results are returned in reverse chronological order.
     """
+    if current_user["sub"] != user_id:
+        raise HTTPException(status_code=403, detail="Access denied")
     # Filter entries belonging to the user
     user_entries = [e for e in _journal_store.values() if e["user_id"] == user_id]
 
@@ -199,12 +227,17 @@ async def list_journal_entries(
 
 
 @router.get("/journal/stats/{user_id}")
-async def get_journal_stats(user_id: str) -> JournalStatsResponse:
+async def get_journal_stats(
+    user_id: str,
+    current_user: dict = Depends(get_current_user),
+) -> JournalStatsResponse:
     """Get summary statistics for a user's journal.
 
     Returns entry counts by system and type, average mood score,
     and a list of all tags used.
     """
+    if current_user["sub"] != user_id:
+        raise HTTPException(status_code=403, detail="Access denied")
     user_entries = [e for e in _journal_store.values() if e["user_id"] == user_id]
 
     if not user_entries:

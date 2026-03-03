@@ -13,13 +13,20 @@ from __future__ import annotations
 import pytest
 from fastapi.testclient import TestClient
 
+from alchymine.api.auth import get_current_user
 from alchymine.api.main import app
 from alchymine.engine.spiral.router import route_user
 
 
+async def _test_current_user() -> dict:
+    return {"sub": "test-user", "email": "test@example.com"}
+
+
 @pytest.fixture
 def client() -> TestClient:
-    return TestClient(app)
+    app.dependency_overrides[get_current_user] = _test_current_user
+    yield TestClient(app)
+    app.dependency_overrides.pop(get_current_user, None)
 
 
 class TestSpiralRouter:
