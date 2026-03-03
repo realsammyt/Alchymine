@@ -216,6 +216,12 @@ jobs:
               -f infrastructure/docker-compose.yml \
               -f infrastructure/docker-compose.prod.yml up -d --remove-orphans
 
+            # Restart nginx so it resolves new container IPs immediately
+            docker compose \
+              --env-file .env.production \
+              -f infrastructure/docker-compose.yml \
+              -f infrastructure/docker-compose.prod.yml restart nginx
+
             # Clean up old images
             docker image prune -f
 
