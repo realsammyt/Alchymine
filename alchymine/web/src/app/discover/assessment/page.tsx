@@ -1,11 +1,11 @@
-'use client';
+"use client";
 
-import { useState, useEffect, useCallback } from 'react';
-import { useRouter } from 'next/navigation';
-import { ALL_QUESTIONS, LIKERT_LABELS, TOTAL_QUESTIONS } from '@/lib/questions';
-import { createReport, IntakePayload } from '@/lib/api';
-import Button from '@/components/shared/Button';
-import ProgressBar from '@/components/shared/ProgressBar';
+import { useState, useEffect, useCallback } from "react";
+import { useRouter } from "next/navigation";
+import { ALL_QUESTIONS, LIKERT_LABELS, TOTAL_QUESTIONS } from "@/lib/questions";
+import { createReport, IntakePayload } from "@/lib/api";
+import Button from "@/components/shared/Button";
+import ProgressBar from "@/components/shared/ProgressBar";
 
 export default function AssessmentPage() {
   const router = useRouter();
@@ -13,13 +13,13 @@ export default function AssessmentPage() {
   const [responses, setResponses] = useState<Record<string, number>>({});
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [direction, setDirection] = useState<'next' | 'prev'>('next');
+  const [direction, setDirection] = useState<"next" | "prev">("next");
 
   // Verify intake data exists
   useEffect(() => {
-    const intake = sessionStorage.getItem('alchymine_intake');
+    const intake = sessionStorage.getItem("alchymine_intake");
     if (!intake) {
-      router.replace('/discover/intake');
+      router.replace("/discover/intake");
     }
   }, [router]);
 
@@ -28,64 +28,67 @@ export default function AssessmentPage() {
   const isLastQuestion = currentIndex === TOTAL_QUESTIONS - 1;
   const allAnswered = Object.keys(responses).length === TOTAL_QUESTIONS;
 
+  const handleSubmit = useCallback(
+    async (finalResponses: Record<string, number>) => {
+      setSubmitting(true);
+      setError(null);
+
+      try {
+        const intakeRaw = sessionStorage.getItem("alchymine_intake");
+        if (!intakeRaw) {
+          router.replace("/discover/intake");
+          return;
+        }
+
+        const intakeData = JSON.parse(intakeRaw);
+
+        const intake: IntakePayload = {
+          full_name: intakeData.fullName,
+          birth_date: intakeData.birthDate,
+          birth_time: intakeData.birthTime || null,
+          birth_city: intakeData.birthCity || null,
+          intention: intakeData.intention,
+          assessment_responses: finalResponses,
+        };
+
+        const result = await createReport(intake);
+        sessionStorage.setItem("alchymine_report_id", result.id);
+        router.push(`/discover/generating/${result.id}`);
+      } catch (err) {
+        setError(
+          err instanceof Error
+            ? err.message
+            : "Something went wrong. Please try again.",
+        );
+        setSubmitting(false);
+      }
+    },
+    [router],
+  );
+
   const handleAnswer = useCallback(
     async (value: number) => {
       const newResponses = { ...responses, [question.id]: value };
       setResponses(newResponses);
 
-      if (isLastQuestion && Object.keys(newResponses).length === TOTAL_QUESTIONS) {
-        // All questions answered — submit
+      if (
+        isLastQuestion &&
+        Object.keys(newResponses).length === TOTAL_QUESTIONS
+      ) {
         await handleSubmit(newResponses);
       } else if (!isLastQuestion) {
-        // Auto-advance to next question
-        setDirection('next');
+        setDirection("next");
         setTimeout(() => {
           setCurrentIndex((prev) => prev + 1);
         }, 200);
       }
     },
-    [responses, question, isLastQuestion, currentIndex],
+    [responses, question, isLastQuestion, handleSubmit],
   );
-
-  async function handleSubmit(finalResponses: Record<string, number>) {
-    setSubmitting(true);
-    setError(null);
-
-    try {
-      const intakeRaw = sessionStorage.getItem('alchymine_intake');
-      if (!intakeRaw) {
-        router.replace('/discover/intake');
-        return;
-      }
-
-      const intakeData = JSON.parse(intakeRaw);
-
-      const intake: IntakePayload = {
-        full_name: intakeData.fullName,
-        birth_date: intakeData.birthDate,
-        birth_time: intakeData.birthTime || null,
-        birth_city: intakeData.birthCity || null,
-        intention: intakeData.intention,
-        assessment_responses: finalResponses,
-      };
-
-      const result = await createReport(intake);
-      // Store the report ID and navigate to generating page
-      sessionStorage.setItem('alchymine_report_id', result.id);
-      router.push(`/discover/generating/${result.id}`);
-    } catch (err) {
-      setError(
-        err instanceof Error
-          ? err.message
-          : 'Something went wrong. Please try again.',
-      );
-      setSubmitting(false);
-    }
-  }
 
   function goBack() {
     if (currentIndex > 0) {
-      setDirection('prev');
+      setDirection("prev");
       setCurrentIndex((prev) => prev - 1);
     }
   }
@@ -93,14 +96,14 @@ export default function AssessmentPage() {
   // Category label for the current section
   function getCategoryLabel(category: string): string {
     switch (category) {
-      case 'big_five':
-        return 'Personality';
-      case 'attachment':
-        return 'Attachment Style';
-      case 'risk_tolerance':
-        return 'Risk Tolerance';
+      case "big_five":
+        return "Personality";
+      case "attachment":
+        return "Attachment Style";
+      case "risk_tolerance":
+        return "Risk Tolerance";
       default:
-        return '';
+        return "";
     }
   }
 
@@ -145,15 +148,15 @@ export default function AssessmentPage() {
                   disabled={submitting}
                   className={`w-full flex items-center gap-4 px-5 py-3.5 rounded-xl border text-left transition-all duration-200 ${
                     isSelected
-                      ? 'border-primary/50 bg-primary/15 text-text'
-                      : 'border-white/10 bg-surface/50 text-text/70 hover:border-white/20 hover:bg-surface/80'
+                      ? "border-primary/50 bg-primary/15 text-text"
+                      : "border-white/10 bg-surface/50 text-text/70 hover:border-white/20 hover:bg-surface/80"
                   } disabled:opacity-50 disabled:cursor-not-allowed`}
                 >
                   <div
                     className={`w-8 h-8 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-colors ${
                       isSelected
-                        ? 'border-primary bg-primary text-bg'
-                        : 'border-white/20'
+                        ? "border-primary bg-primary text-bg"
+                        : "border-white/20"
                     }`}
                   >
                     {isSelected && (
