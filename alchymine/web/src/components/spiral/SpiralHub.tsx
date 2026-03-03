@@ -87,41 +87,66 @@ const GUIDED_INTENTIONS = [
   },
 ];
 
+/** System metadata aligned to the Alchymine design system color tokens. */
 const SYSTEM_META: Record<
   string,
-  { label: string; color: string; icon: string; path: string; tagline: string }
+  {
+    label: string;
+    color: string;
+    accentText: string;
+    accentBg: string;
+    accentBorder: string;
+    icon: string;
+    path: string;
+    tagline: string;
+  }
 > = {
   intelligence: {
     label: "Personalized Intelligence",
-    color: "#6366f1",
+    color: "#DAA520",
+    accentText: "text-primary",
+    accentBg: "bg-primary/10",
+    accentBorder: "border-primary/20",
     icon: "\u{1F52E}",
     path: "/intelligence",
     tagline: "Know yourself deeply",
   },
   healing: {
     label: "Ethical Healing",
-    color: "#10b981",
+    color: "#20B2AA",
+    accentText: "text-accent",
+    accentBg: "bg-accent/10",
+    accentBorder: "border-accent/20",
     icon: "\u{1F331}",
     path: "/healing",
     tagline: "Heal with integrity",
   },
   wealth: {
     label: "Generational Wealth",
-    color: "#f59e0b",
+    color: "#DAA520",
+    accentText: "text-primary",
+    accentBg: "bg-primary/10",
+    accentBorder: "border-primary/20",
     icon: "\u{1F48E}",
     path: "/wealth",
     tagline: "Build lasting prosperity",
   },
   creative: {
     label: "Creative Development",
-    color: "#ec4899",
+    color: "#9B4DCA",
+    accentText: "text-secondary-light",
+    accentBg: "bg-secondary/10",
+    accentBorder: "border-secondary/20",
     icon: "\u{1F3A8}",
     path: "/creative",
     tagline: "Express your vision",
   },
   perspective: {
     label: "Perspective Enhancement",
-    color: "#8b5cf6",
+    color: "#7B2D8E",
+    accentText: "text-secondary",
+    accentBg: "bg-secondary/10",
+    accentBorder: "border-secondary/20",
     icon: "\u{1F52D}",
     path: "/perspective",
     tagline: "Expand your worldview",
@@ -131,6 +156,7 @@ const SYSTEM_META: Record<
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "";
 
 // ── Spiral Visual ─────────────────────────────────────────────────
+// The spiral animation requires dynamic colors, so inline styles are necessary here.
 
 function SpiralVisual({
   active,
@@ -140,67 +166,48 @@ function SpiralVisual({
   primarySystem: string | null;
 }) {
   const color = primarySystem
-    ? SYSTEM_META[primarySystem]?.color || "#6366f1"
-    : "#6366f1";
+    ? SYSTEM_META[primarySystem]?.color || "#DAA520"
+    : "#DAA520";
 
   return (
     <div
-      className="spiral-visual-container"
-      style={{
-        position: "relative",
-        width: 200,
-        height: 200,
-        margin: "0 auto 2rem",
-      }}
+      className="spiral-visual-container relative w-[200px] h-[200px] mx-auto mb-8"
+      aria-hidden="true"
     >
       {/* Outer glow ring */}
       <div
+        className={`absolute inset-0 rounded-full ${active ? "animate-spiral-pulse" : ""}`}
         style={{
-          position: "absolute",
-          inset: 0,
-          borderRadius: "50%",
           background: `radial-gradient(circle at center, ${color}15 0%, transparent 70%)`,
-          animation: active ? "spiralPulse 3s ease-in-out infinite" : undefined,
         }}
       />
       {/* Middle ring */}
       <div
+        className={`absolute rounded-full ${active ? "animate-spiral-rotate" : ""}`}
         style={{
-          position: "absolute",
           inset: 20,
-          borderRadius: "50%",
           border: `2px solid ${color}33`,
-          animation: active ? "spiralRotate 8s linear infinite" : undefined,
           background: `conic-gradient(from 0deg, ${color}11, ${color}22, ${color}11, transparent)`,
         }}
       />
       {/* Inner ring */}
       <div
+        className={`absolute rounded-full ${active ? "animate-spiral-rotate-reverse" : ""}`}
         style={{
-          position: "absolute",
           inset: 45,
-          borderRadius: "50%",
           border: `2px solid ${color}55`,
-          animation: active
-            ? "spiralRotate 5s linear infinite reverse"
-            : undefined,
           background: `conic-gradient(from 180deg, ${color}22, ${color}33, ${color}22, transparent)`,
         }}
       />
       {/* Core circle */}
       <div
+        className={`absolute rounded-full flex items-center justify-center ${active ? "animate-spiral-pulse-fast" : ""}`}
         style={{
-          position: "absolute",
           inset: 70,
-          borderRadius: "50%",
           background: `radial-gradient(circle at center, ${color}44, ${color}22)`,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          animation: active ? "spiralPulse 2s ease-in-out infinite" : undefined,
         }}
       >
-        <span style={{ fontSize: "1.5rem" }}>
+        <span className="text-2xl">
           {primarySystem
             ? SYSTEM_META[primarySystem]?.icon || "\u{2728}"
             : "\u{2728}"}
@@ -216,46 +223,20 @@ function SpiralVisual({
         return (
           <div
             key={key}
-            title={meta.label}
+            className="absolute w-4 h-4 rounded-full transition-all duration-400"
             style={{
-              position: "absolute",
               left: x,
               top: y,
-              width: 16,
-              height: 16,
-              borderRadius: "50%",
               background: isActive ? meta.color : `${meta.color}44`,
               border: isActive
                 ? `2px solid ${meta.color}`
                 : "1px solid transparent",
-              transition: "all 0.4s ease",
               transform: isActive ? "scale(1.4)" : "scale(1)",
               boxShadow: isActive ? `0 0 12px ${meta.color}66` : "none",
             }}
           />
         );
       })}
-      <style jsx>{`
-        @keyframes spiralPulse {
-          0%,
-          100% {
-            opacity: 0.7;
-            transform: scale(1);
-          }
-          50% {
-            opacity: 1;
-            transform: scale(1.05);
-          }
-        }
-        @keyframes spiralRotate {
-          from {
-            transform: rotate(0deg);
-          }
-          to {
-            transform: rotate(360deg);
-          }
-        }
-      `}</style>
     </div>
   );
 }
@@ -269,173 +250,95 @@ function RecommendationCard({
   rec: SystemRecommendation;
   isPrimary: boolean;
 }) {
-  const [hovered, setHovered] = useState(false);
   const meta = SYSTEM_META[rec.system];
   if (!meta) return null;
 
   return (
-    <Link href={meta.path} style={{ textDecoration: "none", color: "inherit" }}>
+    <Link href={meta.path} className="block no-underline text-inherit group">
       <div
+        className={`card-surface border-l-4 px-5 py-5 sm:px-6 transition-all duration-300 hover:-translate-y-0.5 ${
+          isPrimary ? "glow-gold" : ""
+        }`}
+        style={{ borderLeftColor: meta.color }}
         role="article"
         aria-label={`${meta.label} recommendation`}
-        onMouseEnter={() => setHovered(true)}
-        onMouseLeave={() => setHovered(false)}
-        style={{
-          background: isPrimary
-            ? `linear-gradient(135deg, ${meta.color}18, #1e1e2e)`
-            : hovered
-              ? `linear-gradient(135deg, ${meta.color}0d, #1e1e2e)`
-              : "#1e1e2e",
-          borderRadius: 14,
-          padding: "1.25rem 1.5rem",
-          borderLeft: `4px solid ${meta.color}`,
-          border: isPrimary
-            ? `2px solid ${meta.color}55`
-            : `1px solid ${hovered ? meta.color + "44" : "#333"}`,
-          borderLeftWidth: 4,
-          borderLeftStyle: "solid",
-          borderLeftColor: meta.color,
-          cursor: "pointer",
-          transition: "all 0.3s ease",
-          transform: hovered ? "translateY(-2px)" : "translateY(0)",
-          boxShadow: hovered ? `0 4px 20px ${meta.color}22` : "none",
-        }}
       >
         {/* Header row */}
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            marginBottom: "0.5rem",
-          }}
-        >
-          <div
-            style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}
-          >
+        <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center gap-3">
             <div
-              style={{
-                width: 40,
-                height: 40,
-                borderRadius: 10,
-                background: `${meta.color}15`,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                fontSize: "1.25rem",
-              }}
+              className="w-10 h-10 rounded-[10px] flex items-center justify-center text-xl flex-shrink-0"
+              style={{ background: `${meta.color}15` }}
             >
               {meta.icon}
             </div>
             <div>
-              <div
-                style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}
-              >
-                <span
-                  style={{
-                    fontWeight: 600,
-                    fontSize: "0.95rem",
-                    color: "#e5e7eb",
-                  }}
-                >
+              <div className="flex items-center gap-2">
+                <h4 className="font-display text-[0.95rem] font-medium text-text">
                   {meta.label}
-                </span>
+                </h4>
                 {isPrimary && (
                   <span
+                    className="text-[0.65rem] font-body font-semibold uppercase tracking-wide px-2 py-0.5 rounded-full"
                     style={{
-                      fontSize: "0.65rem",
                       background: `${meta.color}22`,
                       color: meta.color,
-                      padding: "2px 8px",
-                      borderRadius: 20,
-                      fontWeight: 600,
-                      textTransform: "uppercase",
-                      letterSpacing: "0.05em",
                     }}
                   >
                     Best Match
                   </span>
                 )}
               </div>
-              <div
-                style={{ fontSize: "0.75rem", color: "#6b7280", marginTop: 2 }}
-              >
+              <p className="text-xs font-body text-text/30 mt-0.5">
                 {meta.tagline}
-              </div>
+              </p>
             </div>
           </div>
         </div>
 
         {/* Confidence bar */}
-        <div style={{ marginBottom: "0.75rem" }}>
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "space-between",
-              marginBottom: 4,
-            }}
-          >
-            <span
-              style={{
-                fontSize: "0.7rem",
-                color: "#6b7280",
-                textTransform: "uppercase",
-                letterSpacing: "0.05em",
-              }}
-            >
+        <div className="mb-3">
+          <div className="flex justify-between mb-1">
+            <span className="text-[0.7rem] font-body text-text/30 uppercase tracking-wide">
               Confidence
             </span>
             <span
-              style={{ fontSize: "0.8rem", fontWeight: 600, color: meta.color }}
+              className="text-[0.8rem] font-body font-semibold"
+              style={{ color: meta.color }}
             >
               {rec.score.toFixed(0)}%
             </span>
           </div>
           <div
-            style={{
-              width: "100%",
-              height: 6,
-              background: "#374151",
-              borderRadius: 3,
-              overflow: "hidden",
-            }}
+            className="w-full h-1.5 bg-white/[0.06] rounded-full overflow-hidden"
+            role="progressbar"
+            aria-valuenow={Math.round(rec.score)}
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-label={`${meta.label} confidence`}
           >
             <div
+              className="h-full rounded-full transition-all duration-700"
               style={{
                 width: `${rec.score}%`,
-                height: "100%",
                 background: `linear-gradient(90deg, ${meta.color}88, ${meta.color})`,
-                borderRadius: 3,
-                transition: "width 0.8s ease-out",
               }}
             />
           </div>
         </div>
 
         {/* Reason */}
-        <p
-          style={{
-            color: "#9ca3af",
-            fontSize: "0.85rem",
-            lineHeight: 1.5,
-            marginBottom: "0.5rem",
-          }}
-        >
+        <p className="font-body text-sm text-text/40 leading-relaxed mb-2">
           {rec.reason}
         </p>
 
         {/* Action link */}
-        <div
-          style={{
-            fontSize: "0.8rem",
-            color: meta.color,
-            fontWeight: 500,
-            opacity: hovered ? 1 : 0.8,
-            transition: "opacity 0.2s",
-          }}
+        <span
+          className="font-body text-sm font-medium opacity-70 group-hover:opacity-100 transition-opacity"
+          style={{ color: meta.color }}
         >
           {rec.entry_action} &rarr;
-        </div>
+        </span>
       </div>
     </Link>
   );
@@ -476,39 +379,17 @@ export default function SpiralHub() {
   const primarySystem = routeResult?.primary_system || null;
 
   return (
-    <div style={{ maxWidth: 820, margin: "0 auto", padding: "2rem 1rem" }}>
+    <div className="max-w-[820px] mx-auto px-4 py-8">
       {/* Header */}
-      <div style={{ textAlign: "center", marginBottom: "1.5rem" }}>
-        <p
-          style={{
-            fontSize: "0.75rem",
-            textTransform: "uppercase",
-            letterSpacing: "0.15em",
-            color: "#c4a04a",
-            marginBottom: "0.75rem",
-          }}
-        >
+      <div className="text-center mb-6">
+        <p className="text-xs font-body font-medium text-primary/70 uppercase tracking-[0.15em] mb-3">
           Your Transformation Hub
         </p>
-        <h1
-          style={{
-            fontSize: "2.25rem",
-            fontWeight: 700,
-            marginBottom: "0.5rem",
-            color: "#e5e7eb",
-          }}
-        >
+        <h1 className="font-display text-display-md font-light text-text mb-2">
           The Alchemical Spiral
         </h1>
-        <p
-          style={{
-            color: "#6b7280",
-            maxWidth: 560,
-            margin: "0 auto",
-            fontSize: "0.95rem",
-            lineHeight: 1.6,
-          }}
-        >
+        <hr className="rule-gold my-4 max-w-[60px] mx-auto" />
+        <p className="font-body text-text/40 max-w-[560px] mx-auto text-sm leading-relaxed">
           Choose what matters most to you right now, and we will guide you to
           the highest-leverage system for your growth.
         </p>
@@ -521,26 +402,11 @@ export default function SpiralHub() {
       />
 
       {/* Intention Selection */}
-      <div style={{ marginBottom: "2rem" }}>
-        <h2
-          style={{
-            fontSize: "0.85rem",
-            color: "#6b7280",
-            textAlign: "center",
-            marginBottom: "1rem",
-            textTransform: "uppercase",
-            letterSpacing: "0.08em",
-          }}
-        >
+      <div className="mb-8">
+        <h2 className="text-xs font-body font-medium text-text/30 text-center mb-4 uppercase tracking-[0.08em]">
           What brings you here today?
         </h2>
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
-            gap: "0.75rem",
-          }}
-        >
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
           {GUIDED_INTENTIONS.map(({ key, label, icon }) => {
             const isSelected = selectedIntention === key;
             return (
@@ -549,32 +415,14 @@ export default function SpiralHub() {
                 onClick={() => getRoute(key)}
                 aria-pressed={isSelected}
                 data-testid={`intention-${key}`}
-                style={{
-                  background: isSelected ? "#6366f122" : "#1e1e2e",
-                  border: isSelected ? "2px solid #6366f1" : "1px solid #333",
-                  borderRadius: 12,
-                  padding: "0.875rem 1rem",
-                  cursor: "pointer",
-                  textAlign: "left",
-                  transition: "all 0.25s ease",
-                  color: "#e5e7eb",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "0.75rem",
-                }}
+                className={`touch-target flex items-center gap-3 px-4 py-3.5 rounded-xl text-left font-body text-sm font-medium text-text transition-all duration-300 ${
+                  isSelected
+                    ? "bg-primary/10 border-2 border-primary"
+                    : "bg-surface border border-white/[0.06] hover:border-white/[0.12] hover:bg-white/[0.03]"
+                }`}
               >
-                <span style={{ fontSize: "1.25rem", flexShrink: 0 }}>
-                  {icon}
-                </span>
-                <span
-                  style={{
-                    fontSize: "0.85rem",
-                    fontWeight: 500,
-                    lineHeight: 1.3,
-                  }}
-                >
-                  {label}
-                </span>
+                <span className="text-xl flex-shrink-0">{icon}</span>
+                <span className="leading-snug">{label}</span>
               </button>
             );
           })}
@@ -583,19 +431,13 @@ export default function SpiralHub() {
 
       {/* Loading State */}
       {loading && (
-        <div style={{ textAlign: "center", padding: "2.5rem 1rem" }}>
-          <div
-            style={{
-              width: 40,
-              height: 40,
-              border: "3px solid #333",
-              borderTopColor: "#6366f1",
-              borderRadius: "50%",
-              margin: "0 auto 1rem",
-              animation: "spiralRotate 0.8s linear infinite",
-            }}
-          />
-          <p style={{ color: "#9ca3af", fontSize: "0.9rem" }}>
+        <div
+          className="text-center py-10"
+          role="status"
+          aria-label="Calculating optimal path"
+        >
+          <div className="w-10 h-10 border-2 border-white/[0.08] border-t-primary rounded-full mx-auto mb-4 animate-spin" />
+          <p className="font-body text-sm text-text/35">
             Calculating your optimal path...
           </p>
         </div>
@@ -605,94 +447,70 @@ export default function SpiralHub() {
       {error && (
         <div
           role="alert"
-          style={{
-            color: "#ef4444",
-            background: "#1e1e2e",
-            padding: "0.75rem 1rem",
-            borderRadius: 8,
-            marginBottom: "1rem",
-            border: "1px solid #ef444433",
-            fontSize: "0.9rem",
-          }}
+          className="flex items-start gap-3 bg-primary-dark/[0.08] border border-primary-dark/[0.18] text-primary-dark text-sm font-body rounded-xl px-4 py-3 mb-4"
         >
+          <svg
+            className="w-4 h-4 flex-shrink-0 mt-0.5"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+          >
+            <circle cx="12" cy="12" r="10" />
+            <line x1="12" y1="8" x2="12" y2="12" />
+            <line x1="12" y1="16" x2="12.01" y2="16" />
+          </svg>
           {error}
         </div>
       )}
 
       {/* Route Results */}
       {routeResult && !loading && (
-        <div data-testid="spiral-results">
+        <div data-testid="spiral-results" className="space-y-6">
           {/* For You Today */}
           <div
+            className="card-surface-elevated p-6"
             style={{
-              background: `linear-gradient(135deg, ${SYSTEM_META[routeResult.primary_system]?.color || "#6366f1"}18, #1e1e2e)`,
-              borderRadius: 16,
-              padding: "1.5rem",
-              marginBottom: "2rem",
-              border: `1px solid ${SYSTEM_META[routeResult.primary_system]?.color || "#6366f1"}33`,
+              background: `linear-gradient(135deg, ${SYSTEM_META[routeResult.primary_system]?.color || "#DAA520"}18, var(--tw-surface-elevated, #22223A))`,
             }}
           >
-            <h3
-              style={{
-                fontSize: "0.8rem",
-                color: "#6b7280",
-                marginBottom: "0.5rem",
-                textTransform: "uppercase",
-                letterSpacing: "0.05em",
-              }}
-            >
+            <h3 className="text-xs font-body font-medium text-text/30 uppercase tracking-[0.05em] mb-2">
               For You Today
             </h3>
-            <p
-              style={{ fontSize: "1.1rem", lineHeight: 1.7, color: "#e5e7eb" }}
-            >
+            <p className="font-body text-base text-text leading-relaxed">
               {routeResult.for_you_today}
             </p>
           </div>
 
           {/* System Rankings */}
-          <h3
-            style={{
-              fontSize: "0.85rem",
-              color: "#6b7280",
-              marginBottom: "1rem",
-              textTransform: "uppercase",
-              letterSpacing: "0.08em",
-            }}
-          >
-            Your Systems, Ranked
-          </h3>
-          <div
-            style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}
-          >
-            {routeResult.recommendations.map((rec) => (
-              <RecommendationCard
-                key={rec.system}
-                rec={rec}
-                isPrimary={rec.priority === 1}
-              />
-            ))}
+          <div>
+            <h3 className="text-xs font-body font-medium text-text/30 uppercase tracking-[0.08em] mb-4">
+              Your Systems, Ranked
+            </h3>
+            <div className="flex flex-col gap-3">
+              {routeResult.recommendations.map((rec) => (
+                <RecommendationCard
+                  key={rec.system}
+                  rec={rec}
+                  isPrimary={rec.priority === 1}
+                />
+              ))}
+            </div>
           </div>
 
           {/* Methodology */}
-          <div
-            style={{
-              marginTop: "2rem",
-              padding: "1rem 1.25rem",
-              background: "#111827",
-              borderRadius: 10,
-              fontSize: "0.75rem",
-              color: "#6b7280",
-              lineHeight: 1.6,
-            }}
-          >
-            <strong style={{ color: "#9ca3af" }}>Methodology:</strong>{" "}
-            {routeResult.methodology}
-            <br />
-            <span>
+          <div className="bg-surface rounded-xl px-5 py-4 border border-white/[0.06]">
+            <p className="font-body text-xs text-text/30 leading-relaxed">
+              <strong className="text-text/50">Methodology:</strong>{" "}
+              {routeResult.methodology}
+            </p>
+            <p className="font-body text-xs text-text/25 mt-1">
               Evidence: {routeResult.evidence_level} | Calculation:{" "}
               {routeResult.calculation_type}
-            </span>
+            </p>
           </div>
         </div>
       )}

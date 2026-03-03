@@ -6,6 +6,7 @@ import { ALL_QUESTIONS, LIKERT_LABELS, TOTAL_QUESTIONS } from "@/lib/questions";
 import { createReport, IntakePayload } from "@/lib/api";
 import Button from "@/components/shared/Button";
 import ProgressBar from "@/components/shared/ProgressBar";
+import { MotionReveal } from "@/components/shared/MotionReveal";
 
 export default function AssessmentPage() {
   const router = useRouter();
@@ -93,7 +94,6 @@ export default function AssessmentPage() {
     }
   }
 
-  // Category label for the current section
   function getCategoryLabel(category: string): string {
     switch (category) {
       case "big_five":
@@ -107,37 +107,80 @@ export default function AssessmentPage() {
     }
   }
 
+  function getCategoryColor(category: string): {
+    bg: string;
+    text: string;
+    border: string;
+  } {
+    switch (category) {
+      case "big_five":
+        return {
+          bg: "bg-primary/[0.06]",
+          text: "text-primary/70",
+          border: "border-primary/[0.12]",
+        };
+      case "attachment":
+        return {
+          bg: "bg-accent/[0.06]",
+          text: "text-accent/70",
+          border: "border-accent/[0.12]",
+        };
+      case "risk_tolerance":
+        return {
+          bg: "bg-secondary/[0.06]",
+          text: "text-secondary-light/70",
+          border: "border-secondary/[0.12]",
+        };
+      default:
+        return {
+          bg: "bg-white/[0.04]",
+          text: "text-text/50",
+          border: "border-white/[0.08]",
+        };
+    }
+  }
+
+  const catColor = getCategoryColor(question.category);
+
   return (
-    <div className="flex-1 flex flex-col items-center justify-center px-6 py-12">
+    <div className="flex-1 flex flex-col items-center justify-center px-4 sm:px-6 py-12">
       <div className="w-full max-w-lg">
         {/* Progress */}
-        <div className="mb-8">
-          <ProgressBar
-            value={progress}
-            label={`Question ${currentIndex + 1} of ${TOTAL_QUESTIONS}`}
-            showPercentage
-          />
-        </div>
+        <MotionReveal y={10}>
+          <div className="mb-8">
+            <ProgressBar
+              value={progress}
+              label={`Question ${currentIndex + 1} of ${TOTAL_QUESTIONS}`}
+              showPercentage
+            />
+          </div>
+        </MotionReveal>
 
         {/* Question Card */}
         <div
           key={question.id}
-          className={`card-surface p-8 mb-6 animate-fade-in`}
+          className="card-surface-elevated p-6 sm:p-8 mb-6 animate-fade-in"
         >
           {/* Category tag */}
-          <div className="mb-4">
-            <span className="text-xs font-medium uppercase tracking-wider text-primary/60 bg-primary/10 px-3 py-1 rounded-full">
+          <div className="mb-5">
+            <span
+              className={`inline-flex items-center text-[0.65rem] font-body font-medium uppercase tracking-[0.15em] ${catColor.text} ${catColor.bg} ${catColor.border} border px-3 py-1.5 rounded-full`}
+            >
               {getCategoryLabel(question.category)}
             </span>
           </div>
 
           {/* Question text */}
-          <h2 className="text-xl sm:text-2xl font-semibold mb-8 leading-relaxed">
+          <h2 className="font-display text-xl sm:text-2xl font-medium mb-8 leading-relaxed text-text">
             {question.text}
           </h2>
 
           {/* Likert scale */}
-          <div className="space-y-3">
+          <div
+            className="space-y-2.5"
+            role="radiogroup"
+            aria-label="Your response"
+          >
             {LIKERT_LABELS.map((label, idx) => {
               const value = idx + 1;
               const isSelected = responses[question.id] === value;
@@ -146,36 +189,37 @@ export default function AssessmentPage() {
                   key={value}
                   onClick={() => handleAnswer(value)}
                   disabled={submitting}
-                  className={`w-full flex items-center gap-4 px-5 py-3.5 rounded-xl border text-left transition-all duration-200 ${
+                  role="radio"
+                  aria-checked={isSelected}
+                  className={`w-full flex items-center gap-4 px-4 sm:px-5 py-3.5 rounded-xl border text-left text-sm font-body transition-all duration-300 touch-target ${
                     isSelected
-                      ? "border-primary/50 bg-primary/15 text-text"
-                      : "border-white/10 bg-surface/50 text-text/70 hover:border-white/20 hover:bg-surface/80"
+                      ? "border-primary/40 bg-primary/[0.08] text-text glow-gold"
+                      : "border-white/[0.06] bg-white/[0.02] text-text/60 hover:border-white/[0.12] hover:bg-white/[0.04]"
                   } disabled:opacity-50 disabled:cursor-not-allowed`}
                 >
                   <div
-                    className={`w-8 h-8 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-colors ${
+                    className={`w-7 h-7 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-all duration-300 ${
                       isSelected
                         ? "border-primary bg-primary text-bg"
-                        : "border-white/20"
+                        : "border-white/[0.15]"
                     }`}
                   >
                     {isSelected && (
                       <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        width="14"
-                        height="14"
+                        className="w-3 h-3"
                         viewBox="0 0 24 24"
                         fill="none"
                         stroke="currentColor"
                         strokeWidth="3"
                         strokeLinecap="round"
                         strokeLinejoin="round"
+                        aria-hidden="true"
                       >
                         <polyline points="20 6 9 17 4 12" />
                       </svg>
                     )}
                   </div>
-                  <span className="text-sm font-medium">{label}</span>
+                  <span className="font-medium">{label}</span>
                 </button>
               );
             })}
@@ -187,25 +231,23 @@ export default function AssessmentPage() {
           <button
             onClick={goBack}
             disabled={currentIndex === 0 || submitting}
-            className="flex items-center gap-1 text-sm text-text/40 hover:text-text/70 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+            className="flex items-center gap-1.5 text-sm font-body text-text/30 hover:text-text/60 transition-colors duration-300 disabled:opacity-30 disabled:cursor-not-allowed touch-target"
           >
             <svg
-              xmlns="http://www.w3.org/2000/svg"
-              width="16"
-              height="16"
+              className="w-4 h-4"
               viewBox="0 0 24 24"
               fill="none"
               stroke="currentColor"
               strokeWidth="2"
               strokeLinecap="round"
               strokeLinejoin="round"
+              aria-hidden="true"
             >
               <path d="m15 18-6-6 6-6" />
             </svg>
             Previous
           </button>
 
-          {/* Show submit button if all questions are answered but user is reviewing */}
           {allAnswered && (
             <Button
               onClick={() => handleSubmit(responses)}
@@ -219,9 +261,11 @@ export default function AssessmentPage() {
 
         {/* Error message */}
         {error && (
-          <div className="mt-4 p-4 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-sm">
-            {error}
-          </div>
+          <MotionReveal y={8}>
+            <div className="mt-4 p-4 rounded-xl card-surface border-primary-dark/20 text-primary-dark text-sm font-body">
+              {error}
+            </div>
+          </MotionReveal>
         )}
       </div>
     </div>

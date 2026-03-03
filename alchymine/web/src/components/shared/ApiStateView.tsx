@@ -42,10 +42,10 @@ export default function ApiStateView({
 
   if (error) {
     return (
-      <div className="card-surface p-6 border-l-2 border-red-400/30">
+      <div className="card-surface p-6 border-l-2 border-primary-dark/30">
         <div className="flex items-start gap-3">
           <span
-            className="text-red-400 text-lg flex-shrink-0"
+            className="text-primary-dark text-lg flex-shrink-0"
             aria-hidden="true"
           >
             {"\u26A0\uFE0F"}

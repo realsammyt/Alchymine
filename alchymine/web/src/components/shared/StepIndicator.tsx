@@ -1,5 +1,10 @@
 "use client";
 
+import {
+  MotionStagger,
+  MotionStaggerItem,
+} from "@/components/shared/MotionReveal";
+
 interface Step {
   label: string;
   path: string;
@@ -15,24 +20,27 @@ export default function StepIndicator({
   currentStep,
 }: StepIndicatorProps) {
   return (
-    <div className="flex items-center justify-center gap-1 sm:gap-2">
+    <MotionStagger
+      staggerDelay={0.07}
+      className="flex items-center justify-center gap-1 sm:gap-2"
+    >
       {steps.map((step, index) => {
         const isCompleted = index < currentStep;
         const isCurrent = index === currentStep;
-        const isFuture = index > currentStep;
 
         return (
-          <div key={step.label} className="flex items-center">
+          <MotionStaggerItem key={step.label} className="flex items-center">
             {/* Step circle + label */}
             <div className="flex flex-col items-center">
               <div
-                className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-semibold transition-all duration-300 ${
+                className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-semibold transition-all duration-500 border ${
                   isCompleted
-                    ? "bg-primary text-bg"
+                    ? "bg-primary border-primary text-bg"
                     : isCurrent
-                      ? "bg-primary/20 text-primary border-2 border-primary"
-                      : "bg-surface text-text/30 border border-white/10"
+                      ? "bg-primary/20 border-primary/40 text-primary glow-gold"
+                      : "bg-white/[0.03] border-white/[0.08] text-text/30"
                 }`}
+                aria-current={isCurrent ? "step" : undefined}
               >
                 {isCompleted ? (
                   <svg
@@ -45,6 +53,7 @@ export default function StepIndicator({
                     strokeWidth="3"
                     strokeLinecap="round"
                     strokeLinejoin="round"
+                    aria-hidden="true"
                   >
                     <polyline points="20 6 9 17 4 12" />
                   </svg>
@@ -53,11 +62,11 @@ export default function StepIndicator({
                 )}
               </div>
               <span
-                className={`mt-1.5 text-[10px] sm:text-xs font-medium transition-colors ${
+                className={`mt-1.5 font-body text-xs tracking-wide transition-all duration-500 ${
                   isCompleted
                     ? "text-primary"
                     : isCurrent
-                      ? "text-text"
+                      ? "text-primary font-medium"
                       : "text-text/30"
                 }`}
               >
@@ -68,14 +77,15 @@ export default function StepIndicator({
             {/* Connector line */}
             {index < steps.length - 1 && (
               <div
-                className={`w-8 sm:w-12 h-0.5 mx-1 sm:mx-2 mt-[-16px] transition-colors duration-300 ${
-                  isCompleted ? "bg-primary" : "bg-white/10"
+                className={`w-8 sm:w-12 h-0.5 mx-1 sm:mx-2 mt-[-16px] transition-all duration-500 ${
+                  isCompleted ? "bg-primary/30" : "bg-white/[0.06]"
                 }`}
+                aria-hidden="true"
               />
             )}
-          </div>
+          </MotionStaggerItem>
         );
       })}
-    </div>
+    </MotionStagger>
   );
 }

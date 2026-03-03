@@ -161,3 +161,4 @@ logs/
 .stylelintcache
 .parcel-cache/
 .claude/
+.ignore/

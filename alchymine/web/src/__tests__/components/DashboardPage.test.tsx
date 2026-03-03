@@ -63,7 +63,7 @@ describe("DashboardPage", () => {
 
   it("displays no-intake message when intake is missing", () => {
     render(<DashboardPage />);
-    expect(screen.getByText(/Your Progress/)).toBeInTheDocument();
+    expect(screen.getByText(/Welcome/)).toBeInTheDocument();
   });
 
   it("has a call-to-action to start the journey", () => {
@@ -83,6 +83,6 @@ describe("DashboardPage", () => {
     render(<DashboardPage />);
     const h1 = screen.getByRole("heading", { level: 1 });
     expect(h1).toBeInTheDocument();
-    expect(h1).toHaveTextContent("Your Progress");
+    expect(h1).toHaveTextContent(/Welcome/);
   });
 });
