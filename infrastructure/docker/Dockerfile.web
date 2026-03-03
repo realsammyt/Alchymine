@@ -31,9 +31,13 @@ COPY --from=deps /app/node_modules ./node_modules
 # Copy application source
 COPY alchymine/web/ ./
 
+# Accept version from build args
+ARG APP_VERSION=dev
+
 # Set build-time environment variables
 ENV NEXT_TELEMETRY_DISABLED=1 \
-    NODE_ENV=production
+    NODE_ENV=production \
+    APP_VERSION=${APP_VERSION}
 
 # Build the Next.js application
 RUN npm run build

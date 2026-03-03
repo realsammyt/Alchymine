@@ -122,6 +122,8 @@ jobs:
             org.opencontainers.image.version=${{ needs.validate.outputs.version }}
             org.opencontainers.image.created=${{ needs.validate.outputs.build_date }}
             org.opencontainers.image.revision=${{ github.sha }}
+          build-args: |
+            APP_VERSION=${{ needs.validate.outputs.version }}
           cache-from: type=gha,scope=${{ matrix.image }}
           cache-to: type=gha,mode=max,scope=${{ matrix.image }}
 
@@ -167,6 +169,7 @@ jobs:
           script: |
             set -e
             TAG="${{ github.event.release.tag_name }}"
+            VERSION="${TAG#v}"
             echo "Deploying Alchymine ${TAG}..."
 
             cd /home/alchymine/Alchymine
@@ -175,9 +178,9 @@ jobs:
             git fetch --tags
             git checkout "${TAG}"
 
-            # Pull updated images and restart the stack
-            docker compose -f infrastructure/docker-compose.yml \
-                           -f infrastructure/docker-compose.prod.yml pull
+            # Build images with version and restart the stack
+            APP_VERSION="${VERSION}" docker compose -f infrastructure/docker-compose.yml \
+                           -f infrastructure/docker-compose.prod.yml build
 
             docker compose -f infrastructure/docker-compose.yml \
                            -f infrastructure/docker-compose.prod.yml up -d --remove-orphans

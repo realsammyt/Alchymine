@@ -58,6 +58,8 @@ services:
     build:
       context: ..
       dockerfile: infrastructure/docker/Dockerfile.web
+      args:
+        APP_VERSION: ${APP_VERSION:-dev}
     container_name: alchymine-web
     restart: unless-stopped
     ports:
