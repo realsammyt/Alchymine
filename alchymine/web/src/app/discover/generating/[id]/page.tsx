@@ -1,15 +1,15 @@
-'use client';
+"use client";
 
-import { useState, useEffect, useRef } from 'react';
-import { useRouter, useParams } from 'next/navigation';
-import { getReport, ApiError } from '@/lib/api';
+import { useState, useEffect, useRef } from "react";
+import { useRouter, useParams } from "next/navigation";
+import { getReport, ApiError } from "@/lib/api";
 
 const GENERATION_STEPS = [
-  { label: 'Calculating numerology...', icon: '🔢', duration: 2000 },
-  { label: 'Mapping astrology...', icon: '⭐', duration: 3000 },
-  { label: 'Analyzing personality...', icon: '🧠', duration: 2500 },
-  { label: 'Mapping archetypes...', icon: '🪞', duration: 2000 },
-  { label: 'Building your profile...', icon: '✨', duration: 3000 },
+  { label: "Calculating numerology...", icon: "🔢", duration: 2000 },
+  { label: "Mapping astrology...", icon: "⭐", duration: 3000 },
+  { label: "Analyzing personality...", icon: "🧠", duration: 2500 },
+  { label: "Mapping archetypes...", icon: "🪞", duration: 2000 },
+  { label: "Building your profile...", icon: "✨", duration: 3000 },
 ];
 
 export default function GeneratingPage() {
@@ -26,7 +26,10 @@ export default function GeneratingPage() {
   // Animate through the visual steps
   useEffect(() => {
     let stepIndex = 0;
-    const totalDuration = GENERATION_STEPS.reduce((s, step) => s + step.duration, 0);
+    const totalDuration = GENERATION_STEPS.reduce(
+      (s, step) => s + step.duration,
+      0,
+    );
     let elapsed = 0;
 
     animationRef.current = setInterval(() => {
@@ -66,15 +69,15 @@ export default function GeneratingPage() {
       try {
         const report = await getReport(reportId);
         // If we get here without an error, the report is complete
-        if (report.status === 'completed') {
+        if (report.status === "completed") {
           setOverallProgress(100);
           if (pollRef.current) clearInterval(pollRef.current);
           if (animationRef.current) clearInterval(animationRef.current);
           setTimeout(() => {
             router.push(`/discover/report/${reportId}`);
           }, 800);
-        } else if (report.status === 'failed') {
-          setError('Report generation failed. Please try again.');
+        } else if (report.status === "failed") {
+          setError("Report generation failed. Please try again.");
           if (pollRef.current) clearInterval(pollRef.current);
           if (animationRef.current) clearInterval(animationRef.current);
         }
@@ -84,7 +87,7 @@ export default function GeneratingPage() {
           return;
         }
         // Real error — but don't stop polling for transient network issues
-        console.error('Polling error:', err);
+        console.error("Polling error:", err);
       }
     }, 2000);
 
@@ -103,7 +106,10 @@ export default function GeneratingPage() {
           {/* Outer glow ring */}
           <div className="absolute inset-0 rounded-full bg-primary/10 animate-pulse-gold" />
           {/* Spinning gradient ring */}
-          <div className="absolute inset-2 rounded-full border-2 border-transparent border-t-primary border-r-primary/50 animate-spin" style={{ animationDuration: '3s' }} />
+          <div
+            className="absolute inset-2 rounded-full border-2 border-transparent border-t-primary border-r-primary/50 animate-spin"
+            style={{ animationDuration: "3s" }}
+          />
           {/* Inner shimmer */}
           <div className="absolute inset-4 rounded-full bg-gradient-to-br from-primary-dark/30 to-secondary-dark/30 shimmer-gold" />
           {/* Center icon */}
@@ -113,7 +119,10 @@ export default function GeneratingPage() {
         </div>
 
         {/* Step label */}
-        <h2 className="text-2xl font-bold mb-2 animate-fade-in" key={step.label}>
+        <h2
+          className="text-2xl font-bold mb-2 animate-fade-in"
+          key={step.label}
+        >
           {step.label}
         </h2>
         <p className="text-text/50 text-sm mb-8">
@@ -140,19 +149,19 @@ export default function GeneratingPage() {
               key={s.label}
               className={`flex items-center gap-3 text-sm transition-all duration-500 ${
                 idx < currentStep
-                  ? 'text-primary'
+                  ? "text-primary"
                   : idx === currentStep
-                    ? 'text-text'
-                    : 'text-text/20'
+                    ? "text-text"
+                    : "text-text/20"
               }`}
             >
               <div
                 className={`w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 transition-colors ${
                   idx < currentStep
-                    ? 'bg-primary text-bg'
+                    ? "bg-primary text-bg"
                     : idx === currentStep
-                      ? 'border-2 border-primary text-primary'
-                      : 'border border-white/10'
+                      ? "border-2 border-primary text-primary"
+                      : "border border-white/10"
                 }`}
               >
                 {idx < currentStep && (
@@ -171,7 +180,7 @@ export default function GeneratingPage() {
                   </svg>
                 )}
               </div>
-              <span>{s.label.replace('...', '')}</span>
+              <span>{s.label.replace("...", "")}</span>
             </div>
           ))}
         </div>
@@ -181,7 +190,7 @@ export default function GeneratingPage() {
           <div className="mt-8 p-4 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-sm">
             {error}
             <button
-              onClick={() => router.push('/discover/intake')}
+              onClick={() => router.push("/discover/intake")}
               className="block mt-2 text-primary hover:text-primary/80 underline"
             >
               Start over

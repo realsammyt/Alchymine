@@ -18,7 +18,7 @@ services:
       - ../pyproject.toml:/app/pyproject.toml:ro
     ports:
       - "${API_PORT:-8000}:8000"
-      - "5678:5678"  # debugpy remote debugging
+      - "5678:5678" # debugpy remote debugging
     environment:
       - ENVIRONMENT=development
       - LOG_LEVEL=DEBUG

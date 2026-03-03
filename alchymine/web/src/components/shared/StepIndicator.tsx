@@ -1,4 +1,4 @@
-'use client';
+"use client";
 
 interface Step {
   label: string;
@@ -28,10 +28,10 @@ export default function StepIndicator({
               <div
                 className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-semibold transition-all duration-300 ${
                   isCompleted
-                    ? 'bg-primary text-bg'
+                    ? "bg-primary text-bg"
                     : isCurrent
-                      ? 'bg-primary/20 text-primary border-2 border-primary'
-                      : 'bg-surface text-text/30 border border-white/10'
+                      ? "bg-primary/20 text-primary border-2 border-primary"
+                      : "bg-surface text-text/30 border border-white/10"
                 }`}
               >
                 {isCompleted ? (
@@ -55,10 +55,10 @@ export default function StepIndicator({
               <span
                 className={`mt-1.5 text-[10px] sm:text-xs font-medium transition-colors ${
                   isCompleted
-                    ? 'text-primary'
+                    ? "text-primary"
                     : isCurrent
-                      ? 'text-text'
-                      : 'text-text/30'
+                      ? "text-text"
+                      : "text-text/30"
                 }`}
               >
                 {step.label}
@@ -69,7 +69,7 @@ export default function StepIndicator({
             {index < steps.length - 1 && (
               <div
                 className={`w-8 sm:w-12 h-0.5 mx-1 sm:mx-2 mt-[-16px] transition-colors duration-300 ${
-                  isCompleted ? 'bg-primary' : 'bg-white/10'
+                  isCompleted ? "bg-primary" : "bg-white/10"
                 }`}
               />
             )}

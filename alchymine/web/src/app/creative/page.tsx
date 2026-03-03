@@ -1,67 +1,77 @@
-'use client';
+"use client";
 
-import { useMemo } from 'react';
-import MethodologyPanel from '@/components/shared/MethodologyPanel';
-import ApiStateView from '@/components/shared/ApiStateView';
-import { getCreativeStyle, StyleFingerprintResponse } from '@/lib/api';
-import { useApi, getStoredIntake } from '@/lib/useApi';
+import { useMemo } from "react";
+import MethodologyPanel from "@/components/shared/MethodologyPanel";
+import ApiStateView from "@/components/shared/ApiStateView";
+import { getCreativeStyle, StyleFingerprintResponse } from "@/lib/api";
+import { useApi, getStoredIntake } from "@/lib/useApi";
 
 const CREATIVE_DIMENSIONS = [
   {
-    name: 'Divergent Thinking',
-    description: 'Ability to generate multiple ideas, explore possibilities, and make unexpected connections.',
-    traits: ['Fluency', 'Flexibility', 'Originality', 'Elaboration'],
+    name: "Divergent Thinking",
+    description:
+      "Ability to generate multiple ideas, explore possibilities, and make unexpected connections.",
+    traits: ["Fluency", "Flexibility", "Originality", "Elaboration"],
   },
   {
-    name: 'Convergent Thinking',
-    description: 'Ability to evaluate ideas, find optimal solutions, and refine concepts into actionable plans.',
-    traits: ['Analysis', 'Synthesis', 'Evaluation', 'Decision-making'],
+    name: "Convergent Thinking",
+    description:
+      "Ability to evaluate ideas, find optimal solutions, and refine concepts into actionable plans.",
+    traits: ["Analysis", "Synthesis", "Evaluation", "Decision-making"],
   },
   {
-    name: 'Creative Temperament',
-    description: 'Personality traits that support creative expression, including openness, tolerance for ambiguity, and intrinsic motivation.',
-    traits: ['Openness', 'Persistence', 'Risk tolerance', 'Curiosity'],
+    name: "Creative Temperament",
+    description:
+      "Personality traits that support creative expression, including openness, tolerance for ambiguity, and intrinsic motivation.",
+    traits: ["Openness", "Persistence", "Risk tolerance", "Curiosity"],
   },
 ];
 
 const STYLE_PROFILES = [
   {
-    name: 'The Architect',
-    description: 'Structured creativity through careful planning, systems design, and methodical execution.',
-    icon: '\u{1F3DB}\u{FE0F}',
+    name: "The Architect",
+    description:
+      "Structured creativity through careful planning, systems design, and methodical execution.",
+    icon: "\u{1F3DB}\u{FE0F}",
   },
   {
-    name: 'The Explorer',
-    description: 'Creativity through experimentation, boundary-pushing, and embracing the unknown.',
-    icon: '\u{1F9ED}',
+    name: "The Explorer",
+    description:
+      "Creativity through experimentation, boundary-pushing, and embracing the unknown.",
+    icon: "\u{1F9ED}",
   },
   {
-    name: 'The Connector',
-    description: 'Creativity through synthesizing ideas from different domains and building bridges between concepts.',
-    icon: '\u{1F517}',
+    name: "The Connector",
+    description:
+      "Creativity through synthesizing ideas from different domains and building bridges between concepts.",
+    icon: "\u{1F517}",
   },
   {
-    name: 'The Alchemist',
-    description: 'Creativity through transformation, taking raw materials and transmuting them into something entirely new.',
-    icon: '\u{2697}\u{FE0F}',
+    name: "The Alchemist",
+    description:
+      "Creativity through transformation, taking raw materials and transmuting them into something entirely new.",
+    icon: "\u{2697}\u{FE0F}",
   },
 ];
 
 const PROJECT_TYPES = [
   {
-    name: 'Solo Projects',
-    description: 'Individual creative works matched to your style profile and strengths.',
-    status: 'available',
+    name: "Solo Projects",
+    description:
+      "Individual creative works matched to your style profile and strengths.",
+    status: "available",
   },
   {
-    name: 'Collaborative Works',
-    description: 'Team projects that pair complementary creative styles for maximum output.',
-    status: 'coming-soon',
+    name: "Collaborative Works",
+    description:
+      "Team projects that pair complementary creative styles for maximum output.",
+    status: "coming-soon",
   },
   {
-    name: 'Creative Challenges',
-    description: 'Time-boxed prompts and constraints designed to stretch your creative abilities.',
-    status: 'coming-soon',
+    name: "Creative Challenges",
+    description:
+      "Time-boxed prompts and constraints designed to stretch your creative abilities.",
+    status: "coming-soon",
   },
 ];
 
@@ -108,9 +118,15 @@ export default function CreativePage() {
         {/* Personalized Style Fingerprint */}
         {hasIntake && (
           <section className="mb-12" aria-labelledby="your-creative-heading">
-            <h2 id="your-creative-heading" className="text-2xl font-bold mb-6 flex items-center gap-3">
-              <span className="w-10 h-10 rounded-xl bg-secondary/10 flex items-center justify-center text-xl" aria-hidden="true">
-                {'\u{2728}'}
+            <h2
+              id="your-creative-heading"
+              className="text-2xl font-bold mb-6 flex items-center gap-3"
+            >
+              <span
+                className="w-10 h-10 rounded-xl bg-secondary/10 flex items-center justify-center text-xl"
+                aria-hidden="true"
+              >
+                {"\u{2728}"}
               </span>
               Your Creative Fingerprint
             </h2>
@@ -126,38 +142,70 @@ export default function CreativePage() {
                 <div className="card-surface p-6 space-y-6">
                   <div className="flex items-center gap-4">
                     <div className="w-16 h-16 rounded-2xl bg-secondary/10 flex items-center justify-center text-3xl">
-                      {STYLE_PROFILES.find(p => p.name.toLowerCase().includes(style.data!.creative_style.toLowerCase()))?.icon ?? '\u{1F3A8}'}
+                      {STYLE_PROFILES.find((p) =>
+                        p.name
+                          .toLowerCase()
+                          .includes(style.data!.creative_style.toLowerCase()),
+                      )?.icon ?? "\u{1F3A8}"}
                     </div>
                     <div>
-                      <h3 className="text-xl font-bold text-secondary">{style.data.creative_style}</h3>
-                      <p className="text-sm text-text/50">Overall Score: {Math.round(style.data.overall_score * 100)}%</p>
+                      <h3 className="text-xl font-bold text-secondary">
+                        {style.data.creative_style}
+                      </h3>
+                      <p className="text-sm text-text/50">
+                        Overall Score:{" "}
+                        {Math.round(style.data.overall_score * 100)}%
+                      </p>
                     </div>
                   </div>
 
                   {/* Guilford Scores */}
-                  {style.data.guilford_summary && Object.keys(style.data.guilford_summary).length > 0 && (
-                    <div className="space-y-2">
-                      <h4 className="text-xs uppercase tracking-wider text-text/40 mb-2">Guilford Scores</h4>
-                      {Object.entries(style.data.guilford_summary).map(([key, val]) => (
-                        <ScoreBar key={key} label={key} value={Number(val) || 0} />
-                      ))}
-                    </div>
-                  )}
+                  {style.data.guilford_summary &&
+                    Object.keys(style.data.guilford_summary).length > 0 && (
+                      <div className="space-y-2">
+                        <h4 className="text-xs uppercase tracking-wider text-text/40 mb-2">
+                          Guilford Scores
+                        </h4>
+                        {Object.entries(style.data.guilford_summary).map(
+                          ([key, val]) => (
+                            <ScoreBar
+                              key={key}
+                              label={key}
+                              value={Number(val) || 0}
+                            />
+                          ),
+                        )}
+                      </div>
+                    )}
 
                   <div className="grid sm:grid-cols-2 gap-4 pt-4 border-t border-white/5">
                     <div>
-                      <h4 className="text-xs uppercase tracking-wider text-text/40 mb-2">Strengths</h4>
+                      <h4 className="text-xs uppercase tracking-wider text-text/40 mb-2">
+                        Strengths
+                      </h4>
                       <div className="flex flex-wrap gap-2">
-                        {style.data.strengths.map(s => (
-                          <span key={s} className="px-3 py-1 bg-secondary/10 text-secondary text-xs rounded-full">{s}</span>
+                        {style.data.strengths.map((s) => (
+                          <span
+                            key={s}
+                            className="px-3 py-1 bg-secondary/10 text-secondary text-xs rounded-full"
+                          >
+                            {s}
+                          </span>
                         ))}
                       </div>
                     </div>
                     <div>
-                      <h4 className="text-xs uppercase tracking-wider text-text/40 mb-2">Growth Areas</h4>
+                      <h4 className="text-xs uppercase tracking-wider text-text/40 mb-2">
+                        Growth Areas
+                      </h4>
                       <div className="flex flex-wrap gap-2">
-                        {style.data.growth_areas.map(g => (
-                          <span key={g} className="px-3 py-1 bg-white/5 text-text/50 text-xs rounded-full">{g}</span>
+                        {style.data.growth_areas.map((g) => (
+                          <span
+                            key={g}
+                            className="px-3 py-1 bg-white/5 text-text/50 text-xs rounded-full"
+                          >
+                            {g}
+                          </span>
                         ))}
                       </div>
                     </div>
@@ -165,10 +213,17 @@ export default function CreativePage() {
 
                   {style.data.recommended_mediums.length > 0 && (
                     <div className="pt-4 border-t border-white/5">
-                      <h4 className="text-xs uppercase tracking-wider text-text/40 mb-2">Recommended Mediums</h4>
+                      <h4 className="text-xs uppercase tracking-wider text-text/40 mb-2">
+                        Recommended Mediums
+                      </h4>
                       <div className="flex flex-wrap gap-2">
-                        {style.data.recommended_mediums.map(m => (
-                          <span key={m} className="px-3 py-1 bg-accent/10 text-accent text-xs rounded-full">{m}</span>
+                        {style.data.recommended_mediums.map((m) => (
+                          <span
+                            key={m}
+                            className="px-3 py-1 bg-accent/10 text-accent text-xs rounded-full"
+                          >
+                            {m}
+                          </span>
                         ))}
                       </div>
                     </div>
@@ -181,23 +236,33 @@ export default function CreativePage() {
 
         {/* Creative Assessment Section */}
         <section className="mb-12" aria-labelledby="assessment-heading">
-          <h2 id="assessment-heading" className="text-2xl font-bold mb-6 flex items-center gap-3">
-            <span className="w-10 h-10 rounded-xl bg-secondary/10 flex items-center justify-center text-xl" aria-hidden="true">
-              {'\u{1F9EA}'}
+          <h2
+            id="assessment-heading"
+            className="text-2xl font-bold mb-6 flex items-center gap-3"
+          >
+            <span
+              className="w-10 h-10 rounded-xl bg-secondary/10 flex items-center justify-center text-xl"
+              aria-hidden="true"
+            >
+              {"\u{1F9EA}"}
             </span>
             Creative Assessment
           </h2>
           <p className="text-text/50 text-sm mb-6">
-            The assessment measures three dimensions of creativity based on J.P. Guilford&apos;s
-            Structure of Intellect model. Each dimension reveals different aspects of your
-            creative potential.
+            The assessment measures three dimensions of creativity based on J.P.
+            Guilford&apos;s Structure of Intellect model. Each dimension reveals
+            different aspects of your creative potential.
           </p>
 
           <div className="grid sm:grid-cols-3 gap-4 mb-4">
             {CREATIVE_DIMENSIONS.map((dimension) => (
               <div key={dimension.name} className="card-surface p-5">
-                <h3 className="text-sm font-semibold text-secondary mb-2">{dimension.name}</h3>
-                <p className="text-sm text-text/50 leading-relaxed mb-3">{dimension.description}</p>
+                <h3 className="text-sm font-semibold text-secondary mb-2">
+                  {dimension.name}
+                </h3>
+                <p className="text-sm text-text/50 leading-relaxed mb-3">
+                  {dimension.description}
+                </p>
                 <div className="flex flex-wrap gap-1.5">
                   {dimension.traits.map((trait) => (
                     <span
@@ -221,16 +286,22 @@ export default function CreativePage() {
               'Guilford, J.P. (1967) "The Nature of Human Intelligence" - foundational creativity model',
               'Torrance, E.P. (1974) "Torrance Tests of Creative Thinking" - validated assessment methodology',
               'Runco, M.A. & Acar, S. (2012) "Divergent Thinking as an Indicator of Creative Potential" - meta-analysis',
-              'Big Five Openness to Experience as creativity predictor - Kaufman et al. (2016)',
+              "Big Five Openness to Experience as creativity predictor - Kaufman et al. (2016)",
             ]}
           />
         </section>
 
         {/* Style Profile Section */}
         <section className="mb-12" aria-labelledby="style-heading">
-          <h2 id="style-heading" className="text-2xl font-bold mb-6 flex items-center gap-3">
-            <span className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center text-xl" aria-hidden="true">
-              {'\u{1F3A8}'}
+          <h2
+            id="style-heading"
+            className="text-2xl font-bold mb-6 flex items-center gap-3"
+          >
+            <span
+              className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center text-xl"
+              aria-hidden="true"
+            >
+              {"\u{1F3A8}"}
             </span>
             Creative Style Profiles
           </h2>
@@ -243,10 +314,16 @@ export default function CreativePage() {
             {STYLE_PROFILES.map((profile) => (
               <div key={profile.name} className="card-surface p-5">
                 <div className="flex items-center gap-3 mb-3">
-                  <span className="text-2xl" aria-hidden="true">{profile.icon}</span>
-                  <h3 className="text-sm font-semibold text-primary">{profile.name}</h3>
+                  <span className="text-2xl" aria-hidden="true">
+                    {profile.icon}
+                  </span>
+                  <h3 className="text-sm font-semibold text-primary">
+                    {profile.name}
+                  </h3>
                 </div>
-                <p className="text-sm text-text/50 leading-relaxed">{profile.description}</p>
+                <p className="text-sm text-text/50 leading-relaxed">
+                  {profile.description}
+                </p>
               </div>
             ))}
           </div>
@@ -254,9 +331,15 @@ export default function CreativePage() {
 
         {/* Projects & Collaboration Section */}
         <section className="mb-12" aria-labelledby="projects-heading">
-          <h2 id="projects-heading" className="text-2xl font-bold mb-6 flex items-center gap-3">
-            <span className="w-10 h-10 rounded-xl bg-accent/10 flex items-center justify-center text-xl" aria-hidden="true">
-              {'\u{1F4DD}'}
+          <h2
+            id="projects-heading"
+            className="text-2xl font-bold mb-6 flex items-center gap-3"
+          >
+            <span
+              className="w-10 h-10 rounded-xl bg-accent/10 flex items-center justify-center text-xl"
+              aria-hidden="true"
+            >
+              {"\u{1F4DD}"}
             </span>
             Projects & Collaboration
           </h2>
@@ -265,17 +348,21 @@ export default function CreativePage() {
             {PROJECT_TYPES.map((project) => (
               <div
                 key={project.name}
-                className={`card-surface p-5 ${project.status === 'coming-soon' ? 'opacity-60' : ''}`}
+                className={`card-surface p-5 ${project.status === "coming-soon" ? "opacity-60" : ""}`}
               >
                 <div className="flex items-center justify-between mb-2">
-                  <h3 className="text-sm font-semibold text-text">{project.name}</h3>
-                  {project.status === 'coming-soon' && (
+                  <h3 className="text-sm font-semibold text-text">
+                    {project.name}
+                  </h3>
+                  {project.status === "coming-soon" && (
                     <span className="px-2 py-0.5 bg-secondary/10 text-secondary/60 text-[10px] font-medium rounded-full">
                       Coming Soon
                     </span>
                   )}
                 </div>
-                <p className="text-sm text-text/50 leading-relaxed">{project.description}</p>
+                <p className="text-sm text-text/50 leading-relaxed">
+                  {project.description}
+                </p>
               </div>
             ))}
           </div>
@@ -287,7 +374,9 @@ export default function CreativePage() {
             href="/discover/intake"
             className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-secondary-dark to-secondary text-white font-semibold rounded-xl text-sm transition-all duration-300 hover:shadow-[0_0_20px_rgba(123,45,142,0.3)] hover:scale-[1.02] active:scale-100"
           >
-            {hasIntake ? 'Update Your Creative Profile' : 'Discover Your Creative DNA'}
+            {hasIntake
+              ? "Update Your Creative Profile"
+              : "Discover Your Creative DNA"}
             <svg
               className="w-4 h-4"
               viewBox="0 0 24 24"

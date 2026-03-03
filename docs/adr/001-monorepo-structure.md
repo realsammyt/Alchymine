@@ -9,6 +9,7 @@
 Alchymine extends the healing-swarm-skills framework to encompass five integrated systems: Expanded Healing, Wealth Engine, Creative Forge, Perspective Prism, and the Alchemical Spiral journey. The original healing-swarm-skills repository is a focused project with its own release cadence and governance.
 
 We evaluated three approaches:
+
 1. **Fork healing-swarm-skills** and build on top of it.
 2. **Monorepo** that embeds healing-swarm-skills as a submodule.
 3. **Standalone monorepo** with healing-swarm-skills as a dependency.
@@ -26,12 +27,14 @@ The monorepo contains all five system domains, shared infrastructure, tests, and
 ## Consequences
 
 **Positive:**
+
 - Independent CI/CD and release cadence.
 - Clear ownership boundaries between Alchymine and healing-swarm-skills.
 - Atomic commits across all five systems when cross-cutting changes are needed.
 - Upstream contributions follow healing-swarm-skills' own review standards.
 
 **Negative:**
+
 - Must track healing-swarm-skills releases and update the dependency manually.
 - Skills contributed upstream may diverge from Alchymine's copies during the PR process.
 - New contributors must understand two codebases to work on healing-related skills.

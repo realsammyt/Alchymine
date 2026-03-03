@@ -1,15 +1,10 @@
-'use client';
+"use client";
 
-import { useState, useEffect } from 'react';
-import { useParams, useRouter } from 'next/navigation';
-import {
-  getReport,
-  ApiError,
-  ReportResponse,
-  IdentityLayer,
-} from '@/lib/api';
-import Card from '@/components/shared/Card';
-import Button from '@/components/shared/Button';
+import { useState, useEffect } from "react";
+import { useParams, useRouter } from "next/navigation";
+import { getReport, ApiError, ReportResponse, IdentityLayer } from "@/lib/api";
+import Card from "@/components/shared/Card";
+import Button from "@/components/shared/Button";
 
 // ─── Helper components ───────────────────────────────────────────────
 
@@ -43,9 +38,7 @@ function NumberCard({
     <div className="bg-surface/50 border border-white/5 rounded-xl p-4 text-center">
       <div className="text-3xl font-bold text-gradient-gold mb-1">{value}</div>
       <div className="text-sm font-medium text-text/80">{label}</div>
-      {subtitle && (
-        <div className="text-xs text-text/40 mt-1">{subtitle}</div>
-      )}
+      {subtitle && <div className="text-xs text-text/40 mt-1">{subtitle}</div>}
     </div>
   );
 }
@@ -93,7 +86,7 @@ export default function ReportPage() {
           }
           setError(err.message);
         } else {
-          setError('Failed to load report');
+          setError("Failed to load report");
         }
       } finally {
         setLoading(false);
@@ -121,7 +114,7 @@ export default function ReportPage() {
           <div className="text-4xl mb-4">⚠️</div>
           <h2 className="text-xl font-bold mb-2">Could not load report</h2>
           <p className="text-text/50 mb-6">{error}</p>
-          <Button onClick={() => router.push('/discover/intake')}>
+          <Button onClick={() => router.push("/discover/intake")}>
             Start Over
           </Button>
         </div>
@@ -162,13 +155,13 @@ export default function ReportPage() {
               expandedContent={
                 <div className="text-sm text-text/50 space-y-2">
                   <p>
-                    <strong className="text-text/70">Methodology:</strong>{' '}
+                    <strong className="text-text/70">Methodology:</strong>{" "}
                     Pythagorean numerology reduces your full birth name and date
                     to single-digit (or master number) archetypes. Each number
                     1-9 (plus 11, 22, 33) carries a vibrational meaning.
                   </p>
                   <p>
-                    <strong className="text-text/70">Source:</strong>{' '}
+                    <strong className="text-text/70">Source:</strong>{" "}
                     Deterministic calculation — no AI involved. Based on the
                     Pythagorean system with standard letter-to-number mapping.
                   </p>
@@ -181,7 +174,7 @@ export default function ReportPage() {
                   value={identity.numerology.life_path}
                   subtitle={
                     identity.numerology.is_master_number
-                      ? 'Master Number'
+                      ? "Master Number"
                       : undefined
                   }
                 />
@@ -207,7 +200,7 @@ export default function ReportPage() {
                 />
                 <NumberCard
                   label="Maturity"
-                  value={identity.numerology.maturity ?? '—'}
+                  value={identity.numerology.maturity ?? "—"}
                 />
               </div>
             </Card>
@@ -220,14 +213,15 @@ export default function ReportPage() {
               expandedContent={
                 <div className="text-sm text-text/50 space-y-2">
                   <p>
-                    <strong className="text-text/70">Methodology:</strong>{' '}
+                    <strong className="text-text/70">Methodology:</strong>{" "}
                     Planetary positions calculated using the Swiss Ephemeris
                     library for your exact birth date. Rising sign requires
                     birth time.
                   </p>
                   <p>
-                    <strong className="text-text/70">Source:</strong>{' '}
-                    Deterministic astronomical calculation — no AI interpretation.
+                    <strong className="text-text/70">Source:</strong>{" "}
+                    Deterministic astronomical calculation — no AI
+                    interpretation.
                   </p>
                 </div>
               }
@@ -243,10 +237,10 @@ export default function ReportPage() {
                 />
                 <NumberCard
                   label="Rising Sign"
-                  value={identity.astrology.rising_sign ?? 'N/A'}
+                  value={identity.astrology.rising_sign ?? "N/A"}
                   subtitle={
                     !identity.astrology.rising_sign
-                      ? 'Birth time required'
+                      ? "Birth time required"
                       : undefined
                   }
                 />
@@ -273,16 +267,15 @@ export default function ReportPage() {
               expandedContent={
                 <div className="text-sm text-text/50 space-y-2">
                   <p>
-                    <strong className="text-text/70">Methodology:</strong>{' '}
-                    Your primary archetype is determined by Life Path number,
-                    with elemental boosts from your Sun sign. The shadow pattern
-                    is the primary growth edge associated with your archetype.
+                    <strong className="text-text/70">Methodology:</strong> Your
+                    primary archetype is determined by Life Path number, with
+                    elemental boosts from your Sun sign. The shadow pattern is
+                    the primary growth edge associated with your archetype.
                   </p>
                   <p>
-                    <strong className="text-text/70">Framework:</strong>{' '}
-                    12 Jungian archetypes: Creator, Sage, Explorer, Mystic,
-                    Ruler, Lover, Hero, Caregiver, Jester, Innocent, Rebel,
-                    Everyman.
+                    <strong className="text-text/70">Framework:</strong> 12
+                    Jungian archetypes: Creator, Sage, Explorer, Mystic, Ruler,
+                    Lover, Hero, Caregiver, Jester, Innocent, Rebel, Everyman.
                   </p>
                 </div>
               }
@@ -363,16 +356,15 @@ export default function ReportPage() {
               expandedContent={
                 <div className="text-sm text-text/50 space-y-2">
                   <p>
-                    <strong className="text-text/70">Methodology:</strong>{' '}
-                    The mini-IPIP is a validated 20-item short form of the
+                    <strong className="text-text/70">Methodology:</strong> The
+                    mini-IPIP is a validated 20-item short form of the
                     International Personality Item Pool Big Five factor markers
                     (Donnellan et al., 2006).
                   </p>
                   <p>
-                    <strong className="text-text/70">Scale:</strong>{' '}
-                    Each trait is scored 0-100. Higher scores indicate stronger
-                    expression of that trait. Scores near 50 indicate moderate
-                    expression.
+                    <strong className="text-text/70">Scale:</strong> Each trait
+                    is scored 0-100. Higher scores indicate stronger expression
+                    of that trait. Scores near 50 indicate moderate expression.
                   </p>
                 </div>
               }
@@ -409,8 +401,8 @@ export default function ReportPage() {
                       </span>
                       <span className="text-base font-semibold text-accent capitalize">
                         {identity.personality.attachment_style.replace(
-                          '-',
-                          ' / ',
+                          "-",
+                          " / ",
                         )}
                       </span>
                     </div>
@@ -423,7 +415,7 @@ export default function ReportPage() {
                           Type {identity.personality.enneagram_type}
                           {identity.personality.enneagram_wing
                             ? `w${identity.personality.enneagram_wing}`
-                            : ''}
+                            : ""}
                         </span>
                       </div>
                     )}
@@ -434,7 +426,10 @@ export default function ReportPage() {
 
             {/* ── Strengths Map ──────────────────────────────────────── */}
             {identity.strengths_map && identity.strengths_map.length > 0 && (
-              <Card title="Strengths Map" subtitle="Top strengths derived from all identity systems">
+              <Card
+                title="Strengths Map"
+                subtitle="Top strengths derived from all identity systems"
+              >
                 <div className="flex flex-wrap gap-2">
                   {identity.strengths_map.map((strength) => (
                     <span
@@ -483,10 +478,10 @@ export default function ReportPage() {
             variant="ghost"
             onClick={() => {
               const apiUrl =
-                process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+                process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
               window.open(
                 `${apiUrl}/api/v1/reports/${reportId}/html`,
-                '_blank',
+                "_blank",
               );
             }}
           >
@@ -507,7 +502,7 @@ export default function ReportPage() {
             </svg>
             Export PDF
           </Button>
-          <Button onClick={() => router.push('/')}>Back to Home</Button>
+          <Button onClick={() => router.push("/")}>Back to Home</Button>
         </div>
       </div>
     </div>

@@ -71,38 +71,83 @@ const SYSTEMS = [
 export default function DashboardPage() {
   return (
     <ProtectedRoute>
-    <main className="min-h-screen px-4 sm:px-6 lg:px-8 py-8">
-      <div className="max-w-6xl mx-auto">
-        {/* Page Header */}
-        <header className="mb-10">
-          <h1 className="text-3xl sm:text-4xl font-bold mb-3">
-            <span className="text-gradient-gold">Dashboard</span>
-          </h1>
-          <p className="text-text/50 text-base max-w-2xl">
-            Your personal transformation at a glance. Five integrated systems
-            work together through a unified profile to support your growth.
-          </p>
-        </header>
+      <main className="min-h-screen px-4 sm:px-6 lg:px-8 py-8">
+        <div className="max-w-6xl mx-auto">
+          {/* Page Header */}
+          <header className="mb-10">
+            <h1 className="text-3xl sm:text-4xl font-bold mb-3">
+              <span className="text-gradient-gold">Dashboard</span>
+            </h1>
+            <p className="text-text/50 text-base max-w-2xl">
+              Your personal transformation at a glance. Five integrated systems
+              work together through a unified profile to support your growth.
+            </p>
+          </header>
 
-        {/* Profile Summary Banner */}
-        <section className="card-surface p-6 mb-8" aria-label="Profile summary">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-            <div>
-              <h2 className="text-lg font-semibold text-text mb-1">
-                Unified Profile
-              </h2>
-              <p className="text-sm text-text/40">
-                Complete your discovery assessment to unlock personalized
-                insights across all five systems.
-              </p>
+          {/* Profile Summary Banner */}
+          <section
+            className="card-surface p-6 mb-8"
+            aria-label="Profile summary"
+          >
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+              <div>
+                <h2 className="text-lg font-semibold text-text mb-1">
+                  Unified Profile
+                </h2>
+                <p className="text-sm text-text/40">
+                  Complete your discovery assessment to unlock personalized
+                  insights across all five systems.
+                </p>
+              </div>
+              <a
+                href="/discover/intake"
+                className="inline-flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-primary-dark to-primary text-bg font-semibold rounded-xl text-sm transition-all duration-300 hover:shadow-[0_0_20px_rgba(218,165,32,0.3)] hover:scale-[1.02] active:scale-100 whitespace-nowrap"
+              >
+                Begin Discovery
+                <svg
+                  className="w-4 h-4"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden="true"
+                >
+                  <path d="M5 12h14" />
+                  <path d="m12 5 7 7-7 7" />
+                </svg>
+              </a>
             </div>
-            <a
-              href="/discover/intake"
-              className="inline-flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-primary-dark to-primary text-bg font-semibold rounded-xl text-sm transition-all duration-300 hover:shadow-[0_0_20px_rgba(218,165,32,0.3)] hover:scale-[1.02] active:scale-100 whitespace-nowrap"
-            >
-              Begin Discovery
+          </section>
+
+          {/* System Cards Grid */}
+          <section aria-label="Five transformation systems">
+            <h2 className="sr-only">Transformation Systems</h2>
+            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-6">
+              {SYSTEMS.map((system) => (
+                <SystemCard
+                  key={system.name}
+                  name={system.name}
+                  href={system.href}
+                  icon={<span aria-hidden="true">{system.icon}</span>}
+                  description={system.description}
+                  status={system.status}
+                  features={system.features}
+                  gradient={system.gradient}
+                />
+              ))}
+            </div>
+          </section>
+
+          {/* Ethics & Transparency Note */}
+          <section
+            className="mt-10 card-surface p-5 border-l-2 border-primary/30"
+            aria-label="Ethics and transparency"
+          >
+            <div className="flex items-start gap-3">
               <svg
-                className="w-4 h-4"
+                className="w-5 h-5 text-primary/60 mt-0.5 flex-shrink-0"
                 viewBox="0 0 24 24"
                 fill="none"
                 stroke="currentColor"
@@ -111,66 +156,24 @@ export default function DashboardPage() {
                 strokeLinejoin="round"
                 aria-hidden="true"
               >
-                <path d="M5 12h14" />
-                <path d="m12 5 7 7-7 7" />
+                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10" />
               </svg>
-            </a>
-          </div>
-        </section>
-
-        {/* System Cards Grid */}
-        <section aria-label="Five transformation systems">
-          <h2 className="sr-only">Transformation Systems</h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-6">
-            {SYSTEMS.map((system) => (
-              <SystemCard
-                key={system.name}
-                name={system.name}
-                href={system.href}
-                icon={<span aria-hidden="true">{system.icon}</span>}
-                description={system.description}
-                status={system.status}
-                features={system.features}
-                gradient={system.gradient}
-              />
-            ))}
-          </div>
-        </section>
-
-        {/* Ethics & Transparency Note */}
-        <section
-          className="mt-10 card-surface p-5 border-l-2 border-primary/30"
-          aria-label="Ethics and transparency"
-        >
-          <div className="flex items-start gap-3">
-            <svg
-              className="w-5 h-5 text-primary/60 mt-0.5 flex-shrink-0"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              aria-hidden="true"
-            >
-              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10" />
-            </svg>
-            <div>
-              <h3 className="text-sm font-semibold text-text/70 mb-1">
-                Ethics-First Design
-              </h3>
-              <p className="text-xs text-text/40 leading-relaxed">
-                All financial calculations are deterministic (never
-                AI-generated). Every system includes methodology panels showing
-                evidence levels, sources, and calculation types. Your data stays
-                on your infrastructure. No dark patterns, no artificial urgency,
-                no manipulative design.
-              </p>
+              <div>
+                <h3 className="text-sm font-semibold text-text/70 mb-1">
+                  Ethics-First Design
+                </h3>
+                <p className="text-xs text-text/40 leading-relaxed">
+                  All financial calculations are deterministic (never
+                  AI-generated). Every system includes methodology panels
+                  showing evidence levels, sources, and calculation types. Your
+                  data stays on your infrastructure. No dark patterns, no
+                  artificial urgency, no manipulative design.
+                </p>
+              </div>
             </div>
-          </div>
-        </section>
-      </div>
-    </main>
+          </section>
+        </div>
+      </main>
     </ProtectedRoute>
   );
 }

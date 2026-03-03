@@ -1,6 +1,6 @@
-import Link from 'next/link';
+import Link from "next/link";
 
-export type SystemStatus = 'active' | 'coming-soon' | 'beta';
+export type SystemStatus = "active" | "coming-soon" | "beta";
 
 interface SystemCardProps {
   name: string;
@@ -12,20 +12,21 @@ interface SystemCardProps {
   gradient: string;
 }
 
-const statusConfig: Record<SystemStatus, { label: string; className: string }> = {
-  active: {
-    label: 'Active',
-    className: 'bg-accent/20 text-accent',
-  },
-  beta: {
-    label: 'Beta',
-    className: 'bg-primary/20 text-primary',
-  },
-  'coming-soon': {
-    label: 'Coming Soon',
-    className: 'bg-secondary/20 text-secondary',
-  },
-};
+const statusConfig: Record<SystemStatus, { label: string; className: string }> =
+  {
+    active: {
+      label: "Active",
+      className: "bg-accent/20 text-accent",
+    },
+    beta: {
+      label: "Beta",
+      className: "bg-primary/20 text-primary",
+    },
+    "coming-soon": {
+      label: "Coming Soon",
+      className: "bg-secondary/20 text-secondary",
+    },
+  };
 
 export default function SystemCard({
   name,
@@ -64,14 +65,18 @@ export default function SystemCard({
         {name}
       </h3>
 
-      <p className="text-text/50 text-sm leading-relaxed mb-4">
-        {description}
-      </p>
+      <p className="text-text/50 text-sm leading-relaxed mb-4">{description}</p>
 
       <ul className="space-y-1.5" aria-label={`${name} features`}>
         {features.map((feature) => (
-          <li key={feature} className="flex items-center gap-2 text-xs text-text/40">
-            <span className="w-1 h-1 rounded-full bg-primary/50 flex-shrink-0" aria-hidden="true" />
+          <li
+            key={feature}
+            className="flex items-center gap-2 text-xs text-text/40"
+          >
+            <span
+              className="w-1 h-1 rounded-full bg-primary/50 flex-shrink-0"
+              aria-hidden="true"
+            />
             {feature}
           </li>
         ))}

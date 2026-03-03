@@ -1,6 +1,6 @@
-'use client';
+"use client";
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback } from "react";
 
 /**
  * Async state for API calls — tracks loading, data, and error.
@@ -48,7 +48,7 @@ export function useApi<T>(
       })
       .catch((err) => {
         if (!cancelled) {
-          setError(err instanceof Error ? err.message : 'An error occurred');
+          setError(err instanceof Error ? err.message : "An error occurred");
           setLoading(false);
         }
       });
@@ -72,9 +72,9 @@ export function getStoredIntake(): {
   birthCity?: string;
   intention?: string;
 } | null {
-  if (typeof window === 'undefined') return null;
+  if (typeof window === "undefined") return null;
   try {
-    const raw = sessionStorage.getItem('alchymine_intake');
+    const raw = sessionStorage.getItem("alchymine_intake");
     return raw ? JSON.parse(raw) : null;
   } catch {
     return null;
@@ -85,6 +85,6 @@ export function getStoredIntake(): {
  * Reads the last generated report ID from sessionStorage.
  */
 export function getStoredReportId(): string | null {
-  if (typeof window === 'undefined') return null;
-  return sessionStorage.getItem('alchymine_report_id');
+  if (typeof window === "undefined") return null;
+  return sessionStorage.getItem("alchymine_report_id");
 }

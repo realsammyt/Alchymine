@@ -22,11 +22,13 @@ Alchymine integrates healing-swarm-skills as follows:
 ## Consequences
 
 **Positive:**
+
 - Full inheritance of healing-swarm-skills' ethical safeguards and cultural review.
 - Clear contribution path back to the upstream project.
 - Cross-system interactions are mediated rather than ad-hoc.
 
 **Negative:**
+
 - Upstream PR acceptance is outside Alchymine's control and may lag.
 - Cross-system bridge adds a layer of indirection for healing-related features.
 - Maintaining compatibility with upstream API changes requires ongoing effort.

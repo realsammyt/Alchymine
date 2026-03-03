@@ -1,6 +1,6 @@
-'use client';
+"use client";
 
-import { ReactNode, useState } from 'react';
+import { ReactNode, useState } from "react";
 
 interface CardProps {
   title?: string;
@@ -18,12 +18,12 @@ export default function Card({
   title,
   subtitle,
   badge,
-  badgeColor = 'bg-primary/20 text-primary',
+  badgeColor = "bg-primary/20 text-primary",
   expandable = false,
   defaultExpanded = false,
   expandedContent,
   children,
-  className = '',
+  className = "",
 }: CardProps) {
   const [expanded, setExpanded] = useState(defaultExpanded);
 
@@ -72,11 +72,11 @@ export default function Card({
               strokeWidth="2"
               strokeLinecap="round"
               strokeLinejoin="round"
-              className={`transition-transform duration-300 ${expanded ? 'rotate-180' : ''}`}
+              className={`transition-transform duration-300 ${expanded ? "rotate-180" : ""}`}
             >
               <path d="m6 9 6 6 6-6" />
             </svg>
-            {expanded ? 'Hide methodology' : 'Show methodology'}
+            {expanded ? "Hide methodology" : "Show methodology"}
           </button>
           {expanded && (
             <div className="mt-4 pt-4 border-t border-white/5 animate-fade-in">

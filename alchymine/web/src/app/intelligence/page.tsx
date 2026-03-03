@@ -1,79 +1,100 @@
-'use client';
+"use client";
 
-import { useMemo } from 'react';
-import MethodologyPanel from '@/components/shared/MethodologyPanel';
-import ApiStateView from '@/components/shared/ApiStateView';
-import { getNumerology, getAstrology, NumerologyResponse, AstrologyResponse } from '@/lib/api';
-import { useApi, getStoredIntake } from '@/lib/useApi';
+import { useMemo } from "react";
+import MethodologyPanel from "@/components/shared/MethodologyPanel";
+import ApiStateView from "@/components/shared/ApiStateView";
+import {
+  getNumerology,
+  getAstrology,
+  NumerologyResponse,
+  AstrologyResponse,
+} from "@/lib/api";
+import { useApi, getStoredIntake } from "@/lib/useApi";
 
 const NUMEROLOGY_NUMBERS = [
   {
-    name: 'Life Path Number',
+    name: "Life Path Number",
     description:
-      'Derived from your complete birth date. Reveals your life purpose, natural talents, and the path of experiences you will encounter.',
-    formula: 'Reduce birth date (MM + DD + YYYY) to single digit or Master Number (11, 22, 33).',
+      "Derived from your complete birth date. Reveals your life purpose, natural talents, and the path of experiences you will encounter.",
+    formula:
+      "Reduce birth date (MM + DD + YYYY) to single digit or Master Number (11, 22, 33).",
   },
   {
-    name: 'Expression Number',
+    name: "Expression Number",
     description:
-      'Calculated from the full name at birth using Pythagorean numerology. Shows your natural abilities, potential, and personal goals.',
-    formula: 'Convert each letter to its numeric value (A=1 through Z=8, cycling), then reduce.',
+      "Calculated from the full name at birth using Pythagorean numerology. Shows your natural abilities, potential, and personal goals.",
+    formula:
+      "Convert each letter to its numeric value (A=1 through Z=8, cycling), then reduce.",
   },
   {
-    name: 'Soul Urge Number',
+    name: "Soul Urge Number",
     description:
-      'Derived from the vowels in your birth name. Reveals your inner desires, motivations, and what truly drives you.',
-    formula: 'Sum the numeric values of all vowels in birth name, then reduce.',
+      "Derived from the vowels in your birth name. Reveals your inner desires, motivations, and what truly drives you.",
+    formula: "Sum the numeric values of all vowels in birth name, then reduce.",
   },
   {
-    name: 'Personality Number',
+    name: "Personality Number",
     description:
-      'Calculated from the consonants in your birth name. Represents how others perceive you and your outward persona.',
-    formula: 'Sum the numeric values of all consonants in birth name, then reduce.',
+      "Calculated from the consonants in your birth name. Represents how others perceive you and your outward persona.",
+    formula:
+      "Sum the numeric values of all consonants in birth name, then reduce.",
   },
 ];
 
 const ASTROLOGY_SECTIONS = [
   {
-    name: 'Sun Sign',
-    description: 'Your core identity and ego expression, determined by the sun\'s position at birth.',
+    name: "Sun Sign",
+    description:
+      "Your core identity and ego expression, determined by the sun's position at birth.",
   },
   {
-    name: 'Moon Sign',
-    description: 'Your emotional nature and inner world, based on the moon\'s zodiac position at birth.',
+    name: "Moon Sign",
+    description:
+      "Your emotional nature and inner world, based on the moon's zodiac position at birth.",
   },
   {
-    name: 'Rising Sign',
-    description: 'Your outward persona and first impression, determined by the ascendant at birth time.',
+    name: "Rising Sign",
+    description:
+      "Your outward persona and first impression, determined by the ascendant at birth time.",
   },
   {
-    name: 'Planetary Aspects',
-    description: 'Geometric relationships between planets that shape personality dynamics and life themes.',
+    name: "Planetary Aspects",
+    description:
+      "Geometric relationships between planets that shape personality dynamics and life themes.",
   },
 ];
 
 const BIORHYTHM_CYCLES = [
   {
-    name: 'Physical',
-    period: '23 days',
-    description: 'Strength, coordination, endurance, and physical well-being.',
-    color: 'text-accent',
+    name: "Physical",
+    period: "23 days",
+    description: "Strength, coordination, endurance, and physical well-being.",
+    color: "text-accent",
   },
   {
-    name: 'Emotional',
-    period: '28 days',
-    description: 'Mood, sensitivity, creativity, and emotional resilience.',
-    color: 'text-secondary',
+    name: "Emotional",
+    period: "28 days",
+    description: "Mood, sensitivity, creativity, and emotional resilience.",
+    color: "text-secondary",
   },
   {
-    name: 'Intellectual',
-    period: '33 days',
-    description: 'Analytical thinking, memory, learning capacity, and communication.',
-    color: 'text-primary',
+    name: "Intellectual",
+    period: "33 days",
+    description:
+      "Analytical thinking, memory, learning capacity, and communication.",
+    color: "text-primary",
   },
 ];
 
-function NumberResult({ label, value, subtitle }: { label: string; value: number | string; subtitle?: string }) {
+function NumberResult({
+  label,
+  value,
+  subtitle,
+}: {
+  label: string;
+  value: number | string;
+  subtitle?: string;
+}) {
   return (
     <div className="bg-surface/50 border border-white/5 rounded-xl p-4 text-center">
       <div className="text-3xl font-bold text-gradient-gold mb-1">{value}</div>
@@ -88,13 +109,20 @@ export default function IntelligencePage() {
   const hasIntake = !!intake?.fullName && !!intake?.birthDate;
 
   const numerology = useApi<NumerologyResponse>(
-    hasIntake ? () => getNumerology(intake!.fullName!, intake!.birthDate!) : null,
+    hasIntake
+      ? () => getNumerology(intake!.fullName!, intake!.birthDate!)
+      : null,
     [intake?.fullName, intake?.birthDate],
   );
 
   const astrology = useApi<AstrologyResponse>(
     hasIntake && intake?.birthDate
-      ? () => getAstrology(intake!.birthDate!, intake?.birthTime ?? undefined, intake?.birthCity ?? undefined)
+      ? () =>
+          getAstrology(
+            intake!.birthDate!,
+            intake?.birthTime ?? undefined,
+            intake?.birthCity ?? undefined,
+          )
       : null,
     [intake?.birthDate, intake?.birthTime],
   );
@@ -105,21 +133,29 @@ export default function IntelligencePage() {
         {/* Page Header */}
         <header className="mb-10">
           <h1 className="text-3xl sm:text-4xl font-bold mb-3">
-            <span className="text-gradient-gold">Personalized Intelligence</span>
+            <span className="text-gradient-gold">
+              Personalized Intelligence
+            </span>
           </h1>
           <p className="text-text/50 text-base max-w-2xl">
-            Numerology, astrology, and biorhythm engines map your unique identity
-            profile using deterministic calculations. Every result is reproducible
-            and transparent.
+            Numerology, astrology, and biorhythm engines map your unique
+            identity profile using deterministic calculations. Every result is
+            reproducible and transparent.
           </p>
         </header>
 
         {/* Personalized Numerology Results */}
         {hasIntake && (
           <section className="mb-12" aria-labelledby="your-numerology-heading">
-            <h2 id="your-numerology-heading" className="text-2xl font-bold mb-6 flex items-center gap-3">
-              <span className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center text-xl" aria-hidden="true">
-                {'\u{2728}'}
+            <h2
+              id="your-numerology-heading"
+              className="text-2xl font-bold mb-6 flex items-center gap-3"
+            >
+              <span
+                className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center text-xl"
+                aria-hidden="true"
+              >
+                {"\u{2728}"}
               </span>
               Your Numerology
             </h2>
@@ -132,12 +168,39 @@ export default function IntelligencePage() {
             >
               {numerology.data && (
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mb-4">
-                  <NumberResult label="Life Path" value={numerology.data.life_path} subtitle={numerology.data.is_master_number ? 'Master Number' : undefined} />
-                  <NumberResult label="Expression" value={numerology.data.expression} subtitle="Destiny Number" />
-                  <NumberResult label="Soul Urge" value={numerology.data.soul_urge} subtitle="Heart's Desire" />
-                  <NumberResult label="Personality" value={numerology.data.personality} subtitle="Outer Number" />
-                  <NumberResult label="Personal Year" value={numerology.data.personal_year} subtitle="Current Cycle" />
-                  <NumberResult label="Maturity" value={numerology.data.maturity} />
+                  <NumberResult
+                    label="Life Path"
+                    value={numerology.data.life_path}
+                    subtitle={
+                      numerology.data.is_master_number
+                        ? "Master Number"
+                        : undefined
+                    }
+                  />
+                  <NumberResult
+                    label="Expression"
+                    value={numerology.data.expression}
+                    subtitle="Destiny Number"
+                  />
+                  <NumberResult
+                    label="Soul Urge"
+                    value={numerology.data.soul_urge}
+                    subtitle="Heart's Desire"
+                  />
+                  <NumberResult
+                    label="Personality"
+                    value={numerology.data.personality}
+                    subtitle="Outer Number"
+                  />
+                  <NumberResult
+                    label="Personal Year"
+                    value={numerology.data.personal_year}
+                    subtitle="Current Cycle"
+                  />
+                  <NumberResult
+                    label="Maturity"
+                    value={numerology.data.maturity}
+                  />
                 </div>
               )}
             </ApiStateView>
@@ -147,9 +210,15 @@ export default function IntelligencePage() {
         {/* Personalized Astrology Results */}
         {hasIntake && (
           <section className="mb-12" aria-labelledby="your-astrology-heading">
-            <h2 id="your-astrology-heading" className="text-2xl font-bold mb-6 flex items-center gap-3">
-              <span className="w-10 h-10 rounded-xl bg-secondary/10 flex items-center justify-center text-xl" aria-hidden="true">
-                {'\u{1F320}'}
+            <h2
+              id="your-astrology-heading"
+              className="text-2xl font-bold mb-6 flex items-center gap-3"
+            >
+              <span
+                className="w-10 h-10 rounded-xl bg-secondary/10 flex items-center justify-center text-xl"
+                aria-hidden="true"
+              >
+                {"\u{1F320}"}
               </span>
               Your Astrology
             </h2>
@@ -162,9 +231,23 @@ export default function IntelligencePage() {
             >
               {astrology.data && (
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mb-4">
-                  <NumberResult label="Sun Sign" value={astrology.data.sun_sign} />
-                  <NumberResult label="Moon Sign" value={astrology.data.moon_sign} />
-                  <NumberResult label="Rising Sign" value={astrology.data.rising_sign ?? 'N/A'} subtitle={!astrology.data.rising_sign ? 'Birth time required' : undefined} />
+                  <NumberResult
+                    label="Sun Sign"
+                    value={astrology.data.sun_sign}
+                  />
+                  <NumberResult
+                    label="Moon Sign"
+                    value={astrology.data.moon_sign}
+                  />
+                  <NumberResult
+                    label="Rising Sign"
+                    value={astrology.data.rising_sign ?? "N/A"}
+                    subtitle={
+                      !astrology.data.rising_sign
+                        ? "Birth time required"
+                        : undefined
+                    }
+                  />
                 </div>
               )}
             </ApiStateView>
@@ -173,9 +256,15 @@ export default function IntelligencePage() {
 
         {/* Numerology Education Section */}
         <section className="mb-12" aria-labelledby="numerology-heading">
-          <h2 id="numerology-heading" className="text-2xl font-bold mb-6 flex items-center gap-3">
-            <span className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center text-xl" aria-hidden="true">
-              {'\u{1F522}'}
+          <h2
+            id="numerology-heading"
+            className="text-2xl font-bold mb-6 flex items-center gap-3"
+          >
+            <span
+              className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center text-xl"
+              aria-hidden="true"
+            >
+              {"\u{1F522}"}
             </span>
             Numerology
           </h2>
@@ -183,11 +272,16 @@ export default function IntelligencePage() {
           <div className="grid sm:grid-cols-2 gap-4 mb-4">
             {NUMEROLOGY_NUMBERS.map((num) => (
               <div key={num.name} className="card-surface p-5">
-                <h3 className="text-sm font-semibold text-primary mb-2">{num.name}</h3>
-                <p className="text-sm text-text/50 leading-relaxed mb-3">{num.description}</p>
+                <h3 className="text-sm font-semibold text-primary mb-2">
+                  {num.name}
+                </h3>
+                <p className="text-sm text-text/50 leading-relaxed mb-3">
+                  {num.description}
+                </p>
                 <div className="bg-bg/50 rounded-lg px-3 py-2">
                   <p className="text-xs text-text/30">
-                    <span className="font-medium text-text/40">Formula:</span> {num.formula}
+                    <span className="font-medium text-text/40">Formula:</span>{" "}
+                    {num.formula}
                   </p>
                 </div>
               </div>
@@ -200,18 +294,24 @@ export default function IntelligencePage() {
             evidenceLevel="traditional"
             calculationType="deterministic"
             sources={[
-              'Pythagorean number theory and letter-number correspondences (historical)',
-              'Cultural numerology traditions across Chaldean, Kabbalistic, and Pythagorean systems',
-              'Alchymine uses Pythagorean (Western) as the primary system for consistency',
+              "Pythagorean number theory and letter-number correspondences (historical)",
+              "Cultural numerology traditions across Chaldean, Kabbalistic, and Pythagorean systems",
+              "Alchymine uses Pythagorean (Western) as the primary system for consistency",
             ]}
           />
         </section>
 
         {/* Astrology Section */}
         <section className="mb-12" aria-labelledby="astrology-heading">
-          <h2 id="astrology-heading" className="text-2xl font-bold mb-6 flex items-center gap-3">
-            <span className="w-10 h-10 rounded-xl bg-secondary/10 flex items-center justify-center text-xl" aria-hidden="true">
-              {'\u{2B50}'}
+          <h2
+            id="astrology-heading"
+            className="text-2xl font-bold mb-6 flex items-center gap-3"
+          >
+            <span
+              className="w-10 h-10 rounded-xl bg-secondary/10 flex items-center justify-center text-xl"
+              aria-hidden="true"
+            >
+              {"\u{2B50}"}
             </span>
             Astrology
           </h2>
@@ -219,8 +319,12 @@ export default function IntelligencePage() {
           <div className="grid sm:grid-cols-2 gap-4 mb-4">
             {ASTROLOGY_SECTIONS.map((section) => (
               <div key={section.name} className="card-surface p-5">
-                <h3 className="text-sm font-semibold text-secondary mb-2">{section.name}</h3>
-                <p className="text-sm text-text/50 leading-relaxed">{section.description}</p>
+                <h3 className="text-sm font-semibold text-secondary mb-2">
+                  {section.name}
+                </h3>
+                <p className="text-sm text-text/50 leading-relaxed">
+                  {section.description}
+                </p>
               </div>
             ))}
           </div>
@@ -231,18 +335,24 @@ export default function IntelligencePage() {
             evidenceLevel="traditional"
             calculationType="hybrid"
             sources={[
-              'Swiss Ephemeris (Astrodienst) for astronomical calculations',
-              'Western tropical zodiac, Placidus house system',
-              'Interpretive frameworks from Liz Greene, Robert Hand, and Stephen Arroyo',
+              "Swiss Ephemeris (Astrodienst) for astronomical calculations",
+              "Western tropical zodiac, Placidus house system",
+              "Interpretive frameworks from Liz Greene, Robert Hand, and Stephen Arroyo",
             ]}
           />
         </section>
 
         {/* Biorhythm Section */}
         <section className="mb-12" aria-labelledby="biorhythm-heading">
-          <h2 id="biorhythm-heading" className="text-2xl font-bold mb-6 flex items-center gap-3">
-            <span className="w-10 h-10 rounded-xl bg-accent/10 flex items-center justify-center text-xl" aria-hidden="true">
-              {'\u{1F4C8}'}
+          <h2
+            id="biorhythm-heading"
+            className="text-2xl font-bold mb-6 flex items-center gap-3"
+          >
+            <span
+              className="w-10 h-10 rounded-xl bg-accent/10 flex items-center justify-center text-xl"
+              aria-hidden="true"
+            >
+              {"\u{1F4C8}"}
             </span>
             Biorhythm
           </h2>
@@ -251,12 +361,18 @@ export default function IntelligencePage() {
             {BIORHYTHM_CYCLES.map((cycle) => (
               <div key={cycle.name} className="card-surface p-5">
                 <div className="flex items-center justify-between mb-3">
-                  <h3 className={`text-sm font-semibold ${cycle.color}`}>{cycle.name}</h3>
+                  <h3 className={`text-sm font-semibold ${cycle.color}`}>
+                    {cycle.name}
+                  </h3>
                   <span className="text-xs text-text/30">{cycle.period}</span>
                 </div>
-                <p className="text-sm text-text/50 leading-relaxed">{cycle.description}</p>
+                <p className="text-sm text-text/50 leading-relaxed">
+                  {cycle.description}
+                </p>
                 <div className="mt-4 h-8 bg-bg/50 rounded-lg flex items-center justify-center">
-                  <span className="text-xs text-text/20">Chart available after assessment</span>
+                  <span className="text-xs text-text/20">
+                    Chart available after assessment
+                  </span>
                 </div>
               </div>
             ))}
@@ -270,7 +386,7 @@ export default function IntelligencePage() {
             sources={[
               'Thommen, George S. "Is This Your Day?" (1973) - foundational biorhythm reference',
               'Hines, T.M. "Comprehensive review of biorhythm theory" (1998) - critical review noting mixed evidence',
-              'Note: Biorhythm theory has limited empirical support. Presented as a self-reflection framework, not a predictive tool.',
+              "Note: Biorhythm theory has limited empirical support. Presented as a self-reflection framework, not a predictive tool.",
             ]}
           />
         </section>
@@ -281,7 +397,7 @@ export default function IntelligencePage() {
             href="/discover/intake"
             className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-primary-dark to-primary text-bg font-semibold rounded-xl text-sm transition-all duration-300 hover:shadow-[0_0_20px_rgba(218,165,32,0.3)] hover:scale-[1.02] active:scale-100"
           >
-            {hasIntake ? 'Recalculate Your Profile' : 'Calculate Your Profile'}
+            {hasIntake ? "Recalculate Your Profile" : "Calculate Your Profile"}
             <svg
               className="w-4 h-4"
               viewBox="0 0 24 24"

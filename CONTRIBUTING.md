@@ -77,6 +77,7 @@ Major changes that affect architecture, cross-system interactions, or public API
 4. **Decision:** Core maintainers accept, reject, or request revision. Accepted RFCs become numbered ADRs.
 
 Examples of changes that require an RFC:
+
 - Adding a new system or pillar.
 - Changing the quality gate pipeline for any domain.
 - Modifying the cross-system data bridge.

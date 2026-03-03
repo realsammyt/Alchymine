@@ -17,6 +17,7 @@ The Perspective Prism implements a 3-layer system for cognitive development:
 - **Layer 3 -- Kegan Worldview Development:** Robert Kegan's constructive-developmental framework for understanding and advancing through stages of meaning-making complexity.
 
 Architecture:
+
 - **5 agents:** Reframe Analyst, Decision Facilitator, Worldview Guide, Integration Coach, and Crisis Sentinel.
 - **7 skills:** Located in `skills/perspective-enhancement/`, covering cognitive distortion identification, reframing exercises, effectual reasoning, worldview assessment, perspective integration, growth tracking, and crisis detection.
 - **6 quality gates:** (1) Psychological safety screen, (2) crisis detection and escalation, (3) scope boundary enforcement (coaching, not therapy), (4) evidence grounding, (5) developmental stage appropriateness, and (6) cross-layer coherence.
@@ -25,11 +26,13 @@ Architecture:
 ## Consequences
 
 **Positive:**
+
 - Three complementary frameworks cover practical, strategic, and developmental perspectives.
 - Deterministic crisis detection eliminates false-negative risk from LLM uncertainty.
 - Six quality gates enforce clear boundaries between coaching and therapy.
 
 **Negative:**
+
 - Kegan's framework requires careful simplification to be accessible without distortion.
 - Crisis detection rules must be maintained and validated against evolving clinical standards.
 - Three theoretical frameworks increase onboarding complexity for contributors.

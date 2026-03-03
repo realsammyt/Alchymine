@@ -29,13 +29,20 @@ jest.mock("next/navigation", () => ({
 // Mock useAuth to return an authenticated user so ProtectedRoute renders children
 jest.mock("@/lib/AuthContext", () => ({
   useAuth: jest.fn().mockReturnValue({
-    user: { id: "test-user", email: "test@example.com", version: "1.0", created_at: "2024-01-01" },
+    user: {
+      id: "test-user",
+      email: "test@example.com",
+      version: "1.0",
+      created_at: "2024-01-01",
+    },
     isLoading: false,
     login: jest.fn(),
     register: jest.fn(),
     logout: jest.fn(),
   }),
-  AuthProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+  AuthProvider: ({ children }: { children: React.ReactNode }) => (
+    <>{children}</>
+  ),
 }));
 
 describe("DashboardPage", () => {
