@@ -291,15 +291,15 @@ export default function PerspectivePage() {
                     <div
                       className={
                         isCurrentStage
-                          ? "card-surface-elevated glow-teal p-5 ring-1 ring-accent/30"
-                          : "card-surface p-5"
+                          ? "card-surface-elevated glow-teal p-5 ring-1 ring-accent/30 transition-all duration-500"
+                          : "card-surface p-5 transition-all duration-500 hover:glow-teal hover:-translate-y-0.5"
                       }
                     >
                       <div className="flex items-center gap-3 mb-2">
                         <span className="w-8 h-8 rounded-full bg-accent/10 text-accent text-sm font-bold flex items-center justify-center flex-shrink-0">
                           {stage.stage}
                         </span>
-                        <h3 className="font-display text-sm font-semibold text-text">
+                        <h3 className="font-display text-sm font-medium text-text">
                           {stage.name}
                           {isCurrentStage && (
                             <span className="ml-2 font-body text-accent text-xs font-normal">
@@ -361,9 +361,9 @@ export default function PerspectivePage() {
             <MotionStagger className="grid sm:grid-cols-2 gap-4">
               {COGNITIVE_BIASES.map((bias) => (
                 <MotionStaggerItem key={bias.name}>
-                  <div className="card-surface p-5 h-full transition-all duration-300 hover:glow-teal hover:-translate-y-1">
+                  <div className="card-surface p-5 h-full transition-all duration-500 hover:glow-teal hover:-translate-y-1">
                     <div className="flex items-center justify-between mb-2">
-                      <h3 className="font-display text-sm font-semibold text-accent">
+                      <h3 className="font-display text-sm font-medium text-accent">
                         {bias.name}
                       </h3>
                       <span className="font-body px-2 py-0.5 bg-white/5 text-text/30 text-[10px] font-medium rounded-full">
@@ -410,12 +410,12 @@ export default function PerspectivePage() {
             <MotionStagger className="grid sm:grid-cols-2 gap-4">
               {SCENARIO_TYPES.map((scenario) => (
                 <MotionStaggerItem key={scenario.name}>
-                  <div className="card-surface p-5 h-full">
+                  <div className="card-surface p-5 h-full transition-all duration-500 hover:glow-teal hover:-translate-y-1">
                     <div className="flex items-center gap-3 mb-3">
                       <span className="text-2xl" aria-hidden="true">
                         {scenario.icon}
                       </span>
-                      <h3 className="font-display text-sm font-semibold text-text">
+                      <h3 className="font-display text-sm font-medium text-text">
                         {scenario.name}
                       </h3>
                     </div>
@@ -434,7 +434,7 @@ export default function PerspectivePage() {
           <div className="text-center">
             <a
               href="/discover/intake"
-              className="inline-flex items-center gap-2 px-6 py-3 min-h-[44px] bg-gradient-to-r from-accent-dark via-accent to-accent-light text-bg font-body font-semibold rounded-xl text-sm transition-all duration-300 hover:shadow-[0_0_20px_rgba(32,178,170,0.3)] hover:scale-[1.02] active:scale-100"
+              className="inline-flex items-center gap-2 px-6 py-3 min-h-[44px] bg-gradient-to-r from-accent-dark via-accent to-accent-light text-bg font-body font-medium rounded-xl text-sm transition-all duration-300 hover:shadow-[0_0_20px_rgba(32,178,170,0.3)] hover:scale-[1.02] active:scale-100"
             >
               {hasIntake
                 ? "Update Your Perspective Profile"

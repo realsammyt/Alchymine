@@ -273,7 +273,7 @@ export default function CreativePage() {
               {CREATIVE_DIMENSIONS.map((dimension) => (
                 <MotionStaggerItem key={dimension.name}>
                   <div className="card-surface p-5 h-full transition-all duration-300 hover:glow-purple hover:-translate-y-1">
-                    <h3 className="font-display text-sm font-semibold text-secondary mb-2">
+                    <h3 className="font-display text-sm font-medium text-secondary mb-2">
                       {dimension.name}
                     </h3>
                     <p className="font-body text-sm text-text/50 leading-relaxed mb-3">
@@ -333,12 +333,12 @@ export default function CreativePage() {
             <MotionStagger className="grid sm:grid-cols-2 gap-4">
               {STYLE_PROFILES.map((profile) => (
                 <MotionStaggerItem key={profile.name}>
-                  <div className="card-surface p-5 h-full">
+                  <div className="card-surface p-5 h-full transition-all duration-500 hover:glow-purple hover:-translate-y-1">
                     <div className="flex items-center gap-3 mb-3">
                       <span className="text-2xl" aria-hidden="true">
                         {profile.icon}
                       </span>
-                      <h3 className="font-display text-sm font-semibold text-secondary">
+                      <h3 className="font-display text-sm font-medium text-secondary">
                         {profile.name}
                       </h3>
                     </div>
@@ -376,7 +376,7 @@ export default function CreativePage() {
                     className={`card-surface-elevated p-5 h-full ${project.status === "coming-soon" ? "opacity-60" : ""}`}
                   >
                     <div className="flex items-center justify-between mb-2">
-                      <h3 className="font-display text-sm font-semibold text-text">
+                      <h3 className="font-display text-sm font-medium text-text">
                         {project.name}
                       </h3>
                       {project.status === "coming-soon" && (
@@ -400,7 +400,7 @@ export default function CreativePage() {
           <div className="text-center">
             <a
               href="/discover/intake"
-              className="inline-flex items-center gap-2 px-6 py-3 min-h-[44px] bg-gradient-to-r from-secondary-dark via-secondary to-secondary-light text-white font-body font-semibold rounded-xl text-sm transition-all duration-300 hover:shadow-[0_0_20px_rgba(123,45,142,0.3)] hover:scale-[1.02] active:scale-100"
+              className="inline-flex items-center gap-2 px-6 py-3 min-h-[44px] bg-gradient-to-r from-secondary-dark via-secondary to-secondary-light text-white font-body font-medium rounded-xl text-sm transition-all duration-300 hover:shadow-[0_0_20px_rgba(123,45,142,0.3)] hover:scale-[1.02] active:scale-100"
             >
               {hasIntake
                 ? "Update Your Creative Profile"

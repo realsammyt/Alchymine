@@ -399,7 +399,7 @@ export default function Navigation() {
                   href={item.href}
                   aria-label={item.label}
                   aria-current={active ? "page" : undefined}
-                  className={`flex flex-col items-center gap-0.5 px-2 py-1 rounded-lg text-[10px] font-medium transition-colors ${
+                  className={`touch-target-sm flex flex-col items-center justify-center gap-0.5 px-2 py-1.5 rounded-lg text-[10px] font-medium transition-colors ${
                     active ? "text-primary" : "text-text/40 hover:text-text/60"
                   }`}
                 >

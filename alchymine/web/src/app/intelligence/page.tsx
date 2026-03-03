@@ -311,8 +311,8 @@ export default function IntelligencePage() {
             <MotionStagger className="grid sm:grid-cols-2 gap-4 mb-4">
               {NUMEROLOGY_NUMBERS.map((num) => (
                 <MotionStaggerItem key={num.name}>
-                  <div className="card-surface p-5 h-full">
-                    <h3 className="font-display text-sm font-semibold text-primary mb-2">
+                  <div className="card-surface p-5 h-full transition-all duration-300 hover:glow-gold hover:-translate-y-1">
+                    <h3 className="font-display text-sm font-medium text-primary mb-2">
                       {num.name}
                     </h3>
                     <p className="font-body text-sm text-text/50 leading-relaxed mb-3">
@@ -365,8 +365,8 @@ export default function IntelligencePage() {
             <MotionStagger className="grid sm:grid-cols-2 gap-4 mb-4">
               {ASTROLOGY_SECTIONS.map((section) => (
                 <MotionStaggerItem key={section.name}>
-                  <div className="card-surface p-5 h-full">
-                    <h3 className="font-display text-sm font-semibold text-secondary mb-2">
+                  <div className="card-surface p-5 h-full transition-all duration-300 hover:glow-gold hover:-translate-y-1">
+                    <h3 className="font-display text-sm font-medium text-secondary mb-2">
                       {section.name}
                     </h3>
                     <p className="font-body text-sm text-text/50 leading-relaxed">
@@ -411,10 +411,10 @@ export default function IntelligencePage() {
             <MotionStagger className="grid sm:grid-cols-3 gap-4 mb-4">
               {BIORHYTHM_CYCLES.map((cycle) => (
                 <MotionStaggerItem key={cycle.name}>
-                  <div className="card-surface p-5 h-full">
+                  <div className="card-surface p-5 h-full transition-all duration-300 hover:glow-gold hover:-translate-y-1">
                     <div className="flex items-center justify-between mb-3">
                       <h3
-                        className={`font-display text-sm font-semibold ${cycle.color}`}
+                        className={`font-display text-sm font-medium ${cycle.color}`}
                       >
                         {cycle.name}
                       </h3>
@@ -454,7 +454,7 @@ export default function IntelligencePage() {
           <div className="text-center">
             <a
               href="/discover/intake"
-              className="inline-flex items-center gap-2 px-6 py-3 min-h-[44px] bg-gradient-to-r from-primary-dark via-primary to-primary-light text-bg font-body font-semibold rounded-xl text-sm transition-all duration-300 hover:shadow-[0_0_20px_rgba(218,165,32,0.3)] hover:scale-[1.02] active:scale-100"
+              className="inline-flex items-center gap-2 px-6 py-3 min-h-[44px] bg-gradient-to-r from-primary-dark via-primary to-primary-light text-bg font-body font-medium rounded-xl text-sm transition-all duration-300 hover:shadow-[0_0_20px_rgba(218,165,32,0.3)] hover:scale-[1.02] active:scale-100"
             >
               {hasIntake
                 ? "Recalculate Your Profile"

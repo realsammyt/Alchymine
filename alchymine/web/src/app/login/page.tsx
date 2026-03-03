@@ -35,20 +35,33 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="grain-overlay min-h-screen flex items-center justify-center px-4">
+    <main className="grain-overlay min-h-screen flex items-center justify-center px-4 py-8 sm:py-4">
       <div className="bg-atmosphere w-full max-w-md">
         <div className="text-center mb-8">
+          <Link
+            href="/"
+            className="inline-block font-display text-2xl font-light tracking-wide text-gradient-gold mb-6 hover:opacity-80 transition-opacity"
+            aria-label="Alchymine home"
+          >
+            Alchymine
+          </Link>
           <h1 className="font-display text-display-md font-light text-gradient-gold">
             Welcome Back
           </h1>
           <hr className="rule-gold my-6 max-w-[120px] mx-auto" />
-          <p className="text-text/50 mt-2">Sign in to your Alchymine account</p>
+          <p className="text-text/50 mt-2 font-body">
+            Sign in to your Alchymine account
+          </p>
         </div>
 
         <MotionReveal delay={0.1}>
           <form onSubmit={handleSubmit} className="card-surface p-6 space-y-5">
             {error && (
-              <div className="bg-red-500/10 border border-red-500/20 text-red-400 text-sm rounded-lg p-3">
+              <div
+                role="alert"
+                aria-live="assertive"
+                className="bg-primary-dark/10 border border-primary-dark/20 text-primary-dark text-sm font-body rounded-xl p-3"
+              >
                 {error}
               </div>
             )}

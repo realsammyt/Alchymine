@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useId, useState } from "react";
 import Link from "next/link";
 import Card from "@/components/shared/Card";
 import Button from "@/components/shared/Button";
@@ -131,6 +131,7 @@ function ProgressRing({
   label: string;
   size?: number;
 }) {
+  const gradientId = useId();
   const radius = (size - 8) / 2;
   const circumference = 2 * Math.PI * radius;
   const offset = circumference - (value / 100) * circumference;
@@ -145,9 +146,8 @@ function ProgressRing({
           className="-rotate-90"
           aria-hidden="true"
         >
-          {/* Unique gradient id per render — avoid SVG id collision */}
           <defs>
-            <linearGradient id="ring-gold" x1="0" y1="0" x2="1" y2="1">
+            <linearGradient id={gradientId} x1="0" y1="0" x2="1" y2="1">
               <stop offset="0%" stopColor="#B8860B" />
               <stop offset="50%" stopColor="#DAA520" />
               <stop offset="100%" stopColor="#F0C050" />
@@ -168,7 +168,7 @@ function ProgressRing({
             cy={size / 2}
             r={radius}
             fill="none"
-            stroke="url(#ring-gold)"
+            stroke={`url(#${gradientId})`}
             strokeWidth="6"
             strokeLinecap="round"
             strokeDasharray={circumference}
@@ -217,9 +217,9 @@ function SystemCard({
     <div className={`card-surface p-4 transition-all duration-300 ${cfg.glow}`}>
       {/* Header */}
       <div className="flex items-center justify-between mb-3">
-        <h4 className={`font-display text-sm font-medium ${cfg.accentText}`}>
+        <h3 className={`font-display text-sm font-medium ${cfg.accentText}`}>
           {cfg.label}
-        </h4>
+        </h3>
         <span className="text-xs font-body text-text/40">
           {activeDays} active {activeDays === 1 ? "day" : "days"}
         </span>
@@ -712,9 +712,9 @@ export default function DashboardPage() {
                               <>
                                 <hr className="rule-gold" />
                                 <div>
-                                  <h4 className="font-body text-xs font-medium text-text/40 uppercase tracking-[0.15em] mb-3">
+                                  <h3 className="font-body text-xs font-medium text-text/40 uppercase tracking-[0.15em] mb-3">
                                     By System
-                                  </h4>
+                                  </h3>
                                   <div className="flex flex-wrap gap-2">
                                     {Object.entries(
                                       journalStats.data.entries_by_system,
@@ -735,9 +735,9 @@ export default function DashboardPage() {
                             {Object.keys(journalStats.data.entries_by_type)
                               .length > 0 && (
                               <div>
-                                <h4 className="font-body text-xs font-medium text-text/40 uppercase tracking-[0.15em] mb-3">
+                                <h3 className="font-body text-xs font-medium text-text/40 uppercase tracking-[0.15em] mb-3">
                                   By Type
-                                </h4>
+                                </h3>
                                 <div className="flex flex-wrap gap-2">
                                   {Object.entries(
                                     journalStats.data.entries_by_type,
@@ -756,9 +756,9 @@ export default function DashboardPage() {
                             {/* Tags */}
                             {journalStats.data.tags_used.length > 0 && (
                               <div>
-                                <h4 className="font-body text-xs font-medium text-text/40 uppercase tracking-[0.15em] mb-3">
+                                <h3 className="font-body text-xs font-medium text-text/40 uppercase tracking-[0.15em] mb-3">
                                   Tags
-                                </h4>
+                                </h3>
                                 <div className="flex flex-wrap gap-2">
                                   {journalStats.data.tags_used.map((tag) => (
                                     <span

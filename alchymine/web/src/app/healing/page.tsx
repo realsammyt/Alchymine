@@ -423,6 +423,7 @@ export default function HealingPage() {
             <h1 className="font-display text-display-md font-light mb-3">
               <span className="text-gradient-teal">Ethical Healing</span>
             </h1>
+            <hr className="rule-gold mb-4" aria-hidden="true" />
             <p className="font-body text-text/40 text-base max-w-2xl">
               Personalized modalities matched to your unique profile.
               Evidence-informed, culturally sensitive, with full safety
@@ -509,7 +510,7 @@ export default function HealingPage() {
             <section className="mb-12" aria-labelledby="matches-heading">
               <h2
                 id="matches-heading"
-                className="font-display text-display-md font-light mb-6 flex items-center gap-3"
+                className="section-heading-sm mb-2 flex items-center gap-3"
               >
                 <span
                   className="w-10 h-10 rounded-xl bg-accent/10 flex items-center justify-center text-xl flex-shrink-0"
@@ -517,10 +518,9 @@ export default function HealingPage() {
                 >
                   {"\u{2728}"}
                 </span>
-                <span className="text-gradient-teal">
-                  Your Matched Modalities
-                </span>
+                Your Matched Modalities
               </h2>
+              <hr className="rule-gold mb-6" aria-hidden="true" />
               <ApiStateView
                 loading={matches.loading}
                 error={matches.error}
@@ -584,14 +584,10 @@ export default function HealingPage() {
               />
             ) : (
               <div id="breathwork">
-                <h2
-                  id="breathwork-heading"
-                  className="font-display text-display-md font-light mb-6"
-                >
-                  <span className="text-gradient-teal">
-                    Breathwork Sessions
-                  </span>
+                <h2 id="breathwork-heading" className="section-heading-sm mb-2">
+                  Breathwork Sessions
                 </h2>
+                <hr className="rule-gold mb-6" aria-hidden="true" />
                 <MotionStagger className="grid md:grid-cols-3 gap-6">
                   {Object.entries(PATTERNS).map(([key, p]) => (
                     <MotionStaggerItem key={key}>
@@ -641,12 +637,10 @@ export default function HealingPage() {
         {/* Modalities Grid */}
         <MotionReveal>
           <section className="mb-12" aria-labelledby="modalities-heading">
-            <h2
-              id="modalities-heading"
-              className="font-display text-display-md font-light mb-6"
-            >
-              <span className="text-gradient-teal">Healing Modalities</span>
+            <h2 id="modalities-heading" className="section-heading-sm mb-2">
+              Healing Modalities
             </h2>
+            <hr className="rule-gold mb-6" aria-hidden="true" />
             <ApiStateView
               loading={modalities.loading}
               error={modalities.error}

@@ -5,10 +5,12 @@ import { MotionReveal } from "@/components/shared/MotionReveal";
 
 export default function DiscoverPage() {
   return (
-    <main className="min-h-screen px-4 sm:px-6 lg:px-8 py-12">
-      <MotionReveal>
-        <SpiralHub />
-      </MotionReveal>
+    <main className="grain-overlay min-h-screen">
+      <div className="bg-atmosphere min-h-screen">
+        <MotionReveal>
+          <SpiralHub />
+        </MotionReveal>
+      </div>
     </main>
   );
 }

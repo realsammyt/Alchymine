@@ -58,6 +58,10 @@ const config: Config = {
         "float-delayed": "float 6s 2s ease-in-out infinite",
         "glow-breathe": "glowBreathe 4s ease-in-out infinite",
         "grain-drift": "grainDrift 0.5s steps(1) infinite",
+        "spiral-pulse": "spiralPulse 3s ease-in-out infinite",
+        "spiral-pulse-fast": "spiralPulse 2s ease-in-out infinite",
+        "spiral-rotate": "spiralRotate 8s linear infinite",
+        "spiral-rotate-reverse": "spiralRotate 5s linear infinite reverse",
       },
       keyframes: {
         shimmer: {
@@ -83,6 +87,14 @@ const config: Config = {
         glowBreathe: {
           "0%, 100%": { opacity: "0.4" },
           "50%": { opacity: "0.8" },
+        },
+        spiralPulse: {
+          "0%, 100%": { opacity: "0.7", transform: "scale(1)" },
+          "50%": { opacity: "1", transform: "scale(1.05)" },
+        },
+        spiralRotate: {
+          from: { transform: "rotate(0deg)" },
+          to: { transform: "rotate(360deg)" },
         },
         grainDrift: {
           "0%": { transform: "translate(0, 0)" },

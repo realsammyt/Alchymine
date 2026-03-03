@@ -586,7 +586,7 @@ export default function JournalPage() {
             <MotionReveal delay={0}>
               <div
                 role="alert"
-                className="flex items-start gap-3 bg-red-500/[0.08] border border-red-500/[0.18] text-red-400 text-sm font-body rounded-xl px-4 py-3 mb-6"
+                className="flex items-start gap-3 bg-primary-dark/[0.08] border border-primary-dark/[0.18] text-primary-dark text-sm font-body rounded-xl px-4 py-3 mb-6"
               >
                 <svg
                   className="w-4 h-4 flex-shrink-0 mt-0.5"
@@ -609,7 +609,11 @@ export default function JournalPage() {
 
           {/* ── Loading state ─────────────────────────────────────────── */}
           {loading && (
-            <div className="flex flex-col items-center gap-4 py-20">
+            <div
+              className="flex flex-col items-center gap-4 py-20"
+              role="status"
+              aria-label="Loading journal entries"
+            >
               <span
                 className="w-8 h-8 border-2 border-primary/30 border-t-primary rounded-full animate-spin"
                 aria-hidden="true"

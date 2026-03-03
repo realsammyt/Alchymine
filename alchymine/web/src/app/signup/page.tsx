@@ -51,14 +51,21 @@ export default function SignupPage() {
   }
 
   return (
-    <main className="grain-overlay min-h-screen flex items-center justify-center px-4">
+    <main className="grain-overlay min-h-screen flex items-center justify-center px-4 py-8 sm:py-4">
       <div className="bg-atmosphere w-full max-w-md">
         <div className="text-center mb-8">
+          <Link
+            href="/"
+            className="inline-block font-display text-2xl font-light tracking-wide text-gradient-gold mb-6 hover:opacity-80 transition-opacity"
+            aria-label="Alchymine home"
+          >
+            Alchymine
+          </Link>
           <h1 className="font-display text-display-md font-light text-gradient-gold">
             Create Account
           </h1>
           <hr className="rule-gold my-6 max-w-[120px] mx-auto" />
-          <p className="text-text/50 mt-2">
+          <p className="text-text/50 mt-2 font-body">
             Join Alchymine to begin your transformation
           </p>
         </div>
@@ -66,7 +73,11 @@ export default function SignupPage() {
         <MotionReveal delay={0.1}>
           <form onSubmit={handleSubmit} className="card-surface p-6 space-y-5">
             {error && (
-              <div className="bg-red-500/10 border border-red-500/20 text-red-400 text-sm rounded-lg p-3">
+              <div
+                role="alert"
+                aria-live="assertive"
+                className="bg-primary-dark/10 border border-primary-dark/20 text-primary-dark text-sm font-body rounded-xl p-3"
+              >
                 {error}
               </div>
             )}
@@ -76,12 +87,16 @@ export default function SignupPage() {
                 htmlFor="email"
                 className="block font-body text-sm font-medium text-text/70 mb-1.5"
               >
-                Email
+                Email{" "}
+                <span className="text-primary/60" aria-hidden="true">
+                  *
+                </span>
               </label>
               <input
                 id="email"
                 type="email"
                 required
+                aria-required="true"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 className="w-full bg-white/[0.03] border border-white/[0.08] rounded-xl px-4 py-3 text-sm font-body placeholder:text-text/25 focus:border-primary/40 focus:ring-1 focus:ring-primary/20 focus:bg-white/[0.05] transition-all duration-300 focus:outline-none text-text"
@@ -94,12 +109,16 @@ export default function SignupPage() {
                 htmlFor="password"
                 className="block font-body text-sm font-medium text-text/70 mb-1.5"
               >
-                Password
+                Password{" "}
+                <span className="text-primary/60" aria-hidden="true">
+                  *
+                </span>
               </label>
               <input
                 id="password"
                 type="password"
                 required
+                aria-required="true"
                 minLength={8}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
@@ -113,12 +132,16 @@ export default function SignupPage() {
                 htmlFor="confirm-password"
                 className="block font-body text-sm font-medium text-text/70 mb-1.5"
               >
-                Confirm Password
+                Confirm Password{" "}
+                <span className="text-primary/60" aria-hidden="true">
+                  *
+                </span>
               </label>
               <input
                 id="confirm-password"
                 type="password"
                 required
+                aria-required="true"
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 className="w-full bg-white/[0.03] border border-white/[0.08] rounded-xl px-4 py-3 text-sm font-body placeholder:text-text/25 focus:border-primary/40 focus:ring-1 focus:ring-primary/20 focus:bg-white/[0.05] transition-all duration-300 focus:outline-none text-text"
@@ -131,12 +154,16 @@ export default function SignupPage() {
                 htmlFor="promo-code"
                 className="block font-body text-sm font-medium text-text/70 mb-1.5"
               >
-                Invitation Code
+                Invitation Code{" "}
+                <span className="text-primary/60" aria-hidden="true">
+                  *
+                </span>
               </label>
               <input
                 id="promo-code"
                 type="text"
                 required
+                aria-required="true"
                 value={promoCode}
                 onChange={(e) => setPromoCode(e.target.value)}
                 className="w-full bg-white/[0.03] border border-white/[0.08] rounded-xl px-4 py-3 text-sm font-body placeholder:text-text/25 focus:border-primary/40 focus:ring-1 focus:ring-primary/20 focus:bg-white/[0.05] transition-all duration-300 focus:outline-none text-text"
