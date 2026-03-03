@@ -86,6 +86,9 @@ class User(Base):
     password_reset_expires: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
+    password_changed_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
 
     # Cross-system fields
     active_plan_day: Mapped[int | None] = mapped_column(Integer, nullable=True)
@@ -269,10 +272,10 @@ class WealthProfile(Base):
     lever_priorities: Mapped[dict | None] = mapped_column(
         JSONColumn, nullable=True, comment="Ordered WealthLever list"
     )
-    # TODO(#36): Encrypt financial_distress_detected — changing Boolean to
-    # EncryptedString is a breaking schema migration with multiple callers
-    # (engine/profile.py WealthLayer, tests). Requires a data migration.
-    financial_distress_detected: Mapped[bool] = mapped_column(Boolean, default=False)
+    # SENSITIVE — encrypted; stored as "true" / "false" strings
+    financial_distress_detected: Mapped[str] = mapped_column(
+        EncryptedString(), default="false", comment="SENSITIVE — encrypted boolean flag"
+    )
     disclaimer_acknowledged: Mapped[bool] = mapped_column(Boolean, default=False)
 
     # Relationship
@@ -404,3 +407,35 @@ class Report(Base):
 
     def __repr__(self) -> str:
         return f"<Report id={self.id!r} status={self.status!r}>"
+
+
+# ─── JournalEntry ──────────────────────────────────────────────────────
+
+
+class JournalEntry(Base):
+    """Journal entry — user reflections, reframes, gratitude, and progress notes.
+
+    Content is encrypted at rest (PII classification).
+    """
+
+    __tablename__ = "journal_entries"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    user_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    system: Mapped[str] = mapped_column(String(50), default="general")
+    entry_type: Mapped[str] = mapped_column(String(50), default="reflection")
+    title: Mapped[str] = mapped_column(String(200), nullable=False)
+    content: Mapped[str] = mapped_column(EncryptedString(), nullable=False)
+    tags: Mapped[dict | None] = mapped_column(JSONColumn, nullable=True)
+    mood_score: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), index=True
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+    def __repr__(self) -> str:
+        return f"<JournalEntry id={self.id!r} user_id={self.user_id!r}>"

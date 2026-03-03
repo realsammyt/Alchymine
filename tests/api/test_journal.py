@@ -8,22 +8,68 @@ Covers:
 
 from __future__ import annotations
 
-import pytest
-from fastapi.testclient import TestClient
+import asyncio
+from collections.abc import AsyncGenerator
 
+import pytest
+from cryptography.fernet import Fernet
+from fastapi.testclient import TestClient
+from sqlalchemy.ext.asyncio import (
+    AsyncEngine,
+    AsyncSession,
+    async_sessionmaker,
+    create_async_engine,
+)
+
+import alchymine.db.models  # noqa: F401
+from alchymine.api.deps import get_db_session
 from alchymine.api.main import app
-from alchymine.api.routers.journal import _journal_store
+from alchymine.db.base import Base
+
+
+@pytest.fixture(autouse=True)
+def _set_encryption_key(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Ensure a valid Fernet key is available for encryption in tests."""
+    key = Fernet.generate_key().decode()
+    monkeypatch.setenv("ALCHYMINE_ENCRYPTION_KEY", key)
 
 
 @pytest.fixture
 def client() -> TestClient:
-    return TestClient(app)
+    """Provide a TestClient wired to an in-memory SQLite engine."""
+    engine = create_async_engine(
+        "sqlite+aiosqlite://",
+        connect_args={"check_same_thread": False},
+        echo=False,
+    )
+
+    # Create tables synchronously before entering the async context
+    loop = asyncio.new_event_loop()
+    loop.run_until_complete(_create_tables(engine))
+
+    factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+
+    async def _override_get_db_session() -> AsyncGenerator[AsyncSession, None]:
+        async with factory() as session:
+            try:
+                yield session
+                await session.commit()
+            except Exception:
+                await session.rollback()
+                raise
+
+    app.dependency_overrides[get_db_session] = _override_get_db_session
+    tc = TestClient(app)
+    yield tc
+    app.dependency_overrides.pop(get_db_session, None)
+
+    loop.run_until_complete(engine.dispose())
+    loop.close()
 
 
-@pytest.fixture(autouse=True)
-def _clear_store() -> None:
-    """Clear journal store between tests."""
-    _journal_store.clear()
+async def _create_tables(engine: AsyncEngine) -> None:
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
 
 
 class TestJournalCreate:

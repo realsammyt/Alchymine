@@ -467,7 +467,8 @@ export default function ReportPage() {
               being configured.
             </p>
             <p className="text-text/50 text-sm mb-6">
-              Your report is being processed. Some sections may still be generating.
+              Your report is being processed. Some sections may still be
+              generating.
             </p>
           </div>
         )}

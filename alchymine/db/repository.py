@@ -20,14 +20,23 @@ Functions — Reports
 - ``list_reports_by_user``   — paginated reports for a given user
 - ``update_report_status``   — change status (and optionally error)
 - ``update_report_content``  — set result / html_content on completion
+
+Functions — Journal Entries
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+- ``create_journal_entry``   — insert a new JournalEntry row
+- ``get_journal_entry``      — fetch a JournalEntry by id
+- ``list_journal_entries``   — paginated entries for a user with optional filters
+- ``update_journal_entry``   — update fields on an existing entry
+- ``delete_journal_entry``   — hard-delete an entry
+- ``get_journal_stats``      — summary statistics for a user's journal
 """
 
 from __future__ import annotations
 
-from datetime import date, time
+from datetime import UTC, date, datetime, time
 from typing import Any
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -36,6 +45,7 @@ from alchymine.db.models import (
     HealingProfile,
     IdentityProfile,
     IntakeData,
+    JournalEntry,
     PerspectiveProfile,
     Report,
     User,
@@ -364,3 +374,235 @@ async def update_report_content(
     await session.flush()
     await session.refresh(report)
     return report
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# Journal Entry CRUD
+# ═══════════════════════════════════════════════════════════════════════
+
+
+async def create_journal_entry(
+    session: AsyncSession,
+    *,
+    user_id: str,
+    title: str,
+    content: str,
+    system: str = "general",
+    entry_type: str = "reflection",
+    tags: list[str] | None = None,
+    mood_score: int | None = None,
+) -> JournalEntry:
+    """Insert a new journal entry row.
+
+    Parameters
+    ----------
+    session:
+        Active async session.
+    user_id:
+        The owner of the entry.
+    title:
+        Entry title (max 200 chars).
+    content:
+        Entry body text — encrypted at rest.
+    system:
+        System this entry relates to (default ``"general"``).
+    entry_type:
+        Entry type (default ``"reflection"``).
+    tags:
+        Optional list of tag strings; stored as a JSON list.
+    mood_score:
+        Optional mood rating (1-10).
+
+    Returns
+    -------
+    JournalEntry
+        The newly created row.
+    """
+    entry = JournalEntry(
+        user_id=user_id,
+        title=title,
+        content=content,
+        system=system,
+        entry_type=entry_type,
+        tags=tags or [],
+        mood_score=mood_score,
+    )
+    session.add(entry)
+    await session.flush()
+    await session.refresh(entry)
+    return entry
+
+
+async def get_journal_entry(session: AsyncSession, entry_id: str) -> JournalEntry | None:
+    """Fetch a single journal entry by id.
+
+    Returns ``None`` if the entry does not exist.
+    """
+    result = await session.execute(select(JournalEntry).where(JournalEntry.id == entry_id))
+    return result.scalar_one_or_none()
+
+
+async def list_journal_entries(
+    session: AsyncSession,
+    user_id: str,
+    *,
+    system: str | None = None,
+    entry_type: str | None = None,
+    offset: int = 0,
+    limit: int = 20,
+) -> tuple[list[JournalEntry], int]:
+    """Return a paginated list of journal entries for *user_id*.
+
+    Entries are returned in reverse chronological order (most recent first).
+
+    Parameters
+    ----------
+    session:
+        Active async session.
+    user_id:
+        The user whose entries to list.
+    system:
+        Optional filter by system name.
+    entry_type:
+        Optional filter by entry type.
+    offset:
+        Number of rows to skip.
+    limit:
+        Maximum number of rows to return.
+
+    Returns
+    -------
+    tuple[list[JournalEntry], int]
+        ``(entries, total_count)`` where *total_count* is the unfiltered
+        count matching the query (before pagination).
+    """
+    base_filter = [JournalEntry.user_id == user_id]
+    if system is not None:
+        base_filter.append(JournalEntry.system == system)
+    if entry_type is not None:
+        base_filter.append(JournalEntry.entry_type == entry_type)
+
+    count_result = await session.execute(
+        select(func.count()).select_from(JournalEntry).where(*base_filter)
+    )
+    total = count_result.scalar_one()
+
+    rows_result = await session.execute(
+        select(JournalEntry)
+        .where(*base_filter)
+        .order_by(JournalEntry.created_at.desc())
+        .offset(offset)
+        .limit(limit)
+    )
+    entries = list(rows_result.scalars().all())
+    return entries, total
+
+
+async def update_journal_entry(
+    session: AsyncSession,
+    entry_id: str,
+    **kwargs: Any,
+) -> JournalEntry | None:
+    """Update fields on an existing journal entry.
+
+    Only the fields present in *kwargs* are updated.  Unknown keys are
+    silently ignored.  Returns the updated entry, or ``None`` if not found.
+    """
+    entry = await get_journal_entry(session, entry_id)
+    if entry is None:
+        return None
+
+    allowed = {"title", "content", "tags", "mood_score", "system", "entry_type"}
+    for key, value in kwargs.items():
+        if key in allowed:
+            setattr(entry, key, value)
+
+    await session.flush()
+    await session.refresh(entry)
+    return entry
+
+
+async def delete_journal_entry(session: AsyncSession, entry_id: str) -> bool:
+    """Delete a journal entry by id.
+
+    Returns ``True`` if the entry was deleted, ``False`` if not found.
+    """
+    entry = await get_journal_entry(session, entry_id)
+    if entry is None:
+        return False
+    await session.delete(entry)
+    await session.flush()
+    return True
+
+
+async def get_journal_stats(session: AsyncSession, user_id: str) -> dict[str, Any]:
+    """Return summary statistics for a user's journal.
+
+    Returns a dict with:
+    - ``total_entries`` — total entry count
+    - ``entries_by_system`` — count per system name
+    - ``entries_by_type`` — count per entry type
+    - ``average_mood`` — mean mood_score (or ``None`` if no scored entries)
+    - ``tags_used`` — sorted list of unique tags
+    - ``streak_days`` — consecutive days with at least one entry ending today
+    """
+    entries_result = await session.execute(
+        select(JournalEntry).where(JournalEntry.user_id == user_id)
+    )
+    entries = list(entries_result.scalars().all())
+
+    if not entries:
+        return {
+            "total_entries": 0,
+            "entries_by_system": {},
+            "entries_by_type": {},
+            "average_mood": None,
+            "streak_days": 0,
+            "tags_used": [],
+        }
+
+    by_system: dict[str, int] = {}
+    by_type: dict[str, int] = {}
+    all_tags: set[str] = set()
+    moods: list[int] = []
+
+    for entry in entries:
+        by_system[entry.system] = by_system.get(entry.system, 0) + 1
+        by_type[entry.entry_type] = by_type.get(entry.entry_type, 0) + 1
+        if entry.mood_score is not None:
+            moods.append(entry.mood_score)
+        if entry.tags:
+            all_tags.update(entry.tags if isinstance(entry.tags, list) else [])
+
+    avg_mood = sum(moods) / len(moods) if moods else None
+
+    # Streak: consecutive days with entries ending today
+    dates = sorted(
+        {
+            e.created_at.strftime("%Y-%m-%d")
+            if hasattr(e.created_at, "strftime")
+            else str(e.created_at)[:10]
+            for e in entries
+        },
+        reverse=True,
+    )
+    today = datetime.now(UTC).strftime("%Y-%m-%d")
+    streak = 0
+    if dates and dates[0] == today:
+        streak = 1
+        for i in range(1, len(dates)):
+            prev = datetime.strptime(dates[i - 1], "%Y-%m-%d")  # noqa: DTZ007
+            curr = datetime.strptime(dates[i], "%Y-%m-%d")  # noqa: DTZ007
+            if (prev - curr).days == 1:
+                streak += 1
+            else:
+                break
+
+    return {
+        "total_entries": len(entries),
+        "entries_by_system": by_system,
+        "entries_by_type": by_type,
+        "average_mood": avg_mood,
+        "streak_days": streak,
+        "tags_used": sorted(all_tags),
+    }

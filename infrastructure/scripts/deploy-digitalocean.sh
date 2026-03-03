@@ -246,6 +246,7 @@ DB_PASSWORD=$(openssl rand -hex 24)
 REDIS_PASSWORD=$(openssl rand -hex 24)
 ENCRYPTION_KEY=$(openssl rand -hex 32)
 FINANCIAL_KEY=$(openssl rand -hex 32)
+PDF_SERVICE_TOKEN=$(openssl rand -hex 32)
 
 cat > "${ENV_FILE}" << ENVEOF
 # ============================================================================
@@ -302,6 +303,12 @@ API_PORT=8000
 ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
 LLM_PROVIDER=anthropic
 LLM_MODEL=claude-sonnet-4-20250514
+
+# ── PDF Service ──────────────────────────────────────────────────────────────
+# Shared bearer token used by the API/worker to authenticate with the PDF service.
+# Generated automatically during deployment — never share or commit this value.
+PDF_SERVICE_TOKEN=${PDF_SERVICE_TOKEN}
+PDF_SERVICE_URL=http://pdf-service:3001
 
 # ── Backup ───────────────────────────────────────────────────────────────────
 BACKUP_RETENTION=30
@@ -431,6 +438,7 @@ echo "    - Celery     (4 workers)"
 echo "    - PostgreSQL (tuned for production)"
 echo "    - Redis      (AOF + RDB persistence)"
 echo "    - Certbot    (auto-renewal every 12h)"
+echo "    - PDF        (Puppeteer, internal-only network)"
 echo ""
 echo "  Security:"
 echo "    - UFW firewall (SSH, HTTP, HTTPS only)"
