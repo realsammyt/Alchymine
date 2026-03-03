@@ -27,11 +27,14 @@ export default function DiscoverLayout({
   const currentStep = getCurrentStep(pathname);
 
   return (
-    <div className="min-h-screen flex flex-col">
+    <div className="min-h-screen flex flex-col grain-overlay bg-atmosphere">
       {/* Top nav bar */}
-      <header className="border-b border-white/5 bg-bg/80 backdrop-blur-md sticky top-0 z-50">
-        <div className="max-w-5xl mx-auto px-6 py-4 flex items-center justify-between">
-          <Link href="/" className="text-lg font-bold text-gradient-gold">
+      <header className="border-b border-white/[0.04] bg-bg/70 backdrop-blur-2xl sticky top-0 z-50">
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 py-4 flex items-center justify-between">
+          <Link
+            href="/"
+            className="font-display text-xl font-light tracking-wide text-gradient-gold"
+          >
             Alchymine
           </Link>
           <div className="hidden sm:block">

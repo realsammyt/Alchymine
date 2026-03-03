@@ -3,14 +3,72 @@
 import { useState, useEffect, useRef } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { getReport, ApiError } from "@/lib/api";
+import { MotionReveal } from "@/components/shared/MotionReveal";
 
 const GENERATION_STEPS = [
-  { label: "Calculating numerology...", icon: "🔢", duration: 2000 },
-  { label: "Mapping astrology...", icon: "⭐", duration: 3000 },
-  { label: "Analyzing personality...", icon: "🧠", duration: 2500 },
-  { label: "Mapping archetypes...", icon: "🪞", duration: 2000 },
-  { label: "Building your profile...", icon: "✨", duration: 3000 },
+  { label: "Calculating numerology...", icon: "numerology", duration: 2000 },
+  { label: "Mapping astrology...", icon: "astrology", duration: 3000 },
+  { label: "Analyzing personality...", icon: "personality", duration: 2500 },
+  { label: "Mapping archetypes...", icon: "archetype", duration: 2000 },
+  { label: "Building your profile...", icon: "profile", duration: 3000 },
 ];
+
+function StepIcon({ icon, className }: { icon: string; className?: string }) {
+  const cls = className ?? "w-5 h-5";
+  const props = {
+    className: cls,
+    viewBox: "0 0 24 24",
+    fill: "none",
+    stroke: "currentColor",
+    strokeWidth: 1.5,
+    strokeLinecap: "round" as const,
+    strokeLinejoin: "round" as const,
+    "aria-hidden": true as const,
+  };
+
+  switch (icon) {
+    case "numerology":
+      return (
+        <svg {...props}>
+          <rect width="18" height="18" x="3" y="3" rx="2" />
+          <path d="M12 8v8" />
+          <path d="M8 12h8" />
+        </svg>
+      );
+    case "astrology":
+      return (
+        <svg {...props}>
+          <circle cx="12" cy="12" r="10" />
+          <path d="M12 2a7 7 0 1 0 7 7" />
+          <circle cx="12" cy="12" r="3" />
+        </svg>
+      );
+    case "personality":
+      return (
+        <svg {...props}>
+          <path d="M12 2a8 8 0 0 0-8 8c0 6 8 12 8 12s8-6 8-12a8 8 0 0 0-8-8z" />
+          <circle cx="12" cy="10" r="3" />
+        </svg>
+      );
+    case "archetype":
+      return (
+        <svg {...props}>
+          <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z" />
+          <circle cx="12" cy="12" r="3" />
+        </svg>
+      );
+    case "profile":
+      return (
+        <svg {...props}>
+          <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+          <circle cx="9" cy="7" r="4" />
+          <polyline points="16 11 18 13 22 9" />
+        </svg>
+      );
+    default:
+      return null;
+  }
+}
 
 export default function GeneratingPage() {
   const router = useRouter();
@@ -34,10 +92,9 @@ export default function GeneratingPage() {
 
     animationRef.current = setInterval(() => {
       elapsed += 100;
-      const progressPercent = Math.min((elapsed / totalDuration) * 90, 90); // cap visual at 90%
+      const progressPercent = Math.min((elapsed / totalDuration) * 90, 90);
       setOverallProgress(progressPercent);
 
-      // Determine which step we're on
       let cumulative = 0;
       for (let i = 0; i < GENERATION_STEPS.length; i++) {
         cumulative += GENERATION_STEPS[i].duration;
@@ -50,7 +107,6 @@ export default function GeneratingPage() {
         }
       }
 
-      // If we've exceeded total duration, just stay on last step
       if (elapsed >= totalDuration) {
         setCurrentStep(GENERATION_STEPS.length - 1);
       }
@@ -68,7 +124,6 @@ export default function GeneratingPage() {
     pollRef.current = setInterval(async () => {
       try {
         const report = await getReport(reportId);
-        // If we get here without an error, the report is complete
         if (report.status === "completed") {
           setOverallProgress(100);
           if (pollRef.current) clearInterval(pollRef.current);
@@ -83,10 +138,8 @@ export default function GeneratingPage() {
         }
       } catch (err) {
         if (err instanceof ApiError && err.status === 202) {
-          // Still generating — this is expected
           return;
         }
-        // Real error — but don't stop polling for transient network issues
         console.error("Polling error:", err);
       }
     }, 2000);
@@ -99,103 +152,115 @@ export default function GeneratingPage() {
   const step = GENERATION_STEPS[currentStep];
 
   return (
-    <div className="flex-1 flex items-center justify-center px-6 py-12">
+    <div className="flex-1 flex items-center justify-center px-4 sm:px-6 py-12">
       <div className="w-full max-w-md text-center">
         {/* Animated orb */}
-        <div className="relative w-32 h-32 mx-auto mb-10">
-          {/* Outer glow ring */}
-          <div className="absolute inset-0 rounded-full bg-primary/10 animate-pulse-gold" />
-          {/* Spinning gradient ring */}
-          <div
-            className="absolute inset-2 rounded-full border-2 border-transparent border-t-primary border-r-primary/50 animate-spin"
-            style={{ animationDuration: "3s" }}
-          />
-          {/* Inner shimmer */}
-          <div className="absolute inset-4 rounded-full bg-gradient-to-br from-primary-dark/30 to-secondary-dark/30 shimmer-gold" />
-          {/* Center icon */}
-          <div className="absolute inset-0 flex items-center justify-center text-4xl">
-            {step.icon}
+        <MotionReveal>
+          <div className="relative w-32 h-32 mx-auto mb-10">
+            {/* Outer glow ring */}
+            <div className="absolute inset-0 rounded-full bg-primary/[0.08] animate-pulse-gold" />
+            {/* Spinning gradient ring */}
+            <div
+              className="absolute inset-2 rounded-full border-2 border-transparent border-t-primary border-r-primary/50 animate-spin"
+              style={{ animationDuration: "3s" }}
+            />
+            {/* Inner shimmer */}
+            <div className="absolute inset-4 rounded-full bg-gradient-to-br from-primary-dark/20 to-secondary-dark/20 shimmer-gold" />
+            {/* Center icon */}
+            <div className="absolute inset-0 flex items-center justify-center">
+              <StepIcon icon={step.icon} className="w-8 h-8 text-primary/70" />
+            </div>
           </div>
-        </div>
+        </MotionReveal>
 
         {/* Step label */}
         <h2
-          className="text-2xl font-bold mb-2 animate-fade-in"
+          className="font-display text-xl sm:text-2xl font-light text-text mb-2 animate-fade-in"
           key={step.label}
         >
           {step.label}
         </h2>
-        <p className="text-text/50 text-sm mb-8">
+        <p className="text-text/35 text-sm font-body mb-8">
           Our deterministic engines are analyzing your unique data.
         </p>
 
         {/* Progress bar */}
-        <div className="w-full bg-surface rounded-full h-2.5 mb-4 overflow-hidden">
+        <div
+          className="w-full bg-white/[0.04] rounded-full h-2 mb-4 overflow-hidden"
+          role="progressbar"
+          aria-valuenow={Math.round(overallProgress)}
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-label="Report generation progress"
+        >
           <div
             className="h-full rounded-full bg-gradient-to-r from-primary-dark to-primary transition-all duration-300 ease-out relative overflow-hidden"
             style={{ width: `${overallProgress}%` }}
           >
-            <div className="absolute inset-0 shimmer-gold opacity-60" />
+            <div className="absolute inset-0 shimmer-gold opacity-50" />
           </div>
         </div>
-        <p className="text-sm text-text/40">
+        <p className="text-xs font-body text-text/25 tracking-wide">
           {Math.round(overallProgress)}% complete
         </p>
 
         {/* Step indicators */}
-        <div className="mt-10 space-y-3">
+        <div className="mt-10 space-y-2.5">
           {GENERATION_STEPS.map((s, idx) => (
             <div
               key={s.label}
-              className={`flex items-center gap-3 text-sm transition-all duration-500 ${
+              className={`flex items-center gap-3 text-sm font-body transition-all duration-500 ${
                 idx < currentStep
-                  ? "text-primary"
+                  ? "text-primary/70"
                   : idx === currentStep
                     ? "text-text"
-                    : "text-text/20"
+                    : "text-text/15"
               }`}
             >
               <div
-                className={`w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 transition-colors ${
+                className={`w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 transition-all duration-500 ${
                   idx < currentStep
                     ? "bg-primary text-bg"
                     : idx === currentStep
-                      ? "border-2 border-primary text-primary"
-                      : "border border-white/10"
+                      ? "border-2 border-primary glow-gold"
+                      : "border border-white/[0.08]"
                 }`}
               >
                 {idx < currentStep && (
                   <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    width="10"
-                    height="10"
+                    className="w-2.5 h-2.5"
                     viewBox="0 0 24 24"
                     fill="none"
                     stroke="currentColor"
                     strokeWidth="3"
                     strokeLinecap="round"
                     strokeLinejoin="round"
+                    aria-hidden="true"
                   >
                     <polyline points="20 6 9 17 4 12" />
                   </svg>
                 )}
               </div>
-              <span>{s.label.replace("...", "")}</span>
+              <span className="tracking-wide">
+                {s.label.replace("...", "")}
+              </span>
             </div>
           ))}
         </div>
 
         {/* Error state */}
         {error && (
-          <div className="mt-8 p-4 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-sm">
-            {error}
-            <button
-              onClick={() => router.push("/discover/intake")}
-              className="block mt-2 text-primary hover:text-primary/80 underline"
-            >
-              Start over
-            </button>
-          </div>
+          <MotionReveal y={8}>
+            <div className="mt-8 p-4 rounded-xl card-surface text-sm font-body text-text/60">
+              <p className="mb-2">{error}</p>
+              <button
+                onClick={() => router.push("/discover/intake")}
+                className="text-primary hover:text-primary-light underline transition-colors duration-300 touch-target"
+              >
+                Start over
+              </button>
+            </div>
+          </MotionReveal>
         )}
       </div>
     </div>

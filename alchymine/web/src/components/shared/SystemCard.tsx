@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 export type SystemStatus = "active" | "coming-soon" | "beta";
+export type SystemGlowColor = "gold" | "teal" | "purple";
 
 interface SystemCardProps {
   name: string;
@@ -10,6 +11,8 @@ interface SystemCardProps {
   status: SystemStatus;
   features: string[];
   gradient: string;
+  /** Controls hover glow color. Defaults to "gold". */
+  glowColor?: SystemGlowColor;
 }
 
 const statusConfig: Record<SystemStatus, { label: string; className: string }> =
@@ -28,6 +31,12 @@ const statusConfig: Record<SystemStatus, { label: string; className: string }> =
     },
   };
 
+const glowHoverClass: Record<SystemGlowColor, string> = {
+  gold: "hover:glow-gold",
+  teal: "hover:glow-teal",
+  purple: "hover:glow-purple",
+};
+
 export default function SystemCard({
   name,
   href,
@@ -36,13 +45,15 @@ export default function SystemCard({
   status,
   features,
   gradient,
+  glowColor = "gold",
 }: SystemCardProps) {
   const statusInfo = statusConfig[status];
+  const hoverGlow = glowHoverClass[glowColor];
 
   return (
     <Link
       href={href}
-      className="group block card-surface p-6 transition-all duration-300 hover:border-primary/20 hover:shadow-lg hover:shadow-primary/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-bg"
+      className={`group block card-surface-elevated p-6 transition-all duration-500 hover:-translate-y-1 ${hoverGlow} focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-bg`}
       aria-label={`${name} system - ${description}`}
     >
       <div className="flex items-start justify-between mb-4">
@@ -61,11 +72,13 @@ export default function SystemCard({
         </span>
       </div>
 
-      <h3 className="text-lg font-semibold text-text mb-2 group-hover:text-primary transition-colors">
+      <h3 className="font-display text-lg font-medium text-text mb-2 group-hover:text-primary transition-colors duration-300">
         {name}
       </h3>
 
-      <p className="text-text/50 text-sm leading-relaxed mb-4">{description}</p>
+      <p className="font-body text-sm text-text/40 leading-relaxed mb-4">
+        {description}
+      </p>
 
       <ul className="space-y-1.5" aria-label={`${name} features`}>
         {features.map((feature) => (
@@ -82,10 +95,10 @@ export default function SystemCard({
         ))}
       </ul>
 
-      <div className="mt-4 pt-4 border-t border-white/5 flex items-center gap-1 text-xs text-primary/60 group-hover:text-primary transition-colors">
+      <div className="mt-4 pt-4 border-t border-white/5 flex items-center gap-1 font-body text-sm tracking-wide text-primary/60 group-hover:text-primary transition-colors duration-300">
         Explore
         <svg
-          className="w-3 h-3 transition-transform group-hover:translate-x-1"
+          className="w-3.5 h-3.5 transition-transform duration-300 group-hover:translate-x-1"
           viewBox="0 0 24 24"
           fill="none"
           stroke="currentColor"

@@ -27,13 +27,13 @@ interface BreathworkTimerProps {
 // ── Phase color to CSS hex map ───────────────────────────────────
 
 const COLOR_MAP: Record<string, string> = {
-  "text-accent": "#14b8a6",
-  "text-primary": "#c4a04a",
+  "text-accent": "#20b2aa",
+  "text-primary": "#DAA520",
   "text-secondary": "#7b2d8e",
 };
 
 function getHexColor(colorClass: string): string {
-  return COLOR_MAP[colorClass] || "#c4a04a";
+  return COLOR_MAP[colorClass] || "#DAA520";
 }
 
 // ── Component ─────────────────────────────────────────────────────
@@ -121,16 +121,23 @@ export default function BreathworkTimer({
         ? 1.0 - (progress / 100) * 0.3
         : 0.85;
 
+  // Inhale phase gets teal glow; other phases use a softer version
+  const isInhale = currentPhase.label === "Inhale";
+
   if (sessionComplete) {
     return (
       <div
         className="card-surface p-8 text-center"
         data-testid="breathwork-complete"
       >
-        <div className="text-4xl mb-4">{"\u{2728}"}</div>
-        <h2 className="text-2xl font-bold mb-2">Session Complete</h2>
-        <p className="text-text/50 mb-2">{pattern.name}</p>
-        <p className="text-text/40 text-sm mb-6">
+        <div className="text-4xl mb-4" aria-hidden="true">
+          {"\u{2728}"}
+        </div>
+        <h2 className="font-display text-2xl font-light mb-2">
+          <span className="text-gradient-teal">Session Complete</span>
+        </h2>
+        <p className="font-body text-sm text-text/50 mb-2">{pattern.name}</p>
+        <p className="font-body text-sm text-text/40 mb-6">
           {pattern.cycles} cycles completed. Great work nurturing your nervous
           system.
         </p>
@@ -152,18 +159,26 @@ export default function BreathworkTimer({
         className="card-surface p-8 text-center"
         data-testid="breathwork-ready"
       >
-        <h2 className="text-2xl font-bold mb-2">{pattern.name}</h2>
-        <p className="text-text/50 text-sm mb-4">{pattern.description}</p>
-        <p className="text-text/40 text-xs mb-6">
+        <h2 className="font-display text-2xl font-light mb-2 text-text">
+          {pattern.name}
+        </h2>
+        <p className="font-body text-sm text-text/50 mb-4">
+          {pattern.description}
+        </p>
+        <p className="font-body text-xs text-text/40 mb-6">
           {pattern.phases
             .map((ph) => `${ph.label} ${ph.duration}s`)
             .join(" \u2192 ")}{" "}
           {"\u00B7"} {pattern.cycles} cycles
         </p>
         <div className="flex gap-3 justify-center">
-          <Button variant="primary" onClick={startSession}>
+          {/* Teal gradient start button */}
+          <button
+            onClick={startSession}
+            className="inline-flex items-center justify-center gap-2 font-body font-medium tracking-wide transition-all duration-300 ease-out px-6 py-3 text-base rounded-xl touch-target bg-gradient-to-r from-accent-dark via-accent to-accent-light text-bg hover:shadow-[0_0_30px_rgba(32,178,170,0.25)] hover:scale-[1.02] active:scale-[0.98]"
+          >
             Begin
-          </Button>
+          </button>
           <Button variant="ghost" onClick={onStop}>
             Back
           </Button>
@@ -174,29 +189,35 @@ export default function BreathworkTimer({
 
   return (
     <div
-      className="card-surface p-8 text-center"
+      className="card-surface p-8 text-center backdrop-blur-xl"
       role="timer"
       aria-live="polite"
       data-testid="breathwork-active"
     >
-      <h2 className="text-2xl font-bold mb-2">{pattern.name}</h2>
-      <p className="text-text/50 mb-8">
+      <h2 className="font-display text-xl font-light text-text mb-1">
+        {pattern.name}
+      </h2>
+      <p className="font-body text-sm text-text/50 mb-8">
         Cycle {currentCycle} of {pattern.cycles}
       </p>
 
       {/* Animated breathing circle */}
       <div className="relative w-52 h-52 mx-auto mb-8">
-        {/* Outer pulse ring */}
+        {/* Outer pulse ring — teal-tinted, pulses with animate-glow-breathe */}
         <div
-          className="absolute inset-0 rounded-full"
+          className={`absolute inset-0 rounded-full animate-glow-breathe ${isInhale ? "glow-teal" : ""}`}
           style={{
-            border: `2px solid ${phaseColor}22`,
-            animation: "breathPulse 2s ease-in-out infinite",
+            border: `2px solid ${phaseColor}33`,
           }}
+          aria-hidden="true"
         />
 
         {/* Progress ring (SVG) */}
-        <svg className="absolute inset-0 -rotate-90" viewBox="0 0 208 208">
+        <svg
+          className="absolute inset-0 -rotate-90"
+          viewBox="0 0 208 208"
+          aria-hidden="true"
+        >
           <circle
             cx="104"
             cy="104"
@@ -230,40 +251,53 @@ export default function BreathworkTimer({
             transform: `scale(${circleScale})`,
             transition: "transform 0.1s linear",
           }}
+          aria-hidden="true"
         />
 
         {/* Center text */}
         <div className="absolute inset-0 flex flex-col items-center justify-center">
-          <span className="text-3xl font-bold" style={{ color: phaseColor }}>
+          <span
+            className="font-body text-sm tracking-wider uppercase"
+            style={{ color: phaseColor }}
+            aria-label={`Current phase: ${currentPhase.label}`}
+          >
             {currentPhase.label}
           </span>
-          <span className="text-text/60 text-xl mt-2">
-            {Math.ceil(timeRemaining)}s
+          <span
+            className="font-display text-3xl font-light mt-1 text-text"
+            aria-label={`${Math.ceil(timeRemaining)} seconds remaining`}
+          >
+            {Math.ceil(timeRemaining)}
           </span>
+          <span className="font-body text-xs text-text/40 mt-0.5">sec</span>
         </div>
       </div>
 
       {/* Phase indicators */}
-      <div className="flex justify-center gap-2 mb-6">
+      <div
+        className="flex justify-center gap-2 mb-6 flex-wrap"
+        role="group"
+        aria-label="Breathing phases"
+      >
         {pattern.phases.map((phase, idx) => (
           <div
             key={idx}
-            className="flex items-center gap-1 px-3 py-1 rounded-full text-xs"
-            style={{
-              background:
-                idx === currentPhaseIndex
-                  ? `${getHexColor(phase.color)}22`
-                  : "transparent",
-              color:
-                idx === currentPhaseIndex
-                  ? getHexColor(phase.color)
-                  : "rgba(255,255,255,0.3)",
-              border:
-                idx === currentPhaseIndex
-                  ? `1px solid ${getHexColor(phase.color)}44`
-                  : "1px solid transparent",
-              fontWeight: idx === currentPhaseIndex ? 600 : 400,
-            }}
+            className={`flex items-center gap-1 px-3 py-1 rounded-full font-body text-xs transition-all duration-300 ${
+              idx === currentPhaseIndex
+                ? "border"
+                : "border border-transparent text-text/30"
+            }`}
+            style={
+              idx === currentPhaseIndex
+                ? {
+                    background: `${getHexColor(phase.color)}22`,
+                    color: getHexColor(phase.color),
+                    borderColor: `${getHexColor(phase.color)}44`,
+                    fontWeight: 600,
+                  }
+                : undefined
+            }
+            aria-current={idx === currentPhaseIndex ? "true" : undefined}
           >
             {phase.label} {phase.duration}s
           </div>
@@ -273,20 +307,6 @@ export default function BreathworkTimer({
       <Button variant="ghost" onClick={stopSession}>
         End Session
       </Button>
-
-      <style jsx>{`
-        @keyframes breathPulse {
-          0%,
-          100% {
-            transform: scale(1);
-            opacity: 0.3;
-          }
-          50% {
-            transform: scale(1.05);
-            opacity: 0.6;
-          }
-        }
-      `}</style>
     </div>
   );
 }

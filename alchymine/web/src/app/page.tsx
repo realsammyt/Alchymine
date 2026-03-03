@@ -417,13 +417,9 @@ export default function LandingPage() {
 
           <MotionReveal delay={0.2} y={20}>
             <h1 className="font-display text-display-xl font-light mb-4">
-              <span className="text-gradient-gold">
-                Discover Who You
-              </span>
+              <span className="text-gradient-gold">Discover Who You</span>
               <br />
-              <span className="text-gradient-gold">
-                Truly Are
-              </span>
+              <span className="text-gradient-gold">Truly Are</span>
             </h1>
           </MotionReveal>
 
@@ -439,9 +435,9 @@ export default function LandingPage() {
 
           <MotionReveal delay={0.5} y={12}>
             <p className="text-base text-text/35 font-body max-w-xl mx-auto mb-12 leading-relaxed">
-              Identity mapping, ethical healing, wealth strategy,
-              creative development, and perspective enhancement — built on
-              transparent methodology and open-source principles.
+              Identity mapping, ethical healing, wealth strategy, creative
+              development, and perspective enhancement — built on transparent
+              methodology and open-source principles.
             </p>
           </MotionReveal>
 
@@ -492,14 +488,32 @@ export default function LandingPage() {
           <MotionReveal delay={0.8} y={8}>
             <div className="mt-16 flex flex-wrap items-center justify-center gap-6 text-xs font-body text-text/25 tracking-wide">
               <span className="flex items-center gap-1.5">
-                <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <svg
+                  className="w-3.5 h-3.5"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden="true"
+                >
                   <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10" />
                 </svg>
                 Ethics-First
               </span>
               <span className="w-px h-3 bg-white/[0.06]" />
               <span className="flex items-center gap-1.5">
-                <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <svg
+                  className="w-3.5 h-3.5"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden="true"
+                >
                   <polyline points="16 18 22 12 16 6" />
                   <polyline points="8 6 2 12 8 18" />
                 </svg>
@@ -507,7 +521,16 @@ export default function LandingPage() {
               </span>
               <span className="w-px h-3 bg-white/[0.06]" />
               <span className="flex items-center gap-1.5">
-                <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <svg
+                  className="w-3.5 h-3.5"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden="true"
+                >
                   <rect width="18" height="11" x="3" y="11" rx="2" ry="2" />
                   <path d="M7 11V7a5 5 0 0 1 10 0v4" />
                 </svg>
@@ -536,7 +559,10 @@ export default function LandingPage() {
             </div>
           </MotionReveal>
 
-          <MotionStagger staggerDelay={0.1} className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+          <MotionStagger
+            staggerDelay={0.1}
+            className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6"
+          >
             {FIVE_SYSTEMS.map((system) => {
               const colors = colorClass(system.color);
               return (
@@ -548,11 +574,18 @@ export default function LandingPage() {
                       <div
                         className={`w-10 h-10 rounded-xl ${colors.bg} ${colors.border} border flex items-center justify-center transition-transform duration-500 group-hover:scale-110`}
                       >
-                        <SystemIcon icon={system.icon} className={colors.text} />
+                        <SystemIcon
+                          icon={system.icon}
+                          className={colors.text}
+                        />
                       </div>
                       <div>
-                        <h3 className="font-display text-lg font-medium text-text">{system.name}</h3>
-                        <p className={`text-xs font-body ${colors.text} tracking-wide`}>
+                        <h3 className="font-display text-lg font-medium text-text">
+                          {system.name}
+                        </h3>
+                        <p
+                          className={`text-xs font-body ${colors.text} tracking-wide`}
+                        >
                           {system.tagline}
                         </p>
                       </div>
@@ -603,12 +636,16 @@ export default function LandingPage() {
               </h2>
               <hr className="rule-gold my-6 max-w-[80px] mx-auto" />
               <p className="text-text/40 font-body max-w-xl mx-auto">
-                Three steps from curiosity to a personalized transformation path.
+                Three steps from curiosity to a personalized transformation
+                path.
               </p>
             </div>
           </MotionReveal>
 
-          <MotionStagger staggerDelay={0.15} className="grid grid-cols-1 md:grid-cols-3 gap-10">
+          <MotionStagger
+            staggerDelay={0.15}
+            className="grid grid-cols-1 md:grid-cols-3 gap-10"
+          >
             {HOW_IT_WORKS.map((item) => (
               <MotionStaggerItem key={item.step}>
                 <div className="text-center">
@@ -646,7 +683,10 @@ export default function LandingPage() {
             </div>
           </MotionReveal>
 
-          <MotionStagger staggerDelay={0.1} className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+          <MotionStagger
+            staggerDelay={0.1}
+            className="grid grid-cols-1 sm:grid-cols-2 gap-6"
+          >
             {TRUST_CARDS.map((card) => (
               <MotionStaggerItem key={card.title}>
                 <div className="card-surface p-6 flex items-start gap-4 h-full">
@@ -654,7 +694,9 @@ export default function LandingPage() {
                     <TrustIcon icon={card.icon} className="text-primary/70" />
                   </div>
                   <div>
-                    <h3 className="font-display text-lg font-medium text-text mb-1.5">{card.title}</h3>
+                    <h3 className="font-display text-lg font-medium text-text mb-1.5">
+                      {card.title}
+                    </h3>
                     <p className="text-sm text-text/40 font-body leading-relaxed">
                       {card.description}
                     </p>
@@ -670,14 +712,45 @@ export default function LandingPage() {
       <section className="py-28 px-4 sm:px-6 relative">
         <div className="absolute inset-0 bg-gradient-to-b from-transparent via-surface/20 to-transparent pointer-events-none" />
         <div className="max-w-4xl mx-auto relative">
-          <MotionStagger staggerDelay={0.15} className="grid grid-cols-1 md:grid-cols-2 gap-8">
+          <MotionStagger
+            staggerDelay={0.15}
+            className="grid grid-cols-1 md:grid-cols-2 gap-8"
+          >
             {/* Invitation card */}
             <MotionStaggerItem>
-            <div className="card-surface-elevated p-8 text-center flex flex-col justify-between h-full">
-              <div>
-                <div className="w-12 h-12 mx-auto mb-4 rounded-full bg-primary/[0.08] flex items-center justify-center">
+              <div className="card-surface-elevated p-8 text-center flex flex-col justify-between h-full">
+                <div>
+                  <div className="w-12 h-12 mx-auto mb-4 rounded-full bg-primary/[0.08] flex items-center justify-center">
+                    <svg
+                      className="w-6 h-6 text-primary"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      aria-hidden="true"
+                    >
+                      <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4" />
+                      <polyline points="10 17 15 12 10 7" />
+                      <line x1="15" y1="12" x2="3" y2="12" />
+                    </svg>
+                  </div>
+                  <h3 className="font-display text-xl font-medium text-text mb-2">
+                    Have an Invitation?
+                  </h3>
+                  <p className="text-sm text-text/40 font-body mb-6">
+                    If you have an invitation code, create your account and
+                    start your transformation journey today.
+                  </p>
+                </div>
+                <Link
+                  href="/signup"
+                  className="inline-flex items-center justify-center gap-2 px-6 py-3 bg-gradient-to-r from-primary-dark via-primary to-primary-light text-bg font-body font-medium rounded-xl text-sm transition-all duration-300 hover:shadow-[0_0_30px_rgba(218,165,32,0.25)] hover:scale-[1.02] active:scale-[0.98]"
+                >
+                  Create Account
                   <svg
-                    className="w-6 h-6 text-primary"
+                    className="w-4 h-4"
                     viewBox="0 0 24 24"
                     fill="none"
                     stroke="currentColor"
@@ -686,105 +759,76 @@ export default function LandingPage() {
                     strokeLinejoin="round"
                     aria-hidden="true"
                   >
-                    <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4" />
-                    <polyline points="10 17 15 12 10 7" />
-                    <line x1="15" y1="12" x2="3" y2="12" />
+                    <path d="M5 12h14" />
+                    <path d="m12 5 7 7-7 7" />
                   </svg>
-                </div>
-                <h3 className="font-display text-xl font-medium text-text mb-2">
-                  Have an Invitation?
-                </h3>
-                <p className="text-sm text-text/40 font-body mb-6">
-                  If you have an invitation code, create your account and start
-                  your transformation journey today.
-                </p>
+                </Link>
               </div>
-              <Link
-                href="/signup"
-                className="inline-flex items-center justify-center gap-2 px-6 py-3 bg-gradient-to-r from-primary-dark via-primary to-primary-light text-bg font-body font-medium rounded-xl text-sm transition-all duration-300 hover:shadow-[0_0_30px_rgba(218,165,32,0.25)] hover:scale-[1.02] active:scale-[0.98]"
-              >
-                Create Account
-                <svg
-                  className="w-4 h-4"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  aria-hidden="true"
-                >
-                  <path d="M5 12h14" />
-                  <path d="m12 5 7 7-7 7" />
-                </svg>
-              </Link>
-            </div>
-
             </MotionStaggerItem>
 
             {/* Waitlist card */}
             <MotionStaggerItem>
-            <div className="card-surface-elevated p-8 text-center flex flex-col justify-between h-full">
-              <div>
-                <div className="w-12 h-12 mx-auto mb-4 rounded-full bg-accent/[0.08] flex items-center justify-center">
-                  <svg
-                    className="w-6 h-6 text-accent"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    aria-hidden="true"
-                  >
-                    <rect width="20" height="16" x="2" y="4" rx="2" />
-                    <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" />
-                  </svg>
+              <div className="card-surface-elevated p-8 text-center flex flex-col justify-between h-full">
+                <div>
+                  <div className="w-12 h-12 mx-auto mb-4 rounded-full bg-accent/[0.08] flex items-center justify-center">
+                    <svg
+                      className="w-6 h-6 text-accent"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      aria-hidden="true"
+                    >
+                      <rect width="20" height="16" x="2" y="4" rx="2" />
+                      <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" />
+                    </svg>
+                  </div>
+                  <h3 className="font-display text-xl font-medium text-text mb-2">
+                    Join the Waitlist
+                  </h3>
+                  <p className="text-sm text-text/40 font-body mb-6">
+                    No invitation code yet? Join the waitlist and we&apos;ll
+                    notify you when spots open up.
+                  </p>
                 </div>
-                <h3 className="font-display text-xl font-medium text-text mb-2">
-                  Join the Waitlist
-                </h3>
-                <p className="text-sm text-text/40 font-body mb-6">
-                  No invitation code yet? Join the waitlist and we&apos;ll
-                  notify you when spots open up.
-                </p>
-              </div>
 
-              {waitlistSubmitted ? (
-                <div className="flex items-center justify-center gap-2 py-3 text-accent text-sm">
-                  <svg
-                    className="w-5 h-5"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    aria-hidden="true"
-                  >
-                    <polyline points="20 6 9 17 4 12" />
-                  </svg>
-                  You&apos;re on the list — we&apos;ll be in touch.
-                </div>
-              ) : (
-                <form onSubmit={handleWaitlist} className="flex gap-2">
-                  <input
-                    type="email"
-                    required
-                    value={waitlistEmail}
-                    onChange={(e) => setWaitlistEmail(e.target.value)}
-                    placeholder="you@example.com"
-                    className="flex-1 bg-white/[0.03] border border-white/[0.08] rounded-xl px-4 py-3 text-sm font-body text-text placeholder:text-text/25 focus:outline-none focus:border-accent/40 focus:ring-1 focus:ring-accent/20 transition-all duration-300"
-                  />
-                  <button
-                    type="submit"
-                    className="px-5 py-3 bg-accent/[0.08] text-accent border border-accent/[0.15] rounded-xl text-sm font-body font-medium hover:bg-accent/[0.12] transition-all duration-300 flex-shrink-0"
-                  >
-                    Join
-                  </button>
-                </form>
-              )}
-            </div>
+                {waitlistSubmitted ? (
+                  <div className="flex items-center justify-center gap-2 py-3 text-accent text-sm">
+                    <svg
+                      className="w-5 h-5"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      aria-hidden="true"
+                    >
+                      <polyline points="20 6 9 17 4 12" />
+                    </svg>
+                    You&apos;re on the list — we&apos;ll be in touch.
+                  </div>
+                ) : (
+                  <form onSubmit={handleWaitlist} className="flex gap-2">
+                    <input
+                      type="email"
+                      required
+                      value={waitlistEmail}
+                      onChange={(e) => setWaitlistEmail(e.target.value)}
+                      placeholder="you@example.com"
+                      className="flex-1 bg-white/[0.03] border border-white/[0.08] rounded-xl px-4 py-3 text-sm font-body text-text placeholder:text-text/25 focus:outline-none focus:border-accent/40 focus:ring-1 focus:ring-accent/20 transition-all duration-300"
+                    />
+                    <button
+                      type="submit"
+                      className="px-5 py-3 bg-accent/[0.08] text-accent border border-accent/[0.15] rounded-xl text-sm font-body font-medium hover:bg-accent/[0.12] transition-all duration-300 flex-shrink-0"
+                    >
+                      Join
+                    </button>
+                  </form>
+                )}
+              </div>
             </MotionStaggerItem>
           </MotionStagger>
         </div>
@@ -793,32 +837,34 @@ export default function LandingPage() {
       {/* ── Founding Quote ──────────────────────────────────────────────── */}
       <section className="py-24 px-4 sm:px-6">
         <MotionReveal>
-        <div className="max-w-3xl mx-auto text-center">
-          <blockquote className="font-display text-xl sm:text-2xl lg:text-3xl text-text/50 italic font-light leading-relaxed mb-6">
-            &ldquo;We built Alchymine because personal transformation tools
-            shouldn&apos;t require blind trust. Every algorithm is visible,
-            every methodology is cited, every financial calculation is
-            deterministic.&rdquo;
-          </blockquote>
-          <hr className="rule-gold my-6 max-w-[60px] mx-auto" />
-          <p className="text-sm font-body text-text/25 tracking-wider uppercase">The Alchymine Project</p>
-          <a
-            href="https://github.com/realsammyt/Alchymine"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-2 mt-4 text-xs font-body text-text/20 hover:text-text/40 transition-colors duration-300"
-          >
-            <svg
-              className="w-4 h-4"
-              viewBox="0 0 24 24"
-              fill="currentColor"
-              aria-hidden="true"
+          <div className="max-w-3xl mx-auto text-center">
+            <blockquote className="font-display text-xl sm:text-2xl lg:text-3xl text-text/50 italic font-light leading-relaxed mb-6">
+              &ldquo;We built Alchymine because personal transformation tools
+              shouldn&apos;t require blind trust. Every algorithm is visible,
+              every methodology is cited, every financial calculation is
+              deterministic.&rdquo;
+            </blockquote>
+            <hr className="rule-gold my-6 max-w-[60px] mx-auto" />
+            <p className="text-sm font-body text-text/25 tracking-wider uppercase">
+              The Alchymine Project
+            </p>
+            <a
+              href="https://github.com/realsammyt/Alchymine"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-2 mt-4 text-xs font-body text-text/20 hover:text-text/40 transition-colors duration-300"
             >
-              <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z" />
-            </svg>
-            View on GitHub
-          </a>
-        </div>
+              <svg
+                className="w-4 h-4"
+                viewBox="0 0 24 24"
+                fill="currentColor"
+                aria-hidden="true"
+              >
+                <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z" />
+              </svg>
+              View on GitHub
+            </a>
+          </div>
         </MotionReveal>
       </section>
 
