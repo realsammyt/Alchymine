@@ -1,8 +1,9 @@
-"""Authentication router — register, login, refresh, password reset, and user info endpoints.
+"""Authentication router — register, login, refresh, logout, password reset, and user info endpoints.
 
 Endpoints:
-- ``POST /auth/register``        — Create a new user and return tokens.
-- ``POST /auth/login``           — Authenticate and return tokens.
+- ``POST /auth/register``        — Create a new user and return tokens (+ set httpOnly cookies).
+- ``POST /auth/login``           — Authenticate and return tokens (+ set httpOnly cookies).
+- ``POST /auth/logout``          — Clear auth cookies.
 - ``POST /auth/refresh``         — Exchange a refresh token for a new access token.
 - ``GET  /auth/me``              — Return current user info (protected).
 - ``POST /auth/forgot-password`` — Request a password reset token.
@@ -17,7 +18,7 @@ import secrets
 from collections.abc import AsyncGenerator
 from datetime import UTC, datetime, timedelta
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from pydantic import BaseModel, EmailStr, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -57,9 +58,13 @@ class LoginRequest(BaseModel):
 
 
 class RefreshRequest(BaseModel):
-    """Request body for token refresh."""
+    """Request body for token refresh.
 
-    refresh_token: str
+    ``refresh_token`` is optional when a ``refresh_token`` httpOnly cookie is
+    present on the request — the endpoint will fall back to reading the cookie.
+    """
+
+    refresh_token: str | None = None
 
 
 class TokenResponse(BaseModel):
@@ -120,12 +125,49 @@ async def get_db() -> AsyncGenerator[AsyncSession, None]:
         yield session
 
 
+# ─── Cookie helpers ───────────────────────────────────────────────────────
+
+_ACCESS_TOKEN_MAX_AGE = 1800  # 30 minutes
+_REFRESH_TOKEN_MAX_AGE = 7 * 24 * 60 * 60  # 7 days
+
+
+def _set_auth_cookies(response: Response, access_token: str, refresh_token: str) -> None:
+    """Attach httpOnly auth cookies to *response* (in addition to the JSON body)."""
+    settings = get_settings()
+    secure = settings.environment != "development"
+    response.set_cookie(
+        key="access_token",
+        value=access_token,
+        httponly=True,
+        secure=secure,
+        samesite="lax",
+        max_age=_ACCESS_TOKEN_MAX_AGE,
+        path="/",
+    )
+    response.set_cookie(
+        key="refresh_token",
+        value=refresh_token,
+        httponly=True,
+        secure=secure,
+        samesite="lax",
+        max_age=_REFRESH_TOKEN_MAX_AGE,
+        path="/api/v1/auth/refresh",
+    )
+
+
+def _clear_auth_cookies(response: Response) -> None:
+    """Remove auth cookies from the client."""
+    response.delete_cookie(key="access_token", path="/")
+    response.delete_cookie(key="refresh_token", path="/api/v1/auth/refresh")
+
+
 # ─── Endpoints ────────────────────────────────────────────────────────────
 
 
 @router.post("/register", response_model=TokenResponse, status_code=status.HTTP_201_CREATED)
 async def register(
     body: RegisterRequest,
+    response: Response,
     db: AsyncSession = Depends(get_db),
 ) -> TokenResponse:
     """Register a new user.
@@ -167,6 +209,8 @@ async def register(
     access_token = create_access_token(token_data)
     refresh_token = create_refresh_token(token_data)
 
+    _set_auth_cookies(response, access_token, refresh_token)
+
     return TokenResponse(
         access_token=access_token,
         refresh_token=refresh_token,
@@ -176,6 +220,7 @@ async def register(
 @router.post("/login", response_model=TokenResponse)
 async def login(
     body: LoginRequest,
+    response: Response,
     db: AsyncSession = Depends(get_db),
 ) -> TokenResponse:
     """Authenticate a user and return tokens.
@@ -205,25 +250,51 @@ async def login(
     access_token = create_access_token(token_data)
     refresh_token = create_refresh_token(token_data)
 
+    _set_auth_cookies(response, access_token, refresh_token)
+
     return TokenResponse(
         access_token=access_token,
         refresh_token=refresh_token,
     )
 
 
+@router.post("/logout", response_model=MessageResponse)
+async def logout(response: Response) -> MessageResponse:
+    """Clear auth cookies to log the user out.
+
+    This removes the httpOnly access and refresh token cookies from the
+    client.  Callers using header-based auth should also discard their
+    locally stored tokens.
+    """
+    _clear_auth_cookies(response)
+    return MessageResponse(message="Logged out successfully.")
+
+
 @router.post("/refresh", response_model=TokenResponse)
 async def refresh(
+    request: Request,
+    response: Response,
     body: RefreshRequest,
     db: AsyncSession = Depends(get_db),
 ) -> TokenResponse:
     """Exchange a refresh token for a new access token.
 
-    Validates the refresh token, verifies the user still exists,
-    and returns a new access + refresh token pair.
+    Accepts the refresh token from either the JSON body or the ``refresh_token``
+    httpOnly cookie.  Validates the token, verifies the user still exists, checks
+    that the token was issued after the last password change, and returns a new
+    access + refresh token pair (also setting fresh cookies).
 
-    Returns 401 if the refresh token is invalid or the user no longer exists.
+    Returns 401 if the refresh token is invalid, the user no longer exists, or
+    the token predates the most recent password change.
     """
-    payload = decode_token(body.refresh_token)
+    raw_refresh = body.refresh_token or request.cookies.get("refresh_token")
+    if not raw_refresh:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Refresh token is required",
+        )
+
+    payload = decode_token(raw_refresh)
 
     # Ensure it is a refresh token
     if payload.get("type") != "refresh":
@@ -248,10 +319,30 @@ async def refresh(
             detail="User no longer exists",
         )
 
+    # Reject tokens issued before (or at the same second as) the last
+    # password change.  JWT ``iat`` is an integer epoch, so we truncate
+    # ``password_changed_at`` to whole seconds for a fair comparison.
+    # Using ``<=`` means tokens minted in the same calendar second as
+    # the change are also revoked — the user must log in again, which
+    # is the safe default.
+    if user.password_changed_at is not None:
+        token_iat = payload.get("iat")
+        changed_at = user.password_changed_at
+        if changed_at.tzinfo is None:
+            changed_at = changed_at.replace(tzinfo=UTC)
+        changed_at_truncated = changed_at.replace(microsecond=0)
+        if token_iat is None or datetime.fromtimestamp(token_iat, tz=UTC) <= changed_at_truncated:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Token has been revoked — please log in again",
+            )
+
     # Issue new tokens
     token_data = {"sub": user.id, "email": user.email}
     access_token = create_access_token(token_data)
     new_refresh_token = create_refresh_token(token_data)
+
+    _set_auth_cookies(response, access_token, new_refresh_token)
 
     return TokenResponse(
         access_token=access_token,
@@ -369,8 +460,10 @@ async def reset_password(
             detail="Invalid or expired reset token",
         )
 
-    # Update password and clear the token
+    # Update password, record the change timestamp (invalidates existing refresh tokens),
+    # and clear the one-time reset token.
     user.password_hash = hash_password(body.new_password)
+    user.password_changed_at = datetime.now(UTC)
     user.password_reset_token = None
     user.password_reset_expires = None
     await db.commit()

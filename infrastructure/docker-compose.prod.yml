@@ -205,9 +205,25 @@ services:
         max-size: "10m"
         max-file: "3"
 
-  # NOTE: PDF service production overrides will be added here once the pdf
-  # service is defined in the base docker-compose.yml. Dockerfile exists at
-  # infrastructure/docker/Dockerfile.pdf and is ready to be wired up.
+  # ─── PDF Service — production settings ──────────────────────────────────
+  pdf-service:
+    restart: always
+    env_file:
+      - path: ../.env.production
+        required: true
+    deploy:
+      resources:
+        limits:
+          memory: 1g
+          cpus: "1.0"
+        reservations:
+          memory: 512m
+          cpus: "0.5"
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   # ─── PostgreSQL — production settings ────────────────────────────────
   db:

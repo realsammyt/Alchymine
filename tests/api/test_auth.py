@@ -373,6 +373,69 @@ class TestRefresh:
         assert me_resp.status_code == 200
         assert me_resp.json()["email"] == "test@example.com"
 
+    def test_refresh_with_missing_token_rejected(self, client: TestClient):
+        """Refreshing without a token in body or cookie should return 401."""
+        response = client.post(
+            "/api/v1/auth/refresh",
+            json={},
+        )
+        assert response.status_code == 401
+
+
+# ─── Cookie Tests ─────────────────────────────────────────────────────────
+
+
+class TestAuthCookies:
+    """Tests that login and register set httpOnly auth cookies."""
+
+    def test_login_sets_cookies(self, client: TestClient, registered_user: dict):
+        """Login should set access_token and refresh_token cookies."""
+        response = client.post(
+            "/api/v1/auth/login",
+            json={"email": "test@example.com", "password": "securepassword123"},
+        )
+        assert response.status_code == 200
+        assert "access_token" in response.cookies
+        assert "refresh_token" in response.cookies
+
+    def test_register_sets_cookies(self, client: TestClient):
+        """Register should set access_token and refresh_token cookies."""
+        response = client.post(
+            "/api/v1/auth/register",
+            json={
+                "email": "cookie@example.com",
+                "password": "password123",
+                "promo_code": "alchyours",
+            },
+        )
+        assert response.status_code == 201
+        assert "access_token" in response.cookies
+        assert "refresh_token" in response.cookies
+
+    def test_me_with_cookie_auth(self, client: TestClient, registered_user: dict):
+        """GET /me should accept the access_token cookie instead of Bearer header."""
+        # Log in to obtain cookies
+        login_resp = client.post(
+            "/api/v1/auth/login",
+            json={"email": "test@example.com", "password": "securepassword123"},
+        )
+        assert login_resp.status_code == 200
+        cookie_value = login_resp.cookies["access_token"]
+
+        # Use cookie instead of Authorization header
+        response = client.get(
+            "/api/v1/auth/me",
+            cookies={"access_token": cookie_value},
+        )
+        assert response.status_code == 200
+        assert response.json()["email"] == "test@example.com"
+
+    def test_logout_clears_cookies(self, client: TestClient, registered_user: dict):
+        """POST /auth/logout should clear auth cookies."""
+        response = client.post("/api/v1/auth/logout")
+        assert response.status_code == 200
+        assert response.json()["message"] == "Logged out successfully."
+
 
 # ─── Forgot Password Tests ──────────────────────────────────────────────
 
@@ -492,3 +555,118 @@ class TestResetPassword:
             json={"token": raw_token, "new_password": "another-password"},
         )
         assert reuse_resp.status_code == 400
+
+
+# ─── Token Revocation Tests ──────────────────────────────────────────────
+
+
+class TestTokenRevocationOnPasswordReset:
+    """Tests that refresh tokens issued before a password reset are invalidated."""
+
+    def test_refresh_token_revoked_after_password_reset(
+        self, client: TestClient, registered_user: dict
+    ):
+        """A refresh token obtained before a password reset should be rejected."""
+        import asyncio
+        import secrets
+
+        from sqlalchemy import select
+
+        from alchymine.api.routers.auth import _hash_reset_token, get_db
+        from alchymine.db.models import User
+
+        old_refresh_token = registered_user["refresh_token"]
+
+        # Verify the old refresh token works before the reset
+        pre_reset_resp = client.post(
+            "/api/v1/auth/refresh",
+            json={"refresh_token": old_refresh_token},
+        )
+        assert pre_reset_resp.status_code == 200
+
+        # Trigger a password reset via the forgot/reset flow
+        client.post(
+            "/api/v1/auth/forgot-password",
+            json={"email": "test@example.com"},
+        )
+
+        raw_token = secrets.token_urlsafe(32)
+        token_hash = _hash_reset_token(raw_token)
+
+        async def _set_reset_token() -> None:
+            async for db in app.dependency_overrides[get_db]():
+                result = await db.execute(select(User).where(User.email == "test@example.com"))
+                user = result.scalar_one()
+                user.password_reset_token = token_hash
+                user.password_reset_expires = datetime.now(UTC) + timedelta(hours=1)
+                await db.commit()
+
+        asyncio.get_event_loop().run_until_complete(_set_reset_token())
+
+        reset_resp = client.post(
+            "/api/v1/auth/reset-password",
+            json={"token": raw_token, "new_password": "brand-new-password-2"},
+        )
+        assert reset_resp.status_code == 200
+
+        # The old refresh token should now be rejected
+        post_reset_resp = client.post(
+            "/api/v1/auth/refresh",
+            json={"refresh_token": old_refresh_token},
+        )
+        assert post_reset_resp.status_code == 401
+        assert "revoked" in post_reset_resp.json()["detail"].lower()
+
+    def test_new_refresh_token_works_after_password_reset(
+        self, client: TestClient, registered_user: dict
+    ):
+        """A refresh token issued after a password reset should be accepted."""
+        import asyncio
+        import secrets
+
+        from sqlalchemy import select
+
+        from alchymine.api.routers.auth import _hash_reset_token, get_db
+        from alchymine.db.models import User
+
+        client.post("/api/v1/auth/forgot-password", json={"email": "test@example.com"})
+
+        raw_token = secrets.token_urlsafe(32)
+        token_hash = _hash_reset_token(raw_token)
+
+        async def _set_reset_token() -> None:
+            async for db in app.dependency_overrides[get_db]():
+                result = await db.execute(select(User).where(User.email == "test@example.com"))
+                user = result.scalar_one()
+                user.password_reset_token = token_hash
+                user.password_reset_expires = datetime.now(UTC) + timedelta(hours=1)
+                await db.commit()
+
+        asyncio.get_event_loop().run_until_complete(_set_reset_token())
+
+        client.post(
+            "/api/v1/auth/reset-password",
+            json={"token": raw_token, "new_password": "post-reset-password"},
+        )
+
+        # Wait so the new login token's ``iat`` (integer seconds) falls
+        # strictly after the password_changed_at second.
+        import time
+
+        time.sleep(1.1)
+
+        # Log in with the new password to get a fresh refresh token
+        login_resp = client.post(
+            "/api/v1/auth/login",
+            json={"email": "test@example.com", "password": "post-reset-password"},
+        )
+        assert login_resp.status_code == 200
+        new_refresh_token = login_resp.json()["refresh_token"]
+
+        # New refresh token should work
+        refresh_resp = client.post(
+            "/api/v1/auth/refresh",
+            json={"refresh_token": new_refresh_token},
+        )
+        assert refresh_resp.status_code == 200
+        assert "access_token" in refresh_resp.json()

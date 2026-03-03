@@ -46,7 +46,10 @@ self.addEventListener("fetch", (event) => {
           const clone = response.clone();
           caches.open(CACHE_NAME).then((cache) => {
             // Only cache unauthenticated GET responses
-            if (event.request.method === "GET" && !event.request.headers.get("Authorization")) {
+            if (
+              event.request.method === "GET" &&
+              !event.request.headers.get("Authorization")
+            ) {
               cache.put(event.request, clone);
             }
           });

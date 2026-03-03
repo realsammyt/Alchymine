@@ -6,6 +6,24 @@ const puppeteer = require("puppeteer-core");
 const app = express();
 const PORT = process.env.PDF_PORT || 3001;
 
+// Require a shared secret token for all non-health requests.
+// The API service must set the same PDF_SERVICE_TOKEN in its environment
+// and pass it as "Authorization: Bearer <token>" on every request.
+const PDF_SERVICE_TOKEN = process.env.PDF_SERVICE_TOKEN;
+if (!PDF_SERVICE_TOKEN) {
+  console.error("FATAL: PDF_SERVICE_TOKEN environment variable is not set.");
+  process.exit(1);
+}
+
+function requireBearerToken(req, res, next) {
+  const authHeader = req.headers["authorization"] || "";
+  const [scheme, token] = authHeader.split(" ");
+  if (scheme !== "Bearer" || token !== PDF_SERVICE_TOKEN) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+  next();
+}
+
 app.use(express.json({ limit: "10mb" }));
 
 let browser;
@@ -33,8 +51,8 @@ app.get("/health", (_req, res) => {
   res.json({ status: "ok", service: "alchymine-pdf" });
 });
 
-// PDF generation endpoint
-app.post("/generate", async (req, res) => {
+// PDF generation endpoint — requires valid bearer token
+app.post("/generate", requireBearerToken, async (req, res) => {
   let page;
   try {
     const { html, options = {} } = req.body;

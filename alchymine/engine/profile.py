@@ -18,7 +18,7 @@ from datetime import date, datetime, time
 from enum import StrEnum
 from typing import Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 # ─── Enums ──────────────────────────────────────────────────────────────
 
@@ -239,6 +239,20 @@ class WealthLayer(BaseModel):
     )
     financial_distress_detected: bool = Field(False)
     disclaimer_acknowledged: bool = Field(False)
+
+    @field_validator("financial_distress_detected", mode="before")
+    @classmethod
+    def _coerce_distress_flag(cls, v: object) -> bool:
+        """Accept encrypted-string values ("true"/"false") from the ORM layer.
+
+        The WealthProfile ORM model stores this flag as an EncryptedString
+        to protect sensitive financial information.  When the value is
+        deserialized from the database it arrives as a plain string;
+        this validator normalises it back to a Python bool.
+        """
+        if isinstance(v, str):
+            return v.lower() == "true"
+        return bool(v)
 
 
 # ─── Layer 4: Creative (v7) ─────────────────────────────────────────────

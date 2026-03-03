@@ -7,21 +7,17 @@ across all five Alchymine systems.
 
 from __future__ import annotations
 
-import uuid
-from datetime import UTC, datetime
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from alchymine.api.auth import get_current_user
+from alchymine.api.deps import get_db_session
+from alchymine.db import repository
 
 router = APIRouter()
-
-# ── In-memory store (swap for DB later) ─────────────────────────────────
-
-_journal_store: dict[str, dict[str, Any]] = {}
-"""Module-level dict holding journal entries keyed by entry ID."""
 
 
 # ── Request / Response models ───────────────────────────────────────────
@@ -89,6 +85,36 @@ class JournalStatsResponse(BaseModel):
     tags_used: list[str]
 
 
+# ── Helpers ──────────────────────────────────────────────────────────────
+
+
+def _entry_to_response(entry: Any) -> JournalEntryResponse:
+    """Convert an ORM JournalEntry to a JournalEntryResponse."""
+    tags = entry.tags if isinstance(entry.tags, list) else []
+    created = (
+        entry.created_at.isoformat()
+        if hasattr(entry.created_at, "isoformat")
+        else str(entry.created_at)
+    )
+    updated = (
+        entry.updated_at.isoformat()
+        if hasattr(entry.updated_at, "isoformat")
+        else str(entry.updated_at)
+    )
+    return JournalEntryResponse(
+        id=entry.id,
+        user_id=entry.user_id,
+        system=entry.system,
+        entry_type=entry.entry_type,
+        title=entry.title,
+        content=entry.content,
+        tags=tags,
+        mood_score=entry.mood_score,
+        created_at=created,
+        updated_at=updated,
+    )
+
+
 # ── Endpoints ───────────────────────────────────────────────────────────
 
 
@@ -96,6 +122,7 @@ class JournalStatsResponse(BaseModel):
 async def create_journal_entry(
     entry: JournalEntryCreate,
     current_user: dict = Depends(get_current_user),
+    session: AsyncSession = Depends(get_db_session),
 ) -> JournalEntryResponse:
     """Create a new journal entry.
 
@@ -104,40 +131,52 @@ async def create_journal_entry(
     """
     if current_user["sub"] != entry.user_id:
         raise HTTPException(status_code=403, detail="Access denied")
-    now = datetime.now(UTC).isoformat()
-    entry_id = str(uuid.uuid4())
 
-    record: dict[str, Any] = {
-        "id": entry_id,
-        "user_id": entry.user_id,
-        "system": entry.system,
-        "entry_type": entry.entry_type,
-        "title": entry.title,
-        "content": entry.content,
-        "tags": entry.tags,
-        "mood_score": entry.mood_score,
-        "created_at": now,
-        "updated_at": now,
-    }
+    db_entry = await repository.create_journal_entry(
+        session,
+        user_id=entry.user_id,
+        title=entry.title,
+        content=entry.content,
+        system=entry.system,
+        entry_type=entry.entry_type,
+        tags=entry.tags,
+        mood_score=entry.mood_score,
+    )
+    return _entry_to_response(db_entry)
 
-    _journal_store[entry_id] = record
 
-    return JournalEntryResponse(**record)
+@router.get("/journal/stats/{user_id}")
+async def get_journal_stats(
+    user_id: str,
+    current_user: dict = Depends(get_current_user),
+    session: AsyncSession = Depends(get_db_session),
+) -> JournalStatsResponse:
+    """Get summary statistics for a user's journal.
+
+    Returns entry counts by system and type, average mood score,
+    and a list of all tags used.
+    """
+    if current_user["sub"] != user_id:
+        raise HTTPException(status_code=403, detail="Access denied")
+
+    stats = await repository.get_journal_stats(session, user_id)
+    return JournalStatsResponse(**stats)
 
 
 @router.get("/journal/{entry_id}")
 async def get_journal_entry(
     entry_id: str,
     current_user: dict = Depends(get_current_user),
+    session: AsyncSession = Depends(get_db_session),
 ) -> JournalEntryResponse:
     """Retrieve a single journal entry by ID."""
-    if entry_id not in _journal_store:
+    db_entry = await repository.get_journal_entry(session, entry_id)
+    if db_entry is None:
         raise HTTPException(status_code=404, detail="Journal entry not found")
 
-    entry = _journal_store[entry_id]
-    if current_user["sub"] != entry["user_id"]:
+    if current_user["sub"] != db_entry.user_id:
         raise HTTPException(status_code=403, detail="Access denied")
-    return JournalEntryResponse(**entry)
+    return _entry_to_response(db_entry)
 
 
 @router.put("/journal/{entry_id}")
@@ -145,42 +184,46 @@ async def update_journal_entry(
     entry_id: str,
     update: JournalEntryUpdate,
     current_user: dict = Depends(get_current_user),
+    session: AsyncSession = Depends(get_db_session),
 ) -> JournalEntryResponse:
     """Update an existing journal entry."""
-    if entry_id not in _journal_store:
+    db_entry = await repository.get_journal_entry(session, entry_id)
+    if db_entry is None:
         raise HTTPException(status_code=404, detail="Journal entry not found")
 
-    record = _journal_store[entry_id]
-    if current_user["sub"] != record["user_id"]:
+    if current_user["sub"] != db_entry.user_id:
         raise HTTPException(status_code=403, detail="Access denied")
 
+    changes: dict[str, Any] = {}
     if update.title is not None:
-        record["title"] = update.title
+        changes["title"] = update.title
     if update.content is not None:
-        record["content"] = update.content
+        changes["content"] = update.content
     if update.tags is not None:
-        record["tags"] = update.tags
+        changes["tags"] = update.tags
     if update.mood_score is not None:
-        record["mood_score"] = update.mood_score
+        changes["mood_score"] = update.mood_score
 
-    record["updated_at"] = datetime.now(UTC).isoformat()
-
-    return JournalEntryResponse(**record)
+    updated = await repository.update_journal_entry(session, entry_id, **changes)
+    assert updated is not None
+    return _entry_to_response(updated)
 
 
 @router.delete("/journal/{entry_id}", status_code=204)
 async def delete_journal_entry(
     entry_id: str,
     current_user: dict = Depends(get_current_user),
+    session: AsyncSession = Depends(get_db_session),
 ) -> None:
     """Delete a journal entry."""
-    if entry_id not in _journal_store:
+    db_entry = await repository.get_journal_entry(session, entry_id)
+    if db_entry is None:
         raise HTTPException(status_code=404, detail="Journal entry not found")
 
-    record = _journal_store[entry_id]
-    if current_user["sub"] != record["user_id"]:
+    if current_user["sub"] != db_entry.user_id:
         raise HTTPException(status_code=403, detail="Access denied")
-    del _journal_store[entry_id]
+
+    await repository.delete_journal_entry(session, entry_id)
 
 
 @router.get("/journal")
@@ -191,6 +234,7 @@ async def list_journal_entries(
     page: int = Query(1, ge=1, description="Page number"),
     per_page: int = Query(20, ge=1, le=100, description="Items per page"),
     current_user: dict = Depends(get_current_user),
+    session: AsyncSession = Depends(get_db_session),
 ) -> JournalListResponse:
     """List journal entries for a user with optional filters.
 
@@ -199,97 +243,20 @@ async def list_journal_entries(
     """
     if current_user["sub"] != user_id:
         raise HTTPException(status_code=403, detail="Access denied")
-    # Filter entries belonging to the user
-    user_entries = [e for e in _journal_store.values() if e["user_id"] == user_id]
 
-    # Apply filters
-    if system:
-        user_entries = [e for e in user_entries if e["system"] == system]
-    if entry_type:
-        user_entries = [e for e in user_entries if e["entry_type"] == entry_type]
-
-    # Sort by created_at descending
-    user_entries.sort(key=lambda e: e["created_at"], reverse=True)
-
-    total = len(user_entries)
-
-    # Paginate
-    start = (page - 1) * per_page
-    end = start + per_page
-    page_entries = user_entries[start:end]
+    offset = (page - 1) * per_page
+    entries, total = await repository.list_journal_entries(
+        session,
+        user_id,
+        system=system,
+        entry_type=entry_type,
+        offset=offset,
+        limit=per_page,
+    )
 
     return JournalListResponse(
-        entries=[JournalEntryResponse(**e) for e in page_entries],
+        entries=[_entry_to_response(e) for e in entries],
         total=total,
         page=page,
         per_page=per_page,
-    )
-
-
-@router.get("/journal/stats/{user_id}")
-async def get_journal_stats(
-    user_id: str,
-    current_user: dict = Depends(get_current_user),
-) -> JournalStatsResponse:
-    """Get summary statistics for a user's journal.
-
-    Returns entry counts by system and type, average mood score,
-    and a list of all tags used.
-    """
-    if current_user["sub"] != user_id:
-        raise HTTPException(status_code=403, detail="Access denied")
-    user_entries = [e for e in _journal_store.values() if e["user_id"] == user_id]
-
-    if not user_entries:
-        return JournalStatsResponse(
-            total_entries=0,
-            entries_by_system={},
-            entries_by_type={},
-            average_mood=None,
-            streak_days=0,
-            tags_used=[],
-        )
-
-    # Count by system
-    by_system: dict[str, int] = {}
-    for entry in user_entries:
-        sys = entry["system"]
-        by_system[sys] = by_system.get(sys, 0) + 1
-
-    # Count by type
-    by_type: dict[str, int] = {}
-    for entry in user_entries:
-        et = entry["entry_type"]
-        by_type[et] = by_type.get(et, 0) + 1
-
-    # Average mood
-    moods = [e["mood_score"] for e in user_entries if e.get("mood_score") is not None]
-    avg_mood = sum(moods) / len(moods) if moods else None
-
-    # Collect unique tags
-    all_tags: set[str] = set()
-    for entry in user_entries:
-        all_tags.update(entry.get("tags", []))
-
-    # Calculate streak (consecutive days with entries)
-    dates = sorted({e["created_at"][:10] for e in user_entries}, reverse=True)
-    streak = 0
-    today = datetime.now(UTC).strftime("%Y-%m-%d")
-    if dates and dates[0] == today:
-        streak = 1
-        for i in range(1, len(dates)):
-            prev = datetime.strptime(dates[i - 1], "%Y-%m-%d")  # noqa: DTZ007
-            curr = datetime.strptime(dates[i], "%Y-%m-%d")  # noqa: DTZ007
-            if (prev - curr).days == 1:
-                streak += 1
-            else:
-                break
-
-    return JournalStatsResponse(
-        total_entries=len(user_entries),
-        entries_by_system=by_system,
-        entries_by_type=by_type,
-        average_mood=avg_mood,
-        streak_days=streak,
-        tags_used=sorted(all_tags),
     )

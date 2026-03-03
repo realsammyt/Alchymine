@@ -9,7 +9,13 @@ import {
   useState,
 } from "react";
 import type { ReactNode } from "react";
-import { loginUser, registerUser, getMe, ApiError } from "@/lib/api";
+import {
+  loginUser,
+  logoutUser,
+  registerUser,
+  getMe,
+  ApiError,
+} from "@/lib/api";
 import type { AuthUser } from "@/lib/api";
 
 interface AuthContextValue {
@@ -21,7 +27,7 @@ interface AuthContextValue {
     password: string,
     promoCode: string,
   ) => Promise<void>;
-  logout: () => void;
+  logout: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -30,16 +36,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Check for existing session on mount
+  // Check for existing session on mount.  Auth is now cookie-based so we
+  // always try /me — the httpOnly access_token cookie is sent automatically.
+  // Legacy localStorage tokens are left in place for the migration fallback
+  // path in api.ts and will be cleaned up on next explicit login/logout.
   useEffect(() => {
-    const token = localStorage.getItem("access_token");
-    if (!token) {
-      setIsLoading(false);
-      return;
-    }
     getMe()
       .then(setUser)
       .catch(() => {
+        // No valid session — clean up any residual localStorage tokens
         localStorage.removeItem("access_token");
         localStorage.removeItem("refresh_token");
       })
@@ -47,6 +52,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const login = useCallback(async (email: string, password: string) => {
+    // Tokens are returned in the JSON body for the migration fallback path
+    // and also set as httpOnly cookies by the server automatically.
     const tokens = await loginUser(email, password);
     localStorage.setItem("access_token", tokens.access_token);
     localStorage.setItem("refresh_token", tokens.refresh_token);
@@ -65,7 +72,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [],
   );
 
-  const logout = useCallback(() => {
+  const logout = useCallback(async () => {
+    // Ask the server to clear the httpOnly cookies, then clean up local state.
+    try {
+      await logoutUser();
+    } catch {
+      // Best-effort — proceed with local cleanup even if the API call fails
+    }
     localStorage.removeItem("access_token");
     localStorage.removeItem("refresh_token");
     setUser(null);

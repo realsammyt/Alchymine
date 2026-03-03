@@ -26,6 +26,8 @@ services:
       - LOG_LEVEL=${LOG_LEVEL:-WARNING}
       - API_SECRET_KEY=${API_SECRET_KEY:?API_SECRET_KEY must be set}
       - ALLOWED_ORIGINS=${ALLOWED_ORIGINS:-["http://localhost:3000"]}
+      - PDF_SERVICE_TOKEN=${PDF_SERVICE_TOKEN:?PDF_SERVICE_TOKEN must be set}
+      - PDF_SERVICE_URL=http://pdf-service:3001
     depends_on:
       db:
         condition: service_healthy
@@ -52,6 +54,7 @@ services:
         max-file: "3"
     networks:
       - alchymine-net
+      - pdf-net
 
   # ─── Web (Next.js Frontend) ──────────────────────────────────────────────
   web:
@@ -183,6 +186,8 @@ services:
       - CELERY_RESULT_BACKEND=redis://:${REDIS_PASSWORD}@redis:6379/1
       - ENVIRONMENT=${ENVIRONMENT:-production}
       - LOG_LEVEL=${LOG_LEVEL:-WARNING}
+      - PDF_SERVICE_TOKEN=${PDF_SERVICE_TOKEN:?PDF_SERVICE_TOKEN must be set}
+      - PDF_SERVICE_URL=http://pdf-service:3001
     depends_on:
       db:
         condition: service_healthy
@@ -219,12 +224,61 @@ services:
         max-file: "3"
     networks:
       - alchymine-net
+      - pdf-net
+
+  # ─── PDF Service (Puppeteer) ──────────────────────────────────────────────
+  pdf-service:
+    build:
+      context: ..
+      dockerfile: infrastructure/docker/Dockerfile.pdf
+    container_name: alchymine-pdf
+    restart: unless-stopped
+    environment:
+      - PDF_SERVICE_TOKEN=${PDF_SERVICE_TOKEN:?PDF_SERVICE_TOKEN must be set}
+      - PDF_PORT=3001
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "wget",
+          "--no-verbose",
+          "--tries=1",
+          "--spider",
+          "http://localhost:3001/health",
+        ]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    deploy:
+      resources:
+        limits:
+          memory: 1g
+          cpus: "1.0"
+        reservations:
+          memory: 512m
+          cpus: "0.5"
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    # pdf-service is intentionally NOT on alchymine-net — it is only reachable
+    # from api and worker via the isolated pdf-net bridge.
+    networks:
+      - pdf-net
 
 # ─── Networks ────────────────────────────────────────────────────────────────
 networks:
   alchymine-net:
     driver: bridge
     name: alchymine-net
+  # Isolated network for PDF service — only api and worker can reach it.
+  # The PDF service is not on alchymine-net so web/nginx cannot call it directly.
+  pdf-net:
+    driver: bridge
+    name: alchymine-pdf-net
+    internal: true
 
 # ─── Volumes ─────────────────────────────────────────────────────────────────
 volumes:

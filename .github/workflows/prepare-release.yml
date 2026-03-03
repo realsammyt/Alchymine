@@ -118,7 +118,7 @@ jobs:
           cat changelog.md
 
       - name: Create draft release
-        uses: softprops/action-gh-release@a06a81a03ee405af7f2048a818ed3f03bbf83c7b  # v2.0.8
+        uses: softprops/action-gh-release@a06a81a03ee405af7f2048a818ed3f03bbf83c7b # v2.0.8
         with:
           tag_name: v${{ steps.version.outputs.next_version }}
           name: "Alchymine v${{ steps.version.outputs.next_version }}"

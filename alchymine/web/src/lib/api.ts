@@ -2,7 +2,8 @@
  * Alchymine API client — typed fetch wrappers for the FastAPI backend.
  */
 
-const BASE = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000") + "/api/v1";
+const BASE =
+  (process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000") + "/api/v1";
 
 // ─── Shared types ────────────────────────────────────────────────────
 
@@ -277,7 +278,10 @@ class ApiError extends Error {
   }
 }
 
-function getAuthHeaders(): Record<string, string> {
+// Provide the Authorization header as a migration fallback when a token is
+// still present in localStorage.  New sessions rely on httpOnly cookies sent
+// automatically via credentials: "include".
+function getLegacyAuthHeaders(): Record<string, string> {
   if (typeof window === "undefined") return {};
   const token = localStorage.getItem("access_token");
   return token ? { Authorization: `Bearer ${token}` } : {};
@@ -286,9 +290,10 @@ function getAuthHeaders(): Record<string, string> {
 async function request<T>(url: string, options?: RequestInit): Promise<T> {
   const res = await fetch(url, {
     ...options,
+    credentials: "include",
     headers: {
       "Content-Type": "application/json",
-      ...getAuthHeaders(),
+      ...getLegacyAuthHeaders(),
       ...options?.headers,
     },
   });
@@ -299,38 +304,44 @@ async function request<T>(url: string, options?: RequestInit): Promise<T> {
     throw new ApiError(202, body.detail || "Still processing");
   }
 
-  // Attempt token refresh on 401
+  // Attempt token refresh on 401.  The refresh request uses credentials: "include"
+  // so the httpOnly refresh_token cookie is sent automatically.  As a migration
+  // fallback we also pass the stored refresh token in the JSON body.
   if (res.status === 401 && typeof window !== "undefined") {
-    const refreshToken = localStorage.getItem("refresh_token");
-    if (refreshToken) {
-      try {
-        const refreshRes = await fetch(`${BASE}/auth/refresh`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ refresh_token: refreshToken }),
+    const legacyRefreshToken = localStorage.getItem("refresh_token");
+    try {
+      const refreshRes = await fetch(`${BASE}/auth/refresh`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          refresh_token: legacyRefreshToken ?? undefined,
+        }),
+      });
+      if (refreshRes.ok) {
+        const tokens = await refreshRes.json();
+        // Persist to localStorage for the header-based fallback path so that
+        // the migration window works correctly; cookies are set by the server.
+        localStorage.setItem("access_token", tokens.access_token);
+        localStorage.setItem("refresh_token", tokens.refresh_token);
+        // Retry the original request
+        const retryRes = await fetch(url, {
+          ...options,
+          credentials: "include",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${tokens.access_token}`,
+            ...options?.headers,
+          },
         });
-        if (refreshRes.ok) {
-          const tokens = await refreshRes.json();
-          localStorage.setItem("access_token", tokens.access_token);
-          localStorage.setItem("refresh_token", tokens.refresh_token);
-          // Retry the original request with new token
-          const retryRes = await fetch(url, {
-            ...options,
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${tokens.access_token}`,
-              ...options?.headers,
-            },
-          });
-          if (retryRes.ok) return retryRes.json();
-        }
-        // Refresh failed — clear tokens
-        localStorage.removeItem("access_token");
-        localStorage.removeItem("refresh_token");
-      } catch {
-        localStorage.removeItem("access_token");
-        localStorage.removeItem("refresh_token");
+        if (retryRes.ok) return retryRes.json();
       }
+      // Refresh failed — clear legacy localStorage tokens
+      localStorage.removeItem("access_token");
+      localStorage.removeItem("refresh_token");
+    } catch {
+      localStorage.removeItem("access_token");
+      localStorage.removeItem("refresh_token");
     }
   }
 
@@ -645,6 +656,12 @@ export async function loginUser(
 
 export async function getMe(): Promise<AuthUser> {
   return request<AuthUser>(`${BASE}/auth/me`);
+}
+
+export async function logoutUser(): Promise<{ message: string }> {
+  return request<{ message: string }>(`${BASE}/auth/logout`, {
+    method: "POST",
+  });
 }
 
 export async function forgotPassword(

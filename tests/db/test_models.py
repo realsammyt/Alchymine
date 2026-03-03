@@ -307,7 +307,7 @@ async def test_wealth_defaults(session: AsyncSession) -> None:
     await session.flush()
 
     assert wealth.risk_tolerance == "moderate"
-    assert wealth.financial_distress_detected is False
+    assert wealth.financial_distress_detected == "false"
     assert wealth.disclaimer_acknowledged is False
 
 

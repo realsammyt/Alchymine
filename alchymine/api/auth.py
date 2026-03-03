@@ -15,7 +15,7 @@ from __future__ import annotations
 from datetime import UTC, datetime, timedelta
 
 import bcrypt
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError, jwt
 
@@ -33,7 +33,7 @@ REFRESH_TOKEN_EXPIRE_DAYS: int = _settings.refresh_token_expire_days
 
 # ─── Password Hashing ────────────────────────────────────────────────────
 
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login")
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login", auto_error=False)
 
 
 def hash_password(password: str) -> str:
@@ -113,8 +113,9 @@ def create_refresh_token(data: dict) -> str:
         The encoded JWT string.
     """
     to_encode = data.copy()
-    expire = datetime.now(UTC) + timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS)
-    to_encode.update({"exp": expire, "type": "refresh"})
+    now = datetime.now(UTC)
+    expire = now + timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS)
+    to_encode.update({"exp": expire, "iat": now, "type": "refresh"})
     return jwt.encode(to_encode, JWT_SECRET_KEY, algorithm=JWT_ALGORITHM)
 
 
@@ -150,13 +151,22 @@ def decode_token(token: str) -> dict:
 # ─── FastAPI Dependencies ─────────────────────────────────────────────────
 
 
-async def get_current_user(token: str = Depends(oauth2_scheme)) -> dict:
-    """FastAPI dependency that extracts the current user from a bearer token.
+async def get_current_user(
+    request: Request,
+    bearer_token: str | None = Depends(oauth2_scheme),
+) -> dict:
+    """FastAPI dependency that extracts the current user from a bearer token or cookie.
+
+    Checks the ``Authorization: Bearer`` header first. If absent, falls back to
+    reading the ``access_token`` httpOnly cookie so cookie-based auth works
+    transparently alongside legacy header-based clients.
 
     Parameters
     ----------
-    token:
-        The JWT bearer token extracted from the Authorization header.
+    request:
+        The incoming HTTP request (used to read cookies).
+    bearer_token:
+        The JWT bearer token extracted from the Authorization header, or None.
 
     Returns
     -------
@@ -166,8 +176,15 @@ async def get_current_user(token: str = Depends(oauth2_scheme)) -> dict:
     Raises
     ------
     HTTPException
-        If the token is missing, expired, or invalid.
+        If no valid token is found in either the header or cookie.
     """
+    token = bearer_token or request.cookies.get("access_token")
+    if not token:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Could not validate credentials",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
     payload = decode_token(token)
     user_id: str | None = payload.get("sub")
     if user_id is None:
