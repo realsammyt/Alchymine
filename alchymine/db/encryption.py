@@ -32,23 +32,33 @@ _ENV_KEY = "ALCHYMINE_ENCRYPTION_KEY"
 
 
 def _get_fernet() -> Fernet:
-    """Return a Fernet instance from the environment key.
+    """Return a Fernet instance from Settings or the environment key.
+
+    Tries Settings first for unified configuration, then falls back to
+    reading the environment variable directly for backward compatibility.
 
     Raises
     ------
     RuntimeError
         If the encryption key is not configured.
     """
-    raw_key = os.environ.get(_ENV_KEY)
-    if not raw_key:
+    key = ""
+    try:
+        from alchymine.config import get_settings
+
+        key = get_settings().alchymine_encryption_key
+    except Exception:  # noqa: S110 — fallback to env var below
+        pass
+
+    if not key:
+        key = os.environ.get(_ENV_KEY, "")
+
+    if not key:
         raise RuntimeError(
-            f"Encryption key not set. "
-            f"Export {_ENV_KEY} with a Fernet-compatible key. "
-            f"Generate one with: "
-            f'python -c "from cryptography.fernet import Fernet; '
-            f'print(Fernet.generate_key().decode())"'
+            f"Encryption key not configured. Set {_ENV_KEY} environment variable. "
+            "Generate with: python -c 'from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())'"
         )
-    return Fernet(raw_key.encode())
+    return Fernet(key.encode() if isinstance(key, str) else key)
 
 
 def encrypt_value(plaintext: str) -> str:

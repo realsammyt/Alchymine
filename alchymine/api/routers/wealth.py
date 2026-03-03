@@ -6,10 +6,11 @@ and 90-day activation plan generation.
 
 from __future__ import annotations
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
+from alchymine.api.auth import get_current_user
 from alchymine.engine.profile import (
     ArchetypeType,
     Intention,
@@ -159,7 +160,10 @@ def _plan_to_response(plan: ActivationPlan) -> WealthPlanResponse:
 
 
 @router.post("/wealth/profile")
-async def calculate_wealth_profile(request: WealthProfileRequest) -> WealthProfileResponse:
+async def calculate_wealth_profile(
+    request: WealthProfileRequest,
+    current_user: dict = Depends(get_current_user),
+) -> WealthProfileResponse:
     """Calculate a wealth archetype from intake data.
 
     Uses the deterministic wealth archetype mapping engine to score all 8
@@ -181,7 +185,10 @@ async def calculate_wealth_profile(request: WealthProfileRequest) -> WealthProfi
 
 
 @router.post("/wealth/plan")
-async def generate_wealth_plan(request: WealthPlanRequest) -> WealthPlanResponse:
+async def generate_wealth_plan(
+    request: WealthPlanRequest,
+    current_user: dict = Depends(get_current_user),
+) -> WealthPlanResponse:
     """Generate a 90-day wealth activation plan.
 
     Combines wealth archetype mapping, lever prioritization, and plan
@@ -210,7 +217,10 @@ async def generate_wealth_plan(request: WealthPlanRequest) -> WealthPlanResponse
 
 
 @router.post("/wealth/levers")
-async def get_lever_priorities(request: LeverRequest) -> LeverResponse:
+async def get_lever_priorities(
+    request: LeverRequest,
+    current_user: dict = Depends(get_current_user),
+) -> LeverResponse:
     """Get wealth lever priorities for a user.
 
     Returns all 5 wealth levers (EARN, KEEP, GROW, PROTECT, TRANSFER)
@@ -227,7 +237,10 @@ async def get_lever_priorities(request: LeverRequest) -> LeverResponse:
 
 
 @router.post("/wealth/plan/export")
-async def export_wealth_plan_csv(request: WealthPlanRequest) -> StreamingResponse:
+async def export_wealth_plan_csv(
+    request: WealthPlanRequest,
+    current_user: dict = Depends(get_current_user),
+) -> StreamingResponse:
     """Export a 90-day wealth activation plan as a downloadable CSV.
 
     Generates the same deterministic plan as ``POST /wealth/plan`` but

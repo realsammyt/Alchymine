@@ -4,9 +4,10 @@ from __future__ import annotations
 
 from datetime import date
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
+from alchymine.api.auth import get_current_user
 from alchymine.engine.numerology import (
     calculate_pythagorean_profile,
     chaldean_name_number,
@@ -54,6 +55,7 @@ async def calculate_numerology(
     name: str,
     birth_date: date | None = None,
     system: str = "pythagorean",
+    current_user: dict = Depends(get_current_user),
 ) -> NumerologyResponse:
     """Calculate numerology for a given name and optional birth date.
 
@@ -91,7 +93,10 @@ async def calculate_numerology(
 
 
 @router.post("/numerology")
-async def calculate_numerology_post(request: NumerologyRequest) -> NumerologyResponse:
+async def calculate_numerology_post(
+    request: NumerologyRequest,
+    current_user: dict = Depends(get_current_user),
+) -> NumerologyResponse:
     """Calculate numerology from POST body."""
     return await calculate_numerology(
         name=request.full_name,

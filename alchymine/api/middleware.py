@@ -8,6 +8,7 @@ Three middleware classes:
 
 from __future__ import annotations
 
+import ipaddress
 import logging
 import os
 import time
@@ -52,12 +53,12 @@ class ErrorHandlerMiddleware(BaseHTTPMiddleware):
         try:
             response = await call_next(request)
             return response
-        except Exception as exc:
+        except Exception:
             logger.exception("Unhandled exception on %s %s", request.method, request.url.path)
             return JSONResponse(
                 status_code=500,
                 content={
-                    "detail": f"Internal server error: {exc}",
+                    "detail": "An unexpected error occurred. Please try again later.",
                     "status_code": 500,
                 },
             )
@@ -92,6 +93,13 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
 # ═══════════════════════════════════════════════════════════════════════════
 # Rate Limit Middleware — Redis-backed sliding window
 # ═══════════════════════════════════════════════════════════════════════════
+
+# Networks whose X-Forwarded-For headers are trusted (internal proxies only)
+TRUSTED_PROXY_NETWORKS: list[ipaddress.IPv4Network | ipaddress.IPv6Network] = [
+    ipaddress.ip_network("172.16.0.0/12"),  # Docker internal
+    ipaddress.ip_network("10.0.0.0/8"),  # Private networks
+    ipaddress.ip_network("127.0.0.0/8"),  # Loopback
+]
 
 # Default per-prefix limits: (max_requests, window_seconds)
 DEFAULT_ROUTE_LIMITS: dict[str, tuple[int, int]] = {
@@ -166,12 +174,18 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
             return None
 
     def _get_client_ip(self, request: Request) -> str:
-        """Extract client IP from the request."""
-        # Prefer X-Forwarded-For header (behind proxy), fall back to client host
-        forwarded = request.headers.get("x-forwarded-for")
-        if forwarded:
-            return forwarded.split(",")[0].strip()
-        return request.client.host if request.client else "unknown"
+        """Extract the real client IP, trusting X-Forwarded-For only from known proxy networks."""
+        peer_ip = request.client.host if request.client else None
+        if peer_ip:
+            try:
+                addr = ipaddress.ip_address(peer_ip)
+                if any(addr in net for net in TRUSTED_PROXY_NETWORKS):
+                    forwarded = request.headers.get("x-forwarded-for")
+                    if forwarded:
+                        return forwarded.split(",")[0].strip()
+            except ValueError:
+                pass
+        return peer_ip or "unknown"
 
     def _resolve_limits(self, path: str) -> tuple[int, int]:
         """Return ``(max_requests, window_seconds)`` for a given request path.
@@ -194,7 +208,12 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
             # Graceful fallback — Redis unavailable, allow traffic
             return await call_next(request)
 
-        key = f"rate_limit:{client_ip}:{window}"
+        bucket = "default"
+        for prefix in self.route_limits:
+            if path.startswith(prefix):
+                bucket = prefix.replace("/", "_").strip("_")
+                break
+        key = f"rate_limit:{client_ip}:{bucket}:{window}"
         try:
             current_count: int = await redis_conn.incr(key)
             if current_count == 1:

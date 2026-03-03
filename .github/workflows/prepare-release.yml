@@ -16,13 +16,12 @@ concurrency:
   group: prepare-release
   cancel-in-progress: true
 
-permissions:
-  contents: write
-
 jobs:
   prepare-release:
     name: "Create draft release"
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v4
         with:
@@ -119,7 +118,7 @@ jobs:
           cat changelog.md
 
       - name: Create draft release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@c062e08bd532815e2082a7e09a33f3f21a0a5827  # v2.0.8
         with:
           tag_name: v${{ steps.version.outputs.next_version }}
           name: "Alchymine v${{ steps.version.outputs.next_version }}"

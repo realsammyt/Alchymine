@@ -7,9 +7,10 @@ All calculations are deterministic.
 
 from __future__ import annotations
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
+from alchymine.api.auth import get_current_user
 from alchymine.engine.perspective import (
     assess_kegan_stage,
     detect_biases,
@@ -132,7 +133,10 @@ class KeganAssessResponse(BaseModel):
 
 
 @router.post("/perspective/frameworks/pros-cons")
-async def analyze_pros_cons(request: ProsConsRequest) -> ProsConsResponse:
+async def analyze_pros_cons(
+    request: ProsConsRequest,
+    current_user: dict = Depends(get_current_user),
+) -> ProsConsResponse:
     """Run a structured pros/cons analysis with balance scoring.
 
     Deterministic calculation of balance score and qualitative assessment.
@@ -159,7 +163,10 @@ async def analyze_pros_cons(request: ProsConsRequest) -> ProsConsResponse:
 
 
 @router.post("/perspective/frameworks/weighted-matrix")
-async def analyze_weighted_matrix(request: WeightedMatrixRequest) -> WeightedMatrixResponse:
+async def analyze_weighted_matrix(
+    request: WeightedMatrixRequest,
+    current_user: dict = Depends(get_current_user),
+) -> WeightedMatrixResponse:
     """Run a weighted decision matrix analysis.
 
     Scores options against weighted criteria using multi-criteria
@@ -177,7 +184,10 @@ async def analyze_weighted_matrix(request: WeightedMatrixRequest) -> WeightedMat
 
 
 @router.post("/perspective/biases/detect")
-async def detect_cognitive_biases(request: BiasDetectRequest) -> BiasDetectResponse:
+async def detect_cognitive_biases(
+    request: BiasDetectRequest,
+    current_user: dict = Depends(get_current_user),
+) -> BiasDetectResponse:
     """Detect potential cognitive biases in reasoning text.
 
     Uses keyword/phrase pattern matching against a catalog of 20 common
@@ -203,7 +213,10 @@ async def detect_cognitive_biases(request: BiasDetectRequest) -> BiasDetectRespo
 
 
 @router.post("/perspective/kegan/assess")
-async def assess_kegan(request: KeganAssessRequest) -> KeganAssessResponse:
+async def assess_kegan(
+    request: KeganAssessRequest,
+    current_user: dict = Depends(get_current_user),
+) -> KeganAssessResponse:
     """Assess developmental stage using Kegan's framework.
 
     Uses a scored questionnaire mapping to determine which of the five

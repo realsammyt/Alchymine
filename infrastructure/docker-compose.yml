@@ -17,14 +17,14 @@ services:
       - POSTGRES_PORT=5432
       - POSTGRES_DB=${POSTGRES_DB:-alchymine}
       - POSTGRES_USER=${POSTGRES_USER:-alchymine}
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-changeme_in_production}
-      - REDIS_URL=redis://redis:6379/0
-      - REDIS_CACHE_URL=redis://redis:6379/1
-      - CELERY_BROKER_URL=redis://redis:6379/0
-      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}
+      - REDIS_URL=redis://:${REDIS_PASSWORD}@redis:6379/0
+      - REDIS_CACHE_URL=redis://:${REDIS_PASSWORD}@redis:6379/1
+      - CELERY_BROKER_URL=redis://:${REDIS_PASSWORD}@redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://:${REDIS_PASSWORD}@redis:6379/1
       - ENVIRONMENT=${ENVIRONMENT:-production}
       - LOG_LEVEL=${LOG_LEVEL:-WARNING}
-      - API_SECRET_KEY=${API_SECRET_KEY:-changeme_generate_with_openssl_rand_hex_32}
+      - API_SECRET_KEY=${API_SECRET_KEY:?API_SECRET_KEY must be set}
       - ALLOWED_ORIGINS=${ALLOWED_ORIGINS:-["http://localhost:3000"]}
     depends_on:
       db:
@@ -100,7 +100,7 @@ services:
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-alchymine}
       POSTGRES_USER: ${POSTGRES_USER:-alchymine}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme_in_production}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}
     volumes:
       - db_data:/var/lib/postgresql/data
     healthcheck:
@@ -134,11 +134,11 @@ services:
     image: redis:7-alpine
     container_name: alchymine-redis
     restart: unless-stopped
-    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    command: redis-server --requirepass ${REDIS_PASSWORD:?REDIS_PASSWORD must be set} --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
     volumes:
       - redis_data:/data
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -176,11 +176,11 @@ services:
       - POSTGRES_PORT=5432
       - POSTGRES_DB=${POSTGRES_DB:-alchymine}
       - POSTGRES_USER=${POSTGRES_USER:-alchymine}
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-changeme_in_production}
-      - REDIS_URL=redis://redis:6379/0
-      - REDIS_CACHE_URL=redis://redis:6379/1
-      - CELERY_BROKER_URL=redis://redis:6379/0
-      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}
+      - REDIS_URL=redis://:${REDIS_PASSWORD}@redis:6379/0
+      - REDIS_CACHE_URL=redis://:${REDIS_PASSWORD}@redis:6379/1
+      - CELERY_BROKER_URL=redis://:${REDIS_PASSWORD}@redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://:${REDIS_PASSWORD}@redis:6379/1
       - ENVIRONMENT=${ENVIRONMENT:-production}
       - LOG_LEVEL=${LOG_LEVEL:-WARNING}
     depends_on:

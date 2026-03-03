@@ -72,7 +72,8 @@ if [[ -z "$SSL_EMAIL" ]]; then
     exit 1
 fi
 
-read -rp "Enter your Anthropic API key (sk-ant-...): " ANTHROPIC_API_KEY
+read -rsp "Enter your Anthropic API key (sk-ant-...): " ANTHROPIC_API_KEY
+echo  # newline after silent input
 if [[ -z "$ANTHROPIC_API_KEY" ]]; then
     warn "No Anthropic API key provided. LLM features will fall back to Ollama."
     ANTHROPIC_API_KEY=""
@@ -242,6 +243,7 @@ fi
 API_SECRET=$(openssl rand -hex 32)
 JWT_SECRET=$(openssl rand -hex 32)
 DB_PASSWORD=$(openssl rand -hex 24)
+REDIS_PASSWORD=$(openssl rand -hex 24)
 ENCRYPTION_KEY=$(openssl rand -hex 32)
 FINANCIAL_KEY=$(openssl rand -hex 32)
 
@@ -280,10 +282,11 @@ POSTGRES_PASSWORD=${DB_PASSWORD}
 DATABASE_URL=postgresql+asyncpg://alchymine:${DB_PASSWORD}@db:5432/alchymine
 
 # ── Redis ────────────────────────────────────────────────────────────────────
-REDIS_URL=redis://redis:6379/0
-REDIS_CACHE_URL=redis://redis:6379/1
-CELERY_BROKER_URL=redis://redis:6379/0
-CELERY_RESULT_BACKEND=redis://redis:6379/0
+REDIS_PASSWORD=${REDIS_PASSWORD}
+REDIS_URL=redis://:${REDIS_PASSWORD}@redis:6379/0
+REDIS_CACHE_URL=redis://:${REDIS_PASSWORD}@redis:6379/1
+CELERY_BROKER_URL=redis://:${REDIS_PASSWORD}@redis:6379/0
+CELERY_RESULT_BACKEND=redis://:${REDIS_PASSWORD}@redis:6379/1
 
 # ── Celery ───────────────────────────────────────────────────────────────────
 CELERY_WORKER_CONCURRENCY=4

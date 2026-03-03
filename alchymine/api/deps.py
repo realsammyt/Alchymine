@@ -11,6 +11,7 @@ from __future__ import annotations
 import logging
 import os
 from collections.abc import AsyncGenerator
+from urllib.parse import urlparse
 
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
 
@@ -36,7 +37,12 @@ def get_db_engine() -> AsyncEngine:
     if _engine is None:
         url = get_settings().database_url
         _engine = get_async_engine(url)
-        logger.info("Database engine created (url=%s)", url)
+        parsed = urlparse(str(url))
+        logger.info(
+            "Database engine created (host=%s, db=%s)",
+            parsed.hostname,
+            parsed.path.lstrip("/"),
+        )
     return _engine
 
 

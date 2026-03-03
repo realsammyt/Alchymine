@@ -6,6 +6,7 @@ import Card from "@/components/shared/Card";
 import Button from "@/components/shared/Button";
 import ProtectedRoute from "@/components/shared/ProtectedRoute";
 import { useApi, getStoredIntake } from "@/lib/useApi";
+import { useAuth } from "@/lib/AuthContext";
 import {
   getOutcomeSummary,
   getJournalStats,
@@ -137,7 +138,8 @@ function SystemCard({
 
 export default function DashboardPage() {
   const intake = getStoredIntake();
-  const userId = intake ? "current-user" : null;
+  const { user } = useAuth();
+  const userId = user?.id ?? null;
   const [activeTab, setActiveTab] = useState<"overview" | "journal">(
     "overview",
   );
@@ -154,30 +156,27 @@ export default function DashboardPage() {
     [userId],
   );
 
-  if (!intake) {
-    return (
-      <div className="flex-1 px-6 py-12">
-        <div className="max-w-4xl mx-auto text-center">
-          <p className="text-sm uppercase tracking-[0.2em] text-primary mb-3">
-            Dashboard
-          </p>
-          <h1 className="text-4xl font-bold mb-4">
-            <span className="text-gradient-gold">Your Progress</span>
-          </h1>
-          <p className="text-text/50 max-w-xl mx-auto mb-8">
-            Complete your intake assessment to start tracking your journey
-            across all five Alchymine systems.
-          </p>
-          <Link href="/discover/intake">
-            <Button>Start Your Journey</Button>
-          </Link>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <ProtectedRoute>
+      {!intake ? (
+        <div className="flex-1 px-6 py-12">
+          <div className="max-w-4xl mx-auto text-center">
+            <p className="text-sm uppercase tracking-[0.2em] text-primary mb-3">
+              Dashboard
+            </p>
+            <h1 className="text-4xl font-bold mb-4">
+              <span className="text-gradient-gold">Your Progress</span>
+            </h1>
+            <p className="text-text/50 max-w-xl mx-auto mb-8">
+              Complete your intake assessment to start tracking your journey
+              across all five Alchymine systems.
+            </p>
+            <Link href="/discover/intake">
+              <Button>Start Your Journey</Button>
+            </Link>
+          </div>
+        </div>
+      ) : (
       <div className="flex-1 px-6 py-12">
         <div className="max-w-4xl mx-auto">
           {/* Header */}
@@ -448,6 +447,7 @@ export default function DashboardPage() {
           )}
         </div>
       </div>
+      )}
     </ProtectedRoute>
   );
 }

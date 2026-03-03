@@ -15,6 +15,7 @@ from fastapi.responses import HTMLResponse, Response
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from alchymine.api.auth import get_current_user
 from alchymine.api.deps import get_db_session
 from alchymine.db import repository
 from alchymine.engine.profile import IntakeData
@@ -83,6 +84,7 @@ class ReportListResponse(BaseModel):
 async def create_report(
     request: ReportRequest,
     session: AsyncSession = Depends(get_db_session),
+    current_user: dict = Depends(get_current_user),
 ) -> ReportStatus:
     """Queue generation of a full Alchymine report.
 
@@ -124,6 +126,7 @@ async def create_report(
 async def get_report_status(
     report_id: str,
     session: AsyncSession = Depends(get_db_session),
+    current_user: dict = Depends(get_current_user),
 ) -> ReportStatus:
     """Return the current processing status of a report.
 
@@ -145,6 +148,7 @@ async def get_report_status(
 async def get_report(
     report_id: str,
     session: AsyncSession = Depends(get_db_session),
+    current_user: dict = Depends(get_current_user),
 ) -> ReportResult:
     """Retrieve a completed report by ID.
 
@@ -176,6 +180,7 @@ async def get_report(
 async def get_report_html(
     report_id: str,
     session: AsyncSession = Depends(get_db_session),
+    current_user: dict = Depends(get_current_user),
 ) -> HTMLResponse:
     """Render a completed report as a styled HTML page.
 
@@ -212,6 +217,7 @@ async def get_report_html(
 async def get_report_pdf(
     report_id: str,
     session: AsyncSession = Depends(get_db_session),
+    current_user: dict = Depends(get_current_user),
 ) -> Response:
     """Download a completed report as a PDF file.
 
@@ -256,11 +262,14 @@ async def list_user_reports(
     skip: int = Query(0, ge=0, description="Number of reports to skip"),
     limit: int = Query(20, ge=1, le=100, description="Maximum reports to return"),
     session: AsyncSession = Depends(get_db_session),
+    current_user: dict = Depends(get_current_user),
 ) -> ReportListResponse:
     """List reports for a specific user with pagination.
 
     Returns reports ordered by creation date (most recent first).
     """
+    if current_user["sub"] != user_id:
+        raise HTTPException(status_code=403, detail="Access denied")
     reports = await repository.list_reports_by_user(session, user_id, skip=skip, limit=limit)
     return ReportListResponse(
         reports=[

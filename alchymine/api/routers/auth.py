@@ -321,11 +321,10 @@ async def forgot_password(
         )
         await db.commit()
 
-        # Log the reset URL (replace with email delivery in production)
+        # Log that a reset was issued (replace with email delivery in production)
         logger.info(
-            "Password reset requested for %s — token: %s (expires in %d min)",
+            "Password reset token generated for %s (expires in %d min)",
             body.email,
-            raw_token,
             RESET_TOKEN_EXPIRE_MINUTES,
         )
 

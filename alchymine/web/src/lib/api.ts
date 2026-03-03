@@ -2,11 +2,7 @@
  * Alchymine API client — typed fetch wrappers for the FastAPI backend.
  */
 
-const API_URL =
-  process.env.API_URL ||
-  process.env.NEXT_PUBLIC_API_URL ||
-  "http://localhost:8000";
-const BASE = `${API_URL}/api/v1`;
+const BASE = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000") + "/api/v1";
 
 // ─── Shared types ────────────────────────────────────────────────────
 

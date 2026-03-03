@@ -466,9 +466,9 @@ export default function ReportPage() {
               populated yet. This may happen when the engine pipeline is still
               being configured.
             </p>
-            <pre className="card-surface p-4 text-left text-xs text-text/40 overflow-auto max-h-80 mb-6">
-              {JSON.stringify(report, null, 2)}
-            </pre>
+            <p className="text-text/50 text-sm mb-6">
+              Your report is being processed. Some sections may still be generating.
+            </p>
           </div>
         )}
 

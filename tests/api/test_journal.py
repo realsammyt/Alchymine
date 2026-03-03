@@ -246,7 +246,8 @@ class TestJournalList:
         assert data["page"] == 1
         assert data["per_page"] == 2
 
-    def test_list_empty_for_other_user(self, client: TestClient) -> None:
+    def test_list_denied_for_other_user(self, client: TestClient) -> None:
+        """Authenticated user cannot list another user's journal entries."""
         client.post(
             "/api/v1/journal",
             json={
@@ -257,15 +258,14 @@ class TestJournalList:
         )
 
         response = client.get("/api/v1/journal?user_id=user-2")
-        data = response.json()
-        assert data["total"] == 0
+        assert response.status_code == 403
 
 
 class TestJournalStats:
     """GET /api/v1/journal/stats/{user_id}"""
 
     def test_stats_empty_user(self, client: TestClient) -> None:
-        response = client.get("/api/v1/journal/stats/user-empty")
+        response = client.get("/api/v1/journal/stats/user-1")
         assert response.status_code == 200
         data = response.json()
         assert data["total_entries"] == 0

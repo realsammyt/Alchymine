@@ -6,9 +6,10 @@ assessments. All scoring is deterministic — no LLM calls.
 
 from __future__ import annotations
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
+from alchymine.api.auth import get_current_user
 from alchymine.engine.personality import (
     ENNEAGRAM_TYPES,
     score_attachment,
@@ -92,7 +93,10 @@ class EnneagramResponse(BaseModel):
 
 
 @router.post("/personality/big-five")
-async def assess_big_five(request: BigFiveRequest) -> BigFiveResponse:
+async def assess_big_five(
+    request: BigFiveRequest,
+    current_user: dict = Depends(get_current_user),
+) -> BigFiveResponse:
     """Score a mini-IPIP Big Five personality assessment.
 
     Accepts 20 Likert-scale responses (1-5) and returns trait scores
@@ -113,7 +117,10 @@ async def assess_big_five(request: BigFiveRequest) -> BigFiveResponse:
 
 
 @router.post("/personality/attachment")
-async def assess_attachment(request: AttachmentRequest) -> AttachmentResponse:
+async def assess_attachment(
+    request: AttachmentRequest,
+    current_user: dict = Depends(get_current_user),
+) -> AttachmentResponse:
     """Score an attachment style assessment.
 
     Accepts 4 Likert-scale responses (1-5) and returns the classified
@@ -128,7 +135,10 @@ async def assess_attachment(request: AttachmentRequest) -> AttachmentResponse:
 
 
 @router.post("/personality/enneagram")
-async def assess_enneagram(request: EnneagramRequest) -> EnneagramResponse:
+async def assess_enneagram(
+    request: EnneagramRequest,
+    current_user: dict = Depends(get_current_user),
+) -> EnneagramResponse:
     """Score an Enneagram type assessment.
 
     Accepts 9 Likert-scale responses (1-5) and returns the primary type

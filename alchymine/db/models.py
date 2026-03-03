@@ -132,10 +132,10 @@ class IntakeData(Base):
         String(36), ForeignKey("users.id", ondelete="CASCADE"), unique=True, index=True
     )
 
-    full_name: Mapped[str] = mapped_column(String(200), nullable=False)
+    full_name: Mapped[str] = mapped_column(EncryptedString(), nullable=False)
     birth_date: Mapped[date] = mapped_column(Date, nullable=False)
     birth_time: Mapped[time | None] = mapped_column(Time, nullable=True)
-    birth_city: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    birth_city: Mapped[str | None] = mapped_column(EncryptedString(), nullable=True)
     intention: Mapped[str] = mapped_column(String(50), nullable=False)
     assessment_responses: Mapped[dict | None] = mapped_column(JSONColumn, nullable=True)
     family_structure: Mapped[str | None] = mapped_column(String(200), nullable=True)
@@ -243,7 +243,9 @@ class WealthProfile(Base):
     )
 
     risk_tolerance: Mapped[str] = mapped_column(
-        String(50), default="moderate", comment="conservative | moderate | aggressive"
+        EncryptedString(),
+        default="moderate",
+        comment="SENSITIVE — encrypted risk tolerance (conservative | moderate | aggressive)",
     )
 
     # SENSITIVE — encrypted
@@ -267,6 +269,9 @@ class WealthProfile(Base):
     lever_priorities: Mapped[dict | None] = mapped_column(
         JSONColumn, nullable=True, comment="Ordered WealthLever list"
     )
+    # TODO(#36): Encrypt financial_distress_detected — changing Boolean to
+    # EncryptedString is a breaking schema migration with multiple callers
+    # (engine/profile.py WealthLayer, tests). Requires a data migration.
     financial_distress_detected: Mapped[bool] = mapped_column(Boolean, default=False)
     disclaimer_acknowledged: Mapped[bool] = mapped_column(Boolean, default=False)
 
@@ -385,7 +390,9 @@ class Report(Base):
         comment="pending | generating | complete | failed",
     )
     user_input: Mapped[str | None] = mapped_column(Text, nullable=True)
-    user_profile: Mapped[dict | None] = mapped_column(JSONColumn, nullable=True)
+    user_profile: Mapped[dict | None] = mapped_column(
+        EncryptedJSON(), nullable=True, comment="Encrypted — may contain PII from intake"
+    )
     result: Mapped[dict | None] = mapped_column(JSONColumn, nullable=True)
     html_content: Mapped[str | None] = mapped_column(Text, nullable=True)
     pdf_path: Mapped[str | None] = mapped_column(String(500), nullable=True)

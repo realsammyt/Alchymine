@@ -8,9 +8,10 @@ and engagement history.
 
 from __future__ import annotations
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 from pydantic import BaseModel, Field
 
+from alchymine.api.auth import get_current_user
 from alchymine.engine.spiral.router import SpiralRouteResult, route_user
 
 router = APIRouter()
@@ -43,7 +44,10 @@ class SpiralRouteRequest(BaseModel):
 
 
 @router.post("/spiral/route")
-async def get_spiral_route(request: SpiralRouteRequest) -> SpiralRouteResult:
+async def get_spiral_route(
+    request: SpiralRouteRequest,
+    current_user: dict = Depends(get_current_user),
+) -> SpiralRouteResult:
     """Determine the highest-leverage system for a user.
 
     Uses deterministic scoring based on:

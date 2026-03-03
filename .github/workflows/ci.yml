@@ -248,10 +248,9 @@ jobs:
         run: pip install --upgrade pip setuptools wheel
 
       - name: Run pip-audit (Python deps)
-        continue-on-error: true
         run: |
           pip-audit --desc \
-            --skip-editable || true
+            --skip-editable
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -265,9 +264,8 @@ jobs:
         run: npm ci
 
       - name: Run npm audit (JS deps)
-        continue-on-error: true
         working-directory: alchymine/web
-        run: npm audit --audit-level=high || true
+        run: npm audit --audit-level=high
 
   # ──────────────────────────────────────────────
   # Final gate: all checks must pass

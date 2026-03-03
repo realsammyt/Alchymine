@@ -254,6 +254,7 @@ services:
     ports: [] # Do not expose to host in production
     command: >
       redis-server
+      --requirepass ${REDIS_PASSWORD:?REDIS_PASSWORD must be set}
       --appendonly yes
       --maxmemory 512mb
       --maxmemory-policy allkeys-lru
@@ -270,7 +271,7 @@ services:
           memory: 256m
           cpus: "0.25"
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
       interval: 10s
       timeout: 3s
       retries: 3

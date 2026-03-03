@@ -13,6 +13,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from alchymine.api.auth import get_current_user
 from alchymine.api.deps import get_db_session
 from alchymine.db import repository
 from alchymine.db.models import User
@@ -125,6 +126,7 @@ def _user_to_response(user: User) -> ProfileResponse:
 async def create_profile(
     request: ProfileCreateRequest,
     session: AsyncSession = Depends(get_db_session),
+    current_user: dict = Depends(get_current_user),
 ) -> ProfileResponse:
     """Create a new user profile with intake data."""
     user = await repository.create_profile(
@@ -144,6 +146,7 @@ async def create_profile(
 async def get_profile(
     user_id: str,
     session: AsyncSession = Depends(get_db_session),
+    current_user: dict = Depends(get_current_user),
 ) -> ProfileResponse:
     """Retrieve a user profile by ID."""
     user = await repository.get_profile(session, user_id)
@@ -157,6 +160,7 @@ async def list_profiles(
     offset: int = 0,
     limit: int = 20,
     session: AsyncSession = Depends(get_db_session),
+    current_user: dict = Depends(get_current_user),
 ) -> ProfileListResponse:
     """List user profiles with pagination."""
     if limit < 1 or limit > 100:
@@ -185,6 +189,7 @@ async def update_layer(
     layer: str,
     request: LayerUpdateRequest,
     session: AsyncSession = Depends(get_db_session),
+    current_user: dict = Depends(get_current_user),
 ) -> ProfileResponse:
     """Update a specific layer of a user profile.
 
@@ -204,6 +209,7 @@ async def update_layer(
 async def delete_profile(
     user_id: str,
     session: AsyncSession = Depends(get_db_session),
+    current_user: dict = Depends(get_current_user),
 ) -> dict[str, str]:
     """Delete a user profile and all associated data."""
     deleted = await repository.delete_profile(session, user_id)

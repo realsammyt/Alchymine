@@ -4,8 +4,10 @@ from __future__ import annotations
 
 from datetime import date, time
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
+
+from alchymine.api.auth import get_current_user
 
 router = APIRouter()
 
@@ -38,6 +40,7 @@ async def calculate_chart(
     birth_date: date,
     birth_time: time | None = None,  # noqa: B008
     birth_city: str | None = None,
+    current_user: dict = Depends(get_current_user),
 ) -> AstrologyResponse:
     """Calculate astrological natal chart.
 
