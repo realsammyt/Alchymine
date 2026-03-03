@@ -182,6 +182,16 @@ jobs:
             git fetch --tags
             git checkout "${TAG}"
 
+            # Source production environment variables (required by docker-compose)
+            if [ -f .env.production ]; then
+              set -a
+              source .env.production
+              set +a
+            else
+              echo "ERROR: .env.production not found. Run deploy-digitalocean.sh first."
+              exit 1
+            fi
+
             # Build images with version and restart the stack
             APP_VERSION="${VERSION}" docker compose -f infrastructure/docker-compose.yml \
                            -f infrastructure/docker-compose.prod.yml build
