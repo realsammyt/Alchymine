@@ -138,19 +138,23 @@ jobs:
       contents: write
     steps:
       - name: Append Docker image info to release
-        uses: softprops/action-gh-release@a06a81a03ee405af7f2048a818ed3f03bbf83c7b # v2.0.8
-        with:
-          tag_name: ${{ github.event.release.tag_name }}
-          append_body: true
-          body: |
-            ## Docker Images
-
-            ```bash
-            docker pull ${{ env.IMAGE_PREFIX }}-api:${{ needs.validate.outputs.version }}
-            docker pull ${{ env.IMAGE_PREFIX }}-web:${{ needs.validate.outputs.version }}
-            ```
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.event.release.tag_name }}
+          VERSION: ${{ needs.validate.outputs.version }}
+          PREFIX: ${{ env.IMAGE_PREFIX }}
+        run: |
+          gh release view "$TAG" -R "$GITHUB_REPOSITORY" --json body -q .body > /tmp/body.md
+          {
+            echo ""
+            echo "## Docker Images"
+            echo ""
+            echo '```bash'
+            echo "docker pull ${PREFIX}-api:${VERSION}"
+            echo "docker pull ${PREFIX}-web:${VERSION}"
+            echo '```'
+          } >> /tmp/body.md
+          gh release edit "$TAG" -R "$GITHUB_REPOSITORY" --notes-file /tmp/body.md
 
   # ──────────────────────────────────────────────
   # Deploy to DigitalOcean via SSH

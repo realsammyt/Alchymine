@@ -244,8 +244,7 @@ API_SECRET=$(openssl rand -hex 32)
 JWT_SECRET=$(openssl rand -hex 32)
 DB_PASSWORD=$(openssl rand -hex 24)
 REDIS_PASSWORD=$(openssl rand -hex 24)
-ENCRYPTION_KEY=$(openssl rand -hex 32)
-FINANCIAL_KEY=$(openssl rand -hex 32)
+ENCRYPTION_KEY=$(python3 -c "import base64,os;print(base64.urlsafe_b64encode(os.urandom(32)).decode())")
 PDF_SERVICE_TOKEN=$(openssl rand -hex 32)
 
 cat > "${ENV_FILE}" << ENVEOF
@@ -264,15 +263,15 @@ LOG_LEVEL=WARNING
 ALLOWED_ORIGINS=["https://${DOMAIN}","https://www.${DOMAIN}"]
 
 # ── API Security ─────────────────────────────────────────────────────────────
-API_SECRET_KEY=${API_SECRET}
 JWT_SECRET_KEY=${JWT_SECRET}
 JWT_ALGORITHM=HS256
 ACCESS_TOKEN_EXPIRE_MINUTES=30
 REFRESH_TOKEN_EXPIRE_DAYS=7
+SIGNUP_PROMO_CODE=CHANGEME-set-your-promo-code
 
 # ── Data Encryption ──────────────────────────────────────────────────────────
-ENCRYPTION_KEY=${ENCRYPTION_KEY}
-FINANCIAL_ENCRYPTION_KEY=${FINANCIAL_KEY}
+# Fernet-compatible key for column-level encryption of PII and sensitive data.
+ALCHYMINE_ENCRYPTION_KEY=${ENCRYPTION_KEY}
 
 # ── PostgreSQL ───────────────────────────────────────────────────────────────
 POSTGRES_HOST=db

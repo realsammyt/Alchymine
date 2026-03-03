@@ -13,18 +13,18 @@ services:
     ports:
       - "${API_PORT:-8000}:8000"
     environment:
-      - POSTGRES_HOST=db
-      - POSTGRES_PORT=5432
-      - POSTGRES_DB=${POSTGRES_DB:-alchymine}
-      - POSTGRES_USER=${POSTGRES_USER:-alchymine}
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}
-      - REDIS_URL=redis://:${REDIS_PASSWORD}@redis:6379/0
+      - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER:-alchymine}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}@db:5432/${POSTGRES_DB:-alchymine}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - REDIS_URL=redis://:${REDIS_PASSWORD:?REDIS_PASSWORD must be set}@redis:6379/0
       - REDIS_CACHE_URL=redis://:${REDIS_PASSWORD}@redis:6379/1
       - CELERY_BROKER_URL=redis://:${REDIS_PASSWORD}@redis:6379/0
       - CELERY_RESULT_BACKEND=redis://:${REDIS_PASSWORD}@redis:6379/1
       - ENVIRONMENT=${ENVIRONMENT:-production}
       - LOG_LEVEL=${LOG_LEVEL:-WARNING}
-      - API_SECRET_KEY=${API_SECRET_KEY:?API_SECRET_KEY must be set}
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY:?JWT_SECRET_KEY must be set}
+      - SIGNUP_PROMO_CODE=${SIGNUP_PROMO_CODE:?SIGNUP_PROMO_CODE must be set}
+      - ALCHYMINE_ENCRYPTION_KEY=${ALCHYMINE_ENCRYPTION_KEY:-}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
       - ALLOWED_ORIGINS=${ALLOWED_ORIGINS:-["http://localhost:3000"]}
       - PDF_SERVICE_TOKEN=${PDF_SERVICE_TOKEN:?PDF_SERVICE_TOKEN must be set}
       - PDF_SERVICE_URL=http://pdf-service:3001
@@ -175,17 +175,18 @@ services:
       --concurrency=${CELERY_WORKER_CONCURRENCY:-4}
       --max-tasks-per-child=1000
     environment:
-      - POSTGRES_HOST=db
-      - POSTGRES_PORT=5432
-      - POSTGRES_DB=${POSTGRES_DB:-alchymine}
-      - POSTGRES_USER=${POSTGRES_USER:-alchymine}
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}
-      - REDIS_URL=redis://:${REDIS_PASSWORD}@redis:6379/0
+      - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER:-alchymine}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}@db:5432/${POSTGRES_DB:-alchymine}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - REDIS_URL=redis://:${REDIS_PASSWORD:?REDIS_PASSWORD must be set}@redis:6379/0
       - REDIS_CACHE_URL=redis://:${REDIS_PASSWORD}@redis:6379/1
       - CELERY_BROKER_URL=redis://:${REDIS_PASSWORD}@redis:6379/0
       - CELERY_RESULT_BACKEND=redis://:${REDIS_PASSWORD}@redis:6379/1
       - ENVIRONMENT=${ENVIRONMENT:-production}
       - LOG_LEVEL=${LOG_LEVEL:-WARNING}
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY:?JWT_SECRET_KEY must be set}
+      - SIGNUP_PROMO_CODE=${SIGNUP_PROMO_CODE:?SIGNUP_PROMO_CODE must be set}
+      - ALCHYMINE_ENCRYPTION_KEY=${ALCHYMINE_ENCRYPTION_KEY:-}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
       - PDF_SERVICE_TOKEN=${PDF_SERVICE_TOKEN:?PDF_SERVICE_TOKEN must be set}
       - PDF_SERVICE_URL=http://pdf-service:3001
     depends_on:
