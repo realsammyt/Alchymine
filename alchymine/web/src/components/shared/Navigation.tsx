@@ -204,10 +204,15 @@ export default function Navigation() {
       >
         {/* Logo */}
         <div className="p-6 border-b border-white/5">
-          <Link href="/" className="text-gradient-gold font-bold text-xl block">
+          <Link
+            href="/"
+            className="text-gradient-gold font-display text-2xl font-light tracking-wide block"
+          >
             Alchymine
           </Link>
-          <p className="text-xs text-text/40 mt-1">Transformation OS</p>
+          <p className="text-xs text-text/40 mt-1 font-body">
+            Transformation OS
+          </p>
         </div>
 
         {/* Nav Items */}
@@ -220,14 +225,23 @@ export default function Navigation() {
                   href={item.href}
                   aria-label={item.label}
                   aria-current={active ? "page" : undefined}
-                  className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 ${
+                  className={`group relative flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-body transition-all duration-300 ease-out ${
                     active
-                      ? "bg-primary/10 text-primary border border-primary/20"
-                      : "text-text/60 hover:text-text hover:bg-white/5"
+                      ? "bg-primary/10 text-primary"
+                      : "text-text/60 hover:text-text hover:bg-white/5 hover:translate-x-0.5"
                   }`}
                 >
                   <NavIcon icon={item.icon} />
                   {item.name}
+                  {active && (
+                    <span
+                      className="absolute bottom-0 left-3 right-3 h-px rounded-full"
+                      style={{
+                        background:
+                          "linear-gradient(90deg, transparent, rgba(218,165,32,0.6), transparent)",
+                      }}
+                    />
+                  )}
                 </Link>
               </li>
             );
@@ -291,7 +305,10 @@ export default function Navigation() {
       {/* Mobile Top Bar */}
       <header className="lg:hidden fixed top-0 left-0 right-0 bg-surface/95 backdrop-blur-xl border-b border-white/5 z-50">
         <div className="flex items-center justify-between px-4 py-3">
-          <Link href="/" className="text-gradient-gold font-bold text-lg">
+          <Link
+            href="/"
+            className="text-gradient-gold font-display text-xl font-light tracking-wide"
+          >
             Alchymine
           </Link>
           <button
@@ -370,7 +387,7 @@ export default function Navigation() {
 
       {/* Mobile Bottom Navigation */}
       <nav
-        className="lg:hidden fixed bottom-0 left-0 right-0 bg-surface/95 backdrop-blur-xl border-t border-white/5 z-50"
+        className="lg:hidden fixed bottom-0 left-0 right-0 backdrop-blur-xl bg-surface/80 border-t border-white/5 z-50"
         aria-label="Quick navigation"
       >
         <ul className="flex items-center justify-around px-2 py-2" role="list">

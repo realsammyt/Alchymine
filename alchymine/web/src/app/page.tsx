@@ -4,6 +4,11 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/lib/AuthContext";
+import {
+  MotionReveal,
+  MotionStagger,
+  MotionStaggerItem,
+} from "@/components/shared/MotionReveal";
 
 const FIVE_SYSTEMS = [
   {
@@ -373,21 +378,21 @@ export default function LandingPage() {
   return (
     <div className="min-h-screen">
       {/* ── Landing Header ──────────────────────────────────────────────── */}
-      <header className="fixed top-0 left-0 right-0 z-50 bg-bg/80 backdrop-blur-xl border-b border-white/5">
-        <div className="max-w-6xl mx-auto flex items-center justify-between px-4 sm:px-6 py-3">
-          <span className="text-gradient-gold font-bold text-xl">
+      <header className="fixed top-0 left-0 right-0 z-50 bg-bg/70 backdrop-blur-2xl border-b border-white/[0.04]">
+        <div className="max-w-6xl mx-auto flex items-center justify-between px-4 sm:px-6 py-4">
+          <span className="font-display text-2xl font-light tracking-wide text-gradient-gold">
             Alchymine
           </span>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-4">
             <Link
               href="/login"
-              className="text-sm text-text/60 hover:text-text transition-colors"
+              className="text-sm font-body text-text/50 hover:text-text transition-colors duration-300"
             >
               Sign In
             </Link>
             <Link
               href="/signup"
-              className="text-sm px-4 py-2 bg-gradient-to-r from-primary-dark to-primary text-bg font-semibold rounded-lg transition-all duration-300 hover:shadow-[0_0_20px_rgba(218,165,32,0.3)] hover:scale-[1.02] active:scale-100"
+              className="text-sm font-body font-medium px-5 py-2.5 bg-gradient-to-r from-primary-dark via-primary to-primary-light text-bg rounded-xl transition-all duration-300 hover:shadow-[0_0_30px_rgba(218,165,32,0.25)] hover:scale-[1.02] active:scale-[0.98]"
             >
               Get Started
             </Link>
@@ -396,281 +401,281 @@ export default function LandingPage() {
       </header>
 
       {/* ── Hero ────────────────────────────────────────────────────────── */}
-      <section className="pt-32 pb-20 px-4 sm:px-6 relative overflow-hidden">
-        {/* Background glow */}
-        <div className="absolute top-20 left-1/2 -translate-x-1/2 w-[600px] h-[600px] bg-primary/5 rounded-full blur-[120px] pointer-events-none" />
-        <div className="absolute top-40 left-1/4 w-[300px] h-[300px] bg-secondary/5 rounded-full blur-[100px] pointer-events-none" />
+      <section className="pt-36 pb-28 px-4 sm:px-6 relative overflow-hidden bg-atmosphere">
+        {/* Atmospheric background orbs */}
+        <div className="absolute top-10 left-1/2 -translate-x-1/2 w-[800px] h-[800px] bg-primary/[0.04] rounded-full blur-[160px] pointer-events-none animate-glow-breathe" />
+        <div className="absolute top-32 left-[15%] w-[400px] h-[400px] bg-secondary/[0.05] rounded-full blur-[120px] pointer-events-none animate-glow-breathe animation-delay-200" />
+        <div className="absolute top-48 right-[15%] w-[300px] h-[300px] bg-accent/[0.03] rounded-full blur-[100px] pointer-events-none animate-glow-breathe animation-delay-400" />
 
         <div className="max-w-4xl mx-auto text-center relative">
-          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-primary/20 bg-primary/5 text-xs text-primary mb-6">
-            <span className="w-1.5 h-1.5 bg-primary rounded-full animate-pulse" />
-            Open-Source Personal Transformation
-          </div>
+          <MotionReveal delay={0.1} y={16}>
+            <div className="inline-flex items-center gap-2.5 px-4 py-2 rounded-full border border-primary/15 bg-primary/[0.04] text-xs font-body font-medium text-primary/80 tracking-wider uppercase mb-8">
+              <span className="w-1.5 h-1.5 bg-primary/60 rounded-full animate-pulse" />
+              Open-Source Personal Transformation
+            </div>
+          </MotionReveal>
 
-          <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold leading-tight mb-6">
-            <span className="text-gradient-gold">
-              Discover Who You Truly Are
-            </span>
-            <br />
-            <span className="text-text/90">
+          <MotionReveal delay={0.2} y={20}>
+            <h1 className="font-display text-display-xl font-light mb-4">
+              <span className="text-gradient-gold">
+                Discover Who You
+              </span>
+              <br />
+              <span className="text-gradient-gold">
+                Truly Are
+              </span>
+            </h1>
+          </MotionReveal>
+
+          <MotionReveal delay={0.35}>
+            <hr className="rule-gold my-8 max-w-[100px] mx-auto" />
+          </MotionReveal>
+
+          <MotionReveal delay={0.4} y={16}>
+            <p className="font-display text-xl sm:text-2xl font-light text-text/40 italic max-w-2xl mx-auto mb-4 leading-relaxed">
               Through Five Integrated Systems
-            </span>
-          </h1>
+            </p>
+          </MotionReveal>
 
-          <p className="text-lg sm:text-xl text-text/50 max-w-2xl mx-auto mb-10 leading-relaxed">
-            AI-powered identity mapping, ethical healing, wealth strategy,
-            creative development, and perspective enhancement — built on
-            transparent methodology and open-source principles.
-          </p>
+          <MotionReveal delay={0.5} y={12}>
+            <p className="text-base text-text/35 font-body max-w-xl mx-auto mb-12 leading-relaxed">
+              Identity mapping, ethical healing, wealth strategy,
+              creative development, and perspective enhancement — built on
+              transparent methodology and open-source principles.
+            </p>
+          </MotionReveal>
 
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-            <Link
-              href="/signup"
-              className="inline-flex items-center gap-2 px-8 py-3.5 bg-gradient-to-r from-primary-dark to-primary text-bg font-semibold rounded-xl text-base transition-all duration-300 hover:shadow-[0_0_30px_rgba(218,165,32,0.3)] hover:scale-[1.02] active:scale-100"
-            >
-              Start Your Discovery
-              <svg
-                className="w-5 h-5"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                aria-hidden="true"
+          <MotionReveal delay={0.6} y={10}>
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+              <Link
+                href="/signup"
+                className="inline-flex items-center gap-2 px-8 py-3.5 bg-gradient-to-r from-primary-dark via-primary to-primary-light text-bg font-body font-medium rounded-xl text-base transition-all duration-300 hover:shadow-[0_0_40px_rgba(218,165,32,0.25)] hover:scale-[1.02] active:scale-[0.98]"
               >
-                <path d="M5 12h14" />
-                <path d="m12 5 7 7-7 7" />
-              </svg>
-            </Link>
-            <a
-              href="#how-it-works"
-              className="inline-flex items-center gap-2 px-6 py-3.5 border border-white/10 text-text/70 rounded-xl text-base hover:bg-white/5 hover:text-text transition-all duration-200"
-            >
-              How It Works
-              <svg
-                className="w-4 h-4"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                aria-hidden="true"
+                Start Your Discovery
+                <svg
+                  className="w-5 h-5"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden="true"
+                >
+                  <path d="M5 12h14" />
+                  <path d="m12 5 7 7-7 7" />
+                </svg>
+              </Link>
+              <a
+                href="#how-it-works"
+                className="inline-flex items-center gap-2 px-6 py-3.5 border border-white/[0.08] text-text/50 font-body rounded-xl text-base hover:bg-white/[0.03] hover:text-text/70 hover:border-white/[0.12] transition-all duration-300"
               >
-                <path d="M12 5v14" />
-                <path d="m19 12-7 7-7-7" />
-              </svg>
-            </a>
-          </div>
+                How It Works
+                <svg
+                  className="w-4 h-4"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden="true"
+                >
+                  <path d="M12 5v14" />
+                  <path d="m19 12-7 7-7-7" />
+                </svg>
+              </a>
+            </div>
+          </MotionReveal>
 
           {/* Trust strip */}
-          <div className="mt-14 flex flex-wrap items-center justify-center gap-6 text-xs text-text/30">
-            <span className="flex items-center gap-1.5">
-              <svg
-                className="w-4 h-4"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                aria-hidden="true"
-              >
-                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10" />
-              </svg>
-              Ethics-First
-            </span>
-            <span className="w-px h-3 bg-white/10" />
-            <span className="flex items-center gap-1.5">
-              <svg
-                className="w-4 h-4"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                aria-hidden="true"
-              >
-                <polyline points="16 18 22 12 16 6" />
-                <polyline points="8 6 2 12 8 18" />
-              </svg>
-              Open Source
-            </span>
-            <span className="w-px h-3 bg-white/10" />
-            <span className="flex items-center gap-1.5">
-              <svg
-                className="w-4 h-4"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                aria-hidden="true"
-              >
-                <rect width="18" height="11" x="3" y="11" rx="2" ry="2" />
-                <path d="M7 11V7a5 5 0 0 1 10 0v4" />
-              </svg>
-              Your Data Stays Yours
-            </span>
-            <span className="w-px h-3 bg-white/10" />
-            <span>CC-BY-NC-SA 4.0</span>
-          </div>
+          <MotionReveal delay={0.8} y={8}>
+            <div className="mt-16 flex flex-wrap items-center justify-center gap-6 text-xs font-body text-text/25 tracking-wide">
+              <span className="flex items-center gap-1.5">
+                <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10" />
+                </svg>
+                Ethics-First
+              </span>
+              <span className="w-px h-3 bg-white/[0.06]" />
+              <span className="flex items-center gap-1.5">
+                <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <polyline points="16 18 22 12 16 6" />
+                  <polyline points="8 6 2 12 8 18" />
+                </svg>
+                Open Source
+              </span>
+              <span className="w-px h-3 bg-white/[0.06]" />
+              <span className="flex items-center gap-1.5">
+                <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <rect width="18" height="11" x="3" y="11" rx="2" ry="2" />
+                  <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                </svg>
+                Your Data Stays Yours
+              </span>
+              <span className="w-px h-3 bg-white/[0.06]" />
+              <span>CC-BY-NC-SA 4.0</span>
+            </div>
+          </MotionReveal>
         </div>
       </section>
 
       {/* ── Five Systems ────────────────────────────────────────────────── */}
-      <section className="py-20 px-4 sm:px-6" id="five-systems">
+      <section className="py-28 px-4 sm:px-6" id="five-systems">
         <div className="max-w-6xl mx-auto">
-          <div className="text-center mb-14">
-            <h2 className="text-3xl sm:text-4xl font-bold mb-4">
-              <span className="text-gradient-gold">
+          <MotionReveal>
+            <div className="text-center mb-16">
+              <h2 className="section-heading text-gradient-gold mb-4">
                 Five Integrated Systems
-              </span>
-            </h2>
-            <p className="text-text/50 max-w-2xl mx-auto">
-              Each system provides a unique lens on your transformation.
-              Together, they create a unified profile that grows with you.
-            </p>
-          </div>
+              </h2>
+              <hr className="rule-gold my-6 max-w-[80px] mx-auto" />
+              <p className="text-text/40 font-body max-w-2xl mx-auto leading-relaxed">
+                Each system provides a unique lens on your transformation.
+                Together, they create a unified profile that grows with you.
+              </p>
+            </div>
+          </MotionReveal>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+          <MotionStagger staggerDelay={0.1} className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
             {FIVE_SYSTEMS.map((system) => {
               const colors = colorClass(system.color);
               return (
-                <div
-                  key={system.name}
-                  className={`group card-surface p-6 transition-all duration-300 ${colors.glow}`}
-                >
-                  <div className="flex items-center gap-3 mb-3">
-                    <div
-                      className={`w-10 h-10 rounded-xl ${colors.bg} ${colors.border} border flex items-center justify-center`}
-                    >
-                      <SystemIcon icon={system.icon} className={colors.text} />
-                    </div>
-                    <div>
-                      <h3 className="font-semibold text-text">{system.name}</h3>
-                      <p className={`text-xs ${colors.text}`}>
-                        {system.tagline}
-                      </p>
-                    </div>
-                  </div>
-                  <p className="text-sm text-text/50 mb-4 leading-relaxed">
-                    {system.description}
-                  </p>
-                  <ul className="space-y-1.5">
-                    {system.features.map((feature) => (
-                      <li
-                        key={feature}
-                        className="flex items-center gap-2 text-xs text-text/40"
+                <MotionStaggerItem key={system.name}>
+                  <div
+                    className={`group card-surface p-6 h-full transition-all duration-500 hover:-translate-y-1 ${colors.glow}`}
+                  >
+                    <div className="flex items-center gap-3 mb-4">
+                      <div
+                        className={`w-10 h-10 rounded-xl ${colors.bg} ${colors.border} border flex items-center justify-center transition-transform duration-500 group-hover:scale-110`}
                       >
-                        <svg
-                          className={`w-3.5 h-3.5 ${colors.text} flex-shrink-0`}
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth="2"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          aria-hidden="true"
+                        <SystemIcon icon={system.icon} className={colors.text} />
+                      </div>
+                      <div>
+                        <h3 className="font-display text-lg font-medium text-text">{system.name}</h3>
+                        <p className={`text-xs font-body ${colors.text} tracking-wide`}>
+                          {system.tagline}
+                        </p>
+                      </div>
+                    </div>
+                    <p className="text-sm text-text/40 font-body mb-4 leading-relaxed">
+                      {system.description}
+                    </p>
+                    <ul className="space-y-2">
+                      {system.features.map((feature) => (
+                        <li
+                          key={feature}
+                          className="flex items-center gap-2 text-xs font-body text-text/35"
                         >
-                          <polyline points="20 6 9 17 4 12" />
-                        </svg>
-                        {feature}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
+                          <svg
+                            className={`w-3.5 h-3.5 ${colors.text} flex-shrink-0 opacity-60`}
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            aria-hidden="true"
+                          >
+                            <polyline points="20 6 9 17 4 12" />
+                          </svg>
+                          {feature}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                </MotionStaggerItem>
               );
             })}
-          </div>
+          </MotionStagger>
         </div>
       </section>
 
       {/* ── How It Works ────────────────────────────────────────────────── */}
-      <section className="py-20 px-4 sm:px-6 bg-surface/30" id="how-it-works">
-        <div className="max-w-4xl mx-auto">
-          <div className="text-center mb-14">
-            <h2 className="text-3xl sm:text-4xl font-bold mb-4">
-              <span className="text-gradient-gold">How It Works</span>
-            </h2>
-            <p className="text-text/50 max-w-xl mx-auto">
-              Three steps from curiosity to a personalized transformation path.
-            </p>
-          </div>
+      <section className="py-28 px-4 sm:px-6 relative" id="how-it-works">
+        {/* Subtle background shift */}
+        <div className="absolute inset-0 bg-gradient-to-b from-transparent via-surface/20 to-transparent pointer-events-none" />
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            {HOW_IT_WORKS.map((item) => (
-              <div key={item.step} className="text-center">
-                <div className="w-14 h-14 mx-auto mb-4 rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-center">
-                  <span className="text-primary font-bold text-lg">
-                    {item.step}
-                  </span>
-                </div>
-                <h3 className="font-semibold text-lg text-text mb-2">
-                  {item.title}
-                </h3>
-                <p className="text-sm text-text/50 leading-relaxed">
-                  {item.description}
-                </p>
-              </div>
-            ))}
-          </div>
-
-          {/* Connecting lines (desktop only) */}
-          <div className="hidden md:flex justify-center mt-[-180px] mb-[120px] pointer-events-none">
-            <div className="flex items-center gap-0 w-[60%]">
-              <div className="flex-1 h-px bg-gradient-to-r from-transparent via-primary/20 to-primary/20" />
-              <div className="flex-1 h-px bg-gradient-to-r from-primary/20 via-primary/20 to-transparent" />
+        <div className="max-w-4xl mx-auto relative">
+          <MotionReveal>
+            <div className="text-center mb-16">
+              <h2 className="section-heading text-gradient-gold mb-4">
+                How It Works
+              </h2>
+              <hr className="rule-gold my-6 max-w-[80px] mx-auto" />
+              <p className="text-text/40 font-body max-w-xl mx-auto">
+                Three steps from curiosity to a personalized transformation path.
+              </p>
             </div>
-          </div>
+          </MotionReveal>
+
+          <MotionStagger staggerDelay={0.15} className="grid grid-cols-1 md:grid-cols-3 gap-10">
+            {HOW_IT_WORKS.map((item) => (
+              <MotionStaggerItem key={item.step}>
+                <div className="text-center">
+                  <div className="w-16 h-16 mx-auto mb-5 rounded-2xl bg-primary/[0.06] border border-primary/[0.12] flex items-center justify-center">
+                    <span className="font-display text-2xl font-light text-primary/70">
+                      {item.step}
+                    </span>
+                  </div>
+                  <h3 className="font-display text-xl font-medium text-text mb-3">
+                    {item.title}
+                  </h3>
+                  <p className="text-sm text-text/40 font-body leading-relaxed">
+                    {item.description}
+                  </p>
+                </div>
+              </MotionStaggerItem>
+            ))}
+          </MotionStagger>
         </div>
       </section>
 
       {/* ── Ethics & Transparency ───────────────────────────────────────── */}
-      <section className="py-20 px-4 sm:px-6" id="ethics">
+      <section className="py-28 px-4 sm:px-6" id="ethics">
         <div className="max-w-5xl mx-auto">
-          <div className="text-center mb-14">
-            <h2 className="text-3xl sm:text-4xl font-bold mb-4">
-              <span className="text-gradient-gold">Built on Trust</span>
-            </h2>
-            <p className="text-text/50 max-w-xl mx-auto">
-              Radical transparency isn&apos;t a feature — it&apos;s the
-              foundation.
-            </p>
-          </div>
+          <MotionReveal>
+            <div className="text-center mb-16">
+              <h2 className="section-heading text-gradient-gold mb-4">
+                Built on Trust
+              </h2>
+              <hr className="rule-gold my-6 max-w-[80px] mx-auto" />
+              <p className="text-text/40 font-body max-w-xl mx-auto">
+                Radical transparency isn&apos;t a feature — it&apos;s the
+                foundation.
+              </p>
+            </div>
+          </MotionReveal>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+          <MotionStagger staggerDelay={0.1} className="grid grid-cols-1 sm:grid-cols-2 gap-6">
             {TRUST_CARDS.map((card) => (
-              <div
-                key={card.title}
-                className="card-surface p-6 flex items-start gap-4"
-              >
-                <div className="w-10 h-10 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center flex-shrink-0">
-                  <TrustIcon icon={card.icon} className="text-primary" />
+              <MotionStaggerItem key={card.title}>
+                <div className="card-surface p-6 flex items-start gap-4 h-full">
+                  <div className="w-10 h-10 rounded-xl bg-primary/[0.06] border border-primary/[0.12] flex items-center justify-center flex-shrink-0">
+                    <TrustIcon icon={card.icon} className="text-primary/70" />
+                  </div>
+                  <div>
+                    <h3 className="font-display text-lg font-medium text-text mb-1.5">{card.title}</h3>
+                    <p className="text-sm text-text/40 font-body leading-relaxed">
+                      {card.description}
+                    </p>
+                  </div>
                 </div>
-                <div>
-                  <h3 className="font-semibold text-text mb-1">{card.title}</h3>
-                  <p className="text-sm text-text/50 leading-relaxed">
-                    {card.description}
-                  </p>
-                </div>
-              </div>
+              </MotionStaggerItem>
             ))}
-          </div>
+          </MotionStagger>
         </div>
       </section>
 
       {/* ── CTA Section ─────────────────────────────────────────────────── */}
-      <section className="py-20 px-4 sm:px-6 bg-surface/30">
-        <div className="max-w-4xl mx-auto">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+      <section className="py-28 px-4 sm:px-6 relative">
+        <div className="absolute inset-0 bg-gradient-to-b from-transparent via-surface/20 to-transparent pointer-events-none" />
+        <div className="max-w-4xl mx-auto relative">
+          <MotionStagger staggerDelay={0.15} className="grid grid-cols-1 md:grid-cols-2 gap-8">
             {/* Invitation card */}
-            <div className="card-surface p-8 text-center flex flex-col justify-between">
+            <MotionStaggerItem>
+            <div className="card-surface-elevated p-8 text-center flex flex-col justify-between h-full">
               <div>
-                <div className="w-12 h-12 mx-auto mb-4 rounded-full bg-primary/20 flex items-center justify-center">
+                <div className="w-12 h-12 mx-auto mb-4 rounded-full bg-primary/[0.08] flex items-center justify-center">
                   <svg
                     className="w-6 h-6 text-primary"
                     viewBox="0 0 24 24"
@@ -686,17 +691,17 @@ export default function LandingPage() {
                     <line x1="15" y1="12" x2="3" y2="12" />
                   </svg>
                 </div>
-                <h3 className="text-xl font-semibold text-text mb-2">
+                <h3 className="font-display text-xl font-medium text-text mb-2">
                   Have an Invitation?
                 </h3>
-                <p className="text-sm text-text/50 mb-6">
+                <p className="text-sm text-text/40 font-body mb-6">
                   If you have an invitation code, create your account and start
                   your transformation journey today.
                 </p>
               </div>
               <Link
                 href="/signup"
-                className="inline-flex items-center justify-center gap-2 px-6 py-3 bg-gradient-to-r from-primary-dark to-primary text-bg font-semibold rounded-xl text-sm transition-all duration-300 hover:shadow-[0_0_20px_rgba(218,165,32,0.3)] hover:scale-[1.02] active:scale-100"
+                className="inline-flex items-center justify-center gap-2 px-6 py-3 bg-gradient-to-r from-primary-dark via-primary to-primary-light text-bg font-body font-medium rounded-xl text-sm transition-all duration-300 hover:shadow-[0_0_30px_rgba(218,165,32,0.25)] hover:scale-[1.02] active:scale-[0.98]"
               >
                 Create Account
                 <svg
@@ -715,10 +720,13 @@ export default function LandingPage() {
               </Link>
             </div>
 
+            </MotionStaggerItem>
+
             {/* Waitlist card */}
-            <div className="card-surface p-8 text-center flex flex-col justify-between">
+            <MotionStaggerItem>
+            <div className="card-surface-elevated p-8 text-center flex flex-col justify-between h-full">
               <div>
-                <div className="w-12 h-12 mx-auto mb-4 rounded-full bg-accent/20 flex items-center justify-center">
+                <div className="w-12 h-12 mx-auto mb-4 rounded-full bg-accent/[0.08] flex items-center justify-center">
                   <svg
                     className="w-6 h-6 text-accent"
                     viewBox="0 0 24 24"
@@ -733,10 +741,10 @@ export default function LandingPage() {
                     <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" />
                   </svg>
                 </div>
-                <h3 className="text-xl font-semibold text-text mb-2">
+                <h3 className="font-display text-xl font-medium text-text mb-2">
                   Join the Waitlist
                 </h3>
-                <p className="text-sm text-text/50 mb-6">
+                <p className="text-sm text-text/40 font-body mb-6">
                   No invitation code yet? Join the waitlist and we&apos;ll
                   notify you when spots open up.
                 </p>
@@ -766,36 +774,39 @@ export default function LandingPage() {
                     value={waitlistEmail}
                     onChange={(e) => setWaitlistEmail(e.target.value)}
                     placeholder="you@example.com"
-                    className="flex-1 bg-bg border border-white/10 rounded-lg px-4 py-2.5 text-sm text-text placeholder-text/30 focus:outline-none focus:border-accent/50 focus:ring-1 focus:ring-accent/30 transition-colors"
+                    className="flex-1 bg-white/[0.03] border border-white/[0.08] rounded-xl px-4 py-3 text-sm font-body text-text placeholder:text-text/25 focus:outline-none focus:border-accent/40 focus:ring-1 focus:ring-accent/20 transition-all duration-300"
                   />
                   <button
                     type="submit"
-                    className="px-5 py-2.5 bg-accent/20 text-accent border border-accent/20 rounded-lg text-sm font-medium hover:bg-accent/30 transition-colors flex-shrink-0"
+                    className="px-5 py-3 bg-accent/[0.08] text-accent border border-accent/[0.15] rounded-xl text-sm font-body font-medium hover:bg-accent/[0.12] transition-all duration-300 flex-shrink-0"
                   >
                     Join
                   </button>
                 </form>
               )}
             </div>
-          </div>
+            </MotionStaggerItem>
+          </MotionStagger>
         </div>
       </section>
 
       {/* ── Founding Quote ──────────────────────────────────────────────── */}
-      <section className="py-16 px-4 sm:px-6">
+      <section className="py-24 px-4 sm:px-6">
+        <MotionReveal>
         <div className="max-w-3xl mx-auto text-center">
-          <blockquote className="text-lg sm:text-xl text-text/60 italic leading-relaxed mb-4">
+          <blockquote className="font-display text-xl sm:text-2xl lg:text-3xl text-text/50 italic font-light leading-relaxed mb-6">
             &ldquo;We built Alchymine because personal transformation tools
             shouldn&apos;t require blind trust. Every algorithm is visible,
             every methodology is cited, every financial calculation is
-            deterministic. This is open-source self-discovery.&rdquo;
+            deterministic.&rdquo;
           </blockquote>
-          <p className="text-sm text-text/30">The Alchymine Project</p>
+          <hr className="rule-gold my-6 max-w-[60px] mx-auto" />
+          <p className="text-sm font-body text-text/25 tracking-wider uppercase">The Alchymine Project</p>
           <a
             href="https://github.com/realsammyt/Alchymine"
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center gap-2 mt-4 text-xs text-text/20 hover:text-text/40 transition-colors"
+            className="inline-flex items-center gap-2 mt-4 text-xs font-body text-text/20 hover:text-text/40 transition-colors duration-300"
           >
             <svg
               className="w-4 h-4"
@@ -808,18 +819,19 @@ export default function LandingPage() {
             View on GitHub
           </a>
         </div>
+        </MotionReveal>
       </section>
 
       {/* ── Footer ──────────────────────────────────────────────────────── */}
-      <footer className="border-t border-white/5 py-12 px-4 sm:px-6">
+      <footer className="border-t border-white/[0.04] py-16 px-4 sm:px-6">
         <div className="max-w-6xl mx-auto">
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-8 mb-8">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-8 mb-10">
             {/* Brand */}
             <div>
-              <span className="text-gradient-gold font-bold text-lg block mb-2">
+              <span className="font-display text-xl font-light tracking-wide text-gradient-gold block mb-3">
                 Alchymine
               </span>
-              <p className="text-xs text-text/30 leading-relaxed">
+              <p className="text-xs font-body text-text/25 leading-relaxed">
                 Open-source, AI-powered Personal Transformation Operating
                 System. Licensed under CC-BY-NC-SA 4.0.
               </p>
@@ -827,10 +839,10 @@ export default function LandingPage() {
 
             {/* Links */}
             <div>
-              <h4 className="text-xs font-semibold text-text/50 uppercase tracking-wider mb-3">
+              <h4 className="text-[0.65rem] font-body font-medium text-text/30 uppercase tracking-[0.15em] mb-4">
                 Navigation
               </h4>
-              <ul className="space-y-2 text-sm text-text/30">
+              <ul className="space-y-2.5 text-sm font-body text-text/25">
                 <li>
                   <a
                     href="#five-systems"
@@ -870,10 +882,10 @@ export default function LandingPage() {
 
             {/* Principles */}
             <div>
-              <h4 className="text-xs font-semibold text-text/50 uppercase tracking-wider mb-3">
+              <h4 className="text-[0.65rem] font-body font-medium text-text/30 uppercase tracking-[0.15em] mb-4">
                 Principles
               </h4>
-              <ul className="space-y-2 text-sm text-text/30">
+              <ul className="space-y-2.5 text-sm font-body text-text/25">
                 <li>First, Do No Harm</li>
                 <li>Transparency Over Trust</li>
                 <li>Your Data Stays Yours</li>
@@ -882,7 +894,7 @@ export default function LandingPage() {
             </div>
           </div>
 
-          <div className="border-t border-white/5 pt-6 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-text/20">
+          <div className="border-t border-white/[0.04] pt-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs font-body text-text/15 tracking-wide">
             <span>v{process.env.NEXT_PUBLIC_APP_VERSION}</span>
             <span>CC-BY-NC-SA 4.0 — The Alchymine Project</span>
           </div>

@@ -34,29 +34,36 @@
     }
   }
 
+  /* ── Display typography defaults ───────────────────────────────────────── */
+  h1,
+  h2,
+  h3 {
+    font-family: var(--font-display), Georgia, serif;
+    text-wrap: balance;
+  }
+
   /* Custom scrollbar — dark theme */
   ::-webkit-scrollbar {
-    width: 8px;
-    height: 8px;
+    width: 6px;
+    height: 6px;
   }
 
   ::-webkit-scrollbar-track {
-    @apply bg-bg;
+    background: transparent;
   }
 
   ::-webkit-scrollbar-thumb {
-    @apply bg-surface rounded-full;
-    border: 2px solid transparent;
+    @apply bg-white/10 rounded-full;
   }
 
   ::-webkit-scrollbar-thumb:hover {
-    background-color: #2a2a4e;
+    @apply bg-white/20;
   }
 
   /* Firefox scrollbar */
   * {
     scrollbar-width: thin;
-    scrollbar-color: #1a1a2e #0a0a0f;
+    scrollbar-color: rgba(255, 255, 255, 0.1) transparent;
   }
 
   /* Selection color */
@@ -66,25 +73,40 @@
 }
 
 @layer components {
-  /* Gold gradient text */
+  /* ── Gradient text effects ──────────────────────────────────────────────── */
   .text-gradient-gold {
     @apply bg-clip-text text-transparent;
     background-image: linear-gradient(
       135deg,
-      #b8860b,
-      #daa520,
-      #f0c050,
-      #daa520
+      #b8860b 0%,
+      #daa520 30%,
+      #f0c050 50%,
+      #daa520 70%,
+      #b8860b 100%
     );
   }
 
-  /* Purple gradient text */
   .text-gradient-purple {
     @apply bg-clip-text text-transparent;
-    background-image: linear-gradient(135deg, #4a0e4e, #7b2d8e, #9b4dca);
+    background-image: linear-gradient(
+      135deg,
+      #4a0e4e 0%,
+      #7b2d8e 40%,
+      #9b4dca 100%
+    );
   }
 
-  /* Gold shimmer background animation */
+  .text-gradient-teal {
+    @apply bg-clip-text text-transparent;
+    background-image: linear-gradient(
+      135deg,
+      #008080 0%,
+      #20b2aa 40%,
+      #5cd6d0 100%
+    );
+  }
+
+  /* ── Gold shimmer background animation ──────────────────────────────────── */
   .shimmer-gold {
     background: linear-gradient(
       90deg,
@@ -98,22 +120,118 @@
     animation: shimmer 2s linear infinite;
   }
 
-  /* Surface card styling */
+  /* ── Surface card styling ───────────────────────────────────────────────── */
   .card-surface {
-    @apply bg-surface rounded-2xl border border-white/5;
+    @apply bg-surface rounded-2xl border border-white/[0.06];
+    box-shadow:
+      0 0 0 1px rgba(255, 255, 255, 0.03) inset,
+      0 4px 24px rgba(0, 0, 0, 0.3);
   }
 
-  /* Glow effect for interactive elements */
+  .card-surface-elevated {
+    @apply bg-surface-elevated rounded-2xl border border-white/[0.08];
+    box-shadow:
+      0 0 0 1px rgba(255, 255, 255, 0.04) inset,
+      0 8px 32px rgba(0, 0, 0, 0.4),
+      0 0 80px rgba(218, 165, 32, 0.02);
+  }
+
+  /* ── Glow effects ───────────────────────────────────────────────────────── */
   .glow-gold {
     box-shadow:
-      0 0 20px rgba(218, 165, 32, 0.15),
-      0 0 60px rgba(218, 165, 32, 0.05);
+      0 0 20px rgba(218, 165, 32, 0.12),
+      0 0 60px rgba(218, 165, 32, 0.04);
   }
 
   .glow-purple {
     box-shadow:
-      0 0 20px rgba(123, 45, 142, 0.15),
-      0 0 60px rgba(123, 45, 142, 0.05);
+      0 0 20px rgba(123, 45, 142, 0.12),
+      0 0 60px rgba(123, 45, 142, 0.04);
+  }
+
+  .glow-teal {
+    box-shadow:
+      0 0 20px rgba(32, 178, 170, 0.12),
+      0 0 60px rgba(32, 178, 170, 0.04);
+  }
+
+  /* ── Grain texture overlay ──────────────────────────────────────────────── */
+  .grain-overlay {
+    position: relative;
+  }
+  .grain-overlay::before {
+    content: "";
+    position: fixed;
+    inset: -50%;
+    width: 200%;
+    height: 200%;
+    z-index: 9999;
+    pointer-events: none;
+    opacity: 0.025;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='1'/%3E%3C/svg%3E");
+    background-size: 128px 128px;
+    animation: grainDrift 0.5s steps(1) infinite;
+  }
+
+  /* ── Atmospheric background mesh ────────────────────────────────────────── */
+  .bg-atmosphere {
+    position: relative;
+  }
+  .bg-atmosphere::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    background:
+      radial-gradient(
+        ellipse 60% 50% at 20% 80%,
+        rgba(123, 45, 142, 0.07) 0%,
+        transparent 70%
+      ),
+      radial-gradient(
+        ellipse 50% 60% at 80% 20%,
+        rgba(218, 165, 32, 0.05) 0%,
+        transparent 70%
+      ),
+      radial-gradient(
+        ellipse 40% 40% at 50% 50%,
+        rgba(32, 178, 170, 0.03) 0%,
+        transparent 60%
+      );
+  }
+  .bg-atmosphere > * {
+    position: relative;
+    z-index: 1;
+  }
+
+  /* ── Decorative rule (horizontal divider) ───────────────────────────────── */
+  .rule-gold {
+    height: 1px;
+    border: none;
+    background: linear-gradient(
+      90deg,
+      transparent 0%,
+      rgba(218, 165, 32, 0.3) 20%,
+      rgba(218, 165, 32, 0.5) 50%,
+      rgba(218, 165, 32, 0.3) 80%,
+      transparent 100%
+    );
+  }
+
+  /* ── Section heading with decorative element ────────────────────────────── */
+  .section-heading {
+    @apply font-display text-display-lg font-light tracking-tight;
+  }
+
+  .section-heading-sm {
+    @apply font-display text-display-md font-light tracking-tight;
+  }
+
+  /* ── Separator dot ──────────────────────────────────────────────────────── */
+  .dot-separator::before {
+    content: "·";
+    @apply mx-3 text-text/20;
   }
 }
 
@@ -133,6 +251,12 @@
   }
   .animation-delay-500 {
     animation-delay: 500ms;
+  }
+  .animation-delay-600 {
+    animation-delay: 600ms;
+  }
+  .animation-delay-700 {
+    animation-delay: 700ms;
   }
 
   /* ── Touch target utilities ────────────────────────────────────────────── */

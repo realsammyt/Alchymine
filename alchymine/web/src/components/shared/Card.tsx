@@ -27,10 +27,31 @@ export default function Card({
 }: CardProps) {
   const [expanded, setExpanded] = useState(defaultExpanded);
 
+  // Derive the accent gradient color from badgeColor for the top border line.
+  // badgeColor examples: "bg-primary/20 text-primary", "bg-accent/20 text-accent"
+  const accentBorderStyle = (() => {
+    if (badgeColor.includes("text-primary")) {
+      return "linear-gradient(90deg, transparent, rgba(218,165,32,0.5), transparent)";
+    }
+    if (badgeColor.includes("text-secondary")) {
+      return "linear-gradient(90deg, transparent, rgba(123,45,142,0.5), transparent)";
+    }
+    if (badgeColor.includes("text-accent")) {
+      return "linear-gradient(90deg, transparent, rgba(32,178,170,0.5), transparent)";
+    }
+    return "linear-gradient(90deg, transparent, rgba(218,165,32,0.3), transparent)";
+  })();
+
   return (
     <div
-      className={`card-surface p-6 transition-all duration-300 ${className}`}
+      className={`card-surface backdrop-blur-sm p-6 transition-all duration-300 relative overflow-hidden ${className}`}
     >
+      {/* Subtle top accent gradient line */}
+      <span
+        aria-hidden="true"
+        className="absolute top-0 left-0 right-0 h-px"
+        style={{ background: accentBorderStyle }}
+      />
       {/* Header */}
       {(title || badge) && (
         <div className="flex items-start justify-between mb-4">
@@ -44,7 +65,7 @@ export default function Card({
           </div>
           {badge && (
             <span
-              className={`px-3 py-1 rounded-full text-xs font-medium ${badgeColor}`}
+              className={`px-3 py-1 rounded-full font-body text-[0.7rem] font-medium tracking-wider uppercase ${badgeColor}`}
             >
               {badge}
             </span>
