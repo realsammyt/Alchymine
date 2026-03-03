@@ -9,7 +9,7 @@ Environment variable names follow the field names in UPPER_CASE by default
 
     DATABASE_URL=postgresql+asyncpg://user:pass@host/db
     JWT_SECRET_KEY=super-secret
-    ALLOWED_ORIGINS='["https://app.example.com"]'
+    ALLOWED_ORIGINS=https://app.example.com,https://staging.example.com
 """
 
 from __future__ import annotations
@@ -38,7 +38,11 @@ class Settings(BaseSettings):
     environment: str = "development"  # development | staging | production
 
     # ── CORS ─────────────────────────────────────────────────────────────
-    allowed_origins: list[str] = ["http://localhost:3000"]
+    # Stored as ``str`` to prevent pydantic-settings from attempting JSON
+    # pre-parsing (which fails for comma-separated values passed through
+    # docker-compose env files).  Use :meth:`get_allowed_origins` for the
+    # parsed ``list[str]``.
+    allowed_origins: str = "http://localhost:3000"
 
     # ── Auth / JWT ───────────────────────────────────────────────────────
     jwt_secret_key: str = "dev-secret-key-change-in-production"
@@ -65,15 +69,23 @@ class Settings(BaseSettings):
     # ── Encryption ───────────────────────────────────────────────────────
     alchymine_encryption_key: str = ""
 
-    # ── Validators ───────────────────────────────────────────────────────
+    # ── Helpers ─────────────────────────────────────────────────────────
 
-    @field_validator("allowed_origins", mode="before")
-    @classmethod
-    def parse_allowed_origins(cls, v: object) -> object:
-        """Accept a bare string (e.g. ``https://example.com``) and wrap it in a list."""
-        if isinstance(v, str) and not v.startswith("["):
-            return [origin.strip() for origin in v.split(",") if origin.strip()]
-        return v
+    def get_allowed_origins(self) -> list[str]:
+        """Return *allowed_origins* as a list, accepting JSON or CSV format."""
+        import json
+
+        v = self.allowed_origins.strip()
+        if v.startswith("["):
+            try:
+                parsed = json.loads(v)
+                if isinstance(parsed, list):
+                    return [str(x) for x in parsed]
+            except (json.JSONDecodeError, ValueError):
+                pass
+        return [origin.strip() for origin in v.split(",") if origin.strip()]
+
+    # ── Validators ───────────────────────────────────────────────────────
 
     @field_validator("jwt_secret_key")
     @classmethod

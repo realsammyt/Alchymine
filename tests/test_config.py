@@ -83,7 +83,7 @@ class TestDefaults:
         monkeypatch.setenv("JWT_SECRET_KEY", _SAFE_JWT_KEY)
         monkeypatch.setenv("SIGNUP_PROMO_CODE", _SAFE_PROMO_CODE)
         s = Settings()
-        assert s.allowed_origins == ["http://localhost:3000"]
+        assert s.get_allowed_origins() == ["http://localhost:3000"]
 
 
 # ─── Environment Variable Overrides ───────────────────────────────────────
@@ -209,16 +209,16 @@ class TestJWTValidation:
 
 
 class TestCORSOrigins:
-    """CORS origins should support JSON list format from env vars."""
+    """CORS origins should support JSON list and comma-separated formats."""
 
-    def test_single_origin(self, monkeypatch):
+    def test_json_single_origin(self, monkeypatch):
         monkeypatch.setenv("JWT_SECRET_KEY", _SAFE_JWT_KEY)
         monkeypatch.setenv("SIGNUP_PROMO_CODE", _SAFE_PROMO_CODE)
         monkeypatch.setenv("ALLOWED_ORIGINS", '["https://app.example.com"]')
         s = Settings()
-        assert s.allowed_origins == ["https://app.example.com"]
+        assert s.get_allowed_origins() == ["https://app.example.com"]
 
-    def test_multiple_origins(self, monkeypatch):
+    def test_json_multiple_origins(self, monkeypatch):
         monkeypatch.setenv("JWT_SECRET_KEY", _SAFE_JWT_KEY)
         monkeypatch.setenv("SIGNUP_PROMO_CODE", _SAFE_PROMO_CODE)
         monkeypatch.setenv(
@@ -226,7 +226,20 @@ class TestCORSOrigins:
             '["https://app.example.com", "https://staging.example.com"]',
         )
         s = Settings()
-        assert s.allowed_origins == [
+        assert s.get_allowed_origins() == [
+            "https://app.example.com",
+            "https://staging.example.com",
+        ]
+
+    def test_csv_multiple_origins(self, monkeypatch):
+        monkeypatch.setenv("JWT_SECRET_KEY", _SAFE_JWT_KEY)
+        monkeypatch.setenv("SIGNUP_PROMO_CODE", _SAFE_PROMO_CODE)
+        monkeypatch.setenv(
+            "ALLOWED_ORIGINS",
+            "https://app.example.com,https://staging.example.com",
+        )
+        s = Settings()
+        assert s.get_allowed_origins() == [
             "https://app.example.com",
             "https://staging.example.com",
         ]
@@ -235,7 +248,7 @@ class TestCORSOrigins:
         monkeypatch.setenv("JWT_SECRET_KEY", _SAFE_JWT_KEY)
         monkeypatch.setenv("SIGNUP_PROMO_CODE", _SAFE_PROMO_CODE)
         s = Settings()
-        assert s.allowed_origins == ["http://localhost:3000"]
+        assert s.get_allowed_origins() == ["http://localhost:3000"]
 
 
 # ─── get_settings() Cache ────────────────────────────────────────────────
