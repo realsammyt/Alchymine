@@ -478,8 +478,7 @@ export default function ReportPage() {
           <Button
             variant="ghost"
             onClick={() => {
-              const apiUrl =
-                process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+              const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "";
               window.open(
                 `${apiUrl}/api/v1/reports/${reportId}/html`,
                 "_blank",

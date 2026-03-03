@@ -31,13 +31,18 @@ COPY --from=deps /app/node_modules ./node_modules
 # Copy application source
 COPY alchymine/web/ ./
 
-# Accept version from build args
+# Accept build args
 ARG APP_VERSION=dev
+# Empty string → relative URLs in the browser (nginx proxies /api/ to FastAPI).
+# Override for dev: NEXT_PUBLIC_API_URL=http://localhost:8000
+ARG NEXT_PUBLIC_API_URL=
 
 # Set build-time environment variables
+# NEXT_PUBLIC_* vars are baked into the client JS bundle at build time.
 ENV NEXT_TELEMETRY_DISABLED=1 \
     NODE_ENV=production \
-    APP_VERSION=${APP_VERSION}
+    APP_VERSION=${APP_VERSION} \
+    NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
 
 # Build the Next.js application
 RUN npm run build

@@ -52,7 +52,7 @@ services:
     restart: "no"
     build:
       context: ..
-      dockerfile: infrastructure/Dockerfile.web
+      dockerfile: infrastructure/docker/Dockerfile.web
       target: deps
     command: npm run dev
     volumes:
