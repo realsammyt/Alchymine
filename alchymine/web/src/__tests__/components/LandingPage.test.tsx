@@ -43,7 +43,9 @@ jest.mock("@/lib/AuthContext", () => ({
 describe("LandingPage", () => {
   it("renders without crashing", () => {
     render(<LandingPage />);
-    expect(screen.getByText("Discover Who You Truly Are")).toBeInTheDocument();
+    const h1 = screen.getByRole("heading", { level: 1 });
+    expect(h1).toHaveTextContent(/Discover Who You/);
+    expect(h1).toHaveTextContent(/Truly Are/);
   });
 
   it("displays the hero tagline", () => {
