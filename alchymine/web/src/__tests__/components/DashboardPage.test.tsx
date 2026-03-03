@@ -1,5 +1,5 @@
 import { render, screen } from "@testing-library/react";
-import DashboardPage from "@/app/page";
+import DashboardPage from "@/app/dashboard/page";
 
 // Mock next/link
 jest.mock("next/link", () => {
@@ -23,7 +23,7 @@ jest.mock("next/link", () => {
 // Mock next/navigation
 jest.mock("next/navigation", () => ({
   useRouter: jest.fn().mockReturnValue({ push: jest.fn(), replace: jest.fn() }),
-  usePathname: jest.fn().mockReturnValue("/"),
+  usePathname: jest.fn().mockReturnValue("/dashboard"),
 }));
 
 // Mock useAuth to return an authenticated user so ProtectedRoute renders children
@@ -45,70 +45,44 @@ jest.mock("@/lib/AuthContext", () => ({
   ),
 }));
 
+// Mock useApi to return loading state (no data)
+jest.mock("@/lib/useApi", () => ({
+  useApi: jest.fn().mockReturnValue({
+    data: null,
+    loading: false,
+    error: new Error("No data"),
+  }),
+  getStoredIntake: jest.fn().mockReturnValue(null),
+}));
+
 describe("DashboardPage", () => {
   it("renders without crashing", () => {
     render(<DashboardPage />);
     expect(screen.getByText("Dashboard")).toBeInTheDocument();
   });
 
-  it("displays the page description", () => {
+  it("displays no-intake message when intake is missing", () => {
     render(<DashboardPage />);
-    expect(
-      screen.getByText(/Your personal transformation at a glance/),
-    ).toBeInTheDocument();
+    expect(screen.getByText(/Your Progress/)).toBeInTheDocument();
   });
 
-  it("renders all five system cards", () => {
+  it("has a call-to-action to start the journey", () => {
     render(<DashboardPage />);
-    expect(screen.getByText("Personalized Intelligence")).toBeInTheDocument();
-    expect(screen.getByText("Ethical Healing")).toBeInTheDocument();
-    expect(screen.getByText("Generational Wealth")).toBeInTheDocument();
-    expect(screen.getByText("Creative Development")).toBeInTheDocument();
-    expect(screen.getByText("Perspective Enhancement")).toBeInTheDocument();
+    const link = screen.getByText("Start Your Journey");
+    expect(link).toBeInTheDocument();
   });
 
-  it("has links to all five system pages", () => {
+  it("has a link to the intake page", () => {
     render(<DashboardPage />);
     const links = screen.getAllByRole("link");
     const hrefs = links.map((link) => link.getAttribute("href"));
-    expect(hrefs).toContain("/intelligence");
-    expect(hrefs).toContain("/healing");
-    expect(hrefs).toContain("/wealth");
-    expect(hrefs).toContain("/creative");
-    expect(hrefs).toContain("/perspective");
-  });
-
-  it('has a "Begin Discovery" link', () => {
-    render(<DashboardPage />);
-    const discoveryLink = screen.getByText("Begin Discovery");
-    expect(discoveryLink).toBeInTheDocument();
-    expect(discoveryLink.closest("a")).toHaveAttribute(
-      "href",
-      "/discover/intake",
-    );
-  });
-
-  it("displays the ethics-first design notice", () => {
-    render(<DashboardPage />);
-    expect(screen.getByText("Ethics-First Design")).toBeInTheDocument();
+    expect(hrefs).toContain("/discover/intake");
   });
 
   it("has proper heading structure", () => {
     render(<DashboardPage />);
     const h1 = screen.getByRole("heading", { level: 1 });
     expect(h1).toBeInTheDocument();
-    expect(h1).toHaveTextContent("Dashboard");
-  });
-
-  it("has accessible section landmarks", () => {
-    render(<DashboardPage />);
-    // Check for labeled sections
-    expect(screen.getByLabelText("Profile summary")).toBeInTheDocument();
-    expect(
-      screen.getByLabelText("Five transformation systems"),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByLabelText("Ethics and transparency"),
-    ).toBeInTheDocument();
+    expect(h1).toHaveTextContent("Your Progress");
   });
 });
