@@ -1,0 +1,21 @@
+# ============================================================================
+# Alchymine — Deploy Overlay (GHCR pre-built images)
+# Usage: docker compose -f docker-compose.yml -f docker-compose.prod.yml -f docker-compose.deploy.yml up -d
+#
+# Replaces `build:` with `image:` directives so compose pulls pre-built images
+# from GitHub Container Registry instead of building locally on the droplet.
+# Requires DEPLOY_VERSION env var (e.g. "0.5.0").
+# ============================================================================
+
+services:
+  api:
+    image: ghcr.io/realsammyt/alchymine-api:${DEPLOY_VERSION:?DEPLOY_VERSION must be set}
+
+  web:
+    image: ghcr.io/realsammyt/alchymine-web:${DEPLOY_VERSION:?DEPLOY_VERSION must be set}
+
+  worker:
+    image: ghcr.io/realsammyt/alchymine-worker:${DEPLOY_VERSION:?DEPLOY_VERSION must be set}
+
+  pdf-service:
+    image: ghcr.io/realsammyt/alchymine-pdf:${DEPLOY_VERSION:?DEPLOY_VERSION must be set}
