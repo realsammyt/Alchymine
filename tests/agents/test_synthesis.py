@@ -290,6 +290,29 @@ class TestGuidedSessionSynthesis:
         for conn in synthesis.cross_system_connections:
             assert "intention_alignment" in conn
 
+    def test_multi_intentions_merge_system_priorities(self) -> None:
+        """Multiple intentions merge system priorities from all intentions."""
+        results = [
+            _intelligence_result(),
+            _healing_result(),
+            _wealth_result(),
+            _creative_result(),
+        ]
+        synthesis = synthesize_guided_session(
+            results,
+            "career",
+            intentions=["career", "health"],
+        )
+        # "career" maps to wealth, creative, perspective
+        # "health" maps to healing, perspective, intelligence
+        # Merged priority should include wealth, creative, healing, intelligence
+        assert "wealth" in synthesis.systems_involved
+        assert "healing" in synthesis.systems_involved
+        # Insights should be stamped with all intentions
+        for insight in synthesis.unified_insights:
+            assert "career" in insight["intention"]
+            assert "health" in insight["intention"]
+
     def test_quality_passed_propagated(self) -> None:
         results = [
             _intelligence_result(quality_passed=True),

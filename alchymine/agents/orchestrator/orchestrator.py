@@ -82,6 +82,7 @@ class MasterOrchestrator:
         user_profile: dict | None = None,
         *,
         intention: str | None = None,
+        intentions: list[str] | None = None,
     ) -> OrchestratorResult:
         """Process a user request end-to-end.
 
@@ -103,6 +104,10 @@ class MasterOrchestrator:
             workflow will prioritize systems aligned with this
             intention. Backward-compatible: omitting this parameter
             falls back to full-profile synthesis.
+        intentions:
+            Optional list of 1-3 intention strings for multi-intention
+            support. When provided, the synthesis workflow merges
+            system priorities from all intentions.
 
         Returns
         -------
@@ -114,6 +119,8 @@ class MasterOrchestrator:
 
         request_data = dict(user_profile or {})
         request_data["text"] = user_input
+        if intentions:
+            request_data["intentions"] = intentions
 
         user_id = request_data.get("id", "anonymous")
 
@@ -148,6 +155,7 @@ class MasterOrchestrator:
             synthesis = self._run_synthesis(
                 coordinator_results,
                 intention=intention,
+                intentions=intentions,
             )
 
         # Overall quality check
@@ -170,6 +178,7 @@ class MasterOrchestrator:
         coordinator_results: list[CoordinatorResult],
         *,
         intention: str | None = None,
+        intentions: list[str] | None = None,
     ) -> dict:
         """Run the synthesis workflow on multi-system results.
 
@@ -183,6 +192,9 @@ class MasterOrchestrator:
             Results from the coordinators that were invoked.
         intention:
             Optional user intention for guided synthesis.
+        intentions:
+            Optional list of 1-3 intention strings for multi-intention
+            support.
 
         Returns
         -------
@@ -192,10 +204,11 @@ class MasterOrchestrator:
         try:
             from .synthesis import synthesize_full_profile, synthesize_guided_session
 
-            if intention:
+            if intentions or intention:
                 synthesis_result = synthesize_guided_session(
                     coordinator_results,
-                    intention,
+                    intention or (intentions[0] if intentions else ""),
+                    intentions=intentions,
                 )
             else:
                 synthesis_result = synthesize_full_profile(coordinator_results)

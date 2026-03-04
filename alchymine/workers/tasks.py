@@ -218,6 +218,8 @@ def generate_report(
     report_id: str,
     user_input: str,
     user_profile: dict[str, Any] | None = None,
+    intention: str | None = None,
+    intentions: list[str] | None = None,
 ) -> dict[str, Any]:
     """Generate an Alchymine report via the MasterOrchestrator.
 
@@ -234,6 +236,10 @@ def generate_report(
         Raw text from the user describing their request.
     user_profile:
         Optional user profile data to forward to the orchestrator.
+    intention:
+        Optional primary intention string for guided synthesis.
+    intentions:
+        Optional list of 1-3 intention strings for multi-intention support.
 
     Returns
     -------
@@ -254,10 +260,18 @@ def generate_report(
     # ── Mark as generating ────────────────────────────────────────────
     _run_async(_db_set_generating(report_id))
 
+    # Resolve intentions: prefer the list, fall back to the single string
+    _resolved_intentions = intentions or ([intention] if intention else None)
+
     try:
         # ── Run the async orchestrator ────────────────────────────────
         orchestrator = MasterOrchestrator()
-        result = _run_async(orchestrator.process_request(user_input, user_profile))
+        result = _run_async(orchestrator.process_request(
+            user_input,
+            user_profile,
+            intention=intention,
+            intentions=_resolved_intentions,
+        ))
 
         serialised = _serialise_orchestrator_result(result)
 

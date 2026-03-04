@@ -107,11 +107,13 @@ async def create_report(
     )
     await session.commit()
 
-    # Dispatch Celery task
+    # Dispatch Celery task with intention(s)
     generate_report_task.delay(
         report_id,
         request.user_input,
         request.user_profile,
+        request.intake.intention.value,
+        [i.value for i in request.intake.intentions],
     )
 
     return ReportStatus(

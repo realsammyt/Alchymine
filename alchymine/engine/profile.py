@@ -18,7 +18,7 @@ from datetime import date, datetime, time
 from enum import StrEnum
 from typing import Any
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 # ─── Enums ──────────────────────────────────────────────────────────────
 
@@ -333,11 +333,19 @@ class IntakeData(BaseModel):
     birth_time: time | None = Field(None, description="Optional: enables Rising sign")
     birth_city: str | None = Field(None, description="Optional: enables house calculations")
     intention: Intention
+    intentions: list[Intention] = Field(default_factory=list, description="1-3 user intentions")
     assessment_responses: dict[str, Any] = Field(
         default_factory=dict, description="20-question assessment raw responses"
     )
     wealth_context: WealthContext | None = None
     family_structure: str | None = None
+
+    @model_validator(mode="after")
+    def _auto_populate_intentions(self) -> IntakeData:
+        """Ensure intentions is populated from the single intention if empty."""
+        if not self.intentions:
+            self.intentions = [self.intention]
+        return self
 
 
 # ─── UserProfile v2.0 ──────────────────────────────────────────────────

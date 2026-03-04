@@ -92,6 +92,7 @@ async def create_profile(
     birth_city: str | None = None,
     assessment_responses: dict[str, Any] | None = None,
     family_structure: str | None = None,
+    intentions: list[str] | None = None,
 ) -> User:
     """Create a new user with intake data.
 
@@ -102,13 +103,17 @@ async def create_profile(
     session.add(user)
     await session.flush()  # generate user.id
 
+    # Derive primary intention from the list when provided
+    _primary = intentions[0] if intentions else intention
+
     intake = IntakeData(
         user_id=user.id,
         full_name=full_name,
         birth_date=birth_date,
         birth_time=birth_time,
         birth_city=birth_city,
-        intention=intention,
+        intention=_primary,
+        intentions=intentions,
         assessment_responses=assessment_responses,
         family_structure=family_structure,
     )

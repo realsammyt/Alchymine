@@ -500,19 +500,25 @@ def synthesize_full_profile(
 def synthesize_guided_session(
     results: list[CoordinatorResult],
     intention: str,
+    *,
+    intentions: list[str] | None = None,
 ) -> SynthesisResult:
-    """Filter and rank insights by relevance to the user's intention.
+    """Filter and rank insights by relevance to the user's intention(s).
 
     Prioritizes systems most aligned with the intention and generates
-    cross-system action items.
+    cross-system action items.  When *intentions* (a list of 1-3
+    intention strings) is provided, system priorities are merged from
+    all intentions (deduplicated, ordered by first appearance).
     """
-    # Determine system priority based on intention
-    intention_lower = intention.lower().strip()
+    # Determine system priority based on intention(s)
+    all_intentions = [i.lower().strip() for i in (intentions or [intention])]
     system_priority: list[str] = []
-    for keyword, systems in _INTENTION_SYSTEM_RELEVANCE.items():
-        if keyword in intention_lower:
-            system_priority = systems
-            break
+    for intent in all_intentions:
+        for keyword, systems in _INTENTION_SYSTEM_RELEVANCE.items():
+            if keyword in intent:
+                for s in systems:
+                    if s not in system_priority:
+                        system_priority.append(s)
 
     # If no specific mapping found, use all systems equally
     if not system_priority:
@@ -533,11 +539,12 @@ def synthesize_guided_session(
     unified_insights: list[dict[str, Any]] = []
     errors: list[str] = []
 
+    intention_label = ", ".join(all_intentions)
     for rank, result in enumerate(sorted_results):
         systems_involved.append(result.system)
         for insight in _extract_insights_from_result(result):
             insight["relevance_rank"] = rank
-            insight["intention"] = intention
+            insight["intention"] = intention_label
             unified_insights.append(insight)
         if result.errors:
             errors.extend(result.errors)

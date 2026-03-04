@@ -140,11 +140,19 @@ class IntakeData(Base):
     birth_time: Mapped[time | None] = mapped_column(Time, nullable=True)
     birth_city: Mapped[str | None] = mapped_column(EncryptedString(), nullable=True)
     intention: Mapped[str] = mapped_column(String(50), nullable=False)
+    intentions: Mapped[list | None] = mapped_column(JSONColumn, nullable=True)
     assessment_responses: Mapped[dict | None] = mapped_column(JSONColumn, nullable=True)
     family_structure: Mapped[str | None] = mapped_column(String(200), nullable=True)
 
     # Relationship
     user: Mapped[User] = relationship("User", back_populates="intake")
+
+    @property
+    def resolved_intentions(self) -> list[str]:
+        """Return the full intentions list, falling back to the single intention."""
+        if self.intentions and isinstance(self.intentions, list):
+            return self.intentions
+        return [self.intention]
 
     def __repr__(self) -> str:
         return f"<IntakeData user_id={self.user_id!r} name={self.full_name!r}>"

@@ -280,16 +280,22 @@ def _healing_modality_matching(state: CoordinatorState) -> CoordinatorState:
         from alchymine.engine.healing import match_modalities
 
         archetype = request_data.get("archetype")
+        intentions = request_data.get("intentions")
         intention = request_data.get("intention")
         archetype_secondary = request_data.get("archetype_secondary")
         big_five = request_data.get("big_five")
 
-        if archetype and big_five and intention:
+        # Prefer multi-intention list, fall back to single intention
+        _intentions = intentions if isinstance(intentions, list) else (
+            [intention] if intention else None
+        )
+
+        if archetype and big_five and _intentions:
             modalities = match_modalities(
                 archetype,
                 archetype_secondary,
                 big_five,
-                [intention] if not isinstance(intention, list) else intention,
+                _intentions,
             )
             results["recommended_modalities"] = [
                 {
@@ -381,14 +387,20 @@ def _wealth_lever_prioritisation(state: CoordinatorState) -> CoordinatorState:
 
         life_path = request_data.get("life_path")
         risk_tolerance = request_data.get("risk_tolerance", "moderate")
+        intentions = request_data.get("intentions")
         intention = request_data.get("intention")
         wealth_context = request_data.get("wealth_context")
 
-        if life_path is not None and intention:
+        # Prefer multi-intention list, fall back to single intention
+        _intentions = intentions if isinstance(intentions, list) else (
+            [intention] if intention else None
+        )
+
+        if life_path is not None and _intentions:
             levers = prioritize_levers(
                 wealth_context,
                 risk_tolerance,
-                [intention] if isinstance(intention, str) else intention,  # type: ignore[list-item]
+                _intentions,  # type: ignore[arg-type]
                 life_path,
             )
             results["lever_priorities"] = [

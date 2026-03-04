@@ -33,6 +33,27 @@ def test_intake_data_creation() -> None:
     assert intake.intention == Intention.FAMILY
 
 
+def test_intake_data_multi_intentions() -> None:
+    """Explicit intentions list is preserved on IntakeData."""
+    intake = IntakeData(
+        full_name="Multi User",
+        birth_date=date(1990, 5, 20),
+        intention=Intention.CAREER,
+        intentions=[Intention.CAREER, Intention.MONEY, Intention.BUSINESS],
+    )
+    assert intake.intentions == [Intention.CAREER, Intention.MONEY, Intention.BUSINESS]
+
+
+def test_intake_data_auto_populates_intentions() -> None:
+    """IntakeData with only intention= auto-populates intentions list."""
+    intake = IntakeData(
+        full_name="Single User",
+        birth_date=date(1985, 8, 10),
+        intention=Intention.FAMILY,
+    )
+    assert intake.intentions == [Intention.FAMILY]
+
+
 def test_numerology_profile_master_numbers() -> None:
     profile = NumerologyProfile(
         life_path=11,

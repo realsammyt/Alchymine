@@ -177,6 +177,58 @@ async def test_create_profile_validation_short_name(client: AsyncClient) -> None
     assert resp.status_code == 422
 
 
+# ─── POST /api/v1/profile — Create with intentions ───────────────────
+
+
+@pytest.mark.asyncio
+async def test_create_profile_with_intentions(client: AsyncClient) -> None:
+    """POST with intentions list stores and returns all intentions."""
+    resp = await client.post(
+        "/api/v1/profile",
+        json={
+            "full_name": "Multi Intent User",
+            "birth_date": "1990-05-20",
+            "intention": "career",
+            "intentions": ["career", "money", "business"],
+        },
+    )
+    assert resp.status_code == 201
+    data = resp.json()
+    assert data["intake"]["intentions"] == ["career", "money", "business"]
+    assert data["intake"]["intention"] == "career"
+
+
+@pytest.mark.asyncio
+async def test_create_profile_legacy_intention_only(client: AsyncClient) -> None:
+    """POST without intentions returns intentions: ["<intention>"] via fallback."""
+    resp = await client.post(
+        "/api/v1/profile",
+        json={
+            "full_name": "Legacy User",
+            "birth_date": "1985-08-10",
+            "intention": "health",
+        },
+    )
+    assert resp.status_code == 201
+    data = resp.json()
+    assert data["intake"]["intentions"] == ["health"]
+
+
+@pytest.mark.asyncio
+async def test_create_profile_too_many_intentions(client: AsyncClient) -> None:
+    """POST with more than 3 intentions returns 422."""
+    resp = await client.post(
+        "/api/v1/profile",
+        json={
+            "full_name": "Too Many Intents",
+            "birth_date": "1990-01-01",
+            "intention": "career",
+            "intentions": ["career", "money", "health", "family"],
+        },
+    )
+    assert resp.status_code == 422
+
+
 # ─── GET /api/v1/profile/{user_id} — Read ─────────────────────────────
 
 

@@ -319,7 +319,29 @@ class TestGenerateReportTask:
 
             generate_report.apply(args=["test-profile", "test", profile]).get()
 
-            instance.process_request.assert_called_once_with("test", profile)
+            instance.process_request.assert_called_once_with(
+                "test",
+                profile,
+                intention=None,
+                intentions=None,
+            )
+
+    def test_generate_report_forwards_intentions(self, engine, mock_orchestrator_result):
+        """Intentions list should be forwarded to orchestrator.process_request."""
+        with patch("alchymine.workers.tasks.MasterOrchestrator") as MockOrch:
+            instance = MockOrch.return_value
+            instance.process_request = AsyncMock(return_value=mock_orchestrator_result)
+
+            generate_report.apply(
+                args=["test-intentions", "test input", None, "career", ["career", "money"]],
+            ).get()
+
+            instance.process_request.assert_called_once_with(
+                "test input",
+                None,
+                intention="career",
+                intentions=["career", "money"],
+            )
 
     def test_connection_error_marks_failed(self, engine):
         """ConnectionError should mark the report as failed."""
