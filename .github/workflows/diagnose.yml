@@ -34,11 +34,11 @@ jobs:
 
             if [ "${{ inputs.action }}" = "hotfix-pull-restart" ]; then
               echo "=== Hotfix: pulling latest main and restarting ==="
-              # Fix .git ownership if root-owned objects block fetch
-              sudo chown -R alchymine:alchymine .git/ 2>/dev/null || true
-              git fetch origin main
-              git checkout main
-              git pull origin main
+              # Download latest main tarball (avoids .git permission issues)
+              curl -sL "https://github.com/realsammyt/Alchymine/archive/refs/heads/main.tar.gz" \
+                -o /tmp/alchymine-main.tar.gz
+              tar xzf /tmp/alchymine-main.tar.gz --strip-components=1 -C /home/alchymine/Alchymine
+              rm -f /tmp/alchymine-main.tar.gz
               $DC up -d --force-recreate nginx
               sleep 3
               $DC ps nginx

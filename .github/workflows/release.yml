@@ -183,24 +183,12 @@ jobs:
 
             cd /home/alchymine/Alchymine
 
-            # Fix .git ownership (Docker builds as root can leave root-owned objects)
-            sudo chown -R alchymine:alchymine .git/
-
-            # Fetch latest code and checkout the release tag
-            # Retry up to 3 times to handle transient GitHub 500 errors
-            for attempt in 1 2 3; do
-              echo "git fetch --tags (attempt ${attempt}/3)..."
-              if git fetch --tags; then
-                break
-              fi
-              if [ "$attempt" = "3" ]; then
-                echo "ERROR: git fetch failed after 3 attempts"
-                exit 1
-              fi
-              echo "Retrying in 10s..."
-              sleep 10
-            done
-            git checkout "${TAG}"
+            # Download release tarball instead of git fetch (avoids .git permission issues)
+            echo "Downloading ${TAG} tarball..."
+            curl -sL "https://github.com/realsammyt/Alchymine/archive/refs/tags/${TAG}.tar.gz" \
+              -o "/tmp/alchymine-${TAG}.tar.gz"
+            tar xzf "/tmp/alchymine-${TAG}.tar.gz" --strip-components=1 -C /home/alchymine/Alchymine
+            rm -f "/tmp/alchymine-${TAG}.tar.gz"
 
             # Verify production env file exists
             if [ ! -f .env.production ]; then
