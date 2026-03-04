@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="96" fill="#0f0f23"/>
+  <!-- Outer ring — teal -->
+  <circle cx="256" cy="256" r="180" fill="none" stroke="#20B2AA" stroke-width="16" opacity="0.4"/>
+  <!-- Inner ring — purple -->
+  <circle cx="256" cy="256" r="120" fill="none" stroke="#8b5cf6" stroke-width="12" opacity="0.5"/>
+  <!-- Central alchemical symbol — gold -->
+  <g fill="none" stroke="#DAA520" stroke-width="14" stroke-linecap="round" stroke-linejoin="round">
+    <!-- Triangle (fire/transformation) -->
+    <polygon points="256,120 340,320 172,320"/>
+    <!-- Horizontal line through triangle (air/mind) -->
+    <line x1="196" y1="248" x2="316" y2="248"/>
+  </g>
+  <!-- Central dot — gold -->
+  <circle cx="256" cy="240" r="12" fill="#DAA520"/>
+</svg>

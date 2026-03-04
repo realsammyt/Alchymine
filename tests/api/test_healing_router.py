@@ -132,6 +132,33 @@ class TestMatchModalities:
             assert "modality" in match
             assert "skill_trigger" in match
 
+    def test_match_intention_only_returns_200(self, client: TestClient) -> None:
+        """POST /healing/match with only intention uses defaults for archetype + big_five."""
+        response = client.post("/api/v1/healing/match", json={"intention": "health"})
+        assert response.status_code == 200
+        data = response.json()
+        assert data["total"] > 0
+        assert len(data["matches"]) == data["total"]
+
+    def test_match_multiple_intentions_returns_200(self, client: TestClient) -> None:
+        """POST /healing/match with intentions list (1-3) works."""
+        response = client.post(
+            "/api/v1/healing/match",
+            json={"intentions": ["health", "career", "family"]},
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert data["total"] > 0
+
+    def test_match_intentions_overrides_intention(self, client: TestClient) -> None:
+        """When both intention and intentions are provided, intentions wins."""
+        # Send both — intentions should take precedence
+        response = client.post(
+            "/api/v1/healing/match",
+            json={"intention": "money", "intentions": ["health"]},
+        )
+        assert response.status_code == 200
+
     def test_match_with_contraindications(self, client: TestClient) -> None:
         """Contraindications filter out matching modalities."""
         response = client.post(

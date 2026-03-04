@@ -289,7 +289,7 @@ def _healing_modality_matching(state: CoordinatorState) -> CoordinatorState:
                 archetype,
                 archetype_secondary,
                 big_five,
-                intention,
+                [intention] if not isinstance(intention, list) else intention,
             )
             results["recommended_modalities"] = [
                 {
@@ -388,7 +388,7 @@ def _wealth_lever_prioritisation(state: CoordinatorState) -> CoordinatorState:
             levers = prioritize_levers(
                 wealth_context,
                 risk_tolerance,
-                intention,
+                [intention] if isinstance(intention, str) else intention,  # type: ignore[list-item]
                 life_path,
             )
             results["lever_priorities"] = [

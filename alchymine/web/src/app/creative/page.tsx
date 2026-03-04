@@ -101,11 +101,13 @@ function ScoreBar({ label, value }: { label: string; value: number }) {
 
 export default function CreativePage() {
   const intake = useMemo(() => getStoredIntake(), []);
-  const hasIntake = !!intake?.intention;
+  const hasIntake = !!(intake?.intentions?.length || intake?.intention);
 
   const style = useApi<StyleFingerprintResponse>(
-    hasIntake ? () => getCreativeStyle({ intention: intake!.intention }) : null,
-    [intake?.intention],
+    hasIntake
+      ? () => getCreativeStyle({ intention: intake!.intentions?.[0] ?? intake!.intention })
+      : null,
+    [intake?.intentions?.join(",") ?? intake?.intention],
   );
 
   return (

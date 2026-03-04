@@ -112,7 +112,7 @@ class ModalityMatcher(DomainAgent):
             archetype,
             archetype_secondary,
             big_five,
-            intention,
+            [intention] if not isinstance(intention, list) else intention,
         )
         return {
             "recommended_modalities": [

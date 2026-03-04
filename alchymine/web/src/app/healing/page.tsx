@@ -17,6 +17,8 @@ import {
   HealingMatchListResponse,
 } from "@/lib/api";
 import { useApi, getStoredIntake } from "@/lib/useApi";
+import { useAuth } from "@/lib/AuthContext";
+import { DEMO_ACCOUNT_EMAIL } from "@/lib/constants";
 
 // ── Constants ─────────────────────────────────────────────────────
 
@@ -339,8 +341,10 @@ function ModalityProgressCards({
 
 export default function HealingPage() {
   const [selectedPattern, setSelectedPattern] = useState<string | null>(null);
+  const { user } = useAuth();
+  const isDemoUser = user?.email === DEMO_ACCOUNT_EMAIL;
   const intake = useMemo(() => getStoredIntake(), []);
-  const hasIntake = !!intake?.intention;
+  const hasIntake = !!(intake?.intentions?.length || intake?.intention);
 
   // Fetch modalities from API
   const modalities = useApi<ModalityListResponse>(
@@ -349,9 +353,12 @@ export default function HealingPage() {
   );
 
   // Fetch personalized matches if user has intake data
+  const intakeIntentions = intake?.intentions ?? (intake?.intention ? [intake.intention] : []);
   const matches = useApi<HealingMatchListResponse>(
-    hasIntake ? () => getHealingMatch({ intention: intake!.intention }) : null,
-    [intake?.intention],
+    hasIntake
+      ? () => getHealingMatch({ intentions: intakeIntentions })
+      : null,
+    [intakeIntentions.join(",")],
   );
 
   // Use API modalities if available, otherwise show hardcoded list
@@ -432,77 +439,79 @@ export default function HealingPage() {
           </header>
         </MotionReveal>
 
-        {/* Practice Streak + Stats Row */}
-        <MotionReveal delay={0.1}>
-          <section
-            className="mb-12 grid md:grid-cols-2 gap-6"
-            aria-labelledby="streak-heading"
-          >
-            <div>
-              <h2 id="streak-heading" className="sr-only">
-                Practice Streak
-              </h2>
-              <PracticeStreakCounter streakDays={demoStreak} />
-            </div>
+        {/* Practice Streak + Stats Row — demo data only */}
+        {isDemoUser && (
+          <MotionReveal delay={0.1}>
+            <section
+              className="mb-12 grid md:grid-cols-2 gap-6"
+              aria-labelledby="streak-heading"
+            >
+              <div>
+                <h2 id="streak-heading" className="sr-only">
+                  Practice Streak
+                </h2>
+                <PracticeStreakCounter streakDays={demoStreak} />
+              </div>
 
-            {/* Quick stats */}
-            <div className="card-surface p-6">
-              <h3 className="font-display text-lg font-light text-text/80 mb-5">
-                Healing Summary
-              </h3>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="text-center">
-                  <div
-                    className="font-display font-light text-gradient-teal"
-                    style={{ fontSize: "clamp(1.75rem, 4vw, 2.25rem)" }}
-                    aria-label="62 total sessions"
-                  >
-                    62
+              {/* Quick stats */}
+              <div className="card-surface p-6">
+                <h3 className="font-display text-lg font-light text-text/80 mb-5">
+                  Healing Summary
+                </h3>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="text-center">
+                    <div
+                      className="font-display font-light text-gradient-teal"
+                      style={{ fontSize: "clamp(1.75rem, 4vw, 2.25rem)" }}
+                      aria-label="62 total sessions"
+                    >
+                      62
+                    </div>
+                    <div className="font-body text-xs text-text/40 mt-1">
+                      Total Sessions
+                    </div>
                   </div>
-                  <div className="font-body text-xs text-text/40 mt-1">
-                    Total Sessions
+                  <div className="text-center">
+                    <div
+                      className="font-display font-light text-gradient-teal"
+                      style={{ fontSize: "clamp(1.75rem, 4vw, 2.25rem)" }}
+                      aria-label="6 modalities used"
+                    >
+                      6
+                    </div>
+                    <div className="font-body text-xs text-text/40 mt-1">
+                      Modalities Used
+                    </div>
                   </div>
-                </div>
-                <div className="text-center">
-                  <div
-                    className="font-display font-light text-gradient-teal"
-                    style={{ fontSize: "clamp(1.75rem, 4vw, 2.25rem)" }}
-                    aria-label="6 modalities used"
-                  >
-                    6
+                  <div className="text-center">
+                    <div
+                      className="font-display font-light text-gradient-teal"
+                      style={{ fontSize: "clamp(1.75rem, 4vw, 2.25rem)" }}
+                      aria-label="4.2 hours this week"
+                    >
+                      4.2h
+                    </div>
+                    <div className="font-body text-xs text-text/40 mt-1">
+                      This Week
+                    </div>
                   </div>
-                  <div className="font-body text-xs text-text/40 mt-1">
-                    Modalities Used
-                  </div>
-                </div>
-                <div className="text-center">
-                  <div
-                    className="font-display font-light text-gradient-teal"
-                    style={{ fontSize: "clamp(1.75rem, 4vw, 2.25rem)" }}
-                    aria-label="4.2 hours this week"
-                  >
-                    4.2h
-                  </div>
-                  <div className="font-body text-xs text-text/40 mt-1">
-                    This Week
-                  </div>
-                </div>
-                <div className="text-center">
-                  <div
-                    className="font-display font-light text-gradient-teal"
-                    style={{ fontSize: "clamp(1.75rem, 4vw, 2.25rem)" }}
-                    aria-label="87% completion rate"
-                  >
-                    87%
-                  </div>
-                  <div className="font-body text-xs text-text/40 mt-1">
-                    Completion Rate
+                  <div className="text-center">
+                    <div
+                      className="font-display font-light text-gradient-teal"
+                      style={{ fontSize: "clamp(1.75rem, 4vw, 2.25rem)" }}
+                      aria-label="87% completion rate"
+                    >
+                      87%
+                    </div>
+                    <div className="font-body text-xs text-text/40 mt-1">
+                      Completion Rate
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
-          </section>
-        </MotionReveal>
+            </section>
+          </MotionReveal>
+        )}
 
         {/* Personalized Matches */}
         {hasIntake && (
@@ -621,18 +630,20 @@ export default function HealingPage() {
           </section>
         </MotionReveal>
 
-        {/* Modality Progress Cards */}
-        <MotionReveal>
-          <section
-            className="mb-12"
-            aria-labelledby="modality-progress-heading"
-          >
-            <h2 id="modality-progress-heading" className="sr-only">
-              Modality Progress
-            </h2>
-            <ModalityProgressCards modalities={DEMO_MODALITY_PROGRESS} />
-          </section>
-        </MotionReveal>
+        {/* Modality Progress Cards — demo data only */}
+        {isDemoUser && (
+          <MotionReveal>
+            <section
+              className="mb-12"
+              aria-labelledby="modality-progress-heading"
+            >
+              <h2 id="modality-progress-heading" className="sr-only">
+                Modality Progress
+              </h2>
+              <ModalityProgressCards modalities={DEMO_MODALITY_PROGRESS} />
+            </section>
+          </MotionReveal>
+        )}
 
         {/* Modalities Grid */}
         <MotionReveal>

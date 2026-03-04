@@ -12,7 +12,9 @@ class MockIntersectionObserver implements IntersectionObserver {
     // Immediately trigger with all entries as intersecting
     setTimeout(() => {
       this.callback(
-        [{ isIntersecting: true, intersectionRatio: 1 }] as IntersectionObserverEntry[],
+        [
+          { isIntersecting: true, intersectionRatio: 1 },
+        ] as IntersectionObserverEntry[],
         this,
       );
     }, 0);

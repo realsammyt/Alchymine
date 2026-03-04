@@ -74,8 +74,19 @@ class WealthPlanRequest(BaseModel):
     life_path: int = Field(..., ge=1, le=33, description="Life Path number")
     archetype_primary: ArchetypeType = Field(..., description="Primary Jungian archetype")
     risk_tolerance: RiskTolerance = Field(RiskTolerance.MODERATE)
-    intention: Intention = Field(Intention.MONEY, description="Primary intention/goal")
+    intention: Intention | None = Field(None, description="Primary intention (backward compat)")
+    intentions: list[Intention] | None = Field(
+        None, min_length=1, max_length=3, description="Life intentions (1-3)"
+    )
     wealth_context: WealthContext | None = Field(None, description="Optional financial context")
+
+    def resolved_intentions(self) -> list[Intention]:
+        """Return the consolidated intention list."""
+        if self.intentions:
+            return list(self.intentions)
+        if self.intention:
+            return [self.intention]
+        return [Intention.MONEY]
 
 
 class PlanPhaseResponse(BaseModel):
@@ -107,8 +118,19 @@ class LeverRequest(BaseModel):
 
     life_path: int = Field(..., ge=1, le=33, description="Life Path number")
     risk_tolerance: RiskTolerance = Field(RiskTolerance.MODERATE)
-    intention: Intention = Field(Intention.MONEY)
+    intention: Intention | None = Field(None, description="Primary intention (backward compat)")
+    intentions: list[Intention] | None = Field(
+        None, min_length=1, max_length=3, description="Life intentions (1-3)"
+    )
     wealth_context: WealthContext | None = None
+
+    def resolved_intentions(self) -> list[Intention]:
+        """Return the consolidated intention list."""
+        if self.intentions:
+            return list(self.intentions)
+        if self.intention:
+            return [self.intention]
+        return [Intention.MONEY]
 
 
 class LeverResponse(BaseModel):
@@ -203,7 +225,7 @@ async def generate_wealth_plan(
     levers = prioritize_levers(
         wealth_context=request.wealth_context,
         risk_tolerance=request.risk_tolerance,
-        intention=request.intention,
+        intentions=request.resolved_intentions(),
         life_path=request.life_path,
     )
 
@@ -229,7 +251,7 @@ async def get_lever_priorities(
     levers = prioritize_levers(
         wealth_context=request.wealth_context,
         risk_tolerance=request.risk_tolerance,
-        intention=request.intention,
+        intentions=request.resolved_intentions(),
         life_path=request.life_path,
     )
 
@@ -255,7 +277,7 @@ async def export_wealth_plan_csv(
     levers = prioritize_levers(
         wealth_context=request.wealth_context,
         risk_tolerance=request.risk_tolerance,
-        intention=request.intention,
+        intentions=request.resolved_intentions(),
         life_path=request.life_path,
     )
 

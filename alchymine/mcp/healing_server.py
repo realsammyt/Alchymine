@@ -109,7 +109,7 @@ def match_modalities_tool(archetype: str, big_five: dict, intention: str) -> lis
         archetype_primary=archetype_type,
         archetype_secondary=None,
         big_five=big_five_scores,
-        intention=intention_enum,
+        intentions=[intention_enum],
     )
     return [
         {

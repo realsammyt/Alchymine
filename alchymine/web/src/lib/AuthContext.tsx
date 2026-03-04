@@ -52,6 +52,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const login = useCallback(async (email: string, password: string) => {
+    // Clean slate — prevent stale intake/report data from a previous account
+    sessionStorage.clear();
     // Tokens are returned in the JSON body for the migration fallback path
     // and also set as httpOnly cookies by the server automatically.
     const tokens = await loginUser(email, password);
@@ -63,6 +65,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const register = useCallback(
     async (email: string, password: string, promoCode: string) => {
+      // Clean slate for new accounts
+      sessionStorage.clear();
       const tokens = await registerUser(email, password, promoCode);
       localStorage.setItem("access_token", tokens.access_token);
       localStorage.setItem("refresh_token", tokens.refresh_token);
@@ -81,6 +85,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
     localStorage.removeItem("access_token");
     localStorage.removeItem("refresh_token");
+    sessionStorage.clear();
     setUser(null);
     // Clear service worker cache to prevent stale data leakage
     if ("caches" in window) {

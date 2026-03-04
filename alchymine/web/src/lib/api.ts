@@ -11,7 +11,8 @@ export interface IntakePayload {
   birth_date: string; // YYYY-MM-DD
   birth_time?: string | null; // HH:MM or null
   birth_city?: string | null;
-  intention: string;
+  intention: string; // Primary intention (first selected) — backward compat for report creation
+  intentions?: string[]; // All selected intentions (1-3)
   assessment_responses: Record<string, number>;
 }
 
