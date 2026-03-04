@@ -197,7 +197,7 @@ def process_assessment(
         archetype_primary=archetype_primary,
         archetype_secondary=archetype_secondary,
         big_five=big_five,
-        intention=intention,
+        intentions=[intention],
         max_difficulty=max_difficulty,
         contraindications=user_contraindications,
     )

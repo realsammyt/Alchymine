@@ -60,17 +60,45 @@ class ModalityListResponse(BaseModel):
 class MatchRequest(BaseModel):
     """Request to match healing modalities for a user profile."""
 
-    archetype_primary: ArchetypeType = Field(..., description="Primary Jungian archetype")
+    archetype_primary: ArchetypeType = Field(
+        ArchetypeType.SAGE,
+        description="Primary Jungian archetype (default: sage — broadest healing affinity)",
+    )
     archetype_secondary: ArchetypeType | None = Field(
         None, description="Optional secondary archetype"
     )
-    big_five: BigFiveScores = Field(..., description="Big Five personality scores (0-100 each)")
-    intention: Intention = Field(..., description="Primary life intention")
+    big_five: BigFiveScores = Field(
+        default_factory=lambda: BigFiveScores(
+            openness=50.0,
+            conscientiousness=50.0,
+            extraversion=50.0,
+            agreeableness=50.0,
+            neuroticism=50.0,
+        ),
+        description="Big Five personality scores (0-100 each; defaults to neutral 50s)",
+    )
+    intention: Intention | None = Field(
+        None, description="Primary life intention (backward compat)"
+    )
+    intentions: list[Intention] | None = Field(
+        None,
+        min_length=1,
+        max_length=3,
+        description="Life intentions (1-3). Overrides `intention` if both provided.",
+    )
     contraindications: list[str] | None = Field(None, description="Known contraindications")
     max_difficulty: PracticeDifficulty = Field(
         PracticeDifficulty.FOUNDATION, description="Highest difficulty level to include"
     )
     top_n: int = Field(7, ge=1, le=15, description="Max number of results to return")
+
+    def resolved_intentions(self) -> list[Intention]:
+        """Return the consolidated intention list."""
+        if self.intentions:
+            return list(self.intentions)
+        if self.intention:
+            return [self.intention]
+        return [Intention.HEALTH]  # safe default
 
 
 class HealingPreferenceResponse(BaseModel):
@@ -238,7 +266,7 @@ async def match_healing_modalities(
         archetype_primary=request.archetype_primary,
         archetype_secondary=request.archetype_secondary,
         big_five=request.big_five,
-        intention=request.intention,
+        intentions=request.resolved_intentions(),
         max_difficulty=request.max_difficulty,
         contraindications=request.contraindications,
         max_results=request.top_n,

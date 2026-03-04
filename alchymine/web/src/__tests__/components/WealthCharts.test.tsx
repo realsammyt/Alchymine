@@ -19,6 +19,17 @@ jest.mock("next/link", () => {
   };
 });
 
+// Mock useAuth — return demo account so demo data is visible in tests
+jest.mock("@/lib/AuthContext", () => ({
+  useAuth: () => ({
+    user: { email: "tyler.sammy+demo@gmail.com" },
+    isLoading: false,
+    login: jest.fn(),
+    register: jest.fn(),
+    logout: jest.fn(),
+  }),
+}));
+
 // Mock the useApi and getStoredIntake
 jest.mock("@/lib/useApi", () => ({
   useApi: () => ({

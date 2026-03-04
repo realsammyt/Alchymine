@@ -122,13 +122,16 @@ const SCENARIO_TYPES = [
 
 export default function PerspectivePage() {
   const intake = useMemo(() => getStoredIntake(), []);
-  const hasIntake = !!intake?.intention;
+  const hasIntake = !!(intake?.intentions?.length || intake?.intention);
 
   const kegan = useApi<KeganAssessResponse>(
     hasIntake
-      ? () => getKeganAssessment({ intention: intake!.intention })
+      ? () =>
+          getKeganAssessment({
+            intention: intake!.intentions?.[0] ?? intake!.intention,
+          })
       : null,
-    [intake?.intention],
+    [intake?.intentions?.join(",") ?? intake?.intention],
   );
 
   return (

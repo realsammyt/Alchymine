@@ -149,7 +149,7 @@ class LeverCalculator(DomainAgent):
         levers = prioritize_levers(
             wealth_context=wealth_context,
             risk_tolerance=risk_tolerance,
-            intention=intention,
+            intentions=[intention],
             life_path=life_path,
         )
 

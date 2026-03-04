@@ -8,6 +8,8 @@ boosting to produce a ranked list of HealingPreference objects.
 
 from __future__ import annotations
 
+from collections.abc import Sequence
+
 from alchymine.engine.archetype.definitions import ARCHETYPE_DEFINITIONS
 from alchymine.engine.profile import (
     ArchetypeType,
@@ -242,7 +244,7 @@ def match_modalities(
     archetype_primary: ArchetypeType,
     archetype_secondary: ArchetypeType | None,
     big_five: BigFiveScores,
-    intention: Intention,
+    intentions: Sequence[Intention],
     max_difficulty: PracticeDifficulty = PracticeDifficulty.FOUNDATION,
     contraindications: list[str] | None = None,
     max_results: int = 7,
@@ -251,7 +253,7 @@ def match_modalities(
 
     Algorithm:
     1. Seed scores from archetype healing affinities (primary + secondary).
-    2. Boost modalities that align with the user's stated intention.
+    2. Boost modalities that align with the user's stated intentions.
     3. Filter out modalities above the user's max difficulty.
     4. Filter out contraindicated modalities.
     5. Apply Big Five personality trait boosts by category.
@@ -265,8 +267,8 @@ def match_modalities(
         Optional secondary archetype (contributes at 60% weight).
     big_five:
         Big Five personality scores (0-100 each).
-    intention:
-        The user's primary life intention.
+    intentions:
+        The user's life intentions (1-3). Boosts are applied for each.
     max_difficulty:
         Highest practice difficulty the user has opted into.
     contraindications:
@@ -299,11 +301,12 @@ def match_modalities(
         if name not in scores:
             scores[name] = 0.10  # baseline
 
-    # Step 2: Intention boosts
-    intention_boosts = _INTENTION_BOOSTS.get(intention, {})
-    for modality_name, boost in intention_boosts.items():
-        if modality_name in scores:
-            scores[modality_name] += boost
+    # Step 2: Intention boosts (applied for each selected intention)
+    for intention in intentions:
+        intention_boosts = _INTENTION_BOOSTS.get(intention, {})
+        for modality_name, boost in intention_boosts.items():
+            if modality_name in scores:
+                scores[modality_name] += boost
 
     # Step 3: Filter by difficulty
     eligible: dict[str, float] = {}

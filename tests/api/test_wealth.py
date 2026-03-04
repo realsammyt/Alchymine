@@ -169,6 +169,23 @@ class TestWealthLeversEndpoint:
         assert len(data["levers"]) == 5
         assert set(data["levers"]) == {"EARN", "KEEP", "GROW", "PROTECT", "TRANSFER"}
 
+    def test_levers_with_multiple_intentions(self, client: TestClient) -> None:
+        """POST /wealth/levers works with intentions list (1-3)."""
+        response = client.post(
+            "/api/v1/wealth/levers",
+            json={
+                "life_path": 1,
+                "risk_tolerance": "moderate",
+                "intentions": ["money", "family", "legacy"],
+            },
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert len(data["levers"]) == 5
+        # family + legacy should boost PROTECT and TRANSFER
+        assert "PROTECT" in data["levers"][:3]
+        assert "TRANSFER" in data["levers"][:3]
+
 
 # ═══════════════════════════════════════════════════════════════════════════
 # Compatibility Endpoint

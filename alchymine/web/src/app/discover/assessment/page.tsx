@@ -48,7 +48,8 @@ export default function AssessmentPage() {
           birth_date: intakeData.birthDate,
           birth_time: intakeData.birthTime || null,
           birth_city: intakeData.birthCity || null,
-          intention: intakeData.intention,
+          intention: intakeData.intention ?? intakeData.intentions?.[0],
+          intentions: intakeData.intentions ?? (intakeData.intention ? [intakeData.intention] : []),
           assessment_responses: finalResponses,
         };
 

@@ -192,7 +192,7 @@ class TestMatchModalities:
             archetype_primary=ArchetypeType.SAGE,
             archetype_secondary=None,
             big_five=NEUTRAL_BIG_FIVE,
-            intention=Intention.PURPOSE,
+            intentions=[Intention.PURPOSE],
             max_difficulty=PracticeDifficulty.ADVANCED,
         )
         assert isinstance(results, list)
@@ -204,7 +204,7 @@ class TestMatchModalities:
             archetype_primary=ArchetypeType.CREATOR,
             archetype_secondary=None,
             big_five=NEUTRAL_BIG_FIVE,
-            intention=Intention.HEALTH,
+            intentions=[Intention.HEALTH],
             max_difficulty=PracticeDifficulty.ADVANCED,
             max_results=3,
         )
@@ -216,7 +216,7 @@ class TestMatchModalities:
             archetype_primary=ArchetypeType.EXPLORER,
             archetype_secondary=ArchetypeType.SAGE,
             big_five=NEUTRAL_BIG_FIVE,
-            intention=Intention.CAREER,
+            intentions=[Intention.CAREER],
             max_difficulty=PracticeDifficulty.ADVANCED,
         )
         assert len(results) <= 7
@@ -227,7 +227,7 @@ class TestMatchModalities:
             archetype_primary=ArchetypeType.MYSTIC,
             archetype_secondary=None,
             big_five=NEUTRAL_BIG_FIVE,
-            intention=Intention.PURPOSE,
+            intentions=[Intention.PURPOSE],
             max_difficulty=PracticeDifficulty.ADVANCED,
         )
         scores = [r.preference_score for r in results]
@@ -239,7 +239,7 @@ class TestMatchModalities:
             archetype_primary=ArchetypeType.HERO,
             archetype_secondary=ArchetypeType.REBEL,
             big_five=NEUTRAL_BIG_FIVE,
-            intention=Intention.HEALTH,
+            intentions=[Intention.HEALTH],
             max_difficulty=PracticeDifficulty.ADVANCED,
         )
         for r in results:
@@ -253,7 +253,7 @@ class TestMatchModalities:
             archetype_primary=ArchetypeType.SAGE,
             archetype_secondary=None,
             big_five=NEUTRAL_BIG_FIVE,
-            intention=Intention.CAREER,
+            intentions=[Intention.CAREER],
             max_difficulty=PracticeDifficulty.FOUNDATION,
         )
         for r in results:
@@ -268,7 +268,7 @@ class TestMatchModalities:
             archetype_primary=ArchetypeType.LOVER,
             archetype_secondary=None,
             big_five=NEUTRAL_BIG_FIVE,
-            intention=Intention.LOVE,
+            intentions=[Intention.LOVE],
             max_difficulty=PracticeDifficulty.DEVELOPING,
         )
         allowed = {PracticeDifficulty.FOUNDATION, PracticeDifficulty.DEVELOPING}
@@ -284,7 +284,7 @@ class TestMatchModalities:
             archetype_primary=ArchetypeType.SAGE,
             archetype_secondary=None,
             big_five=NEUTRAL_BIG_FIVE,
-            intention=Intention.HEALTH,
+            intentions=[Intention.HEALTH],
             max_difficulty=PracticeDifficulty.ADVANCED,
             contraindications=["severe asthma"],
         )
@@ -297,7 +297,7 @@ class TestMatchModalities:
             archetype_primary=ArchetypeType.CREATOR,
             archetype_secondary=None,
             big_five=NEUTRAL_BIG_FIVE,
-            intention=Intention.PURPOSE,
+            intentions=[Intention.PURPOSE],
             max_difficulty=PracticeDifficulty.ADVANCED,
             contraindications=["epilepsy"],
         )
@@ -311,7 +311,7 @@ class TestMatchModalities:
             archetype_primary=ArchetypeType.SAGE,
             archetype_secondary=None,
             big_five=NEUTRAL_BIG_FIVE,
-            intention=Intention.HEALTH,
+            intentions=[Intention.HEALTH],
             max_difficulty=PracticeDifficulty.ADVANCED,
             contraindications=["SEVERE ASTHMA"],
         )
@@ -324,14 +324,14 @@ class TestMatchModalities:
             archetype_primary=ArchetypeType.SAGE,
             archetype_secondary=None,
             big_five=NEUTRAL_BIG_FIVE,
-            intention=Intention.PURPOSE,
+            intentions=[Intention.PURPOSE],
             max_difficulty=PracticeDifficulty.ADVANCED,
         )
         results_with_secondary = match_modalities(
             archetype_primary=ArchetypeType.SAGE,
             archetype_secondary=ArchetypeType.HERO,
             big_five=NEUTRAL_BIG_FIVE,
-            intention=Intention.PURPOSE,
+            intentions=[Intention.PURPOSE],
             max_difficulty=PracticeDifficulty.ADVANCED,
         )
         scores_no = {r.modality: r.preference_score for r in results_no_secondary}
@@ -347,14 +347,14 @@ class TestMatchModalities:
             archetype_primary=ArchetypeType.EVERYMAN,
             archetype_secondary=None,
             big_five=high_n,
-            intention=Intention.HEALTH,
+            intentions=[Intention.HEALTH],
             max_difficulty=PracticeDifficulty.ADVANCED,
         )
         results_low = match_modalities(
             archetype_primary=ArchetypeType.EVERYMAN,
             archetype_secondary=None,
             big_five=low_n,
-            intention=Intention.HEALTH,
+            intentions=[Intention.HEALTH],
             max_difficulty=PracticeDifficulty.ADVANCED,
         )
 
@@ -376,7 +376,7 @@ class TestMatchModalities:
             archetype_primary=ArchetypeType.SAGE,
             archetype_secondary=None,
             big_five=introvert,
-            intention=Intention.PURPOSE,
+            intentions=[Intention.PURPOSE],
             max_difficulty=PracticeDifficulty.ADVANCED,
         )
         modality_names = [r.modality for r in results[:3]]
@@ -392,7 +392,7 @@ class TestMatchModalities:
             archetype_primary=ArchetypeType.EVERYMAN,
             archetype_secondary=None,
             big_five=NEUTRAL_BIG_FIVE,
-            intention=Intention.HEALTH,
+            intentions=[Intention.HEALTH],
             max_difficulty=PracticeDifficulty.ADVANCED,
         )
         modality_names = [r.modality for r in results]
@@ -423,7 +423,7 @@ class TestMatchModalities:
             archetype_primary=ArchetypeType.MYSTIC,
             archetype_secondary=ArchetypeType.SAGE,
             big_five=NEUTRAL_BIG_FIVE,
-            intention=Intention.PURPOSE,
+            intentions=[Intention.PURPOSE],
             max_difficulty=PracticeDifficulty.ADVANCED,
         )
         names = [r.modality for r in results]
@@ -437,7 +437,7 @@ class TestMatchModalities:
                     archetype_primary=archetype,
                     archetype_secondary=None,
                     big_five=NEUTRAL_BIG_FIVE,
-                    intention=intention,
+                    intentions=[intention],
                     max_difficulty=PracticeDifficulty.ADVANCED,
                 )
                 assert len(results) > 0, f"No results for {archetype}/{intention}"
@@ -625,7 +625,7 @@ class TestHealingIntegration:
             archetype_primary=ArchetypeType.CREATOR,
             archetype_secondary=None,
             big_five=NEUTRAL_BIG_FIVE,
-            intention=Intention.PURPOSE,
+            intentions=[Intention.PURPOSE],
             max_difficulty=PracticeDifficulty.ADVANCED,
             max_results=1,
         )
@@ -637,7 +637,7 @@ class TestHealingIntegration:
             archetype_primary=ArchetypeType.MYSTIC,
             archetype_secondary=None,
             big_five=NEUTRAL_BIG_FIVE,
-            intention=Intention.PURPOSE,
+            intentions=[Intention.PURPOSE],
             max_difficulty=PracticeDifficulty.ADVANCED,
             contraindications=["severe asthma", "schizophrenia", "epilepsy"],
         )
@@ -655,14 +655,14 @@ class TestHealingIntegration:
             archetype_primary=ArchetypeType.EVERYMAN,
             archetype_secondary=None,
             big_five=agreeable,
-            intention=Intention.FAMILY,
+            intentions=[Intention.FAMILY],
             max_difficulty=PracticeDifficulty.ADVANCED,
         )
         results_disagree = match_modalities(
             archetype_primary=ArchetypeType.EVERYMAN,
             archetype_secondary=None,
             big_five=disagreeable,
-            intention=Intention.FAMILY,
+            intentions=[Intention.FAMILY],
             max_difficulty=PracticeDifficulty.ADVANCED,
         )
 

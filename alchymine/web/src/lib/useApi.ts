@@ -71,6 +71,7 @@ export function getStoredIntake(): {
   birthTime?: string;
   birthCity?: string;
   intention?: string;
+  intentions?: string[];
 } | null {
   if (typeof window === "undefined") return null;
   try {

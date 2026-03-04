@@ -25,8 +25,10 @@ interface IntakeFormData {
   birthDate: string;
   birthTime: string;
   birthCity: string;
-  intention: string;
+  intentions: string[];
 }
+
+const MAX_INTENTIONS = 3;
 
 function IntentionIcon({
   icon,
@@ -124,10 +126,10 @@ export default function IntakePage() {
     birthDate: "",
     birthTime: "",
     birthCity: "",
-    intention: "",
+    intentions: [],
   });
   const [errors, setErrors] = useState<
-    Partial<Record<keyof IntakeFormData, string>>
+    Partial<Record<keyof IntakeFormData | "intentions", string>>
   >({});
 
   function validate(): boolean {
@@ -140,8 +142,8 @@ export default function IntakePage() {
     if (!formData.birthDate) {
       newErrors.birthDate = "Please select your birth date.";
     }
-    if (!formData.intention) {
-      newErrors.intention = "Please select your primary intention.";
+    if (formData.intentions.length === 0) {
+      newErrors.intentions = "Please select at least one intention.";
     }
 
     setErrors(newErrors);
@@ -152,8 +154,15 @@ export default function IntakePage() {
     e.preventDefault();
     if (!validate()) return;
 
-    // Store in sessionStorage for the assessment page to pick up
-    sessionStorage.setItem("alchymine_intake", JSON.stringify(formData));
+    // Store in sessionStorage for the assessment page to pick up.
+    // Include `intention` (primary) for backward compat with report creation.
+    sessionStorage.setItem(
+      "alchymine_intake",
+      JSON.stringify({
+        ...formData,
+        intention: formData.intentions[0],
+      }),
+    );
     router.push("/discover/assessment");
   }
 
@@ -284,47 +293,65 @@ export default function IntakePage() {
               />
             </div>
 
-            {/* Intention Selector */}
+            {/* Intention Selector — multi-select (1-3) */}
             <div>
-              <label className="block text-sm font-body font-medium text-text/60 mb-3">
+              <label className="block text-sm font-body font-medium text-text/60 mb-1">
                 What brings you here? <span className="text-primary">*</span>
               </label>
+              <p className="text-xs font-body text-text/30 mb-3">
+                Select up to {MAX_INTENTIONS} that resonate most
+              </p>
               <MotionStagger
                 staggerDelay={0.04}
                 className="grid grid-cols-2 gap-3"
               >
-                {INTENTIONS.map((intent) => (
-                  <MotionStaggerItem key={intent.value}>
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setFormData((prev) => ({
-                          ...prev,
-                          intention: intent.value,
-                        }))
-                      }
-                      className={`w-full flex items-center gap-2.5 px-4 py-3 rounded-xl border text-left text-sm font-body transition-all duration-300 touch-target ${
-                        formData.intention === intent.value
-                          ? "border-primary/40 bg-primary/[0.08] text-text glow-gold"
-                          : "border-white/[0.06] bg-white/[0.02] text-text/50 hover:border-white/[0.12] hover:bg-white/[0.04]"
-                      }`}
-                    >
-                      <IntentionIcon
-                        icon={intent.icon}
-                        className={`w-4 h-4 flex-shrink-0 ${
-                          formData.intention === intent.value
-                            ? "text-primary"
-                            : "text-text/30"
+                {INTENTIONS.map((intent) => {
+                  const selected = formData.intentions.includes(intent.value);
+                  const atMax =
+                    formData.intentions.length >= MAX_INTENTIONS && !selected;
+                  return (
+                    <MotionStaggerItem key={intent.value}>
+                      <button
+                        type="button"
+                        disabled={atMax}
+                        onClick={() =>
+                          setFormData((prev) => ({
+                            ...prev,
+                            intentions: selected
+                              ? prev.intentions.filter(
+                                  (v) => v !== intent.value,
+                                )
+                              : [...prev.intentions, intent.value],
+                          }))
+                        }
+                        className={`w-full flex items-center gap-2.5 px-4 py-3 rounded-xl border text-left text-sm font-body transition-all duration-300 touch-target ${
+                          selected
+                            ? "border-primary/40 bg-primary/[0.08] text-text glow-gold"
+                            : atMax
+                              ? "border-white/[0.04] bg-white/[0.01] text-text/20 cursor-not-allowed"
+                              : "border-white/[0.06] bg-white/[0.02] text-text/50 hover:border-white/[0.12] hover:bg-white/[0.04]"
                         }`}
-                      />
-                      <span>{intent.label}</span>
-                    </button>
-                  </MotionStaggerItem>
-                ))}
+                      >
+                        <IntentionIcon
+                          icon={intent.icon}
+                          className={`w-4 h-4 flex-shrink-0 ${
+                            selected ? "text-primary" : "text-text/30"
+                          }`}
+                        />
+                        <span className="flex-1">{intent.label}</span>
+                        {selected && (
+                          <span className="text-xs text-primary/60 font-medium">
+                            {formData.intentions.indexOf(intent.value) + 1}
+                          </span>
+                        )}
+                      </button>
+                    </MotionStaggerItem>
+                  );
+                })}
               </MotionStagger>
-              {errors.intention && (
+              {errors.intentions && (
                 <p className="mt-1.5 text-sm font-body text-primary-dark">
-                  {errors.intention}
+                  {errors.intentions}
                 </p>
               )}
             </div>

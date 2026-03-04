@@ -19,6 +19,8 @@ import {
   LeverResponse,
 } from "@/lib/api";
 import { useApi, getStoredIntake } from "@/lib/useApi";
+import { useAuth } from "@/lib/AuthContext";
+import { DEMO_ACCOUNT_EMAIL } from "@/lib/constants";
 
 // ── Constants ─────────────────────────────────────────────────────
 
@@ -653,17 +655,20 @@ function LeverPriorityDisplay({ levers }: { levers: string[] }) {
 
 export default function WealthPage() {
   const [selectedLever, setSelectedLever] = useState<string | null>(null);
+  const { user } = useAuth();
+  const isDemoUser = user?.email === DEMO_ACCOUNT_EMAIL;
   const intake = useMemo(() => getStoredIntake(), []);
-  const hasIntake = !!intake?.intention;
+  const hasIntake = !!(intake?.intentions?.length || intake?.intention);
+  const intakeIntentions = intake?.intentions ?? (intake?.intention ? [intake.intention] : []);
 
   const wealthProfile = useApi<WealthProfileResponse>(
-    hasIntake ? () => getWealthProfile({ intention: intake!.intention }) : null,
-    [intake?.intention],
+    hasIntake ? () => getWealthProfile({ intentions: intakeIntentions }) : null,
+    [intakeIntentions.join(",")],
   );
 
   const levers = useApi<LeverResponse>(
-    hasIntake ? () => getWealthLevers({ intention: intake!.intention }) : null,
-    [intake?.intention],
+    hasIntake ? () => getWealthLevers({ intentions: intakeIntentions }) : null,
+    [intakeIntentions.join(",")],
   );
 
   return (
@@ -786,60 +791,62 @@ export default function WealthPage() {
             </section>
           )}
 
-          {/* ── Financial Dashboard Cards ────────────────────────────── */}
-          <section
-            className="mb-12"
-            aria-labelledby="financial-dashboard-heading"
-          >
-            <MotionReveal delay={0.05}>
-              <h2
-                id="financial-dashboard-heading"
-                className="section-heading-sm mb-3 flex items-center gap-3"
-              >
-                <span
-                  className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center text-xl"
-                  aria-hidden="true"
+          {/* ── Financial Dashboard Cards — demo data only ─────────────── */}
+          {isDemoUser && (
+            <section
+              className="mb-12"
+              aria-labelledby="financial-dashboard-heading"
+            >
+              <MotionReveal delay={0.05}>
+                <h2
+                  id="financial-dashboard-heading"
+                  className="section-heading-sm mb-3 flex items-center gap-3"
                 >
-                  {"\u{1F4CA}"}
-                </span>
-                Financial Dashboard
-              </h2>
-              <hr className="rule-gold my-5 max-w-[60px]" />
-              <p className="font-body text-text/40 text-sm mb-6">
-                Sample visualizations showing how your financial data will be
-                displayed. All calculations use standard deterministic formulas.
-              </p>
-            </MotionReveal>
+                  <span
+                    className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center text-xl"
+                    aria-hidden="true"
+                  >
+                    {"\u{1F4CA}"}
+                  </span>
+                  Financial Dashboard
+                </h2>
+                <hr className="rule-gold my-5 max-w-[60px]" />
+                <p className="font-body text-text/40 text-sm mb-6">
+                  Sample visualizations showing how your financial data will be
+                  displayed. All calculations use standard deterministic formulas.
+                </p>
+              </MotionReveal>
 
-            <MotionStagger staggerDelay={0.12} className="space-y-6">
-              {/* Debt Payoff Timeline */}
-              <MotionStaggerItem>
-                <Card title="">
-                  <DebtPayoffTimeline debts={DEMO_DEBTS} />
-                </Card>
-              </MotionStaggerItem>
+              <MotionStagger staggerDelay={0.12} className="space-y-6">
+                {/* Debt Payoff Timeline */}
+                <MotionStaggerItem>
+                  <Card title="">
+                    <DebtPayoffTimeline debts={DEMO_DEBTS} />
+                  </Card>
+                </MotionStaggerItem>
 
-              {/* Budget Breakdown */}
-              <MotionStaggerItem>
-                <Card title="">
-                  <BudgetBreakdown
-                    income={DEMO_BUDGET.income}
-                    categories={DEMO_BUDGET.categories}
-                  />
-                </Card>
-              </MotionStaggerItem>
+                {/* Budget Breakdown */}
+                <MotionStaggerItem>
+                  <Card title="">
+                    <BudgetBreakdown
+                      income={DEMO_BUDGET.income}
+                      categories={DEMO_BUDGET.categories}
+                    />
+                  </Card>
+                </MotionStaggerItem>
 
-              {/* Net Worth Tracker */}
-              <MotionStaggerItem>
-                <Card title="">
-                  <NetWorthTracker
-                    assets={DEMO_NET_WORTH.assets}
-                    liabilities={DEMO_NET_WORTH.liabilities}
-                  />
-                </Card>
-              </MotionStaggerItem>
-            </MotionStagger>
-          </section>
+                {/* Net Worth Tracker */}
+                <MotionStaggerItem>
+                  <Card title="">
+                    <NetWorthTracker
+                      assets={DEMO_NET_WORTH.assets}
+                      liabilities={DEMO_NET_WORTH.liabilities}
+                    />
+                  </Card>
+                </MotionStaggerItem>
+              </MotionStagger>
+            </section>
+          )}
 
           {/* ── Five Wealth Levers ───────────────────────────────────── */}
           <section className="mb-12" aria-labelledby="levers-heading">
@@ -946,77 +953,79 @@ export default function WealthPage() {
             </MotionStagger>
           </section>
 
-          {/* ── 90-Day Activation Plan ───────────────────────────────── */}
-          <section className="mb-12" aria-labelledby="plan-heading">
-            <MotionReveal delay={0.05}>
-              <h2 id="plan-heading" className="section-heading-sm mb-2">
-                90-Day Activation Plan
-              </h2>
-              <hr className="rule-gold my-5 max-w-[60px]" />
-            </MotionReveal>
+          {/* ── 90-Day Activation Plan — demo data only ──────────────── */}
+          {isDemoUser && (
+            <section className="mb-12" aria-labelledby="plan-heading">
+              <MotionReveal delay={0.05}>
+                <h2 id="plan-heading" className="section-heading-sm mb-2">
+                  90-Day Activation Plan
+                </h2>
+                <hr className="rule-gold my-5 max-w-[60px]" />
+              </MotionReveal>
 
-            <MotionReveal delay={0.12}>
-              <div className="card-surface-elevated p-6">
-                <div className="flex items-start justify-between mb-6">
-                  <div>
-                    <h3 className="font-display text-lg font-light text-text">
-                      Your Personalized Roadmap
-                    </h3>
-                    <p className="font-body text-sm text-text/50 mt-1">
-                      Three-phase wealth-building activation plan
-                    </p>
+              <MotionReveal delay={0.12}>
+                <div className="card-surface-elevated p-6">
+                  <div className="flex items-start justify-between mb-6">
+                    <div>
+                      <h3 className="font-display text-lg font-light text-text">
+                        Your Personalized Roadmap
+                      </h3>
+                      <p className="font-body text-sm text-text/50 mt-1">
+                        Three-phase wealth-building activation plan
+                      </p>
+                    </div>
+                    <span className="px-3 py-1 rounded-full font-body text-[0.7rem] font-medium tracking-wider uppercase bg-primary/20 text-primary">
+                      Phase 2
+                    </span>
                   </div>
-                  <span className="px-3 py-1 rounded-full font-body text-[0.7rem] font-medium tracking-wider uppercase bg-primary/20 text-primary">
-                    Phase 2
-                  </span>
+                  <div className="space-y-4">
+                    <div>
+                      <div className="flex justify-between font-body text-sm mb-1.5">
+                        <span className="text-text/60">
+                          Phase 1: Foundation (Days 1–30)
+                        </span>
+                        <span className="text-primary font-medium">EARN</span>
+                      </div>
+                      <ProgressBar
+                        value={100}
+                        variant="gold"
+                        size="sm"
+                        aria-label="Phase 1 Foundation: 100% complete"
+                      />
+                    </div>
+                    <div>
+                      <div className="flex justify-between font-body text-sm mb-1.5">
+                        <span className="text-text/60">
+                          Phase 2: Building (Days 31–60)
+                        </span>
+                        <span className="text-secondary font-medium">KEEP</span>
+                      </div>
+                      <ProgressBar
+                        value={60}
+                        variant="purple"
+                        size="sm"
+                        aria-label="Phase 2 Building: 60% complete"
+                      />
+                    </div>
+                    <div>
+                      <div className="flex justify-between font-body text-sm mb-1.5">
+                        <span className="text-text/60">
+                          Phase 3: Acceleration (Days 61–90)
+                        </span>
+                        <span className="text-accent font-medium">GROW</span>
+                      </div>
+                      <ProgressBar
+                        value={20}
+                        variant="teal"
+                        size="sm"
+                        aria-label="Phase 3 Acceleration: 20% complete"
+                      />
+                    </div>
+                  </div>
                 </div>
-                <div className="space-y-4">
-                  <div>
-                    <div className="flex justify-between font-body text-sm mb-1.5">
-                      <span className="text-text/60">
-                        Phase 1: Foundation (Days 1–30)
-                      </span>
-                      <span className="text-primary font-medium">EARN</span>
-                    </div>
-                    <ProgressBar
-                      value={100}
-                      variant="gold"
-                      size="sm"
-                      aria-label="Phase 1 Foundation: 100% complete"
-                    />
-                  </div>
-                  <div>
-                    <div className="flex justify-between font-body text-sm mb-1.5">
-                      <span className="text-text/60">
-                        Phase 2: Building (Days 31–60)
-                      </span>
-                      <span className="text-secondary font-medium">KEEP</span>
-                    </div>
-                    <ProgressBar
-                      value={60}
-                      variant="purple"
-                      size="sm"
-                      aria-label="Phase 2 Building: 60% complete"
-                    />
-                  </div>
-                  <div>
-                    <div className="flex justify-between font-body text-sm mb-1.5">
-                      <span className="text-text/60">
-                        Phase 3: Acceleration (Days 61–90)
-                      </span>
-                      <span className="text-accent font-medium">GROW</span>
-                    </div>
-                    <ProgressBar
-                      value={20}
-                      variant="teal"
-                      size="sm"
-                      aria-label="Phase 3 Acceleration: 20% complete"
-                    />
-                  </div>
-                </div>
-              </div>
-            </MotionReveal>
-          </section>
+              </MotionReveal>
+            </section>
+          )}
 
           {/* ── Methodology Panel ────────────────────────────────────── */}
           <section className="mb-12">

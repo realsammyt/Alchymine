@@ -1,21 +1,21 @@
 import type { Metadata, Viewport } from "next";
-import { Cormorant_Garamond, Outfit } from "next/font/google";
+import localFont from "next/font/local";
 import "./globals.css";
 import Navigation from "@/components/shared/Navigation";
 import ContentWrapper from "@/components/shared/ContentWrapper";
 import { Providers } from "./providers";
 
-const cormorant = Cormorant_Garamond({
-  subsets: ["latin"],
-  weight: ["300", "400", "500", "600", "700"],
-  style: ["normal", "italic"],
+const cormorant = localFont({
+  src: [
+    { path: "../fonts/CormorantGaramond-Latin.woff2", style: "normal" },
+    { path: "../fonts/CormorantGaramond-LatinItalic.woff2", style: "italic" },
+  ],
   variable: "--font-display",
   display: "swap",
 });
 
-const outfit = Outfit({
-  subsets: ["latin"],
-  weight: ["300", "400", "500", "600", "700"],
+const outfit = localFont({
+  src: [{ path: "../fonts/Outfit-Variable.woff2", style: "normal" }],
   variable: "--font-body",
   display: "swap",
 });

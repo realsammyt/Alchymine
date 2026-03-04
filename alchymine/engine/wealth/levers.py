@@ -9,6 +9,8 @@ No LLM involvement — pure rule-based scoring.
 
 from __future__ import annotations
 
+from collections.abc import Sequence
+
 from alchymine.engine.profile import Intention, RiskTolerance, WealthContext, WealthLever
 
 # ─── Income range classification ──────────────────────────────────────────
@@ -118,7 +120,7 @@ _LIFE_PATH_BOOSTS: dict[int, dict[WealthLever, float]] = {
 def prioritize_levers(
     wealth_context: WealthContext | None,
     risk_tolerance: RiskTolerance,
-    intention: Intention,
+    intentions: Sequence[Intention],
     life_path: int,
 ) -> list[WealthLever]:
     """Prioritize the 5 wealth levers based on user context.
@@ -132,8 +134,8 @@ def prioritize_levers(
         Voluntarily provided financial context. If None, defaults are used.
     risk_tolerance : RiskTolerance
         The user's financial risk tolerance level.
-    intention : Intention
-        The user's primary intention/goal.
+    intentions : Sequence[Intention]
+        The user's life intentions (1-3). Boosts are applied for each.
     life_path : int
         Numerology Life Path number (1-9, 11, 22, 33).
 
@@ -185,10 +187,11 @@ def prioritize_levers(
         scores[WealthLever.GROW] += _RISK_MODERATE_GROW_BOOST
         scores[WealthLever.KEEP] += _RISK_MODERATE_KEEP_BOOST
 
-    # 3. Apply intention adjustments
-    intention_boosts = _INTENTION_BOOSTS.get(intention, {})
-    for lever, boost in intention_boosts.items():
-        scores[lever] += boost
+    # 3. Apply intention adjustments (for each selected intention)
+    for intention in intentions:
+        intention_boosts = _INTENTION_BOOSTS.get(intention, {})
+        for lever, boost in intention_boosts.items():
+            scores[lever] += boost
 
     # 4. Apply life path adjustments
     path_boosts = _LIFE_PATH_BOOSTS.get(life_path, {})

@@ -124,7 +124,7 @@ def prioritize_levers_tool(
     levers = prioritize_levers(
         wealth_context=wealth_context,
         risk_tolerance=risk,
-        intention=intent,
+        intentions=[intent],
         life_path=life_path,
     )
     return [lever.value for lever in levers]
