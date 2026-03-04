@@ -286,8 +286,8 @@ def _healing_modality_matching(state: CoordinatorState) -> CoordinatorState:
         big_five = request_data.get("big_five")
 
         # Prefer multi-intention list, fall back to single intention
-        _intentions = intentions if isinstance(intentions, list) else (
-            [intention] if intention else None
+        _intentions = (
+            intentions if isinstance(intentions, list) else ([intention] if intention else None)
         )
 
         if archetype and big_five and _intentions:
@@ -392,8 +392,8 @@ def _wealth_lever_prioritisation(state: CoordinatorState) -> CoordinatorState:
         wealth_context = request_data.get("wealth_context")
 
         # Prefer multi-intention list, fall back to single intention
-        _intentions = intentions if isinstance(intentions, list) else (
-            [intention] if intention else None
+        _intentions = (
+            intentions if isinstance(intentions, list) else ([intention] if intention else None)
         )
 
         if life_path is not None and _intentions:

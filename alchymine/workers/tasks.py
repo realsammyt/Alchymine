@@ -266,12 +266,14 @@ def generate_report(
     try:
         # ── Run the async orchestrator ────────────────────────────────
         orchestrator = MasterOrchestrator()
-        result = _run_async(orchestrator.process_request(
-            user_input,
-            user_profile,
-            intention=intention,
-            intentions=_resolved_intentions,
-        ))
+        result = _run_async(
+            orchestrator.process_request(
+                user_input,
+                user_profile,
+                intention=intention,
+                intentions=_resolved_intentions,
+            )
+        )
 
         serialised = _serialise_orchestrator_result(result)
 
