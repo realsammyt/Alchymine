@@ -30,10 +30,15 @@ class ProfileCreateRequest(BaseModel):
     full_name: str = Field(..., min_length=2, max_length=200)
     birth_date: date
     intention: str = Field(..., min_length=1, max_length=50)
+    intentions: list[str] | None = Field(None, min_length=1, max_length=3)
     birth_time: time | None = None
     birth_city: str | None = None
     assessment_responses: dict[str, Any] | None = None
     family_structure: str | None = None
+
+    def resolved_intentions(self) -> list[str]:
+        """Return the full intentions list, falling back to the single intention."""
+        return self.intentions or [self.intention]
 
 
 class IntakeResponse(BaseModel):
@@ -44,6 +49,7 @@ class IntakeResponse(BaseModel):
     birth_time: time | None = None
     birth_city: str | None = None
     intention: str
+    intentions: list[str] = Field(default_factory=list)
     assessment_responses: dict[str, Any] | None = None
     family_structure: str | None = None
 
@@ -91,6 +97,7 @@ def _user_to_response(user: User) -> ProfileResponse:
             birth_time=user.intake.birth_time,
             birth_city=user.intake.birth_city,
             intention=user.intake.intention,
+            intentions=user.intake.resolved_intentions,
             assessment_responses=user.intake.assessment_responses,
             family_structure=user.intake.family_structure,
         )
@@ -134,6 +141,7 @@ async def create_profile(
         full_name=request.full_name,
         birth_date=request.birth_date,
         intention=request.intention,
+        intentions=request.resolved_intentions(),
         birth_time=request.birth_time,
         birth_city=request.birth_city,
         assessment_responses=request.assessment_responses,

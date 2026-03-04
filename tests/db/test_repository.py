@@ -60,6 +60,40 @@ async def test_create_profile_full(session: AsyncSession) -> None:
     assert user.intake.family_structure == "single parent"
 
 
+# ─── create_profile with intentions ────────────────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_create_profile_with_intentions_list(session: AsyncSession) -> None:
+    """create_profile stores and reads back a multi-intention list."""
+    user = await create_profile(
+        session,
+        full_name="Multi Intent User",
+        birth_date=date(1990, 5, 20),
+        intention="career",
+        intentions=["career", "money", "business"],
+    )
+
+    assert user.intake is not None
+    assert user.intake.intention == "career"
+    assert user.intake.intentions == ["career", "money", "business"]
+    assert user.intake.resolved_intentions == ["career", "money", "business"]
+
+
+@pytest.mark.asyncio
+async def test_create_profile_legacy_single_intention(session: AsyncSession) -> None:
+    """create_profile with intentions=None falls back via resolved_intentions."""
+    user = await create_profile(
+        session,
+        full_name="Legacy User",
+        birth_date=date(1985, 8, 10),
+        intention="health",
+    )
+
+    assert user.intake.intentions is None
+    assert user.intake.resolved_intentions == ["health"]
+
+
 # ─── get_profile ────────────────────────────────────────────────────────
 
 
