@@ -41,6 +41,9 @@ jobs:
               if [ -z "$PREVIOUS" ]; then
                 echo "ERROR: No .previous-version file found — nothing to roll back to."
                 echo "Current version: ${CURRENT}"
+                echo "This happens if only one deploy has been run with the zero-downtime script."
+                echo "To deploy a specific version manually, SSH in and run:"
+                echo "  infrastructure/scripts/deploy-zero-downtime.sh <version>"
                 exit 1
               fi
 

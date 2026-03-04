@@ -78,15 +78,19 @@ jobs:
           - image: api
             context: .
             dockerfile: infrastructure/docker/Dockerfile.api
+            build_args: ""
           - image: web
             context: .
             dockerfile: infrastructure/docker/Dockerfile.web
+            build_args: APP_VERSION=${{ needs.validate.outputs.version }}
           - image: worker
             context: .
             dockerfile: infrastructure/docker/Dockerfile.worker
+            build_args: ""
           - image: pdf
             context: .
             dockerfile: infrastructure/docker/Dockerfile.pdf
+            build_args: ""
     steps:
       - uses: actions/checkout@v4
 
@@ -128,8 +132,7 @@ jobs:
             org.opencontainers.image.version=${{ needs.validate.outputs.version }}
             org.opencontainers.image.created=${{ needs.validate.outputs.build_date }}
             org.opencontainers.image.revision=${{ github.sha }}
-          build-args: |
-            APP_VERSION=${{ needs.validate.outputs.version }}
+          build-args: ${{ matrix.build_args }}
           cache-from: type=gha,scope=${{ matrix.image }}
           cache-to: type=gha,mode=max,scope=${{ matrix.image }}
 

@@ -103,6 +103,8 @@ log "=========================================="
 if [ -f "$VERSION_FILE" ]; then
   cp "$VERSION_FILE" "$PREV_VERSION_FILE"
   log "Previous version: $(cat "$PREV_VERSION_FILE")"
+else
+  log "First deploy — no previous version to roll back to"
 fi
 
 # ── Step 1: Pull GHCR images ────────────────────────────────────────────────
