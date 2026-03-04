@@ -101,10 +101,10 @@ cd alchymine/web && npm run type-check
 
 ## Deployment
 
-Alchymine uses an automated release-based deployment pipeline:
+Alchymine uses a **zero-downtime** release pipeline with automatic rollback:
 
 ```
-Merge PR to main → Draft release auto-created → Review & publish → Docker build + SSH deploy
+Merge PR to main → Draft release auto-created → Review & publish → Zero-downtime deploy
 ```
 
 ### How it works
@@ -112,7 +112,16 @@ Merge PR to main → Draft release auto-created → Review & publish → Docker 
 1. **Merge to `main`** — CI runs (lint, test, build). If green, the `prepare-release` workflow auto-detects version bump from commit messages and creates a **draft GitHub Release**
 2. **Review the draft** — Go to GitHub Releases, review the changelog and version
 3. **Publish the release** — Click "Publish release" to trigger the deployment pipeline
-4. **Automated deploy** — Docker images are built, pushed to GHCR, and deployed to the DigitalOcean droplet via SSH
+4. **Zero-downtime deploy** — All 4 Docker images (api, web, worker, pdf) are built and pushed to GHCR, then the deploy script:
+   - Pulls pre-built images on the droplet (old version still serving)
+   - Starts temporary containers and health-checks them
+   - Swaps nginx to the new containers via graceful reload
+   - Recreates the compose stack, then swaps nginx back
+   - If any health check fails, the old version keeps serving automatically
+
+### Rollback
+
+If a deploy goes wrong, use the **Diagnose** workflow (`Actions → Diagnose → rollback`) to redeploy the previous version. The deploy script tracks `.deployed-version` and `.previous-version` on the droplet.
 
 ### Required GitHub Secrets
 
@@ -130,10 +139,8 @@ Set these in **GitHub → Settings → Secrets and variables → Actions**:
 ```bash
 ssh alchymine@your-server-ip
 cd ~/Alchymine
-git fetch --tags && git checkout v<version>
-cd infrastructure
-docker compose -f docker-compose.yml -f docker-compose.prod.yml pull
-docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --remove-orphans
+# Deploy a specific version (images must exist in GHCR)
+infrastructure/scripts/deploy-zero-downtime.sh <version>
 ```
 
 See [docs/guides/deployment-guide.md](docs/guides/deployment-guide.md) for the full deployment guide.
