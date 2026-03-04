@@ -1,16 +1,25 @@
-# Quick diagnostic — manually triggered to check droplet health
+# Manually triggered to diagnose or hotfix the droplet
 name: Diagnose
 
 on:
   workflow_dispatch:
+    inputs:
+      action:
+        description: "Action to perform"
+        required: true
+        default: "diagnose"
+        type: choice
+        options:
+          - diagnose
+          - hotfix-pull-restart
 
 jobs:
-  check:
-    name: "Check droplet"
+  run:
+    name: "${{ inputs.action }}"
     runs-on: ubuntu-latest
     environment: production
     steps:
-      - name: SSH diagnostics
+      - name: SSH into droplet
         uses: appleboy/ssh-action@0ff4204d59e8e51228ff73bce53f80d53301dee2 # v1.0.3
         with:
           host: ${{ secrets.DEPLOY_HOST }}
@@ -19,39 +28,31 @@ jobs:
           passphrase: ${{ secrets.DEPLOY_SSH_PASSPHRASE }}
           command_timeout: 5m
           script: |
-            set -x
+            set -ex
             cd /home/alchymine/Alchymine
+            DC="docker compose --env-file .env.production -f infrastructure/docker-compose.yml -f infrastructure/docker-compose.prod.yml"
 
-            echo "=== Container status ==="
-            docker compose \
-              --env-file .env.production \
-              -f infrastructure/docker-compose.yml \
-              -f infrastructure/docker-compose.prod.yml ps -a
-
-            echo "=== Nginx logs (last 30) ==="
-            docker compose \
-              --env-file .env.production \
-              -f infrastructure/docker-compose.yml \
-              -f infrastructure/docker-compose.prod.yml logs --tail=30 nginx
-
-            echo "=== Check SSL certs ==="
-            docker compose \
-              --env-file .env.production \
-              -f infrastructure/docker-compose.yml \
-              -f infrastructure/docker-compose.prod.yml exec -T nginx ls -la /etc/letsencrypt/live/alchymine.com/ 2>&1 || echo "SSL cert dir missing!"
-
-            echo "=== Test port 443 ==="
-            curl -sk https://localhost/ -o /dev/null -w "HTTPS status: %{http_code}\n" 2>&1 || echo "Port 443 not responding"
-
-            echo "=== Test port 80 ==="
-            curl -s http://localhost/nginx-health -o /dev/null -w "HTTP status: %{http_code}\n" 2>&1 || echo "Port 80 not responding"
-
-            echo "=== Test internal services ==="
-            curl -s http://localhost:8000/health -o /dev/null -w "API status: %{http_code}\n" 2>&1 || echo "API not responding"
-            curl -s http://localhost:3000/ -o /dev/null -w "Web status: %{http_code}\n" 2>&1 || echo "Web not responding"
-
-            echo "=== Disk space ==="
-            df -h /
-
-            echo "=== Docker disk usage ==="
-            docker system df
+            if [ "${{ inputs.action }}" = "hotfix-pull-restart" ]; then
+              echo "=== Hotfix: pulling latest main and restarting ==="
+              git fetch origin main
+              git checkout main
+              git pull origin main
+              $DC restart nginx
+              sleep 3
+              $DC ps nginx
+              curl -sk https://localhost/ -o /dev/null -w "HTTPS: %{http_code}\n" || echo "443 still down"
+              curl -s http://localhost/nginx-health -o /dev/null -w "HTTP: %{http_code}\n" || echo "80 still down"
+            else
+              echo "=== Container status ==="
+              $DC ps -a
+              echo "=== Nginx logs (last 30) ==="
+              $DC logs --tail=30 nginx
+              echo "=== Test ports ==="
+              curl -sk https://localhost/ -o /dev/null -w "HTTPS: %{http_code}\n" 2>&1 || echo "443 down"
+              curl -s http://localhost/nginx-health -o /dev/null -w "HTTP: %{http_code}\n" 2>&1 || echo "80 down"
+              curl -s http://localhost:8000/health -o /dev/null -w "API: %{http_code}\n" 2>&1 || echo "API down"
+              curl -s http://localhost:3000/ -o /dev/null -w "Web: %{http_code}\n" 2>&1 || echo "Web down"
+              echo "=== Disk ==="
+              df -h /
+              docker system df
+            fi
