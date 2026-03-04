@@ -34,10 +34,12 @@ jobs:
 
             if [ "${{ inputs.action }}" = "hotfix-pull-restart" ]; then
               echo "=== Hotfix: pulling latest main and restarting ==="
+              # Fix .git ownership if root-owned objects block fetch
+              sudo chown -R alchymine:alchymine .git/ 2>/dev/null || true
               git fetch origin main
               git checkout main
               git pull origin main
-              $DC restart nginx
+              $DC up -d --force-recreate nginx
               sleep 3
               $DC ps nginx
               curl -sk https://localhost/ -o /dev/null -w "HTTPS: %{http_code}\n" || echo "443 still down"

@@ -183,6 +183,9 @@ jobs:
 
             cd /home/alchymine/Alchymine
 
+            # Fix .git ownership (Docker builds as root can leave root-owned objects)
+            sudo chown -R alchymine:alchymine .git/
+
             # Fetch latest code and checkout the release tag
             # Retry up to 3 times to handle transient GitHub 500 errors
             for attempt in 1 2 3; do
