@@ -12,6 +12,7 @@ on:
         options:
           - diagnose
           - hotfix-pull-restart
+          - rollback
 
 jobs:
   run:
@@ -26,13 +27,31 @@ jobs:
           username: ${{ secrets.DEPLOY_USER }}
           key: ${{ secrets.DEPLOY_SSH_KEY }}
           passphrase: ${{ secrets.DEPLOY_SSH_PASSPHRASE }}
-          command_timeout: 5m
+          command_timeout: 20m
           script: |
             set -ex
             cd /home/alchymine/Alchymine
             DC="docker compose --env-file .env.production -f infrastructure/docker-compose.yml -f infrastructure/docker-compose.prod.yml"
 
-            if [ "${{ inputs.action }}" = "hotfix-pull-restart" ]; then
+            if [ "${{ inputs.action }}" = "rollback" ]; then
+              echo "=== Rollback to previous version ==="
+              CURRENT=$(cat .deployed-version 2>/dev/null || echo "unknown")
+              PREVIOUS=$(cat .previous-version 2>/dev/null || echo "")
+
+              if [ -z "$PREVIOUS" ]; then
+                echo "ERROR: No .previous-version file found — nothing to roll back to."
+                echo "Current version: ${CURRENT}"
+                exit 1
+              fi
+
+              echo "Current version: ${CURRENT}"
+              echo "Rolling back to: ${PREVIOUS}"
+
+              chmod +x infrastructure/scripts/deploy-zero-downtime.sh
+              infrastructure/scripts/deploy-zero-downtime.sh "${PREVIOUS}"
+              echo "Rollback complete. Now serving v${PREVIOUS}"
+
+            elif [ "${{ inputs.action }}" = "hotfix-pull-restart" ]; then
               echo "=== Hotfix: pulling latest main and restarting ==="
               # Download latest main tarball (avoids .git permission issues)
               curl -sL "https://github.com/realsammyt/Alchymine/archive/refs/heads/main.tar.gz" \

@@ -81,6 +81,12 @@ jobs:
           - image: web
             context: .
             dockerfile: infrastructure/docker/Dockerfile.web
+          - image: worker
+            context: .
+            dockerfile: infrastructure/docker/Dockerfile.worker
+          - image: pdf
+            context: .
+            dockerfile: infrastructure/docker/Dockerfile.pdf
     steps:
       - uses: actions/checkout@v4
 
@@ -152,6 +158,8 @@ jobs:
             echo '```bash'
             echo "docker pull ${PREFIX}-api:${VERSION}"
             echo "docker pull ${PREFIX}-web:${VERSION}"
+            echo "docker pull ${PREFIX}-worker:${VERSION}"
+            echo "docker pull ${PREFIX}-pdf:${VERSION}"
             echo '```'
           } >> /tmp/body.md
           gh release edit "$TAG" -R "$GITHUB_REPOSITORY" --notes-file /tmp/body.md
@@ -167,7 +175,7 @@ jobs:
     permissions:
       contents: read
     steps:
-      - name: Deploy via SSH
+      - name: Deploy via SSH (zero-downtime)
         uses: appleboy/ssh-action@0ff4204d59e8e51228ff73bce53f80d53301dee2 # v1.0.3
         with:
           host: ${{ secrets.DEPLOY_HOST }}
@@ -179,11 +187,11 @@ jobs:
             set -e
             TAG="${{ github.event.release.tag_name }}"
             VERSION="${TAG#v}"
-            echo "Deploying Alchymine ${TAG}..."
+            echo "Deploying Alchymine ${TAG} (zero-downtime)..."
 
             cd /home/alchymine/Alchymine
 
-            # Download release tarball instead of git fetch (avoids .git permission issues)
+            # Download release tarball for updated compose files, scripts, nginx config
             echo "Downloading ${TAG} tarball..."
             curl -sL "https://github.com/realsammyt/Alchymine/archive/refs/tags/${TAG}.tar.gz" \
               -o "/tmp/alchymine-${TAG}.tar.gz"
@@ -196,62 +204,6 @@ jobs:
               exit 1
             fi
 
-            # Build images with version and restart the stack
-            # --env-file tells docker compose where to read variable substitutions from
-            APP_VERSION="${VERSION}" docker compose \
-              --env-file .env.production \
-              -f infrastructure/docker-compose.yml \
-              -f infrastructure/docker-compose.prod.yml build
-
-            docker compose \
-              --env-file .env.production \
-              -f infrastructure/docker-compose.yml \
-              -f infrastructure/docker-compose.prod.yml up -d --remove-orphans
-
-            # Restart nginx so it resolves new container IPs immediately
-            docker compose \
-              --env-file .env.production \
-              -f infrastructure/docker-compose.yml \
-              -f infrastructure/docker-compose.prod.yml restart nginx
-
-            # Clean up old images
-            docker image prune -f
-
-            echo "Deploy complete. Waiting for health checks..."
-
-      - name: Verify deployment health
-        uses: appleboy/ssh-action@0ff4204d59e8e51228ff73bce53f80d53301dee2 # v1.0.3
-        with:
-          host: ${{ secrets.DEPLOY_HOST }}
-          username: ${{ secrets.DEPLOY_USER }}
-          key: ${{ secrets.DEPLOY_SSH_KEY }}
-          passphrase: ${{ secrets.DEPLOY_SSH_PASSPHRASE }}
-          script: |
-            set -e
-            echo "Checking API health..."
-            for i in $(seq 1 15); do
-              if curl -sf http://localhost:8000/health > /dev/null 2>&1; then
-                echo "API is healthy"
-                break
-              fi
-              if [ "$i" = "15" ]; then
-                echo "API health check failed after 30s"
-                exit 1
-              fi
-              sleep 2
-            done
-
-            echo "Checking web health..."
-            for i in $(seq 1 15); do
-              if curl -sf http://localhost:3000/ > /dev/null 2>&1; then
-                echo "Web is healthy"
-                break
-              fi
-              if [ "$i" = "15" ]; then
-                echo "Web health check failed after 30s"
-                exit 1
-              fi
-              sleep 2
-            done
-
-            echo "All services healthy. Deployment verified."
+            # Run zero-downtime deploy (pulls GHCR images, health-checks, swaps nginx)
+            chmod +x infrastructure/scripts/deploy-zero-downtime.sh
+            infrastructure/scripts/deploy-zero-downtime.sh "${VERSION}"
