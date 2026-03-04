@@ -176,4 +176,4 @@ Alchymine operates under a unified ethical framework:
 
 CC-BY-NC-SA 4.0. See [LICENSE](LICENSE).
 
-For commercial licensing: tyler@futuretalk.ca
+For commercial licensing: tyler@tylersammy.com
