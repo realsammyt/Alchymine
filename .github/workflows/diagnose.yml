@@ -1,0 +1,57 @@
+# Quick diagnostic — manually triggered to check droplet health
+name: Diagnose
+
+on:
+  workflow_dispatch:
+
+jobs:
+  check:
+    name: "Check droplet"
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: SSH diagnostics
+        uses: appleboy/ssh-action@0ff4204d59e8e51228ff73bce53f80d53301dee2 # v1.0.3
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          passphrase: ${{ secrets.DEPLOY_SSH_PASSPHRASE }}
+          command_timeout: 5m
+          script: |
+            set -x
+            cd /home/alchymine/Alchymine
+
+            echo "=== Container status ==="
+            docker compose \
+              --env-file .env.production \
+              -f infrastructure/docker-compose.yml \
+              -f infrastructure/docker-compose.prod.yml ps -a
+
+            echo "=== Nginx logs (last 30) ==="
+            docker compose \
+              --env-file .env.production \
+              -f infrastructure/docker-compose.yml \
+              -f infrastructure/docker-compose.prod.yml logs --tail=30 nginx
+
+            echo "=== Check SSL certs ==="
+            docker compose \
+              --env-file .env.production \
+              -f infrastructure/docker-compose.yml \
+              -f infrastructure/docker-compose.prod.yml exec -T nginx ls -la /etc/letsencrypt/live/alchymine.com/ 2>&1 || echo "SSL cert dir missing!"
+
+            echo "=== Test port 443 ==="
+            curl -sk https://localhost/ -o /dev/null -w "HTTPS status: %{http_code}\n" 2>&1 || echo "Port 443 not responding"
+
+            echo "=== Test port 80 ==="
+            curl -s http://localhost/nginx-health -o /dev/null -w "HTTP status: %{http_code}\n" 2>&1 || echo "Port 80 not responding"
+
+            echo "=== Test internal services ==="
+            curl -s http://localhost:8000/health -o /dev/null -w "API status: %{http_code}\n" 2>&1 || echo "API not responding"
+            curl -s http://localhost:3000/ -o /dev/null -w "Web status: %{http_code}\n" 2>&1 || echo "Web not responding"
+
+            echo "=== Disk space ==="
+            df -h /
+
+            echo "=== Docker disk usage ==="
+            docker system df
