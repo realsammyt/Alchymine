@@ -413,7 +413,7 @@ export default function DashboardPage() {
           {!intake ? (
             // ── Empty state ─────────────────────────────────────────
             <div className="px-4 sm:px-6 lg:px-8 py-12 sm:py-16">
-              <div className="max-w-4xl mx-auto">
+              <div className="max-w-4xl mx-auto space-y-8">
                 <MotionReveal delay={0.1} y={16}>
                   <div className="card-surface-elevated glow-gold text-center px-6 py-16 sm:px-12">
                     {/* Decorative orb */}
@@ -437,7 +437,7 @@ export default function DashboardPage() {
                     </div>
 
                     <p className="text-xs font-body font-medium text-primary/70 uppercase tracking-[0.2em] mb-4">
-                      Dashboard
+                      Welcome to Alchymine
                     </p>
                     <h1 className="font-display text-display-md font-light mb-3">
                       Welcome,{" "}
@@ -451,6 +451,112 @@ export default function DashboardPage() {
                     <Link href="/discover/intake">
                       <Button size="lg">Start Your Journey</Button>
                     </Link>
+                  </div>
+                </MotionReveal>
+
+                {/* Five system cards */}
+                <MotionReveal delay={0.25} y={16}>
+                  <div>
+                    <p className="text-xs font-body font-medium text-text/30 uppercase tracking-[0.18em] mb-4 text-center">
+                      The Five Systems
+                    </p>
+                    <MotionStagger
+                      staggerDelay={0.07}
+                      className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3"
+                    >
+                      {[
+                        {
+                          href: "/intelligence",
+                          label: "Personal Intelligence",
+                          description:
+                            "Numerology, astrology & personality insights",
+                          accentText: "text-primary",
+                          accentBg: "bg-primary/[0.07]",
+                          accentBorder: "border-primary/[0.15]",
+                          icon: (
+                            <svg
+                              className="w-5 h-5"
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth="2"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              aria-hidden="true"
+                            >
+                              <circle cx="12" cy="12" r="10" />
+                              <path d="M12 16v-4" />
+                              <path d="M12 8h.01" />
+                            </svg>
+                          ),
+                        },
+                        {
+                          href: "/healing",
+                          label: "Ethical Healing",
+                          description:
+                            "Evidence-based modalities & breathwork",
+                          accentText: "text-accent",
+                          accentBg: "bg-accent/[0.07]",
+                          accentBorder: "border-accent/[0.15]",
+                          icon: <IconLeaf />,
+                        },
+                        {
+                          href: "/wealth",
+                          label: "Generational Wealth",
+                          description: "Wealth archetype & financial planning",
+                          accentText: "text-primary",
+                          accentBg: "bg-primary/[0.07]",
+                          accentBorder: "border-primary/[0.15]",
+                          icon: <IconChart />,
+                        },
+                        {
+                          href: "/creative",
+                          label: "Creative Forge",
+                          description:
+                            "Guilford assessment & creative DNA",
+                          accentText: "text-secondary-light",
+                          accentBg: "bg-secondary/[0.07]",
+                          accentBorder: "border-secondary/[0.15]",
+                          icon: <IconPalette />,
+                        },
+                        {
+                          href: "/perspective",
+                          label: "Perspective Prism",
+                          description:
+                            "Kegan stages & cognitive bias awareness",
+                          accentText: "text-accent",
+                          accentBg: "bg-accent/[0.07]",
+                          accentBorder: "border-accent/[0.15]",
+                          icon: (
+                            <svg
+                              className="w-5 h-5"
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth="2"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              aria-hidden="true"
+                            >
+                              <circle cx="11" cy="11" r="8" />
+                              <path d="m21 21-4.35-4.35" />
+                            </svg>
+                          ),
+                        },
+                      ].map((sys) => (
+                        <MotionStaggerItem key={sys.href}>
+                          <QuickActionCard
+                            href={sys.href}
+                            label={sys.label}
+                            description={sys.description}
+                            accentText={sys.accentText}
+                            accentBg={sys.accentBg}
+                            accentBorder={sys.accentBorder}
+                            icon={sys.icon}
+                          />
+                        </MotionStaggerItem>
+                      ))}
+                    </MotionStagger>
                   </div>
                 </MotionReveal>
               </div>
