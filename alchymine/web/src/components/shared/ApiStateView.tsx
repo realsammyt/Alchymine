@@ -34,7 +34,7 @@ export default function ApiStateView({
         role="status"
         aria-live="polite"
       >
-        <div className="w-8 h-8 rounded-full border-2 border-primary border-t-transparent animate-spin mx-auto mb-3" />
+        <div className="w-8 h-8 rounded-full border-2 border-primary border-t-transparent animate-spin mx-auto mb-3" aria-hidden="true" />
         <p className="text-text/50 text-sm">{loadingText}</p>
       </div>
     );
