@@ -150,6 +150,10 @@ $RECYCLE.BIN/
 logs/
 *.log
 
+# ─── Secrets / Config with API keys ──────────────────────────────────────
+config/resend-config.yml
+scripts/setup-resend-key.sh
+
 # ─── Misc ─────────────────────────────────────────────────────────────────
 *.bak
 *.tmp
