@@ -13,11 +13,13 @@ import {
 import {
   getHealingModalities,
   getHealingMatch,
+  logActivity,
   ModalityListResponse,
   HealingMatchListResponse,
 } from "@/lib/api";
 import { useApi, getStoredIntake } from "@/lib/useApi";
 import { useAuth } from "@/lib/AuthContext";
+import ProtectedRoute from "@/components/shared/ProtectedRoute";
 import { DEMO_ACCOUNT_EMAIL } from "@/lib/constants";
 
 // ── Constants ─────────────────────────────────────────────────────
@@ -353,11 +355,10 @@ export default function HealingPage() {
   );
 
   // Fetch personalized matches if user has intake data
-  const intakeIntentions = intake?.intentions ?? (intake?.intention ? [intake.intention] : []);
+  const intakeIntentions =
+    intake?.intentions ?? (intake?.intention ? [intake.intention] : []);
   const matches = useApi<HealingMatchListResponse>(
-    hasIntake
-      ? () => getHealingMatch({ intentions: intakeIntentions })
-      : null,
+    hasIntake ? () => getHealingMatch({ intentions: intakeIntentions }) : null,
     [intakeIntentions.join(",")],
   );
 
@@ -368,365 +369,380 @@ export default function HealingPage() {
   const demoStreak = 5;
 
   return (
-    <main className="min-h-screen grain-overlay bg-atmosphere px-4 sm:px-6 lg:px-8 py-8">
-      <div className="max-w-5xl mx-auto">
-        {/* Crisis Resources — ALWAYS visible, prominent, at top */}
-        <MotionReveal duration={0.5}>
-          <section className="mb-10" aria-labelledby="crisis-heading">
-            <div className="card-surface border border-accent/10 p-5">
-              <h2
-                id="crisis-heading"
-                className="font-display text-lg font-light text-text/80 mb-2 flex items-center gap-3"
-              >
-                <span
-                  className="w-8 h-8 rounded-lg bg-accent/10 flex items-center justify-center flex-shrink-0"
-                  aria-hidden="true"
+    <ProtectedRoute>
+      <main className="min-h-screen grain-overlay bg-atmosphere px-4 sm:px-6 lg:px-8 py-8">
+        <div className="max-w-5xl mx-auto">
+          {/* Crisis Resources — ALWAYS visible, prominent, at top */}
+          <MotionReveal duration={0.5}>
+            <section className="mb-10" aria-labelledby="crisis-heading">
+              <div className="card-surface border border-accent/10 p-5">
+                <h2
+                  id="crisis-heading"
+                  className="font-display text-lg font-light text-text/80 mb-2 flex items-center gap-3"
                 >
-                  <svg
-                    className="w-4 h-4 text-accent"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
+                  <span
+                    className="w-8 h-8 rounded-lg bg-accent/10 flex items-center justify-center flex-shrink-0"
+                    aria-hidden="true"
                   >
-                    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10" />
-                    <path d="M12 8v4" />
-                    <path d="M12 16h.01" />
-                  </svg>
-                </span>
-                Crisis Resources
-              </h2>
-              <p className="font-body text-text/40 text-sm mb-4 ml-11">
-                If you or someone you know is in crisis, these resources are
-                available 24/7. You are not alone.
-              </p>
-              <div className="grid sm:grid-cols-3 gap-3">
-                {CRISIS_RESOURCES.map((resource) => (
-                  <div
-                    key={resource.name}
-                    className="bg-white/[0.03] border border-white/[0.06] rounded-xl p-4"
-                  >
-                    <h3 className="font-body text-sm font-medium text-text/80 mb-1">
-                      {resource.name}
-                    </h3>
-                    <p className="font-body text-accent font-medium text-sm mb-1">
-                      {resource.contact}
-                    </p>
-                    <p className="font-body text-xs text-text/40">
-                      {resource.description}
-                    </p>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </section>
-        </MotionReveal>
-
-        {/* Page Header */}
-        <MotionReveal delay={0.05}>
-          <header className="mb-10">
-            <h1 className="font-display text-display-md font-light mb-3">
-              <span className="text-gradient-teal">Ethical Healing</span>
-            </h1>
-            <hr className="rule-gold mb-4" aria-hidden="true" />
-            <p className="font-body text-text/40 text-base max-w-2xl">
-              Personalized modalities matched to your unique profile.
-              Evidence-informed, culturally sensitive, with full safety
-              protocols.
-            </p>
-          </header>
-        </MotionReveal>
-
-        {/* Practice Streak + Stats Row — demo data only */}
-        {isDemoUser && (
-          <MotionReveal delay={0.1}>
-            <section
-              className="mb-12 grid md:grid-cols-2 gap-6"
-              aria-labelledby="streak-heading"
-            >
-              <div>
-                <h2 id="streak-heading" className="sr-only">
-                  Practice Streak
+                    <svg
+                      className="w-4 h-4 text-accent"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10" />
+                      <path d="M12 8v4" />
+                      <path d="M12 16h.01" />
+                    </svg>
+                  </span>
+                  Crisis Resources
                 </h2>
-                <PracticeStreakCounter streakDays={demoStreak} />
-              </div>
-
-              {/* Quick stats */}
-              <div className="card-surface p-6">
-                <h3 className="font-display text-lg font-light text-text/80 mb-5">
-                  Healing Summary
-                </h3>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="text-center">
+                <p className="font-body text-text/40 text-sm mb-4 ml-11">
+                  If you or someone you know is in crisis, these resources are
+                  available 24/7. You are not alone.
+                </p>
+                <div className="grid sm:grid-cols-3 gap-3">
+                  {CRISIS_RESOURCES.map((resource) => (
                     <div
-                      className="font-display font-light text-gradient-teal"
-                      style={{ fontSize: "clamp(1.75rem, 4vw, 2.25rem)" }}
-                      aria-label="62 total sessions"
+                      key={resource.name}
+                      className="bg-white/[0.03] border border-white/[0.06] rounded-xl p-4"
                     >
-                      62
+                      <h3 className="font-body text-sm font-medium text-text/80 mb-1">
+                        {resource.name}
+                      </h3>
+                      <p className="font-body text-accent font-medium text-sm mb-1">
+                        {resource.contact}
+                      </p>
+                      <p className="font-body text-xs text-text/40">
+                        {resource.description}
+                      </p>
                     </div>
-                    <div className="font-body text-xs text-text/40 mt-1">
-                      Total Sessions
-                    </div>
-                  </div>
-                  <div className="text-center">
-                    <div
-                      className="font-display font-light text-gradient-teal"
-                      style={{ fontSize: "clamp(1.75rem, 4vw, 2.25rem)" }}
-                      aria-label="6 modalities used"
-                    >
-                      6
-                    </div>
-                    <div className="font-body text-xs text-text/40 mt-1">
-                      Modalities Used
-                    </div>
-                  </div>
-                  <div className="text-center">
-                    <div
-                      className="font-display font-light text-gradient-teal"
-                      style={{ fontSize: "clamp(1.75rem, 4vw, 2.25rem)" }}
-                      aria-label="4.2 hours this week"
-                    >
-                      4.2h
-                    </div>
-                    <div className="font-body text-xs text-text/40 mt-1">
-                      This Week
-                    </div>
-                  </div>
-                  <div className="text-center">
-                    <div
-                      className="font-display font-light text-gradient-teal"
-                      style={{ fontSize: "clamp(1.75rem, 4vw, 2.25rem)" }}
-                      aria-label="87% completion rate"
-                    >
-                      87%
-                    </div>
-                    <div className="font-body text-xs text-text/40 mt-1">
-                      Completion Rate
-                    </div>
-                  </div>
+                  ))}
                 </div>
               </div>
             </section>
           </MotionReveal>
-        )}
 
-        {/* Personalized Matches */}
-        {hasIntake && (
-          <MotionReveal>
-            <section className="mb-12" aria-labelledby="matches-heading">
-              <h2
-                id="matches-heading"
-                className="section-heading-sm mb-2 flex items-center gap-3"
+          {/* Page Header */}
+          <MotionReveal delay={0.05}>
+            <header className="mb-10">
+              <h1 className="font-display text-display-md font-light mb-3">
+                <span className="text-gradient-teal">Ethical Healing</span>
+              </h1>
+              <hr className="rule-gold mb-4" aria-hidden="true" />
+              <p className="font-body text-text/40 text-base max-w-2xl">
+                Personalized modalities matched to your unique profile.
+                Evidence-informed, culturally sensitive, with full safety
+                protocols.
+              </p>
+            </header>
+          </MotionReveal>
+
+          {/* Practice Streak + Stats Row — demo data only */}
+          {isDemoUser && (
+            <MotionReveal delay={0.1}>
+              <section
+                className="mb-12 grid md:grid-cols-2 gap-6"
+                aria-labelledby="streak-heading"
               >
-                <span
-                  className="w-10 h-10 rounded-xl bg-accent/10 flex items-center justify-center text-xl flex-shrink-0"
-                  aria-hidden="true"
+                <div>
+                  <h2 id="streak-heading" className="sr-only">
+                    Practice Streak
+                  </h2>
+                  <PracticeStreakCounter streakDays={demoStreak} />
+                </div>
+
+                {/* Quick stats */}
+                <div className="card-surface p-6">
+                  <h3 className="font-display text-lg font-light text-text/80 mb-5">
+                    Healing Summary
+                  </h3>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="text-center">
+                      <div
+                        className="font-display font-light text-gradient-teal"
+                        style={{ fontSize: "clamp(1.75rem, 4vw, 2.25rem)" }}
+                        aria-label="62 total sessions"
+                      >
+                        62
+                      </div>
+                      <div className="font-body text-xs text-text/40 mt-1">
+                        Total Sessions
+                      </div>
+                    </div>
+                    <div className="text-center">
+                      <div
+                        className="font-display font-light text-gradient-teal"
+                        style={{ fontSize: "clamp(1.75rem, 4vw, 2.25rem)" }}
+                        aria-label="6 modalities used"
+                      >
+                        6
+                      </div>
+                      <div className="font-body text-xs text-text/40 mt-1">
+                        Modalities Used
+                      </div>
+                    </div>
+                    <div className="text-center">
+                      <div
+                        className="font-display font-light text-gradient-teal"
+                        style={{ fontSize: "clamp(1.75rem, 4vw, 2.25rem)" }}
+                        aria-label="4.2 hours this week"
+                      >
+                        4.2h
+                      </div>
+                      <div className="font-body text-xs text-text/40 mt-1">
+                        This Week
+                      </div>
+                    </div>
+                    <div className="text-center">
+                      <div
+                        className="font-display font-light text-gradient-teal"
+                        style={{ fontSize: "clamp(1.75rem, 4vw, 2.25rem)" }}
+                        aria-label="87% completion rate"
+                      >
+                        87%
+                      </div>
+                      <div className="font-body text-xs text-text/40 mt-1">
+                        Completion Rate
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </section>
+            </MotionReveal>
+          )}
+
+          {/* Personalized Matches */}
+          {hasIntake && (
+            <MotionReveal>
+              <section className="mb-12" aria-labelledby="matches-heading">
+                <h2
+                  id="matches-heading"
+                  className="section-heading-sm mb-2 flex items-center gap-3"
                 >
-                  {"\u{2728}"}
-                </span>
-                Your Matched Modalities
-              </h2>
-              <hr className="rule-gold mb-6" aria-hidden="true" />
-              <ApiStateView
-                loading={matches.loading}
-                error={matches.error}
-                empty={!matches.data || matches.data.matches.length === 0}
-                loadingText="Matching modalities to your profile..."
-                emptyText="Complete the full assessment to get personalized modality recommendations."
-                onRetry={matches.refetch}
-              >
-                {matches.data && (
-                  <MotionStagger className="grid sm:grid-cols-2 gap-4">
-                    {matches.data.matches.map((match) => (
-                      <MotionStaggerItem key={match.modality}>
-                        <div
-                          className={`card-surface p-5 hover:-translate-y-1 transition-all duration-500 ${
-                            match.contraindicated
-                              ? "opacity-50 border-l-2 border-white/20"
-                              : "hover:glow-teal"
-                          }`}
-                        >
-                          <div className="flex items-center justify-between mb-2">
-                            <div className="flex items-center gap-2">
-                              <span className="text-xl" aria-hidden="true">
-                                {getModalityIcon(match.modality)}
+                  <span
+                    className="w-10 h-10 rounded-xl bg-accent/10 flex items-center justify-center text-xl flex-shrink-0"
+                    aria-hidden="true"
+                  >
+                    {"\u{2728}"}
+                  </span>
+                  Your Matched Modalities
+                </h2>
+                <hr className="rule-gold mb-6" aria-hidden="true" />
+                <ApiStateView
+                  loading={matches.loading}
+                  error={matches.error}
+                  empty={!matches.data || matches.data.matches.length === 0}
+                  loadingText="Matching modalities to your profile..."
+                  emptyText="Complete the full assessment to get personalized modality recommendations."
+                  onRetry={matches.refetch}
+                >
+                  {matches.data && (
+                    <MotionStagger className="grid sm:grid-cols-2 gap-4">
+                      {matches.data.matches.map((match) => (
+                        <MotionStaggerItem key={match.modality}>
+                          <div
+                            className={`card-surface p-5 hover:-translate-y-1 transition-all duration-500 ${
+                              match.contraindicated
+                                ? "opacity-50 border-l-2 border-white/20"
+                                : "hover:glow-teal"
+                            }`}
+                          >
+                            <div className="flex items-center justify-between mb-2">
+                              <div className="flex items-center gap-2">
+                                <span className="text-xl" aria-hidden="true">
+                                  {getModalityIcon(match.modality)}
+                                </span>
+                                <h3 className="font-body font-medium text-sm text-text/80">
+                                  {match.modality}
+                                </h3>
+                              </div>
+                              <span className="font-body text-xs text-accent/70">
+                                {Math.round(match.preference_score * 100)}%
                               </span>
-                              <h3 className="font-body font-medium text-sm text-text/80">
-                                {match.modality}
-                              </h3>
                             </div>
-                            <span className="font-body text-xs text-accent/70">
-                              {Math.round(match.preference_score * 100)}%
-                            </span>
-                          </div>
-                          <div className="flex items-center gap-2 mt-2 flex-wrap">
-                            <span className="font-body text-[0.7rem] tracking-wider uppercase px-2 py-0.5 bg-white/5 text-text/30 rounded-full">
-                              {match.difficulty_level}
-                            </span>
-                            {match.contraindicated && (
-                              <span className="font-body text-[0.7rem] tracking-wider uppercase px-2 py-0.5 bg-white/5 text-text/40 rounded-full">
-                                Contraindicated
+                            <div className="flex items-center gap-2 mt-2 flex-wrap">
+                              <span className="font-body text-[0.7rem] tracking-wider uppercase px-2 py-0.5 bg-white/5 text-text/30 rounded-full">
+                                {match.difficulty_level}
                               </span>
-                            )}
+                              {match.contraindicated && (
+                                <span className="font-body text-[0.7rem] tracking-wider uppercase px-2 py-0.5 bg-white/5 text-text/40 rounded-full">
+                                  Contraindicated
+                                </span>
+                              )}
+                            </div>
                           </div>
+                        </MotionStaggerItem>
+                      ))}
+                    </MotionStagger>
+                  )}
+                </ApiStateView>
+              </section>
+            </MotionReveal>
+          )}
+
+          {/* Breathwork Timer */}
+          <MotionReveal>
+            <section className="mb-12" aria-labelledby="breathwork-heading">
+              {selectedPattern ? (
+                <BreathworkTimer
+                  pattern={PATTERNS[selectedPattern]}
+                  onComplete={() => {
+                    if (user?.id && selectedPattern) {
+                      logActivity({
+                        user_id: user.id,
+                        system: "healing",
+                        activity_type: "breathwork_session",
+                        metadata: { pattern: selectedPattern },
+                      }).catch(() => {});
+                    }
+                    setSelectedPattern(null);
+                  }}
+                  onStop={() => setSelectedPattern(null)}
+                />
+              ) : (
+                <div id="breathwork">
+                  <h2
+                    id="breathwork-heading"
+                    className="section-heading-sm mb-2"
+                  >
+                    Breathwork Sessions
+                  </h2>
+                  <hr className="rule-gold mb-6" aria-hidden="true" />
+                  <MotionStagger className="grid md:grid-cols-3 gap-6">
+                    {Object.entries(PATTERNS).map(([key, p]) => (
+                      <MotionStaggerItem key={key}>
+                        <div className="card-surface p-6 hover:glow-teal hover:-translate-y-1 transition-all duration-500 flex flex-col h-full">
+                          <h3 className="font-display text-lg font-light text-gradient-teal mb-2">
+                            {p.name}
+                          </h3>
+                          <p className="font-body text-text/40 text-sm mb-4 flex-1">
+                            {p.description}
+                          </p>
+                          <p className="font-body text-text/25 text-xs mb-5">
+                            {p.phases
+                              .map((ph) => `${ph.label} ${ph.duration}s`)
+                              .join(" \u2192 ")}{" "}
+                            {"\u00B7"} {p.cycles} cycles
+                          </p>
+                          <Button
+                            variant="primary"
+                            size="sm"
+                            onClick={() => setSelectedPattern(key)}
+                            aria-label={`Start ${p.name} session`}
+                          >
+                            Start
+                          </Button>
                         </div>
                       </MotionStaggerItem>
                     ))}
                   </MotionStagger>
-                )}
-              </ApiStateView>
+                </div>
+              )}
             </section>
           </MotionReveal>
-        )}
 
-        {/* Breathwork Timer */}
-        <MotionReveal>
-          <section className="mb-12" aria-labelledby="breathwork-heading">
-            {selectedPattern ? (
-              <BreathworkTimer
-                pattern={PATTERNS[selectedPattern]}
-                onComplete={() => setSelectedPattern(null)}
-                onStop={() => setSelectedPattern(null)}
-              />
-            ) : (
-              <div id="breathwork">
-                <h2 id="breathwork-heading" className="section-heading-sm mb-2">
-                  Breathwork Sessions
+          {/* Modality Progress Cards — demo data only */}
+          {isDemoUser && (
+            <MotionReveal>
+              <section
+                className="mb-12"
+                aria-labelledby="modality-progress-heading"
+              >
+                <h2 id="modality-progress-heading" className="sr-only">
+                  Modality Progress
                 </h2>
-                <hr className="rule-gold mb-6" aria-hidden="true" />
-                <MotionStagger className="grid md:grid-cols-3 gap-6">
-                  {Object.entries(PATTERNS).map(([key, p]) => (
-                    <MotionStaggerItem key={key}>
-                      <div className="card-surface p-6 hover:glow-teal hover:-translate-y-1 transition-all duration-500 flex flex-col h-full">
-                        <h3 className="font-display text-lg font-light text-gradient-teal mb-2">
-                          {p.name}
+                <ModalityProgressCards modalities={DEMO_MODALITY_PROGRESS} />
+              </section>
+            </MotionReveal>
+          )}
+
+          {/* Modalities Grid */}
+          <MotionReveal>
+            <section className="mb-12" aria-labelledby="modalities-heading">
+              <h2 id="modalities-heading" className="section-heading-sm mb-2">
+                Healing Modalities
+              </h2>
+              <hr className="rule-gold mb-6" aria-hidden="true" />
+              <ApiStateView
+                loading={modalities.loading}
+                error={modalities.error}
+                loadingText="Loading modalities..."
+                onRetry={modalities.refetch}
+              >
+                <MotionStagger className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+                  {(modalityList.length > 0
+                    ? modalityList.map((mod) => ({
+                        key: mod.name,
+                        icon: getModalityIcon(mod.name),
+                        name: mod.name,
+                        sub: mod.category,
+                        badge: mod.evidence_level,
+                        dim: false,
+                      }))
+                    : [
+                        "Breathwork",
+                        "Coherence Meditation",
+                        "Language Awareness",
+                        "Resilience Training",
+                        "Sound Healing",
+                        "Somatic Practice",
+                        "Nature Healing",
+                        "Sleep Healing",
+                      ].map((name) => ({
+                        key: name,
+                        icon: getModalityIcon(name),
+                        name,
+                        sub: null,
+                        badge: "Coming Soon",
+                        dim: true,
+                      }))
+                  ).map((item) => (
+                    <MotionStaggerItem key={item.key}>
+                      <div
+                        className={`card-surface p-4 hover:glow-teal hover:-translate-y-1 transition-all duration-500 ${
+                          item.dim ? "opacity-50" : "cursor-pointer"
+                        }`}
+                      >
+                        <div className="text-3xl mb-3" aria-hidden="true">
+                          {item.icon}
+                        </div>
+                        <h3 className="font-body font-medium text-sm text-text/80">
+                          {item.name}
                         </h3>
-                        <p className="font-body text-text/40 text-sm mb-4 flex-1">
-                          {p.description}
-                        </p>
-                        <p className="font-body text-text/25 text-xs mb-5">
-                          {p.phases
-                            .map((ph) => `${ph.label} ${ph.duration}s`)
-                            .join(" \u2192 ")}{" "}
-                          {"\u00B7"} {p.cycles} cycles
-                        </p>
-                        <Button
-                          variant="primary"
-                          size="sm"
-                          onClick={() => setSelectedPattern(key)}
-                          aria-label={`Start ${p.name} session`}
-                        >
-                          Start
-                        </Button>
+                        {item.sub && (
+                          <p className="font-body text-xs text-text/40 mt-1">
+                            {item.sub}
+                          </p>
+                        )}
+                        <span className="font-body text-[0.7rem] tracking-wider uppercase inline-block mt-2 px-2 py-0.5 bg-white/5 text-text/30 rounded-full">
+                          {item.badge}
+                        </span>
                       </div>
                     </MotionStaggerItem>
                   ))}
                 </MotionStagger>
-              </div>
-            )}
-          </section>
-        </MotionReveal>
+              </ApiStateView>
 
-        {/* Modality Progress Cards — demo data only */}
-        {isDemoUser && (
-          <MotionReveal>
-            <section
-              className="mb-12"
-              aria-labelledby="modality-progress-heading"
-            >
-              <h2 id="modality-progress-heading" className="sr-only">
-                Modality Progress
-              </h2>
-              <ModalityProgressCards modalities={DEMO_MODALITY_PROGRESS} />
+              <MethodologyPanel
+                title="Healing Modalities"
+                methodology="Healing modalities are matched to user profiles based on attachment style, personality traits, and stated intentions. Breathwork protocols follow established patterns (Box Breathing, Coherence, 4-7-8) with fixed timing cycles. Modality recommendations are AI-assisted but grounded in evidence-based frameworks. All sessions include safety protocols and crisis resource access."
+                evidenceLevel="moderate"
+                calculationType="hybrid"
+                sources={[
+                  'Zaccaro et al. (2018) "How Breath-Control Can Change Your Life" - systematic review of breathwork effects on autonomic nervous system',
+                  'McCraty & Zayas (2014) "Cardiac coherence, self-regulation" - HeartMath Institute research on coherence breathing',
+                  'Weil, A. "4-7-8 Breathing Technique" - clinical observations on relaxation response',
+                  "SAMHSA Treatment Improvement Protocols for crisis resource standards",
+                ]}
+              />
             </section>
           </MotionReveal>
-        )}
-
-        {/* Modalities Grid */}
-        <MotionReveal>
-          <section className="mb-12" aria-labelledby="modalities-heading">
-            <h2 id="modalities-heading" className="section-heading-sm mb-2">
-              Healing Modalities
-            </h2>
-            <hr className="rule-gold mb-6" aria-hidden="true" />
-            <ApiStateView
-              loading={modalities.loading}
-              error={modalities.error}
-              loadingText="Loading modalities..."
-              onRetry={modalities.refetch}
-            >
-              <MotionStagger className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
-                {(modalityList.length > 0
-                  ? modalityList.map((mod) => ({
-                      key: mod.name,
-                      icon: getModalityIcon(mod.name),
-                      name: mod.name,
-                      sub: mod.category,
-                      badge: mod.evidence_level,
-                      dim: false,
-                    }))
-                  : [
-                      "Breathwork",
-                      "Coherence Meditation",
-                      "Language Awareness",
-                      "Resilience Training",
-                      "Sound Healing",
-                      "Somatic Practice",
-                      "Nature Healing",
-                      "Sleep Healing",
-                    ].map((name) => ({
-                      key: name,
-                      icon: getModalityIcon(name),
-                      name,
-                      sub: null,
-                      badge: "Coming Soon",
-                      dim: true,
-                    }))
-                ).map((item) => (
-                  <MotionStaggerItem key={item.key}>
-                    <div
-                      className={`card-surface p-4 hover:glow-teal hover:-translate-y-1 transition-all duration-500 ${
-                        item.dim ? "opacity-50" : "cursor-pointer"
-                      }`}
-                    >
-                      <div className="text-3xl mb-3" aria-hidden="true">
-                        {item.icon}
-                      </div>
-                      <h3 className="font-body font-medium text-sm text-text/80">
-                        {item.name}
-                      </h3>
-                      {item.sub && (
-                        <p className="font-body text-xs text-text/40 mt-1">
-                          {item.sub}
-                        </p>
-                      )}
-                      <span className="font-body text-[0.7rem] tracking-wider uppercase inline-block mt-2 px-2 py-0.5 bg-white/5 text-text/30 rounded-full">
-                        {item.badge}
-                      </span>
-                    </div>
-                  </MotionStaggerItem>
-                ))}
-              </MotionStagger>
-            </ApiStateView>
-
-            <MethodologyPanel
-              title="Healing Modalities"
-              methodology="Healing modalities are matched to user profiles based on attachment style, personality traits, and stated intentions. Breathwork protocols follow established patterns (Box Breathing, Coherence, 4-7-8) with fixed timing cycles. Modality recommendations are AI-assisted but grounded in evidence-based frameworks. All sessions include safety protocols and crisis resource access."
-              evidenceLevel="moderate"
-              calculationType="hybrid"
-              sources={[
-                'Zaccaro et al. (2018) "How Breath-Control Can Change Your Life" - systematic review of breathwork effects on autonomic nervous system',
-                'McCraty & Zayas (2014) "Cardiac coherence, self-regulation" - HeartMath Institute research on coherence breathing',
-                'Weil, A. "4-7-8 Breathing Technique" - clinical observations on relaxation response',
-                "SAMHSA Treatment Improvement Protocols for crisis resource standards",
-              ]}
-            />
-          </section>
-        </MotionReveal>
-      </div>
-    </main>
+        </div>
+      </main>
+    </ProtectedRoute>
   );
 }

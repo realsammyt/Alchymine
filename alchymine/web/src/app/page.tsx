@@ -15,9 +15,10 @@ const FIVE_SYSTEMS = [
     name: "Personalized Intelligence",
     tagline: "Know thyself — mathematically",
     description:
-      "Numerology, natal chart analysis, biorhythm tracking, archetype mapping, and Big Five personality assessment — all deterministic, all transparent.",
+      "Decode your life path through numerology, astrology & biorhythm. Natal chart analysis, archetype mapping, and Big Five personality assessment — all deterministic, all transparent.",
     icon: "brain",
     color: "primary",
+    href: "/intelligence",
     features: [
       "Life Path & Expression Numbers",
       "Natal Chart Analysis",
@@ -28,9 +29,10 @@ const FIVE_SYSTEMS = [
     name: "Ethical Healing",
     tagline: "First, do no harm",
     description:
-      "Personalized modalities matched to your profile with full safety protocols, crisis resources, and evidence-based methodology panels.",
+      "Evidence-based modalities matched to your unique needs with full safety protocols, crisis resources, and methodology panels.",
     icon: "leaf",
     color: "accent",
+    href: "/healing",
     features: [
       "Breathwork & Somatic Practices",
       "Modality Matching",
@@ -41,9 +43,10 @@ const FIVE_SYSTEMS = [
     name: "Generational Wealth",
     tagline: "Math, not magic",
     description:
-      "Five-lever financial strategy with deterministic calculations. All financial math is computed, never AI-generated. Your data stays encrypted.",
+      "Deterministic financial planning with your wealth archetype. All financial math is computed, never AI-generated. Your data stays encrypted.",
     icon: "chart",
     color: "primary",
+    href: "/wealth",
     features: [
       "Wealth Archetype Assessment",
       "Debt Payoff Calculator",
@@ -54,9 +57,10 @@ const FIVE_SYSTEMS = [
     name: "Creative Development",
     tagline: "Unlock your creative DNA",
     description:
-      "Guilford-based creative assessment, Creative DNA profiling, medium affinity mapping, and tools for sustained creative output.",
+      "Discover your creative DNA through Guilford's framework. Creative profiling, medium affinity mapping, and tools for sustained creative output.",
     icon: "palette",
     color: "secondary",
+    href: "/creative",
     features: [
       "Divergent Thinking Assessment",
       "Creative DNA Profile",
@@ -67,9 +71,10 @@ const FIVE_SYSTEMS = [
     name: "Perspective Enhancement",
     tagline: "See beyond the frame",
     description:
-      "Kegan developmental stages, mental models, cognitive bias awareness, and strategic clarity tools for how you see the world.",
+      "Map your developmental stage with Kegan's model. Mental models, cognitive bias awareness, and strategic clarity tools for how you see the world.",
     icon: "telescope",
     color: "accent",
+    href: "/perspective",
     features: [
       "Developmental Stage Mapping",
       "Cognitive Reframing",
@@ -81,19 +86,19 @@ const FIVE_SYSTEMS = [
 const HOW_IT_WORKS = [
   {
     step: "01",
-    title: "Discovery",
+    title: "Tell Us About You",
     description:
       "Answer a short intake form — your name, birth date, intentions, and a 20-question assessment. Takes about 10 minutes.",
   },
   {
     step: "02",
-    title: "Blueprint",
+    title: "Get Your Profile",
     description:
       "Our engines generate your personalized profile across all five systems. Deterministic math, transparent methodology, evidence ratings on every output.",
   },
   {
     step: "03",
-    title: "Path",
+    title: "Transform",
     description:
       "Follow your personalized transformation path with daily practices, insights, and tools — all grounded in your unique profile data.",
   },
@@ -454,10 +459,10 @@ export default function LandingPage() {
             <MotionReveal delay={0.6} y={10}>
               <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
                 <Link
-                  href="/signup"
+                  href="/discover/intake"
                   className="inline-flex items-center gap-2 px-8 py-3.5 bg-gradient-to-r from-primary-dark via-primary to-primary-light text-bg font-body font-medium rounded-xl text-base transition-all duration-300 hover:shadow-[0_0_40px_rgba(218,165,32,0.25)] hover:scale-[1.02] active:scale-[0.98]"
                 >
-                  Start Your Discovery
+                  Begin Your Journey
                   <svg
                     className="w-5 h-5"
                     viewBox="0 0 24 24"
@@ -472,25 +477,12 @@ export default function LandingPage() {
                     <path d="m12 5 7 7-7 7" />
                   </svg>
                 </Link>
-                <a
-                  href="#how-it-works"
+                <Link
+                  href="/login"
                   className="inline-flex items-center gap-2 px-6 py-3.5 border border-white/[0.08] text-text/50 font-body rounded-xl text-base hover:bg-white/[0.03] hover:text-text/70 hover:border-white/[0.12] transition-all duration-300"
                 >
-                  How It Works
-                  <svg
-                    className="w-4 h-4"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    aria-hidden="true"
-                  >
-                    <path d="M12 5v14" />
-                    <path d="m19 12-7 7-7-7" />
-                  </svg>
-                </a>
+                  Sign In
+                </Link>
               </div>
             </MotionReveal>
 
@@ -559,7 +551,7 @@ export default function LandingPage() {
             <MotionReveal>
               <div className="text-center mb-16">
                 <h2 className="section-heading text-gradient-gold mb-4">
-                  Five Integrated Systems
+                  Five Systems, One Journey
                 </h2>
                 <hr className="rule-gold my-6 max-w-[80px] mx-auto" />
                 <p className="text-text/40 font-body max-w-2xl mx-auto leading-relaxed">
@@ -577,8 +569,9 @@ export default function LandingPage() {
                 const colors = colorClass(system.color);
                 return (
                   <MotionStaggerItem key={system.name}>
-                    <div
-                      className={`group card-surface p-6 h-full transition-all duration-500 hover:-translate-y-1 ${colors.glow}`}
+                    <Link
+                      href={system.href}
+                      className={`group card-surface p-6 h-full transition-all duration-500 hover:-translate-y-1 ${colors.glow} block`}
                     >
                       <div className="flex items-center gap-3 mb-4">
                         <div
@@ -625,7 +618,7 @@ export default function LandingPage() {
                           </li>
                         ))}
                       </ul>
-                    </div>
+                    </Link>
                   </MotionStaggerItem>
                 );
               })}
@@ -683,7 +676,7 @@ export default function LandingPage() {
             <MotionReveal>
               <div className="text-center mb-16">
                 <h2 className="section-heading text-gradient-gold mb-4">
-                  Built on Trust
+                  First, Do No Harm
                 </h2>
                 <hr className="rule-gold my-6 max-w-[80px] mx-auto" />
                 <p className="text-text/40 font-body max-w-xl mx-auto">
@@ -881,6 +874,41 @@ export default function LandingPage() {
             </div>
           </MotionReveal>
         </section>
+
+        {/* ── Footer CTA ──────────────────────────────────────────────────── */}
+        <section className="py-20 px-4 sm:px-6 relative">
+          <div className="absolute inset-0 bg-gradient-to-b from-transparent via-primary/[0.03] to-transparent pointer-events-none" />
+          <div className="max-w-2xl mx-auto text-center relative">
+            <MotionReveal>
+              <h2 className="font-display text-3xl sm:text-4xl font-light text-gradient-gold mb-4">
+                Ready to Begin?
+              </h2>
+              <p className="text-text/40 font-body mb-8 leading-relaxed">
+                Your free assessment takes about 10 minutes. No credit card
+                required.
+              </p>
+              <Link
+                href="/signup"
+                className="inline-flex items-center gap-2 px-8 py-3.5 bg-gradient-to-r from-primary-dark via-primary to-primary-light text-bg font-body font-medium rounded-xl text-base transition-all duration-300 hover:shadow-[0_0_40px_rgba(218,165,32,0.25)] hover:scale-[1.02] active:scale-[0.98]"
+              >
+                Start Your Free Assessment
+                <svg
+                  className="w-5 h-5"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden="true"
+                >
+                  <path d="M5 12h14" />
+                  <path d="m12 5 7 7-7 7" />
+                </svg>
+              </Link>
+            </MotionReveal>
+          </div>
+        </section>
       </main>
 
       {/* ── Footer ──────────────────────────────────────────────────────── */}
@@ -956,7 +984,7 @@ export default function LandingPage() {
           </div>
 
           <div className="border-t border-white/[0.04] pt-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs font-body text-text/25 tracking-wide">
-            <span>v{process.env.NEXT_PUBLIC_APP_VERSION}</span>
+            <span>v{process.env.NEXT_PUBLIC_APP_VERSION ?? "dev"}</span>
             <span>CC-BY-NC-SA 4.0 — The Alchymine Project</span>
           </div>
         </div>

@@ -50,6 +50,12 @@ const NAV_ITEMS: NavItem[] = [
     icon: "telescope",
     label: "Perspective Enhancement system",
   },
+  {
+    name: "Journal",
+    href: "/journal",
+    icon: "book",
+    label: "Reflection journal",
+  },
 ];
 
 function NavIcon({
@@ -163,6 +169,22 @@ function NavIcon({
           <path d="m16.243 5.636 2.16.45a.93.93 0 0 1 .704 1.108l-.534 2.15a1.07 1.07 0 0 1-1.267.69l-2.455-.519" />
           <path d="m13.56 11.747-3.495 5.245" />
           <path d="m10.065 12.493-3.495 5.245" />
+        </svg>
+      );
+    case "book":
+      return (
+        <svg
+          className={baseClass}
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          aria-hidden="true"
+        >
+          <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z" />
+          <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z" />
         </svg>
       );
     default:
@@ -408,7 +430,16 @@ export default function Navigation() {
                     className={active ? "text-primary" : ""}
                   />
                   <span className="truncate max-w-[48px]">
-                    {item.name === "Dashboard" ? "Home" : item.name.slice(0, 5)}
+                    {(
+                      {
+                        Dashboard: "Home",
+                        Intelligence: "Mind",
+                        Healing: "Heal",
+                        Wealth: "Wealth",
+                        Creative: "Create",
+                        Perspective: "View",
+                      } as Record<string, string>
+                    )[item.name] ?? item.name}
                   </span>
                 </Link>
               </li>

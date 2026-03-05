@@ -1,6 +1,7 @@
 "use client";
 
-import { useMemo } from "react";
+import { useState, useEffect, useMemo } from "react";
+import ProtectedRoute from "@/components/shared/ProtectedRoute";
 import MethodologyPanel from "@/components/shared/MethodologyPanel";
 import ApiStateView from "@/components/shared/ApiStateView";
 import {
@@ -121,8 +122,15 @@ const SCENARIO_TYPES = [
 ];
 
 export default function PerspectivePage() {
-  const intake = useMemo(() => getStoredIntake(), []);
+  const [mounted, setMounted] = useState(false);
+  const intake = useMemo(() => (mounted ? getStoredIntake() : null), [mounted]);
   const hasIntake = !!(intake?.intentions?.length || intake?.intention);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  const intakeKey = intake?.intentions?.join(",") ?? intake?.intention ?? "";
 
   const kegan = useApi<KeganAssessResponse>(
     hasIntake
@@ -131,10 +139,11 @@ export default function PerspectivePage() {
             intention: intake!.intentions?.[0] ?? intake!.intention,
           })
       : null,
-    [intake?.intentions?.join(",") ?? intake?.intention],
+    [intakeKey],
   );
 
   return (
+    <ProtectedRoute>
     <main className="grain-overlay bg-atmosphere min-h-screen px-4 sm:px-6 lg:px-8 py-8">
       <div className="max-w-5xl mx-auto">
         {/* Page Header */}
@@ -460,5 +469,6 @@ export default function PerspectivePage() {
         </MotionReveal>
       </div>
     </main>
+    </ProtectedRoute>
   );
 }

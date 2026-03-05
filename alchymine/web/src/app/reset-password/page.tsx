@@ -5,7 +5,7 @@ import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import Button from "@/components/shared/Button";
 import { MotionReveal } from "@/components/shared/MotionReveal";
-import { resetPassword, ApiError } from "@/lib/api";
+import { resetPassword, friendlyAuthError } from "@/lib/api";
 
 function ResetPasswordForm() {
   const searchParams = useSearchParams();
@@ -39,11 +39,7 @@ function ResetPasswordForm() {
       await resetPassword(token, password);
       setSuccess(true);
     } catch (err) {
-      if (err instanceof ApiError) {
-        setError(err.message);
-      } else {
-        setError("An unexpected error occurred");
-      }
+      setError(friendlyAuthError(err, "reset-password"));
     } finally {
       setLoading(false);
     }
@@ -157,6 +153,7 @@ function ResetPasswordForm() {
               id="password"
               type="password"
               required
+              autoComplete="new-password"
               minLength={8}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
@@ -176,6 +173,7 @@ function ResetPasswordForm() {
               id="confirm-password"
               type="password"
               required
+              autoComplete="new-password"
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
               className="w-full bg-white/[0.03] border border-white/[0.08] rounded-xl px-4 py-3 text-sm font-body text-text placeholder:text-text/25 focus:outline-none focus:border-primary/40 focus:ring-1 focus:ring-primary/20 transition-all duration-300 [color-scheme:dark]"
@@ -207,7 +205,7 @@ export default function ResetPasswordPage() {
     <main className="grain-overlay min-h-screen flex items-center justify-center px-4 py-8">
       <div className="bg-atmosphere min-h-screen absolute inset-0" />
       <div className="relative z-10">
-        <Suspense>
+        <Suspense fallback={<div className="w-full max-w-md mx-auto" />}>
           <ResetPasswordForm />
         </Suspense>
       </div>

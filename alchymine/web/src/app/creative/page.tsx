@@ -1,6 +1,7 @@
 "use client";
 
-import { useMemo } from "react";
+import { useState, useEffect, useMemo } from "react";
+import ProtectedRoute from "@/components/shared/ProtectedRoute";
 import MethodologyPanel from "@/components/shared/MethodologyPanel";
 import ApiStateView from "@/components/shared/ApiStateView";
 import {
@@ -8,7 +9,12 @@ import {
   MotionStagger,
   MotionStaggerItem,
 } from "@/components/shared/MotionReveal";
-import { getCreativeStyle, StyleFingerprintResponse } from "@/lib/api";
+import {
+  getCreativeStyle,
+  getCreativeProjects,
+  StyleFingerprintResponse,
+  ProjectListResponse,
+} from "@/lib/api";
 import { useApi, getStoredIntake } from "@/lib/useApi";
 
 const CREATIVE_DIMENSIONS = [
@@ -59,24 +65,21 @@ const STYLE_PROFILES = [
   },
 ];
 
-const PROJECT_TYPES = [
+const PROJECT_TYPE_DEFAULTS = [
   {
     name: "Solo Projects",
     description:
       "Individual creative works matched to your style profile and strengths.",
-    status: "available",
   },
   {
     name: "Collaborative Works",
     description:
       "Team projects that pair complementary creative styles for maximum output.",
-    status: "coming-soon",
   },
   {
     name: "Creative Challenges",
     description:
       "Time-boxed prompts and constraints designed to stretch your creative abilities.",
-    status: "coming-soon",
   },
 ];
 
@@ -100,17 +103,39 @@ function ScoreBar({ label, value }: { label: string; value: number }) {
 }
 
 export default function CreativePage() {
-  const intake = useMemo(() => getStoredIntake(), []);
+  const [mounted, setMounted] = useState(false);
+  const intake = useMemo(() => (mounted ? getStoredIntake() : null), [mounted]);
   const hasIntake = !!(intake?.intentions?.length || intake?.intention);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  const intakeKey = intake?.intentions?.join(",") ?? intake?.intention ?? "";
 
   const style = useApi<StyleFingerprintResponse>(
     hasIntake
-      ? () => getCreativeStyle({ intention: intake!.intentions?.[0] ?? intake!.intention })
+      ? () =>
+          getCreativeStyle({
+            intention: intake!.intentions?.[0] ?? intake!.intention,
+          })
       : null,
-    [intake?.intentions?.join(",") ?? intake?.intention],
+    [intakeKey],
+  );
+
+  const projects = useApi<ProjectListResponse>(
+    hasIntake
+      ? () =>
+          getCreativeProjects({
+            intention: intake!.intentions?.[0] ?? intake!.intention,
+            style: style.data?.creative_style,
+          })
+      : null,
+    [intakeKey, style.data?.creative_style],
   );
 
   return (
+    <ProtectedRoute>
     <main className="grain-overlay bg-atmosphere min-h-screen px-4 sm:px-6 lg:px-8 py-8">
       <div className="max-w-5xl mx-auto">
         {/* Page Header */}
@@ -371,29 +396,61 @@ export default function CreativePage() {
             </h2>
             <hr className="rule-gold mb-6" aria-hidden="true" />
 
-            <MotionStagger className="grid sm:grid-cols-3 gap-4">
-              {PROJECT_TYPES.map((project) => (
-                <MotionStaggerItem key={project.name}>
-                  <div
-                    className={`card-surface-elevated p-5 h-full ${project.status === "coming-soon" ? "opacity-60" : ""}`}
-                  >
-                    <div className="flex items-center justify-between mb-2">
-                      <h3 className="font-display text-sm font-medium text-text">
+            {hasIntake ? (
+              <ApiStateView
+                loading={projects.loading}
+                error={projects.error}
+                empty={!projects.data}
+                loadingText="Generating project recommendations..."
+                emptyText="Complete your intake to receive personalized project recommendations."
+                onRetry={projects.refetch}
+              >
+                {projects.data && projects.data.projects.length > 0 && (
+                  <MotionStagger className="grid sm:grid-cols-3 gap-4">
+                    {projects.data.projects.map((project) => (
+                      <MotionStaggerItem key={project.title}>
+                        <div className="card-surface-elevated p-5 h-full">
+                          <div className="flex items-center justify-between mb-2">
+                            <h3 className="font-display text-sm font-medium text-text">
+                              {project.title}
+                            </h3>
+                            <span className="px-2 py-0.5 bg-secondary/10 text-secondary/60 text-[10px] font-medium rounded-full capitalize">
+                              {project.type}
+                            </span>
+                          </div>
+                          <p className="font-body text-sm text-text/50 leading-relaxed mb-3">
+                            {project.description}
+                          </p>
+                          <div className="flex items-center gap-2 mt-auto pt-2">
+                            <span className="px-2 py-0.5 bg-accent/10 text-accent/70 text-[10px] rounded-full capitalize">
+                              {project.medium}
+                            </span>
+                            <span className="px-2 py-0.5 bg-white/5 text-text/30 text-[10px] rounded-full capitalize">
+                              {project.skill_level}
+                            </span>
+                          </div>
+                        </div>
+                      </MotionStaggerItem>
+                    ))}
+                  </MotionStagger>
+                )}
+              </ApiStateView>
+            ) : (
+              <MotionStagger className="grid sm:grid-cols-3 gap-4">
+                {PROJECT_TYPE_DEFAULTS.map((project) => (
+                  <MotionStaggerItem key={project.name}>
+                    <div className="card-surface-elevated p-5 h-full">
+                      <h3 className="font-display text-sm font-medium text-text mb-2">
                         {project.name}
                       </h3>
-                      {project.status === "coming-soon" && (
-                        <span className="px-2 py-0.5 bg-secondary/10 text-secondary/60 text-[10px] font-medium rounded-full">
-                          Coming Soon
-                        </span>
-                      )}
+                      <p className="font-body text-sm text-text/50 leading-relaxed">
+                        {project.description}
+                      </p>
                     </div>
-                    <p className="font-body text-sm text-text/50 leading-relaxed">
-                      {project.description}
-                    </p>
-                  </div>
-                </MotionStaggerItem>
-              ))}
-            </MotionStagger>
+                  </MotionStaggerItem>
+                ))}
+              </MotionStagger>
+            )}
           </section>
         </MotionReveal>
 
@@ -425,5 +482,6 @@ export default function CreativePage() {
         </MotionReveal>
       </div>
     </main>
+    </ProtectedRoute>
   );
 }
