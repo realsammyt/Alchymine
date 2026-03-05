@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useState, useEffect, useMemo } from "react";
 import MethodologyPanel from "@/components/shared/MethodologyPanel";
 import ApiStateView from "@/components/shared/ApiStateView";
 import {
@@ -121,8 +121,15 @@ const SCENARIO_TYPES = [
 ];
 
 export default function PerspectivePage() {
-  const intake = useMemo(() => getStoredIntake(), []);
+  const [mounted, setMounted] = useState(false);
+  const intake = useMemo(() => (mounted ? getStoredIntake() : null), [mounted]);
   const hasIntake = !!(intake?.intentions?.length || intake?.intention);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  const intakeKey = intake?.intentions?.join(",") ?? intake?.intention ?? "";
 
   const kegan = useApi<KeganAssessResponse>(
     hasIntake
@@ -131,7 +138,7 @@ export default function PerspectivePage() {
             intention: intake!.intentions?.[0] ?? intake!.intention,
           })
       : null,
-    [intake?.intentions?.join(",") ?? intake?.intention],
+    [intakeKey],
   );
 
   return (
