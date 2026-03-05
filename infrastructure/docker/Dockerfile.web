@@ -68,8 +68,8 @@ RUN apk add --no-cache tini
 # (cross-spawn CVE-2024-21538, glob CVE-2025-64756, tar GHSA-qffp-2rhf-9h96)
 # Remaining minimatch CVEs in npm internals are handled via .trivyignore
 RUN npm install -g npm@latest && \
-    # Force-update tar to pick up path traversal fix (>=7.5.10)
-    cd /usr/local/lib/node_modules/npm && npm update tar --save && \
+    # Patch tar inside npm's own node_modules to fix path traversal (>=7.5.10)
+    npm --prefix /usr/local/lib/node_modules/npm install tar@latest && \
     npm cache clean --force
 
 # Create non-root user
