@@ -112,6 +112,18 @@ class Settings(BaseSettings):
             raise ValueError("SIGNUP_PROMO_CODE must be set to a value of at least 6 characters")
         return v
 
+    @field_validator("resend_api_key")
+    @classmethod
+    def validate_resend_api_key(cls, v: str, info: object) -> str:
+        """Require Resend API key in production so password reset emails are delivered."""
+        data: dict = getattr(info, "data", {})
+        env = data.get("environment", "development")
+        if env == "production" and not v:
+            raise ValueError(
+                "RESEND_API_KEY must be set in production for password reset email delivery."
+            )
+        return v
+
     @field_validator("alchymine_encryption_key")
     @classmethod
     def validate_encryption_key(cls, v: str, info: object) -> str:

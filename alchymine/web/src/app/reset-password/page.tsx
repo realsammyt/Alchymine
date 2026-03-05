@@ -205,7 +205,7 @@ export default function ResetPasswordPage() {
     <main className="grain-overlay min-h-screen flex items-center justify-center px-4 py-8">
       <div className="bg-atmosphere min-h-screen absolute inset-0" />
       <div className="relative z-10">
-        <Suspense>
+        <Suspense fallback={<div className="w-full max-w-md mx-auto" />}>
           <ResetPasswordForm />
         </Suspense>
       </div>

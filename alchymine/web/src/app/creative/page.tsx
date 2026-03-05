@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
+import ProtectedRoute from "@/components/shared/ProtectedRoute";
 import MethodologyPanel from "@/components/shared/MethodologyPanel";
 import ApiStateView from "@/components/shared/ApiStateView";
 import {
@@ -134,6 +135,7 @@ export default function CreativePage() {
   );
 
   return (
+    <ProtectedRoute>
     <main className="grain-overlay bg-atmosphere min-h-screen px-4 sm:px-6 lg:px-8 py-8">
       <div className="max-w-5xl mx-auto">
         {/* Page Header */}
@@ -480,5 +482,6 @@ export default function CreativePage() {
         </MotionReveal>
       </div>
     </main>
+    </ProtectedRoute>
   );
 }

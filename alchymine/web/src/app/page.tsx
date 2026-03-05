@@ -984,7 +984,7 @@ export default function LandingPage() {
           </div>
 
           <div className="border-t border-white/[0.04] pt-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs font-body text-text/25 tracking-wide">
-            <span>v{process.env.NEXT_PUBLIC_APP_VERSION}</span>
+            <span>v{process.env.NEXT_PUBLIC_APP_VERSION ?? "dev"}</span>
             <span>CC-BY-NC-SA 4.0 — The Alchymine Project</span>
           </div>
         </div>
