@@ -58,12 +58,14 @@ jest.mock("@/lib/useApi", () => ({
 describe("DashboardPage", () => {
   it("renders without crashing", () => {
     render(<DashboardPage />);
-    expect(screen.getByText("Dashboard")).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { level: 1 }),
+    ).toBeInTheDocument();
   });
 
   it("displays no-intake message when intake is missing", () => {
     render(<DashboardPage />);
-    expect(screen.getByText(/Welcome/)).toBeInTheDocument();
+    expect(screen.getByText("Welcome to Alchymine")).toBeInTheDocument();
   });
 
   it("has a call-to-action to start the journey", () => {

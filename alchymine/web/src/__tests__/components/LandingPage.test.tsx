@@ -66,11 +66,12 @@ describe("LandingPage", () => {
 
   it("has sign in and get started links in header", () => {
     render(<LandingPage />);
-    expect(screen.getByText("Sign In")).toBeInTheDocument();
+    const signInLinks = screen.getAllByText("Sign In");
+    expect(signInLinks.length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText("Get Started")).toBeInTheDocument();
   });
 
-  it("has links to signup", () => {
+  it("has links to signup and login", () => {
     render(<LandingPage />);
     const links = screen.getAllByRole("link");
     const hrefs = links.map((link) => link.getAttribute("href"));
@@ -80,19 +81,17 @@ describe("LandingPage", () => {
 
   it("renders the How It Works section", () => {
     render(<LandingPage />);
-    // "How It Works" appears as both a CTA button and a section heading
     expect(screen.getAllByText("How It Works").length).toBeGreaterThanOrEqual(
       1,
     );
-    expect(screen.getByText("Discovery")).toBeInTheDocument();
-    expect(screen.getByText("Blueprint")).toBeInTheDocument();
-    expect(screen.getByText("Path")).toBeInTheDocument();
+    expect(screen.getByText("Tell Us About You")).toBeInTheDocument();
+    expect(screen.getByText("Get Your Profile")).toBeInTheDocument();
+    expect(screen.getByText("Transform")).toBeInTheDocument();
   });
 
-  it("renders the trust/ethics section", () => {
+  it("renders the ethics section", () => {
     render(<LandingPage />);
-    expect(screen.getByText("Built on Trust")).toBeInTheDocument();
-    // Trust card titles appear as headings within the ethics section
+    expect(screen.getAllByText("First, Do No Harm").length).toBeGreaterThanOrEqual(1);
     expect(screen.getAllByText("Open Source").length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText("Math-Only Finance")).toBeInTheDocument();
     expect(screen.getByText("Local-First Data")).toBeInTheDocument();
@@ -110,5 +109,12 @@ describe("LandingPage", () => {
     expect(
       screen.getByText("CC-BY-NC-SA 4.0 — The Alchymine Project"),
     ).toBeInTheDocument();
+  });
+
+  it("has Begin Your Journey CTA linking to discover intake", () => {
+    render(<LandingPage />);
+    expect(screen.getByText("Begin Your Journey")).toBeInTheDocument();
+    const link = screen.getByText("Begin Your Journey").closest("a");
+    expect(link).toHaveAttribute("href", "/discover/intake");
   });
 });

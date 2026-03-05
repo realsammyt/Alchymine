@@ -1,5 +1,11 @@
 import { render, screen } from "@testing-library/react";
 
+// Mock next/navigation (required by ProtectedRoute)
+jest.mock("next/navigation", () => ({
+  useRouter: () => ({ replace: jest.fn(), push: jest.fn(), back: jest.fn() }),
+  usePathname: () => "/wealth",
+}));
+
 // Mock next/link
 jest.mock("next/link", () => {
   return function MockLink({
