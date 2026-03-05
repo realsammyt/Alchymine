@@ -36,7 +36,9 @@ class TestSendPasswordResetEmail:
 
         assert result is False
         assert "RESEND_API_KEY not set" in caplog.text
-        assert "http://localhost:3000/reset-password?token=tok123" in caplog.text
+        assert "user@example.com" in caplog.text
+        # Token/URL must NOT appear in logs (credential leak prevention)
+        assert "tok123" not in caplog.text
 
     @pytest.mark.asyncio
     async def test_send_email_success(self):
