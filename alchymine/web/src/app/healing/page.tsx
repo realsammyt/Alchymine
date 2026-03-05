@@ -18,6 +18,7 @@ import {
 } from "@/lib/api";
 import { useApi, getStoredIntake } from "@/lib/useApi";
 import { useAuth } from "@/lib/AuthContext";
+import ProtectedRoute from "@/components/shared/ProtectedRoute";
 import { DEMO_ACCOUNT_EMAIL } from "@/lib/constants";
 
 // ── Constants ─────────────────────────────────────────────────────
@@ -368,6 +369,7 @@ export default function HealingPage() {
   const demoStreak = 5;
 
   return (
+    <ProtectedRoute>
     <main className="min-h-screen grain-overlay bg-atmosphere px-4 sm:px-6 lg:px-8 py-8">
       <div className="max-w-5xl mx-auto">
         {/* Crisis Resources — ALWAYS visible, prominent, at top */}
@@ -728,5 +730,6 @@ export default function HealingPage() {
         </MotionReveal>
       </div>
     </main>
+    </ProtectedRoute>
   );
 }

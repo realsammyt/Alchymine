@@ -20,6 +20,7 @@ import {
 } from "@/lib/api";
 import { useApi, getStoredIntake } from "@/lib/useApi";
 import { useAuth } from "@/lib/AuthContext";
+import ProtectedRoute from "@/components/shared/ProtectedRoute";
 import { DEMO_ACCOUNT_EMAIL } from "@/lib/constants";
 
 // ── Constants ─────────────────────────────────────────────────────
@@ -659,7 +660,8 @@ export default function WealthPage() {
   const isDemoUser = user?.email === DEMO_ACCOUNT_EMAIL;
   const intake = useMemo(() => getStoredIntake(), []);
   const hasIntake = !!(intake?.intentions?.length || intake?.intention);
-  const intakeIntentions = intake?.intentions ?? (intake?.intention ? [intake.intention] : []);
+  const intakeIntentions =
+    intake?.intentions ?? (intake?.intention ? [intake.intention] : []);
 
   const wealthProfile = useApi<WealthProfileResponse>(
     hasIntake ? () => getWealthProfile({ intentions: intakeIntentions }) : null,
@@ -672,6 +674,7 @@ export default function WealthPage() {
   );
 
   return (
+    <ProtectedRoute>
     <div className="grain-overlay bg-atmosphere min-h-screen">
       <main className="px-4 sm:px-6 lg:px-8 py-8">
         <div className="max-w-5xl mx-auto">
@@ -813,7 +816,8 @@ export default function WealthPage() {
                 <hr className="rule-gold my-5 max-w-[60px]" />
                 <p className="font-body text-text/40 text-sm mb-6">
                   Sample visualizations showing how your financial data will be
-                  displayed. All calculations use standard deterministic formulas.
+                  displayed. All calculations use standard deterministic
+                  formulas.
                 </p>
               </MotionReveal>
 
@@ -1060,5 +1064,6 @@ export default function WealthPage() {
         </div>
       </main>
     </div>
+    </ProtectedRoute>
   );
 }
