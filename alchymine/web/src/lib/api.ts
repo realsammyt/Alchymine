@@ -278,6 +278,35 @@ class ApiError extends Error {
   }
 }
 
+/** Map an ApiError from an auth endpoint to a user-friendly message. */
+export function friendlyAuthError(
+  err: unknown,
+  context: "login" | "signup" | "forgot-password" | "reset-password",
+): string {
+  if (!(err instanceof ApiError)) {
+    return "An unexpected error occurred";
+  }
+  // Connection refused / DNS failure
+  if (err.status === 0 || err.status === 404) {
+    return "Unable to connect to server. Please try again.";
+  }
+  if (err.status === 500) {
+    return "Something went wrong. Please try again.";
+  }
+  if (context === "login" && err.status === 401) {
+    return "Invalid email or password";
+  }
+  if (context === "signup") {
+    if (err.status === 403) return "Invalid invitation code";
+    if (err.status === 409) return "An account with this email already exists";
+  }
+  // 400 validation — show the backend's detail message
+  if (err.status === 400 && err.message && err.message !== `HTTP 400`) {
+    return err.message;
+  }
+  return err.message || "An unexpected error occurred";
+}
+
 // Provide the Authorization header as a migration fallback when a token is
 // still present in localStorage.  New sessions rely on httpOnly cookies sent
 // automatically via credentials: "include".
