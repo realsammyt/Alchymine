@@ -66,6 +66,12 @@ class Settings(BaseSettings):
     celery_result_backend: str = "redis://localhost:6379/2"
     celery_always_eager: bool = False
 
+    # ── Email ──────────────────────────────────────────────────────────────
+    email_provider: str = "resend"
+    resend_api_key: str = ""
+    email_from: str = "noreply@alchymine.app"
+    frontend_url: str = "http://localhost:3000"
+
     # ── Encryption ───────────────────────────────────────────────────────
     alchymine_encryption_key: str = ""
 
@@ -104,6 +110,18 @@ class Settings(BaseSettings):
         """Require a non-empty promo code of at least 6 characters."""
         if not v or len(v) < 6:
             raise ValueError("SIGNUP_PROMO_CODE must be set to a value of at least 6 characters")
+        return v
+
+    @field_validator("resend_api_key")
+    @classmethod
+    def validate_resend_api_key(cls, v: str, info: object) -> str:
+        """Require Resend API key in production so password reset emails are delivered."""
+        data: dict = getattr(info, "data", {})
+        env = data.get("environment", "development")
+        if env == "production" and not v:
+            raise ValueError(
+                "RESEND_API_KEY must be set in production for password reset email delivery."
+            )
         return v
 
     @field_validator("alchymine_encryption_key")

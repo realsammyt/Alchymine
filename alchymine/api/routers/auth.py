@@ -18,7 +18,7 @@ import secrets
 from collections.abc import AsyncGenerator
 from datetime import UTC, datetime, timedelta
 
-from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request, Response, status
 from pydantic import BaseModel, EmailStr, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -34,6 +34,7 @@ from alchymine.api.auth import (
 from alchymine.config import get_settings
 from alchymine.db.base import Base, get_async_engine, get_async_session_factory
 from alchymine.db.models import User
+from alchymine.email import send_password_reset_email
 
 logger = logging.getLogger(__name__)
 
@@ -390,6 +391,7 @@ def _hash_reset_token(token: str) -> str:
 @router.post("/forgot-password", response_model=MessageResponse)
 async def forgot_password(
     body: ForgotPasswordRequest,
+    background_tasks: BackgroundTasks,
     db: AsyncSession = Depends(get_db),
 ) -> MessageResponse:
     """Request a password reset.
@@ -412,12 +414,8 @@ async def forgot_password(
         )
         await db.commit()
 
-        # Log that a reset was issued (replace with email delivery in production)
-        logger.info(
-            "Password reset token generated for %s (expires in %d min)",
-            body.email,
-            RESET_TOKEN_EXPIRE_MINUTES,
-        )
+        # Send the reset email (fire-and-forget via BackgroundTasks)
+        background_tasks.add_task(send_password_reset_email, body.email, raw_token)
 
     return MessageResponse(
         message="If an account exists with that email, password reset instructions have been sent.",

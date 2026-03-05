@@ -26,6 +26,9 @@ services:
       - ALCHYMINE_ENCRYPTION_KEY=${ALCHYMINE_ENCRYPTION_KEY:-}
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
       - ALLOWED_ORIGINS=${ALLOWED_ORIGINS:-["http://localhost:3000"]}
+      - RESEND_API_KEY=${RESEND_API_KEY:-}
+      - EMAIL_FROM=${EMAIL_FROM:-noreply@alchymine.app}
+      - FRONTEND_URL=${FRONTEND_URL:-http://localhost:3000}
       - PDF_SERVICE_TOKEN=${PDF_SERVICE_TOKEN:?PDF_SERVICE_TOKEN must be set}
       - PDF_SERVICE_URL=http://pdf-service:3001
     depends_on:
