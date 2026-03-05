@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Button from "@/components/shared/Button";
 import { useAuth } from "@/lib/AuthContext";
-import { ApiError } from "@/lib/api";
+import { friendlyAuthError } from "@/lib/api";
 import { MotionReveal } from "@/components/shared/MotionReveal";
 
 export default function SignupPage() {
@@ -40,11 +40,7 @@ export default function SignupPage() {
       await register(email, password, promoCode.trim());
       router.push("/dashboard");
     } catch (err) {
-      if (err instanceof ApiError) {
-        setError(err.message);
-      } else {
-        setError("An unexpected error occurred");
-      }
+      setError(friendlyAuthError(err, "signup"));
     } finally {
       setLoading(false);
     }
@@ -97,6 +93,7 @@ export default function SignupPage() {
                 type="email"
                 required
                 aria-required="true"
+                autoComplete="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 className="w-full bg-white/[0.03] border border-white/[0.08] rounded-xl px-4 py-3 text-sm font-body placeholder:text-text/25 focus:border-primary/40 focus:ring-1 focus:ring-primary/20 focus:bg-white/[0.05] transition-all duration-300 focus:outline-none text-text"
@@ -119,6 +116,7 @@ export default function SignupPage() {
                 type="password"
                 required
                 aria-required="true"
+                autoComplete="new-password"
                 minLength={8}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
@@ -142,6 +140,7 @@ export default function SignupPage() {
                 type="password"
                 required
                 aria-required="true"
+                autoComplete="new-password"
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 className="w-full bg-white/[0.03] border border-white/[0.08] rounded-xl px-4 py-3 text-sm font-body placeholder:text-text/25 focus:border-primary/40 focus:ring-1 focus:ring-primary/20 focus:bg-white/[0.05] transition-all duration-300 focus:outline-none text-text"

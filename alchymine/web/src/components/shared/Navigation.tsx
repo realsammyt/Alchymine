@@ -430,7 +430,16 @@ export default function Navigation() {
                     className={active ? "text-primary" : ""}
                   />
                   <span className="truncate max-w-[48px]">
-                    {item.name === "Dashboard" ? "Home" : item.name.slice(0, 5)}
+                    {
+                      ({
+                        Dashboard: "Home",
+                        Intelligence: "Mind",
+                        Healing: "Heal",
+                        Wealth: "Wealth",
+                        Creative: "Create",
+                        Perspective: "View",
+                      } as Record<string, string>)[item.name] ?? item.name
+                    }
                   </span>
                 </Link>
               </li>
