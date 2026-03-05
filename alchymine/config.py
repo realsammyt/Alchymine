@@ -66,6 +66,12 @@ class Settings(BaseSettings):
     celery_result_backend: str = "redis://localhost:6379/2"
     celery_always_eager: bool = False
 
+    # ── Email ──────────────────────────────────────────────────────────────
+    email_provider: str = "resend"
+    resend_api_key: str = ""
+    email_from: str = "noreply@alchymine.app"
+    frontend_url: str = "http://localhost:3000"
+
     # ── Encryption ───────────────────────────────────────────────────────
     alchymine_encryption_key: str = ""
 

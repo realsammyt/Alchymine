@@ -36,6 +36,8 @@ dependencies = [
     "httpx>=0.28.0",
     # Agents / Graphs
     "langgraph>=0.2.0",
+    # Email
+    "resend>=2.0.0",
     # Utilities
     "pyyaml>=6.0.0",
     "python-multipart>=0.0.12",
@@ -127,6 +129,7 @@ module = [
     "jinja2.*",
     "playwright.*",
     "langgraph.*",
+    "resend.*",
 ]
 ignore_missing_imports = true
 

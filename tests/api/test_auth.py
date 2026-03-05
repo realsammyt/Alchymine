@@ -670,3 +670,59 @@ class TestTokenRevocationOnPasswordReset:
         )
         assert refresh_resp.status_code == 200
         assert "access_token" in refresh_resp.json()
+
+
+# ─── Password Reset Email Tests ─────────────────────────────────────────
+
+
+class TestPasswordResetEmail:
+    """Tests that the forgot-password endpoint integrates with the email service."""
+
+    def test_forgot_password_calls_email_service(
+        self, client: TestClient, registered_user: dict
+    ):
+        """Requesting a reset for an existing email should schedule the email task."""
+        from unittest.mock import AsyncMock, patch
+
+        mock_send = AsyncMock(return_value=True)
+        with patch("alchymine.api.routers.auth.send_password_reset_email", mock_send):
+            response = client.post(
+                "/api/v1/auth/forgot-password",
+                json={"email": "test@example.com"},
+            )
+        assert response.status_code == 200
+        mock_send.assert_called_once()
+        call_args = mock_send.call_args
+        assert call_args[0][0] == "test@example.com"
+        # Second arg is the raw token string
+        assert isinstance(call_args[0][1], str)
+        assert len(call_args[0][1]) > 0
+
+    def test_forgot_password_nonexistent_email_no_email_sent(self, client: TestClient):
+        """Requesting a reset for a non-existent email should NOT call the email service."""
+        from unittest.mock import AsyncMock, patch
+
+        mock_send = AsyncMock(return_value=True)
+        with patch("alchymine.api.routers.auth.send_password_reset_email", mock_send):
+            response = client.post(
+                "/api/v1/auth/forgot-password",
+                json={"email": "nobody@example.com"},
+            )
+        assert response.status_code == 200
+        mock_send.assert_not_called()
+
+    def test_forgot_password_email_failure_still_returns_success(
+        self, client: TestClient, registered_user: dict
+    ):
+        """Even if the email service fails, the endpoint should still return 200."""
+        from unittest.mock import AsyncMock, patch
+
+        mock_send = AsyncMock(return_value=False)
+        with patch("alchymine.api.routers.auth.send_password_reset_email", mock_send):
+            response = client.post(
+                "/api/v1/auth/forgot-password",
+                json={"email": "test@example.com"},
+            )
+        assert response.status_code == 200
+        assert "message" in response.json()
+        mock_send.assert_called_once()
