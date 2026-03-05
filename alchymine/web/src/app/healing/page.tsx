@@ -13,6 +13,7 @@ import {
 import {
   getHealingModalities,
   getHealingMatch,
+  logActivity,
   ModalityListResponse,
   HealingMatchListResponse,
 } from "@/lib/api";
@@ -353,11 +354,10 @@ export default function HealingPage() {
   );
 
   // Fetch personalized matches if user has intake data
-  const intakeIntentions = intake?.intentions ?? (intake?.intention ? [intake.intention] : []);
+  const intakeIntentions =
+    intake?.intentions ?? (intake?.intention ? [intake.intention] : []);
   const matches = useApi<HealingMatchListResponse>(
-    hasIntake
-      ? () => getHealingMatch({ intentions: intakeIntentions })
-      : null,
+    hasIntake ? () => getHealingMatch({ intentions: intakeIntentions }) : null,
     [intakeIntentions.join(",")],
   );
 
@@ -588,7 +588,17 @@ export default function HealingPage() {
             {selectedPattern ? (
               <BreathworkTimer
                 pattern={PATTERNS[selectedPattern]}
-                onComplete={() => setSelectedPattern(null)}
+                onComplete={() => {
+                  if (user?.id && selectedPattern) {
+                    logActivity({
+                      user_id: user.id,
+                      system: "healing",
+                      activity_type: "breathwork_session",
+                      metadata: { pattern: selectedPattern },
+                    }).catch(() => {});
+                  }
+                  setSelectedPattern(null);
+                }}
                 onStop={() => setSelectedPattern(null)}
               />
             ) : (
