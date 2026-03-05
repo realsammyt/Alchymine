@@ -6,8 +6,6 @@ import logging
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
-logging.basicConfig(level=logging.INFO)
-
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -39,6 +37,8 @@ from alchymine.api.routers import (
     wealth,
 )
 from alchymine.config import get_settings
+
+logging.basicConfig(level=logging.INFO)
 
 
 @asynccontextmanager
