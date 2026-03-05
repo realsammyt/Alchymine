@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
+import Link from "next/link";
 import ProtectedRoute from "@/components/shared/ProtectedRoute";
 import MethodologyPanel from "@/components/shared/MethodologyPanel";
 import ApiStateView from "@/components/shared/ApiStateView";
@@ -11,6 +12,7 @@ import {
 } from "@/components/shared/MotionReveal";
 import { getKeganAssessment, KeganAssessResponse } from "@/lib/api";
 import { useApi, getStoredIntake } from "@/lib/useApi";
+import EvidenceBadge from "@/components/shared/EvidenceBadge";
 
 const KEGAN_STAGES = [
   {
@@ -144,7 +146,7 @@ export default function PerspectivePage() {
 
   return (
     <ProtectedRoute>
-    <main className="grain-overlay bg-atmosphere min-h-screen px-4 sm:px-6 lg:px-8 py-8">
+    <main id="main-content" className="grain-overlay bg-atmosphere min-h-screen px-4 sm:px-6 lg:px-8 py-8">
       <div className="max-w-5xl mx-auto">
         {/* Page Header */}
         <MotionReveal delay={0}>
@@ -278,7 +280,7 @@ export default function PerspectivePage() {
           <section className="mb-12" aria-labelledby="frameworks-heading">
             <h2
               id="frameworks-heading"
-              className="section-heading-sm mb-2 flex items-center gap-3"
+              className="section-heading-sm mb-2 flex items-center gap-3 flex-wrap"
             >
               <span
                 className="w-10 h-10 rounded-xl bg-accent/10 flex items-center justify-center text-xl"
@@ -287,6 +289,7 @@ export default function PerspectivePage() {
                 {"\u{1F4D0}"}
               </span>
               Developmental Frameworks
+              <EvidenceBadge level="strong" />
             </h2>
             <hr className="rule-gold mb-4" aria-hidden="true" />
             <p className="font-body text-text/50 text-sm mb-6">
@@ -440,6 +443,38 @@ export default function PerspectivePage() {
             </MotionStagger>
           </section>
         </MotionReveal>
+
+        {/* Connections — healing-perspective bridge */}
+        {hasIntake && (
+          <MotionReveal delay={0.1}>
+            <section
+              className="mb-12"
+              aria-labelledby="perspective-connections-heading"
+              data-testid="connections-section"
+            >
+              <div className="card-surface border border-accent/10 p-5">
+                <h2
+                  id="perspective-connections-heading"
+                  className="font-display text-sm font-medium text-accent mb-3"
+                >
+                  Connected: Perspective &amp; Healing Readiness
+                </h2>
+                <p className="font-body text-sm text-text/50 leading-relaxed mb-3">
+                  Nervous system regulation through healing practices creates the physiological
+                  safety needed for higher-order perspective work. Kegan stage transitions require
+                  a regulated nervous system — breathwork and somatic healing practices prepare
+                  your system to hold greater complexity without collapsing into reactivity.
+                </p>
+                <Link
+                  href="/healing"
+                  className="font-body text-xs text-accent underline underline-offset-2"
+                >
+                  Explore Ethical Healing &rarr;
+                </Link>
+              </div>
+            </section>
+          </MotionReveal>
+        )}
 
         {/* CTA */}
         <MotionReveal delay={0.1}>

@@ -225,7 +225,7 @@ export default function JournalPage() {
 
   return (
     <ProtectedRoute>
-      <div className="grain-overlay min-h-screen bg-bg">
+      <main id="main-content" className="grain-overlay min-h-screen bg-bg">
         <div className="bg-atmosphere min-h-screen">
           <div className="w-full px-4 sm:px-6 lg:px-8 max-w-5xl mx-auto py-10 sm:py-14">
             {/* ── Page header ──────────────────────────────────────────── */}
@@ -865,7 +865,7 @@ export default function JournalPage() {
             </div>
           </div>
         )}
-      </div>
+      </main>
     </ProtectedRoute>
   );
 }

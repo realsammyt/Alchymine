@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
+import Link from "next/link";
 import ProtectedRoute from "@/components/shared/ProtectedRoute";
 import MethodologyPanel from "@/components/shared/MethodologyPanel";
 import ApiStateView from "@/components/shared/ApiStateView";
@@ -16,6 +17,8 @@ import {
   ProjectListResponse,
 } from "@/lib/api";
 import { useApi, getStoredIntake } from "@/lib/useApi";
+import CreativeProjects from "@/components/creative/CreativeProjects";
+import EvidenceBadge from "@/components/shared/EvidenceBadge";
 
 const CREATIVE_DIMENSIONS = [
   {
@@ -136,7 +139,7 @@ export default function CreativePage() {
 
   return (
     <ProtectedRoute>
-    <main className="grain-overlay bg-atmosphere min-h-screen px-4 sm:px-6 lg:px-8 py-8">
+    <main id="main-content" className="grain-overlay bg-atmosphere min-h-screen px-4 sm:px-6 lg:px-8 py-8">
       <div className="max-w-5xl mx-auto">
         {/* Page Header */}
         <MotionReveal delay={0}>
@@ -279,7 +282,7 @@ export default function CreativePage() {
           <section className="mb-12" aria-labelledby="assessment-heading">
             <h2
               id="assessment-heading"
-              className="section-heading-sm mb-2 flex items-center gap-3"
+              className="section-heading-sm mb-2 flex items-center gap-3 flex-wrap"
             >
               <span
                 className="w-10 h-10 rounded-xl bg-secondary/10 flex items-center justify-center text-xl"
@@ -288,6 +291,7 @@ export default function CreativePage() {
                 {"\u{1F9EA}"}
               </span>
               Creative Assessment
+              <EvidenceBadge level="strong" />
             </h2>
             <hr className="rule-gold mb-4" aria-hidden="true" />
             <p className="font-body text-text/50 text-sm mb-6">
@@ -405,54 +409,58 @@ export default function CreativePage() {
                 emptyText="Complete your intake to receive personalized project recommendations."
                 onRetry={projects.refetch}
               >
-                {projects.data && projects.data.projects.length > 0 && (
-                  <MotionStagger className="grid sm:grid-cols-3 gap-4">
-                    {projects.data.projects.map((project) => (
-                      <MotionStaggerItem key={project.title}>
-                        <div className="card-surface-elevated p-5 h-full">
-                          <div className="flex items-center justify-between mb-2">
-                            <h3 className="font-display text-sm font-medium text-text">
-                              {project.title}
-                            </h3>
-                            <span className="px-2 py-0.5 bg-secondary/10 text-secondary/60 text-[10px] font-medium rounded-full capitalize">
-                              {project.type}
-                            </span>
-                          </div>
-                          <p className="font-body text-sm text-text/50 leading-relaxed mb-3">
-                            {project.description}
-                          </p>
-                          <div className="flex items-center gap-2 mt-auto pt-2">
-                            <span className="px-2 py-0.5 bg-accent/10 text-accent/70 text-[10px] rounded-full capitalize">
-                              {project.medium}
-                            </span>
-                            <span className="px-2 py-0.5 bg-white/5 text-text/30 text-[10px] rounded-full capitalize">
-                              {project.skill_level}
-                            </span>
-                          </div>
-                        </div>
-                      </MotionStaggerItem>
-                    ))}
-                  </MotionStagger>
+                {projects.data && (
+                  <CreativeProjects
+                    projects={projects.data.projects}
+                    orientation={projects.data.orientation}
+                  />
                 )}
               </ApiStateView>
             ) : (
-              <MotionStagger className="grid sm:grid-cols-3 gap-4">
-                {PROJECT_TYPE_DEFAULTS.map((project) => (
-                  <MotionStaggerItem key={project.name}>
-                    <div className="card-surface-elevated p-5 h-full">
-                      <h3 className="font-display text-sm font-medium text-text mb-2">
-                        {project.name}
-                      </h3>
-                      <p className="font-body text-sm text-text/50 leading-relaxed">
-                        {project.description}
-                      </p>
-                    </div>
-                  </MotionStaggerItem>
-                ))}
-              </MotionStagger>
+              <CreativeProjects
+                projects={PROJECT_TYPE_DEFAULTS.map((p, idx) => ({
+                  title: p.name,
+                  description: p.description,
+                  type: idx === 1 ? "collaborative" : idx === 2 ? "challenge" : "solo",
+                  medium: "mixed",
+                  skill_level: "beginner",
+                }))}
+              />
             )}
           </section>
         </MotionReveal>
+
+        {/* Connections — shadow-block bridge */}
+        {hasIntake && (
+          <MotionReveal delay={0.1}>
+            <section
+              className="mb-12"
+              aria-labelledby="creative-connections-heading"
+              data-testid="connections-section"
+            >
+              <div className="card-surface border border-secondary/10 p-5">
+                <h2
+                  id="creative-connections-heading"
+                  className="font-display text-sm font-medium text-secondary-light mb-3"
+                >
+                  Connected: Creative Blocks &amp; Shadow Work
+                </h2>
+                <p className="font-body text-sm text-text/50 leading-relaxed mb-3">
+                  Your shadow archetype patterns often manifest as creative blocks. When you feel
+                  stuck creatively, it is frequently your shadow — the unconscious, disowned parts
+                  of yourself — asserting itself. Understanding your Jungian shadow can dissolve
+                  creative resistance at its root rather than treating the symptom.
+                </p>
+                <Link
+                  href="/intelligence"
+                  className="font-body text-xs text-secondary-light underline underline-offset-2"
+                >
+                  Explore Personal Intelligence &rarr;
+                </Link>
+              </div>
+            </section>
+          </MotionReveal>
+        )}
 
         {/* CTA */}
         <MotionReveal delay={0.1}>
