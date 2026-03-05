@@ -147,12 +147,16 @@ function ResetPasswordForm() {
               htmlFor="password"
               className="block text-sm font-body font-medium text-text/60 mb-2"
             >
-              New Password
+              New Password{" "}
+              <span className="text-primary/60" aria-hidden="true">
+                *
+              </span>
             </label>
             <input
               id="password"
               type="password"
               required
+              aria-required="true"
               autoComplete="new-password"
               minLength={8}
               value={password}
@@ -167,12 +171,16 @@ function ResetPasswordForm() {
               htmlFor="confirm-password"
               className="block text-sm font-body font-medium text-text/60 mb-2"
             >
-              Confirm New Password
+              Confirm New Password{" "}
+              <span className="text-primary/60" aria-hidden="true">
+                *
+              </span>
             </label>
             <input
               id="confirm-password"
               type="password"
               required
+              aria-required="true"
               autoComplete="new-password"
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}

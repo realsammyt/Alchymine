@@ -4,7 +4,6 @@ import { useState, useMemo } from "react";
 import Link from "next/link";
 import Button from "@/components/shared/Button";
 import Card from "@/components/shared/Card";
-import ProgressBar from "@/components/shared/ProgressBar";
 import MethodologyPanel from "@/components/shared/MethodologyPanel";
 import ApiStateView from "@/components/shared/ApiStateView";
 import {
@@ -15,13 +14,20 @@ import {
 import {
   getWealthProfile,
   getWealthLevers,
+  getWealthPlan,
   WealthProfileResponse,
   LeverResponse,
+  WealthPlanResponse,
 } from "@/lib/api";
 import { useApi, getStoredIntake } from "@/lib/useApi";
 import { useAuth } from "@/lib/AuthContext";
 import ProtectedRoute from "@/components/shared/ProtectedRoute";
 import { DEMO_ACCOUNT_EMAIL } from "@/lib/constants";
+import DebtCalculator, {
+  DEMO_DEBT_ENTRIES,
+} from "@/components/wealth/DebtCalculator";
+import WealthPlanTracker from "@/components/wealth/WealthPlanTracker";
+import EvidenceBadge from "@/components/shared/EvidenceBadge";
 
 // ── Constants ─────────────────────────────────────────────────────
 
@@ -673,10 +679,15 @@ export default function WealthPage() {
     [intakeIntentions.join(",")],
   );
 
+  const wealthPlan = useApi<WealthPlanResponse>(
+    hasIntake ? () => getWealthPlan({ intentions: intakeIntentions }) : null,
+    [intakeIntentions.join(",")],
+  );
+
   return (
     <ProtectedRoute>
       <div className="grain-overlay bg-atmosphere min-h-screen">
-        <main className="px-4 sm:px-6 lg:px-8 py-8">
+        <main id="main-content" className="px-4 sm:px-6 lg:px-8 py-8">
           <div className="max-w-5xl mx-auto">
             {/* ── Page Header ─────────────────────────────────────────── */}
             <header className="mb-10">
@@ -854,11 +865,47 @@ export default function WealthPage() {
               </section>
             )}
 
+            {/* ── Debt Payoff Calculator ───────────────────────────────── */}
+            <section className="mb-12" aria-labelledby="debt-calc-heading">
+              <MotionReveal delay={0.05}>
+                <h2
+                  id="debt-calc-heading"
+                  className="section-heading-sm mb-3 flex items-center gap-3"
+                >
+                  <span
+                    className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center text-xl"
+                    aria-hidden="true"
+                  >
+                    {"\u{1F9EE}"}
+                  </span>
+                  Debt Payoff Calculator
+                </h2>
+                <hr className="rule-gold my-5 max-w-[60px]" />
+                <p className="font-body text-text/40 text-sm mb-6">
+                  Compare avalanche vs. snowball strategies side-by-side. All
+                  calculations run client-side — your data never leaves your
+                  browser.
+                </p>
+              </MotionReveal>
+
+              <MotionReveal delay={0.12}>
+                <Card title="">
+                  <DebtCalculator
+                    initialDebts={isDemoUser ? DEMO_DEBT_ENTRIES : undefined}
+                  />
+                </Card>
+              </MotionReveal>
+            </section>
+
             {/* ── Five Wealth Levers ───────────────────────────────────── */}
             <section className="mb-12" aria-labelledby="levers-heading">
               <MotionReveal delay={0.05}>
-                <h2 id="levers-heading" className="section-heading-sm mb-2">
+                <h2
+                  id="levers-heading"
+                  className="section-heading-sm mb-2 flex items-center gap-3 flex-wrap"
+                >
                   Five Wealth Levers
+                  <EvidenceBadge level="strong" />
                 </h2>
                 <hr className="rule-gold my-5 max-w-[60px]" />
               </MotionReveal>
@@ -963,78 +1010,36 @@ export default function WealthPage() {
               </MotionStagger>
             </section>
 
-            {/* ── 90-Day Activation Plan — demo data only ──────────────── */}
-            {isDemoUser && (
+            {/* ── 90-Day Wealth Plan Tracker ────────────────────────────── */}
+            {(isDemoUser || hasIntake) && (
               <section className="mb-12" aria-labelledby="plan-heading">
                 <MotionReveal delay={0.05}>
-                  <h2 id="plan-heading" className="section-heading-sm mb-2">
+                  <h2
+                    id="plan-heading"
+                    className="section-heading-sm mb-2 flex items-center gap-3"
+                  >
+                    <span
+                      className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center text-xl"
+                      aria-hidden="true"
+                    >
+                      {"\u{1F4C5}"}
+                    </span>
                     90-Day Activation Plan
                   </h2>
                   <hr className="rule-gold my-5 max-w-[60px]" />
                 </MotionReveal>
 
                 <MotionReveal delay={0.12}>
-                  <div className="card-surface-elevated p-6">
-                    <div className="flex items-start justify-between mb-6">
-                      <div>
-                        <h3 className="font-display text-lg font-light text-text">
-                          Your Personalized Roadmap
-                        </h3>
-                        <p className="font-body text-sm text-text/50 mt-1">
-                          Three-phase wealth-building activation plan
-                        </p>
-                      </div>
-                      <span className="px-3 py-1 rounded-full font-body text-[0.7rem] font-medium tracking-wider uppercase bg-primary/20 text-primary">
-                        Phase 2
-                      </span>
-                    </div>
-                    <div className="space-y-4">
-                      <div>
-                        <div className="flex justify-between font-body text-sm mb-1.5">
-                          <span className="text-text/60">
-                            Phase 1: Foundation (Days 1–30)
-                          </span>
-                          <span className="text-primary font-medium">EARN</span>
-                        </div>
-                        <ProgressBar
-                          value={100}
-                          variant="gold"
-                          size="sm"
-                          aria-label="Phase 1 Foundation: 100% complete"
-                        />
-                      </div>
-                      <div>
-                        <div className="flex justify-between font-body text-sm mb-1.5">
-                          <span className="text-text/60">
-                            Phase 2: Building (Days 31–60)
-                          </span>
-                          <span className="text-secondary font-medium">
-                            KEEP
-                          </span>
-                        </div>
-                        <ProgressBar
-                          value={60}
-                          variant="purple"
-                          size="sm"
-                          aria-label="Phase 2 Building: 60% complete"
-                        />
-                      </div>
-                      <div>
-                        <div className="flex justify-between font-body text-sm mb-1.5">
-                          <span className="text-text/60">
-                            Phase 3: Acceleration (Days 61–90)
-                          </span>
-                          <span className="text-accent font-medium">GROW</span>
-                        </div>
-                        <ProgressBar
-                          value={20}
-                          variant="teal"
-                          size="sm"
-                          aria-label="Phase 3 Acceleration: 20% complete"
-                        />
-                      </div>
-                    </div>
-                  </div>
+                  <Card title="">
+                    <WealthPlanTracker
+                      plan={wealthPlan.data ?? undefined}
+                      storagePrefix={
+                        isDemoUser
+                          ? "alchymine_wealthplan_demo"
+                          : "alchymine_wealthplan_user"
+                      }
+                    />
+                  </Card>
                 </MotionReveal>
               </section>
             )}
@@ -1056,6 +1061,40 @@ export default function WealthPage() {
                 />
               </MotionReveal>
             </section>
+
+            {/* ── Connections — cycle-timing bridge ───────────────────── */}
+            {hasIntake && (
+              <MotionReveal delay={0.05}>
+                <section
+                  className="mb-12"
+                  aria-labelledby="wealth-connections-heading"
+                  data-testid="connections-section"
+                >
+                  <div className="card-surface border border-primary/10 p-5">
+                    <h2
+                      id="wealth-connections-heading"
+                      className="font-display text-sm font-medium text-primary mb-3"
+                    >
+                      Connected: Wealth &amp; Numerology Cycles
+                    </h2>
+                    <p className="font-body text-sm text-text/50 leading-relaxed mb-3">
+                      Your numerology Personal Year cycle influences your
+                      optimal wealth-building timing. Years 1 and 8 favor bold
+                      financial moves and new ventures, while Years 4 and 6 are
+                      best for consolidation, protecting assets, and
+                      strengthening foundations. Align your lever focus with
+                      your current cycle for maximum impact.
+                    </p>
+                    <Link
+                      href="/intelligence"
+                      className="font-body text-xs text-primary underline underline-offset-2"
+                    >
+                      Explore Personal Intelligence &rarr;
+                    </Link>
+                  </div>
+                </section>
+              </MotionReveal>
+            )}
 
             {/* ── CTA ─────────────────────────────────────────────────── */}
             <MotionReveal delay={0.05}>

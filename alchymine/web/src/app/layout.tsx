@@ -62,9 +62,23 @@ export default function RootLayout({
       <head>
         {/* PWA: Apple touch icon (placeholder — replace with real asset) */}
         <link rel="apple-touch-icon" href="/icon-192.png" />
+        {/* Preconnect to API origin for faster first requests */}
+        {process.env.NEXT_PUBLIC_API_URL && (
+          <link
+            rel="preconnect"
+            href={new URL(process.env.NEXT_PUBLIC_API_URL).origin}
+          />
+        )}
       </head>
       <body className="font-body bg-bg text-text min-h-screen antialiased">
         <Providers>
+          {/* Skip navigation — first focusable element, visible on keyboard focus */}
+          <a
+            href="#main-content"
+            className="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 focus:z-[9999] focus:bg-primary focus:text-bg focus:px-4 focus:py-2 focus:rounded-lg focus:text-sm focus:font-body focus:outline-none"
+          >
+            Skip to main content
+          </a>
           <Navigation />
           <ContentWrapper>{children}</ContentWrapper>
         </Providers>

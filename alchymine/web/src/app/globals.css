@@ -10,6 +10,8 @@
     /* Prevent text size adjustment on orientation change (mobile) */
     -webkit-text-size-adjust: 100%;
     text-size-adjust: 100%;
+    /* Dark color scheme for browser chrome (scrollbars, inputs) */
+    color-scheme: dark;
   }
 
   body {
@@ -42,33 +44,35 @@
     text-wrap: balance;
   }
 
-  /* Custom scrollbar — dark theme */
+  /* Custom scrollbar — dark theme with gold-tinted thumb */
   ::-webkit-scrollbar {
     width: 6px;
     height: 6px;
   }
 
   ::-webkit-scrollbar-track {
-    background: transparent;
+    background: rgba(10, 10, 15, 0.8);
   }
 
   ::-webkit-scrollbar-thumb {
-    @apply bg-white/10 rounded-full;
+    background: rgba(218, 165, 32, 0.2);
+    border-radius: 9999px;
   }
 
   ::-webkit-scrollbar-thumb:hover {
-    @apply bg-white/20;
+    background: rgba(218, 165, 32, 0.35);
   }
 
   /* Firefox scrollbar */
   * {
     scrollbar-width: thin;
-    scrollbar-color: rgba(255, 255, 255, 0.1) transparent;
+    scrollbar-color: rgba(218, 165, 32, 0.2) rgba(10, 10, 15, 0.8);
   }
 
-  /* Selection color */
+  /* Gold text selection */
   ::selection {
-    @apply bg-primary/30 text-text;
+    background: rgba(212, 175, 55, 0.3);
+    color: white;
   }
 }
 
@@ -379,5 +383,35 @@
     .standalone\:pt-safe {
       padding-top: env(safe-area-inset-top);
     }
+  }
+}
+
+/* ── Confetti animations ──────────────────────────────────────────────────── */
+@keyframes confetti-fall {
+  0% {
+    transform: translateY(0) translateX(0) rotate(0deg);
+    opacity: 1;
+  }
+  80% {
+    opacity: 0.8;
+  }
+  100% {
+    transform: translateY(110vh) translateX(var(--drift, 0px)) rotate(720deg);
+    opacity: 0;
+  }
+}
+
+@keyframes confetti-glow {
+  0% {
+    opacity: 0;
+    transform: scale(0.5);
+  }
+  30% {
+    opacity: 1;
+    transform: scale(1.2);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(2);
   }
 }

@@ -15,6 +15,7 @@ import {
   AstrologyResponse,
 } from "@/lib/api";
 import { useApi, getStoredIntake } from "@/lib/useApi";
+import EvidenceBadge from "@/components/shared/EvidenceBadge";
 
 const NUMEROLOGY_NUMBERS = [
   {
@@ -137,7 +138,10 @@ export default function IntelligencePage() {
   );
 
   return (
-    <main className="grain-overlay bg-atmosphere min-h-screen px-4 sm:px-6 lg:px-8 py-8">
+    <main
+      id="main-content"
+      className="grain-overlay bg-atmosphere min-h-screen px-4 sm:px-6 lg:px-8 py-8"
+    >
       <div className="max-w-5xl mx-auto">
         {/* Page Header */}
         <MotionReveal delay={0}>
@@ -296,7 +300,7 @@ export default function IntelligencePage() {
           <section className="mb-12" aria-labelledby="numerology-heading">
             <h2
               id="numerology-heading"
-              className="section-heading-sm mb-2 flex items-center gap-3"
+              className="section-heading-sm mb-2 flex items-center gap-3 flex-wrap"
             >
               <span
                 className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center text-xl"
@@ -305,6 +309,7 @@ export default function IntelligencePage() {
                 {"\u{1F522}"}
               </span>
               Numerology
+              <EvidenceBadge level="traditional" />
             </h2>
             <hr className="rule-gold mb-6" aria-hidden="true" />
 
@@ -350,7 +355,7 @@ export default function IntelligencePage() {
           <section className="mb-12" aria-labelledby="astrology-heading">
             <h2
               id="astrology-heading"
-              className="section-heading-sm mb-2 flex items-center gap-3"
+              className="section-heading-sm mb-2 flex items-center gap-3 flex-wrap"
             >
               <span
                 className="w-10 h-10 rounded-xl bg-secondary/10 flex items-center justify-center text-xl"
@@ -359,6 +364,7 @@ export default function IntelligencePage() {
                 {"\u{2B50}"}
               </span>
               Astrology
+              <EvidenceBadge level="traditional" />
             </h2>
             <hr className="rule-gold mb-6" aria-hidden="true" />
 
@@ -396,7 +402,7 @@ export default function IntelligencePage() {
           <section className="mb-12" aria-labelledby="biorhythm-heading">
             <h2
               id="biorhythm-heading"
-              className="section-heading-sm mb-2 flex items-center gap-3"
+              className="section-heading-sm mb-2 flex items-center gap-3 flex-wrap"
             >
               <span
                 className="w-10 h-10 rounded-xl bg-accent/10 flex items-center justify-center text-xl"
@@ -405,7 +411,11 @@ export default function IntelligencePage() {
                 {"\u{1F4C8}"}
               </span>
               Biorhythm
+              <EvidenceBadge level="entertainment" />
             </h2>
+            <p className="font-body text-[11px] text-text/30 italic mb-2">
+              For entertainment and self-reflection purposes only.
+            </p>
             <hr className="rule-gold mb-6" aria-hidden="true" />
 
             <MotionStagger className="grid sm:grid-cols-3 gap-4 mb-4">

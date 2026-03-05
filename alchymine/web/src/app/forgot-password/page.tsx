@@ -112,12 +112,16 @@ export default function ForgotPasswordPage() {
                 htmlFor="email"
                 className="block text-sm font-body font-medium text-text/60 mb-2"
               >
-                Email
+                Email{" "}
+                <span className="text-primary/60" aria-hidden="true">
+                  *
+                </span>
               </label>
               <input
                 id="email"
                 type="email"
                 required
+                aria-required="true"
                 autoComplete="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}

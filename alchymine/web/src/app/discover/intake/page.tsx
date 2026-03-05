@@ -194,12 +194,19 @@ export default function IntakePage() {
                 htmlFor="fullName"
                 className="block text-sm font-body font-medium text-text/60 mb-2"
               >
-                Full Name <span className="text-primary">*</span>
+                Full Name{" "}
+                <span className="text-primary" aria-hidden="true">
+                  *
+                </span>
               </label>
               <input
                 id="fullName"
                 type="text"
                 required
+                aria-required="true"
+                aria-describedby={
+                  errors.fullName ? "fullName-error" : undefined
+                }
                 placeholder="e.g. Maya Angelou"
                 value={formData.fullName}
                 onChange={(e) =>
@@ -208,7 +215,11 @@ export default function IntakePage() {
                 className={inputClass}
               />
               {errors.fullName && (
-                <p className="mt-1.5 text-sm font-body text-primary-dark">
+                <p
+                  id="fullName-error"
+                  role="alert"
+                  className="mt-1.5 text-sm font-body text-primary-dark"
+                >
                   {errors.fullName}
                 </p>
               )}
@@ -220,12 +231,19 @@ export default function IntakePage() {
                 htmlFor="birthDate"
                 className="block text-sm font-body font-medium text-text/60 mb-2"
               >
-                Birth Date <span className="text-primary">*</span>
+                Birth Date{" "}
+                <span className="text-primary" aria-hidden="true">
+                  *
+                </span>
               </label>
               <input
                 id="birthDate"
                 type="date"
                 required
+                aria-required="true"
+                aria-describedby={
+                  errors.birthDate ? "birthDate-error" : undefined
+                }
                 value={formData.birthDate}
                 onChange={(e) =>
                   setFormData((prev) => ({
@@ -236,7 +254,11 @@ export default function IntakePage() {
                 className={inputClass}
               />
               {errors.birthDate && (
-                <p className="mt-1.5 text-sm font-body text-primary-dark">
+                <p
+                  id="birthDate-error"
+                  role="alert"
+                  className="mt-1.5 text-sm font-body text-primary-dark"
+                >
                   {errors.birthDate}
                 </p>
               )}
@@ -294,11 +316,17 @@ export default function IntakePage() {
             </div>
 
             {/* Intention Selector — multi-select (1-3) */}
-            <div>
-              <label className="block text-sm font-body font-medium text-text/60 mb-1">
-                What brings you here? <span className="text-primary">*</span>
-              </label>
-              <p className="text-xs font-body text-text/30 mb-3">
+            <fieldset>
+              <legend className="block text-sm font-body font-medium text-text/60 mb-1">
+                What brings you here?{" "}
+                <span className="text-primary" aria-hidden="true">
+                  *
+                </span>
+              </legend>
+              <p
+                id="intentions-hint"
+                className="text-xs font-body text-text/30 mb-3"
+              >
                 Select up to {MAX_INTENTIONS} that resonate most
               </p>
               <MotionStagger
@@ -314,6 +342,7 @@ export default function IntakePage() {
                       <button
                         type="button"
                         disabled={atMax}
+                        aria-pressed={selected}
                         onClick={() =>
                           setFormData((prev) => ({
                             ...prev,
@@ -324,7 +353,7 @@ export default function IntakePage() {
                               : [...prev.intentions, intent.value],
                           }))
                         }
-                        className={`w-full flex items-center gap-2.5 px-4 py-3 rounded-xl border text-left text-sm font-body transition-all duration-300 touch-target ${
+                        className={`w-full flex items-center gap-2.5 px-4 py-3 rounded-xl border text-left text-sm font-body transition-all duration-300 touch-target focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2 focus-visible:ring-offset-bg focus-visible:outline-none ${
                           selected
                             ? "border-primary/40 bg-primary/[0.08] text-text glow-gold"
                             : atMax
@@ -340,7 +369,10 @@ export default function IntakePage() {
                         />
                         <span className="flex-1">{intent.label}</span>
                         {selected && (
-                          <span className="text-xs text-primary/60 font-medium">
+                          <span
+                            className="text-xs text-primary/60 font-medium"
+                            aria-hidden="true"
+                          >
                             {formData.intentions.indexOf(intent.value) + 1}
                           </span>
                         )}
@@ -350,11 +382,15 @@ export default function IntakePage() {
                 })}
               </MotionStagger>
               {errors.intentions && (
-                <p className="mt-1.5 text-sm font-body text-primary-dark">
+                <p
+                  id="intentions-error"
+                  role="alert"
+                  className="mt-1.5 text-sm font-body text-primary-dark"
+                >
                   {errors.intentions}
                 </p>
               )}
-            </div>
+            </fieldset>
 
             {/* Submit */}
             <div className="pt-4">

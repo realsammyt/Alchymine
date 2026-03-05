@@ -91,7 +91,9 @@ describe("LandingPage", () => {
 
   it("renders the ethics section", () => {
     render(<LandingPage />);
-    expect(screen.getAllByText("First, Do No Harm").length).toBeGreaterThanOrEqual(1);
+    expect(
+      screen.getAllByText("First, Do No Harm").length,
+    ).toBeGreaterThanOrEqual(1);
     expect(screen.getAllByText("Open Source").length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText("Math-Only Finance")).toBeInTheDocument();
     expect(screen.getByText("Local-First Data")).toBeInTheDocument();

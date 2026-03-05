@@ -56,6 +56,12 @@ const NAV_ITEMS: NavItem[] = [
     icon: "book",
     label: "Reflection journal",
   },
+  {
+    name: "Profile",
+    href: "/profile",
+    icon: "user",
+    label: "Your unified profile",
+  },
 ];
 
 function NavIcon({
@@ -185,6 +191,22 @@ function NavIcon({
         >
           <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z" />
           <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z" />
+        </svg>
+      );
+    case "user":
+      return (
+        <svg
+          className={baseClass}
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          aria-hidden="true"
+        >
+          <circle cx="12" cy="8" r="4" />
+          <path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" />
         </svg>
       );
     default:
@@ -335,11 +357,12 @@ export default function Navigation() {
           </Link>
           <button
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            className="p-2 text-text/60 hover:text-text rounded-lg hover:bg-white/5 transition-colors"
+            className="p-2 text-text/60 hover:text-text rounded-lg hover:bg-white/5 transition-colors focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2 focus-visible:ring-offset-bg focus-visible:outline-none"
             aria-label={
               mobileMenuOpen ? "Close navigation menu" : "Open navigation menu"
             }
             aria-expanded={mobileMenuOpen}
+            aria-controls="mobile-nav-menu"
           >
             {mobileMenuOpen ? (
               <svg
@@ -377,6 +400,7 @@ export default function Navigation() {
         {/* Mobile dropdown menu */}
         {mobileMenuOpen && (
           <nav
+            id="mobile-nav-menu"
             className="px-4 pb-4 animate-fade-in"
             aria-label="Main navigation"
           >

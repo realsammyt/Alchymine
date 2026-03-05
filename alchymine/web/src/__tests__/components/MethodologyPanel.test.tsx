@@ -55,7 +55,7 @@ describe("MethodologyPanel", () => {
 
   it("shows evidence rating badge when expanded", () => {
     render(<MethodologyPanel {...defaultProps} defaultExpanded />);
-    expect(screen.getByText("Strong Evidence")).toBeInTheDocument();
+    expect(screen.getByText("Peer-Reviewed")).toBeInTheDocument();
   });
 
   it("shows calculation type badge when expanded", () => {

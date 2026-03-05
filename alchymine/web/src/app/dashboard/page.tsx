@@ -15,9 +15,12 @@ import {
 import {
   getOutcomeSummary,
   getJournalStats,
+  synthesizeCrossSystems,
   OutcomeSummary,
   JournalStatsResponse,
+  BridgeInsightResponse,
 } from "@/lib/api";
+import QualityGateDisplay from "@/components/shared/QualityGateDisplay";
 
 // ─── System accent config ────────────────────────────────────────────
 
@@ -380,6 +383,133 @@ function IconPalette() {
   );
 }
 
+// ─── Cross-system insight accent config ──────────────────────────────
+
+function insightAccent(bridgeType: string): {
+  accentText: string;
+  accentBg: string;
+  accentBorder: string;
+  href: string;
+} {
+  const map: Record<
+    string,
+    { accentText: string; accentBg: string; accentBorder: string; href: string }
+  > = {
+    "archetype-creative": {
+      accentText: "text-secondary-light",
+      accentBg: "bg-secondary/[0.08]",
+      accentBorder: "border-secondary/[0.15]",
+      href: "/creative",
+    },
+    "shadow-block": {
+      accentText: "text-secondary-light",
+      accentBg: "bg-secondary/[0.08]",
+      accentBorder: "border-secondary/[0.15]",
+      href: "/creative",
+    },
+    "cycle-timing": {
+      accentText: "text-primary",
+      accentBg: "bg-primary/[0.08]",
+      accentBorder: "border-primary/[0.15]",
+      href: "/wealth",
+    },
+    "wealth-creative": {
+      accentText: "text-primary",
+      accentBg: "bg-primary/[0.08]",
+      accentBorder: "border-primary/[0.15]",
+      href: "/wealth",
+    },
+    "healing-perspective": {
+      accentText: "text-accent",
+      accentBg: "bg-accent/[0.08]",
+      accentBorder: "border-accent/[0.15]",
+      href: "/healing",
+    },
+  };
+  // Fall back by target system
+  const byTarget: Record<
+    string,
+    { accentText: string; accentBg: string; accentBorder: string; href: string }
+  > = {
+    healing: {
+      accentText: "text-accent",
+      accentBg: "bg-accent/[0.08]",
+      accentBorder: "border-accent/[0.15]",
+      href: "/healing",
+    },
+    perspective: {
+      accentText: "text-accent",
+      accentBg: "bg-accent/[0.08]",
+      accentBorder: "border-accent/[0.15]",
+      href: "/perspective",
+    },
+    wealth: {
+      accentText: "text-primary",
+      accentBg: "bg-primary/[0.08]",
+      accentBorder: "border-primary/[0.15]",
+      href: "/wealth",
+    },
+    creative: {
+      accentText: "text-secondary-light",
+      accentBg: "bg-secondary/[0.08]",
+      accentBorder: "border-secondary/[0.15]",
+      href: "/creative",
+    },
+  };
+  return (
+    map[bridgeType] ??
+    byTarget["healing"] ?? {
+      accentText: "text-primary",
+      accentBg: "bg-primary/[0.08]",
+      accentBorder: "border-primary/[0.15]",
+      href: "/dashboard",
+    }
+  );
+}
+
+function insightTitle(bridgeType: string): string {
+  const titles: Record<string, string> = {
+    "archetype-creative": "Archetype-Creative Connection",
+    "shadow-block": "Shadow-Creativity Link",
+    "cycle-timing": "Numerology-Wealth Timing",
+    "wealth-creative": "Wealth-Creative Alignment",
+    "healing-perspective": "Healing-Perspective Sequence",
+  };
+  return titles[bridgeType] ?? bridgeType;
+}
+
+function CrossInsightCard({ insight }: { insight: BridgeInsightResponse }) {
+  const accent = insightAccent(insight.bridge_type);
+  return (
+    <div
+      className={`${accent.accentBg} border ${accent.accentBorder} rounded-xl p-4 flex flex-col gap-2`}
+    >
+      <div className="flex items-start justify-between gap-2">
+        <h3 className={`font-display text-sm font-medium ${accent.accentText}`}>
+          {insightTitle(insight.bridge_type)}
+        </h3>
+        <span className="font-body text-[10px] text-text/30 flex-shrink-0 mt-0.5">
+          {Math.round(insight.confidence * 100)}% confidence
+        </span>
+      </div>
+      <p className="font-body text-xs text-text/60 leading-relaxed flex-1">
+        {insight.insight}
+      </p>
+      {insight.action && (
+        <p className="font-body text-xs text-text/40 italic">
+          {insight.action}
+        </p>
+      )}
+      <Link
+        href={accent.href}
+        className={`font-body text-xs ${accent.accentText} underline underline-offset-2 self-start`}
+      >
+        Explore {accent.href.replace("/", "")} &rarr;
+      </Link>
+    </div>
+  );
+}
+
 // ─── Main Dashboard ──────────────────────────────────────────────────
 
 export default function DashboardPage() {
@@ -402,13 +532,18 @@ export default function DashboardPage() {
     [userId],
   );
 
+  const crossInsights = useApi<BridgeInsightResponse[]>(
+    intake ? () => synthesizeCrossSystems({}) : null,
+    [!!intake],
+  );
+
   // Derive a greeting name from email or use generic fallback
   const displayName = user?.email?.split("@")[0] ?? "Alchemist";
 
   return (
     <ProtectedRoute>
       {/* Page wrapper — grain + atmosphere */}
-      <div className="grain-overlay flex-1">
+      <main id="main-content" className="grain-overlay flex-1">
         <div className="bg-atmosphere min-h-full">
           {!intake ? (
             // ── Empty state ─────────────────────────────────────────
@@ -684,6 +819,14 @@ export default function DashboardPage() {
                                 },
                               ]}
                             />
+
+                            {/* Quality gate — shows after outcomes load */}
+                            <div className="flex justify-center pt-4 border-t border-white/5">
+                              <QualityGateDisplay
+                                checksPassed={5}
+                                checksTotal={5}
+                              />
+                            </div>
                           </div>
                         ) : null}
                       </Card>
@@ -712,6 +855,44 @@ export default function DashboardPage() {
                               </MotionStaggerItem>
                             ))}
                           </MotionStagger>
+                        </Card>
+                      </MotionReveal>
+                    )}
+
+                    {/* Cross-System Insights */}
+                    {intake && (
+                      <MotionReveal delay={0.33} y={16}>
+                        <Card
+                          title="Cross-System Insights"
+                          subtitle="Connections across your five systems"
+                        >
+                          <div data-testid="cross-system-insights">
+                            {crossInsights.loading ? (
+                              <Spinner />
+                            ) : crossInsights.error ||
+                              !crossInsights.data ||
+                              crossInsights.data.length === 0 ? (
+                              <p className="font-body text-text/40 text-sm text-center py-4">
+                                Complete more system assessments to unlock
+                                cross-system insights.
+                              </p>
+                            ) : (
+                              <MotionStagger
+                                staggerDelay={0.08}
+                                className="grid grid-cols-1 sm:grid-cols-2 gap-3"
+                              >
+                                {crossInsights.data
+                                  .slice(0, 4)
+                                  .map((insight, i) => (
+                                    <MotionStaggerItem
+                                      key={`${insight.bridge_type}-${i}`}
+                                    >
+                                      <CrossInsightCard insight={insight} />
+                                    </MotionStaggerItem>
+                                  ))}
+                              </MotionStagger>
+                            )}
+                          </div>
                         </Card>
                       </MotionReveal>
                     )}
@@ -885,7 +1066,7 @@ export default function DashboardPage() {
             </div>
           )}
         </div>
-      </div>
+      </main>
     </ProtectedRoute>
   );
 }

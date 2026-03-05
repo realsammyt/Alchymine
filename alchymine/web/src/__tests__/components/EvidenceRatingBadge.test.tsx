@@ -4,15 +4,16 @@ import EvidenceRatingBadge from "@/components/shared/EvidenceRatingBadge";
 describe("EvidenceRatingBadge", () => {
   it("renders without crashing", () => {
     render(<EvidenceRatingBadge level="strong" />);
-    expect(screen.getByText("Strong Evidence")).toBeInTheDocument();
+    expect(screen.getByText("Peer-Reviewed")).toBeInTheDocument();
   });
 
   it("renders the correct label for each evidence level", () => {
     const levels = [
-      { level: "strong" as const, label: "Strong Evidence" },
-      { level: "moderate" as const, label: "Moderate Evidence" },
-      { level: "emerging" as const, label: "Emerging Evidence" },
-      { level: "traditional" as const, label: "Traditional Framework" },
+      { level: "strong" as const, label: "Peer-Reviewed" },
+      { level: "moderate" as const, label: "Emerging Research" },
+      { level: "emerging" as const, label: "Theoretical" },
+      { level: "traditional" as const, label: "Cultural/Historical" },
+      { level: "entertainment" as const, label: "Entertainment" },
     ];
 
     levels.forEach(({ level, label }) => {
@@ -26,7 +27,7 @@ describe("EvidenceRatingBadge", () => {
     render(<EvidenceRatingBadge level="moderate" />);
     const badge = screen.getByRole("img");
     expect(badge).toHaveAttribute("aria-label");
-    expect(badge.getAttribute("aria-label")).toContain("Moderate Evidence");
+    expect(badge.getAttribute("aria-label")).toContain("Emerging Research");
   });
 
   it("renders four evidence dots", () => {
@@ -42,6 +43,13 @@ describe("EvidenceRatingBadge", () => {
     const dotClassNames = Array.from(dots).map((d) => d.className);
     expect(dotClassNames.filter((c) => !c.includes("/20"))).toHaveLength(2);
     expect(dotClassNames.filter((c) => c.includes("/20"))).toHaveLength(2);
+  });
+
+  it("shows no filled dots for entertainment level", () => {
+    const { container } = render(<EvidenceRatingBadge level="entertainment" />);
+    const dots = container.querySelectorAll("span > span > span");
+    const dotClassNames = Array.from(dots).map((d) => d.className);
+    expect(dotClassNames.filter((c) => c.includes("/20"))).toHaveLength(4);
   });
 
   it("shows tooltip text by default", () => {

@@ -712,4 +712,67 @@ export async function resetPassword(
   });
 }
 
+// ─── Integration / Cross-System types ────────────────────────────
+
+export interface BridgeInsightResponse {
+  source_system: string;
+  target_system: string;
+  bridge_type: string;
+  insight: string;
+  action: string;
+  confidence: number;
+}
+
+export interface ProfileSynthesisRequest {
+  numerology?: Record<string, unknown> | null;
+  archetype?: Record<string, unknown> | null;
+  personality?: Record<string, unknown> | null;
+  wealth_archetype?: string | null;
+  creative_style?: string | null;
+  kegan_stage?: number | null;
+}
+
+export interface IntakeProfileData {
+  full_name: string;
+  birth_date: string;
+  birth_time?: string | null;
+  birth_city?: string | null;
+  intention: string;
+  intentions: string[];
+  assessment_responses?: Record<string, unknown> | null;
+  family_structure?: string | null;
+}
+
+export interface ProfileResponse {
+  id: string;
+  version: string;
+  created_at: string | null;
+  updated_at: string | null;
+  intake: IntakeProfileData | null;
+  identity: Record<string, unknown> | null;
+  healing: Record<string, unknown> | null;
+  wealth: Record<string, unknown> | null;
+  creative: Record<string, unknown> | null;
+  perspective: Record<string, unknown> | null;
+}
+
+// ─── Integration API functions ────────────────────────────────────
+
+export async function synthesizeCrossSystems(
+  data: ProfileSynthesisRequest,
+): Promise<BridgeInsightResponse[]> {
+  return request<BridgeInsightResponse[]>(`${BASE}/integration/synthesize`, {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+}
+
+// ─── Profile API functions ────────────────────────────────────────
+
+export async function getProfile(userId: string): Promise<ProfileResponse> {
+  return request<ProfileResponse>(
+    `${BASE}/profile/${encodeURIComponent(userId)}`,
+  );
+}
+
 export { ApiError };

@@ -1,10 +1,13 @@
 "use client";
 
 import { useState, useMemo } from "react";
+import Link from "next/link";
 import Button from "@/components/shared/Button";
 import MethodologyPanel from "@/components/shared/MethodologyPanel";
 import ApiStateView from "@/components/shared/ApiStateView";
-import BreathworkTimer from "@/components/shared/BreathworkTimer";
+import BreathworkTimer, {
+  BreathworkCompletionData,
+} from "@/components/shared/BreathworkTimer";
 import {
   MotionReveal,
   MotionStagger,
@@ -13,14 +16,17 @@ import {
 import {
   getHealingModalities,
   getHealingMatch,
+  getOutcomeSummary,
   logActivity,
   ModalityListResponse,
   HealingMatchListResponse,
+  OutcomeSummary,
 } from "@/lib/api";
 import { useApi, getStoredIntake } from "@/lib/useApi";
 import { useAuth } from "@/lib/AuthContext";
 import ProtectedRoute from "@/components/shared/ProtectedRoute";
 import { DEMO_ACCOUNT_EMAIL } from "@/lib/constants";
+import EvidenceBadge from "@/components/shared/EvidenceBadge";
 
 // ── Constants ─────────────────────────────────────────────────────
 
@@ -339,6 +345,107 @@ function ModalityProgressCards({
   );
 }
 
+// ── Healing Progress Dashboard ────────────────────────────────────
+
+function HealingProgressDashboard({ summary }: { summary: OutcomeSummary }) {
+  const healingSystem = summary.systems.find((s) => s.system === "healing");
+  const activeDays = healingSystem?.active_days ?? 0;
+  const engagementScore = healingSystem
+    ? Math.round(healingSystem.engagement_score)
+    : 0;
+  const milestonesCompleted = healingSystem?.milestones_completed ?? 0;
+  const milestonesTotal = healingSystem?.milestones_total ?? 0;
+
+  // Derive "sessions this week" from active_days (capped at 7)
+  const sessionsThisWeek = Math.min(activeDays, 7);
+
+  // Suggested next modality: cycle through based on what they may not have tried
+  const MODALITY_ORDER = [
+    "Breathwork",
+    "Meditation",
+    "Sound Healing",
+    "Somatic Practice",
+    "Nature Healing",
+    "Sleep Healing",
+  ];
+  const nextModality =
+    MODALITY_ORDER[milestonesCompleted % MODALITY_ORDER.length] ??
+    MODALITY_ORDER[0];
+
+  return (
+    <div
+      data-testid="healing-progress-dashboard"
+      className="card-surface p-6 glow-teal"
+    >
+      <h3 className="font-display text-lg font-light text-text/80 mb-5">
+        Your Healing Progress
+      </h3>
+
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
+        <div className="text-center">
+          <div
+            className="font-display font-light text-gradient-teal"
+            style={{ fontSize: "clamp(1.5rem, 3.5vw, 2rem)" }}
+            aria-label={`${activeDays} total active days`}
+          >
+            {activeDays}
+          </div>
+          <div className="font-body text-xs text-text/40 mt-1">Active Days</div>
+        </div>
+        <div className="text-center">
+          <div
+            className="font-display font-light text-gradient-teal"
+            style={{ fontSize: "clamp(1.5rem, 3.5vw, 2rem)" }}
+            aria-label={`${sessionsThisWeek} sessions this week`}
+          >
+            {sessionsThisWeek}
+          </div>
+          <div className="font-body text-xs text-text/40 mt-1">This Week</div>
+        </div>
+        <div className="text-center">
+          <div
+            className="font-display font-light text-gradient-teal"
+            style={{ fontSize: "clamp(1.5rem, 3.5vw, 2rem)" }}
+            aria-label={`${engagementScore} engagement score`}
+          >
+            {engagementScore}
+          </div>
+          <div className="font-body text-xs text-text/40 mt-1">Engagement</div>
+        </div>
+        <div className="text-center">
+          <div
+            className="font-display font-light text-gradient-teal"
+            style={{ fontSize: "clamp(1.5rem, 3.5vw, 2rem)" }}
+            aria-label={`${milestonesCompleted} of ${milestonesTotal} milestones`}
+          >
+            {milestonesCompleted}/{milestonesTotal}
+          </div>
+          <div className="font-body text-xs text-text/40 mt-1">Milestones</div>
+        </div>
+      </div>
+
+      {/* Recommended next */}
+      <div className="bg-white/[0.03] border border-accent/10 rounded-xl p-4 flex items-center justify-between gap-4">
+        <div>
+          <p className="font-body text-xs text-text/40 uppercase tracking-wider mb-1">
+            Recommended Next
+          </p>
+          <p className="font-body text-sm font-medium text-text/80">
+            {getModalityIcon(nextModality)}{" "}
+            <span className="ml-1">{nextModality}</span>
+          </p>
+        </div>
+        <a
+          href="#breathwork"
+          className="font-body text-xs text-accent hover:text-accent-light transition-colors duration-200 whitespace-nowrap"
+        >
+          Start &rarr;
+        </a>
+      </div>
+    </div>
+  );
+}
+
 // ── Main Component ────────────────────────────────────────────────
 
 export default function HealingPage() {
@@ -362,6 +469,12 @@ export default function HealingPage() {
     [intakeIntentions.join(",")],
   );
 
+  // Fetch outcomes summary for progress dashboard (non-demo users)
+  const outcomeSummary = useApi<OutcomeSummary>(
+    user?.id && !isDemoUser ? () => getOutcomeSummary(user.id) : null,
+    [user?.id ?? ""],
+  );
+
   // Use API modalities if available, otherwise show hardcoded list
   const modalityList = modalities.data?.modalities ?? [];
 
@@ -370,7 +483,10 @@ export default function HealingPage() {
 
   return (
     <ProtectedRoute>
-      <main className="min-h-screen grain-overlay bg-atmosphere px-4 sm:px-6 lg:px-8 py-8">
+      <main
+        id="main-content"
+        className="min-h-screen grain-overlay bg-atmosphere px-4 sm:px-6 lg:px-8 py-8"
+      >
         <div className="max-w-5xl mx-auto">
           {/* Crisis Resources — ALWAYS visible, prominent, at top */}
           <MotionReveal duration={0.5}>
@@ -515,6 +631,21 @@ export default function HealingPage() {
             </MotionReveal>
           )}
 
+          {/* Healing Progress Dashboard — real API data for non-demo users */}
+          {!isDemoUser && outcomeSummary.data && (
+            <MotionReveal delay={0.1}>
+              <section
+                className="mb-12"
+                aria-labelledby="healing-dashboard-heading"
+              >
+                <h2 id="healing-dashboard-heading" className="sr-only">
+                  Healing Progress Dashboard
+                </h2>
+                <HealingProgressDashboard summary={outcomeSummary.data} />
+              </section>
+            </MotionReveal>
+          )}
+
           {/* Personalized Matches */}
           {hasIntake && (
             <MotionReveal>
@@ -590,13 +721,18 @@ export default function HealingPage() {
               {selectedPattern ? (
                 <BreathworkTimer
                   pattern={PATTERNS[selectedPattern]}
-                  onComplete={() => {
+                  onComplete={(data: BreathworkCompletionData) => {
                     if (user?.id && selectedPattern) {
                       logActivity({
                         user_id: user.id,
                         system: "healing",
                         activity_type: "breathwork_session",
-                        metadata: { pattern: selectedPattern },
+                        metadata: {
+                          pattern: selectedPattern,
+                          pattern_name: data.pattern_name,
+                          duration_seconds: data.duration_seconds,
+                          cycles: data.cycles,
+                        },
                       }).catch(() => {});
                     }
                     setSelectedPattern(null);
@@ -607,9 +743,10 @@ export default function HealingPage() {
                 <div id="breathwork">
                   <h2
                     id="breathwork-heading"
-                    className="section-heading-sm mb-2"
+                    className="section-heading-sm mb-2 flex items-center gap-3 flex-wrap"
                   >
                     Breathwork Sessions
+                    <EvidenceBadge level="strong" />
                   </h2>
                   <hr className="rule-gold mb-6" aria-hidden="true" />
                   <MotionStagger className="grid md:grid-cols-3 gap-6">
@@ -663,8 +800,12 @@ export default function HealingPage() {
           {/* Modalities Grid */}
           <MotionReveal>
             <section className="mb-12" aria-labelledby="modalities-heading">
-              <h2 id="modalities-heading" className="section-heading-sm mb-2">
+              <h2
+                id="modalities-heading"
+                className="section-heading-sm mb-2 flex items-center gap-3 flex-wrap"
+              >
                 Healing Modalities
+                <EvidenceBadge level="moderate" />
               </h2>
               <hr className="rule-gold mb-6" aria-hidden="true" />
               <ApiStateView
@@ -741,8 +882,71 @@ export default function HealingPage() {
               />
             </section>
           </MotionReveal>
+          {/* Connections — healing-perspective bridge */}
+          {hasIntake && (
+            <MotionReveal>
+              <section
+                className="mb-12"
+                aria-labelledby="healing-connections-heading"
+                data-testid="connections-section"
+              >
+                <div className="card-surface border border-accent/10 p-5">
+                  <h2
+                    id="healing-connections-heading"
+                    className="font-display text-sm font-medium text-accent mb-3"
+                  >
+                    Connected: Healing &amp; Perspective
+                  </h2>
+                  <p className="font-body text-sm text-text/50 leading-relaxed mb-3">
+                    Your healing practices directly prime your capacity for
+                    perspective shifts. Breathwork and somatic work soften rigid
+                    thinking patterns, making Kegan stage transitions more
+                    accessible. Start with a breathwork session before doing
+                    perspective work for deeper integration.
+                  </p>
+                  <Link
+                    href="/perspective"
+                    className="font-body text-xs text-accent underline underline-offset-2"
+                  >
+                    Explore Perspective Prism &rarr;
+                  </Link>
+                </div>
+              </section>
+            </MotionReveal>
+          )}
+
+          {/* Bottom spacing to prevent fixed footer overlap */}
+          <div className="h-12" aria-hidden="true" />
         </div>
       </main>
+
+      {/* Fixed "Need Support?" safety link — always accessible, non-intrusive */}
+      <div
+        className="fixed bottom-4 right-4 z-50"
+        role="complementary"
+        aria-label="Crisis support resources"
+      >
+        <a
+          href="#crisis-heading"
+          className="font-body text-xs text-text/30 hover:text-text/60 transition-colors duration-200 flex items-center gap-1.5 bg-bg/80 backdrop-blur-sm px-3 py-2 rounded-full border border-white/5 hover:border-white/10"
+          aria-label="Need support? Jump to crisis resources"
+        >
+          <span aria-hidden="true">
+            <svg
+              className="w-3 h-3"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10" />
+            </svg>
+          </span>
+          Need Support?
+        </a>
+      </div>
     </ProtectedRoute>
   );
 }
