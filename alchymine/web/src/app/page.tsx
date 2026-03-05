@@ -884,7 +884,8 @@ export default function LandingPage() {
                 Ready to Begin?
               </h2>
               <p className="text-text/40 font-body mb-8 leading-relaxed">
-                Your free assessment takes about 10 minutes. No credit card required.
+                Your free assessment takes about 10 minutes. No credit card
+                required.
               </p>
               <Link
                 href="/signup"

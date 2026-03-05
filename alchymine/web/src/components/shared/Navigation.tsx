@@ -430,16 +430,16 @@ export default function Navigation() {
                     className={active ? "text-primary" : ""}
                   />
                   <span className="truncate max-w-[48px]">
-                    {
-                      ({
+                    {(
+                      {
                         Dashboard: "Home",
                         Intelligence: "Mind",
                         Healing: "Heal",
                         Wealth: "Wealth",
                         Creative: "Create",
                         Perspective: "View",
-                      } as Record<string, string>)[item.name] ?? item.name
-                    }
+                      } as Record<string, string>
+                    )[item.name] ?? item.name}
                   </span>
                 </Link>
               </li>

@@ -675,395 +675,403 @@ export default function WealthPage() {
 
   return (
     <ProtectedRoute>
-    <div className="grain-overlay bg-atmosphere min-h-screen">
-      <main className="px-4 sm:px-6 lg:px-8 py-8">
-        <div className="max-w-5xl mx-auto">
-          {/* ── Page Header ─────────────────────────────────────────── */}
-          <header className="mb-10">
-            <MotionReveal delay={0.05} y={16}>
-              <h1 className="font-display text-display-md font-light mb-3">
-                <span className="text-gradient-gold">Generational Wealth</span>
-              </h1>
-            </MotionReveal>
-            <MotionReveal delay={0.15} y={12}>
-              <p className="font-body text-text/40 text-base max-w-2xl">
-                Five-lever generational wealth strategy. All calculations are
-                deterministic — no AI guesswork with your finances.
-              </p>
-            </MotionReveal>
-            <MotionReveal delay={0.22} y={8}>
-              <div className="mt-4 inline-block bg-surface/50 border border-primary/20 rounded-full px-4 py-2">
-                <span className="font-body text-xs text-text/40">
-                  Not financial advice. All strategies require professional
-                  review.
-                </span>
-              </div>
-            </MotionReveal>
-          </header>
-
-          {/* ── Personalized Wealth Profile ──────────────────────────── */}
-          {hasIntake && (
-            <section className="mb-12" aria-labelledby="your-wealth-heading">
-              <MotionReveal delay={0.1}>
-                <h2
-                  id="your-wealth-heading"
-                  className="section-heading-sm mb-6 flex items-center gap-3"
-                >
-                  <span
-                    className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center text-xl"
-                    aria-hidden="true"
-                  >
-                    {"\u{2728}"}
+      <div className="grain-overlay bg-atmosphere min-h-screen">
+        <main className="px-4 sm:px-6 lg:px-8 py-8">
+          <div className="max-w-5xl mx-auto">
+            {/* ── Page Header ─────────────────────────────────────────── */}
+            <header className="mb-10">
+              <MotionReveal delay={0.05} y={16}>
+                <h1 className="font-display text-display-md font-light mb-3">
+                  <span className="text-gradient-gold">
+                    Generational Wealth
                   </span>
-                  Your Wealth Profile
-                </h2>
+                </h1>
               </MotionReveal>
-              <ApiStateView
-                loading={wealthProfile.loading}
-                error={wealthProfile.error}
-                empty={!wealthProfile.data}
-                loadingText="Analyzing your wealth archetype..."
-                emptyText="Complete the full assessment to discover your wealth archetype and personalized strategies."
-                onRetry={wealthProfile.refetch}
-              >
-                {wealthProfile.data && (
-                  <MotionReveal delay={0.15}>
-                    <div className="card-surface p-6 space-y-4">
-                      <div className="flex items-center gap-4">
-                        <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center text-3xl">
-                          {WEALTH_ARCHETYPES_PREVIEW.find((a) =>
-                            a.name
-                              .toLowerCase()
-                              .includes(
-                                wealthProfile.data!.wealth_archetype.toLowerCase(),
-                              ),
-                          )?.icon ?? "\u{1F4B0}"}
-                        </div>
-                        <div>
-                          <h3 className="font-display text-xl font-light text-primary">
-                            {wealthProfile.data.wealth_archetype}
-                          </h3>
-                          <p className="font-body text-sm text-text/50">
-                            {wealthProfile.data.description}
-                          </p>
-                        </div>
-                      </div>
-
-                      <div className="grid sm:grid-cols-2 gap-4 pt-4 border-t border-white/5">
-                        <div>
-                          <h4 className="font-body text-xs uppercase tracking-wider text-text/40 mb-2">
-                            Strengths
-                          </h4>
-                          <div className="flex flex-wrap gap-2">
-                            {wealthProfile.data.strengths.map((s) => (
-                              <span
-                                key={s}
-                                className="px-3 py-1 bg-primary/10 text-primary font-body text-xs rounded-full"
-                              >
-                                {s}
-                              </span>
-                            ))}
-                          </div>
-                        </div>
-                        <div>
-                          <h4 className="font-body text-xs uppercase tracking-wider text-text/40 mb-2">
-                            Blind Spots
-                          </h4>
-                          <div className="flex flex-wrap gap-2">
-                            {wealthProfile.data.blind_spots.map((b) => (
-                              <span
-                                key={b}
-                                className="px-3 py-1 bg-white/5 text-text/50 font-body text-xs rounded-full"
-                              >
-                                {b}
-                              </span>
-                            ))}
-                          </div>
-                        </div>
-                      </div>
-
-                      {levers.data && (
-                        <div className="pt-4 border-t border-white/5">
-                          <LeverPriorityDisplay levers={levers.data.levers} />
-                        </div>
-                      )}
-                    </div>
-                  </MotionReveal>
-                )}
-              </ApiStateView>
-            </section>
-          )}
-
-          {/* ── Financial Dashboard Cards — demo data only ─────────────── */}
-          {isDemoUser && (
-            <section
-              className="mb-12"
-              aria-labelledby="financial-dashboard-heading"
-            >
-              <MotionReveal delay={0.05}>
-                <h2
-                  id="financial-dashboard-heading"
-                  className="section-heading-sm mb-3 flex items-center gap-3"
-                >
-                  <span
-                    className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center text-xl"
-                    aria-hidden="true"
-                  >
-                    {"\u{1F4CA}"}
+              <MotionReveal delay={0.15} y={12}>
+                <p className="font-body text-text/40 text-base max-w-2xl">
+                  Five-lever generational wealth strategy. All calculations are
+                  deterministic — no AI guesswork with your finances.
+                </p>
+              </MotionReveal>
+              <MotionReveal delay={0.22} y={8}>
+                <div className="mt-4 inline-block bg-surface/50 border border-primary/20 rounded-full px-4 py-2">
+                  <span className="font-body text-xs text-text/40">
+                    Not financial advice. All strategies require professional
+                    review.
                   </span>
-                  Financial Dashboard
+                </div>
+              </MotionReveal>
+            </header>
+
+            {/* ── Personalized Wealth Profile ──────────────────────────── */}
+            {hasIntake && (
+              <section className="mb-12" aria-labelledby="your-wealth-heading">
+                <MotionReveal delay={0.1}>
+                  <h2
+                    id="your-wealth-heading"
+                    className="section-heading-sm mb-6 flex items-center gap-3"
+                  >
+                    <span
+                      className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center text-xl"
+                      aria-hidden="true"
+                    >
+                      {"\u{2728}"}
+                    </span>
+                    Your Wealth Profile
+                  </h2>
+                </MotionReveal>
+                <ApiStateView
+                  loading={wealthProfile.loading}
+                  error={wealthProfile.error}
+                  empty={!wealthProfile.data}
+                  loadingText="Analyzing your wealth archetype..."
+                  emptyText="Complete the full assessment to discover your wealth archetype and personalized strategies."
+                  onRetry={wealthProfile.refetch}
+                >
+                  {wealthProfile.data && (
+                    <MotionReveal delay={0.15}>
+                      <div className="card-surface p-6 space-y-4">
+                        <div className="flex items-center gap-4">
+                          <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center text-3xl">
+                            {WEALTH_ARCHETYPES_PREVIEW.find((a) =>
+                              a.name
+                                .toLowerCase()
+                                .includes(
+                                  wealthProfile.data!.wealth_archetype.toLowerCase(),
+                                ),
+                            )?.icon ?? "\u{1F4B0}"}
+                          </div>
+                          <div>
+                            <h3 className="font-display text-xl font-light text-primary">
+                              {wealthProfile.data.wealth_archetype}
+                            </h3>
+                            <p className="font-body text-sm text-text/50">
+                              {wealthProfile.data.description}
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="grid sm:grid-cols-2 gap-4 pt-4 border-t border-white/5">
+                          <div>
+                            <h4 className="font-body text-xs uppercase tracking-wider text-text/40 mb-2">
+                              Strengths
+                            </h4>
+                            <div className="flex flex-wrap gap-2">
+                              {wealthProfile.data.strengths.map((s) => (
+                                <span
+                                  key={s}
+                                  className="px-3 py-1 bg-primary/10 text-primary font-body text-xs rounded-full"
+                                >
+                                  {s}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                          <div>
+                            <h4 className="font-body text-xs uppercase tracking-wider text-text/40 mb-2">
+                              Blind Spots
+                            </h4>
+                            <div className="flex flex-wrap gap-2">
+                              {wealthProfile.data.blind_spots.map((b) => (
+                                <span
+                                  key={b}
+                                  className="px-3 py-1 bg-white/5 text-text/50 font-body text-xs rounded-full"
+                                >
+                                  {b}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+
+                        {levers.data && (
+                          <div className="pt-4 border-t border-white/5">
+                            <LeverPriorityDisplay levers={levers.data.levers} />
+                          </div>
+                        )}
+                      </div>
+                    </MotionReveal>
+                  )}
+                </ApiStateView>
+              </section>
+            )}
+
+            {/* ── Financial Dashboard Cards — demo data only ─────────────── */}
+            {isDemoUser && (
+              <section
+                className="mb-12"
+                aria-labelledby="financial-dashboard-heading"
+              >
+                <MotionReveal delay={0.05}>
+                  <h2
+                    id="financial-dashboard-heading"
+                    className="section-heading-sm mb-3 flex items-center gap-3"
+                  >
+                    <span
+                      className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center text-xl"
+                      aria-hidden="true"
+                    >
+                      {"\u{1F4CA}"}
+                    </span>
+                    Financial Dashboard
+                  </h2>
+                  <hr className="rule-gold my-5 max-w-[60px]" />
+                  <p className="font-body text-text/40 text-sm mb-6">
+                    Sample visualizations showing how your financial data will
+                    be displayed. All calculations use standard deterministic
+                    formulas.
+                  </p>
+                </MotionReveal>
+
+                <MotionStagger staggerDelay={0.12} className="space-y-6">
+                  {/* Debt Payoff Timeline */}
+                  <MotionStaggerItem>
+                    <Card title="">
+                      <DebtPayoffTimeline debts={DEMO_DEBTS} />
+                    </Card>
+                  </MotionStaggerItem>
+
+                  {/* Budget Breakdown */}
+                  <MotionStaggerItem>
+                    <Card title="">
+                      <BudgetBreakdown
+                        income={DEMO_BUDGET.income}
+                        categories={DEMO_BUDGET.categories}
+                      />
+                    </Card>
+                  </MotionStaggerItem>
+
+                  {/* Net Worth Tracker */}
+                  <MotionStaggerItem>
+                    <Card title="">
+                      <NetWorthTracker
+                        assets={DEMO_NET_WORTH.assets}
+                        liabilities={DEMO_NET_WORTH.liabilities}
+                      />
+                    </Card>
+                  </MotionStaggerItem>
+                </MotionStagger>
+              </section>
+            )}
+
+            {/* ── Five Wealth Levers ───────────────────────────────────── */}
+            <section className="mb-12" aria-labelledby="levers-heading">
+              <MotionReveal delay={0.05}>
+                <h2 id="levers-heading" className="section-heading-sm mb-2">
+                  Five Wealth Levers
                 </h2>
                 <hr className="rule-gold my-5 max-w-[60px]" />
-                <p className="font-body text-text/40 text-sm mb-6">
-                  Sample visualizations showing how your financial data will be
-                  displayed. All calculations use standard deterministic
-                  formulas.
+              </MotionReveal>
+
+              <MotionStagger
+                staggerDelay={0.09}
+                className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6"
+              >
+                {WEALTH_LEVERS.map((lever) => (
+                  <MotionStaggerItem key={lever.name}>
+                    <button
+                      onClick={() =>
+                        setSelectedLever(
+                          selectedLever === lever.name ? null : lever.name,
+                        )
+                      }
+                      aria-pressed={selectedLever === lever.name}
+                      className={`card-surface p-4 text-left w-full transition-all duration-300 hover:-translate-y-1 touch-target ${
+                        selectedLever === lever.name
+                          ? "glow-gold ring-1 ring-primary/30"
+                          : "hover:glow-gold"
+                      }`}
+                    >
+                      <div className="text-3xl mb-2" aria-hidden="true">
+                        {lever.icon}
+                      </div>
+                      <h3 className="font-display font-medium text-sm mb-1">
+                        {lever.name}
+                      </h3>
+                      <p className="font-body text-text/40 text-xs">
+                        {lever.description}
+                      </p>
+                    </button>
+                  </MotionStaggerItem>
+                ))}
+              </MotionStagger>
+
+              {selectedLever && (
+                <MotionReveal duration={0.4}>
+                  <div className="card-surface-elevated p-6 mb-6 animate-fade-in">
+                    <h3 className="font-display text-xl font-light text-primary mb-4">
+                      {
+                        WEALTH_LEVERS.find((l) => l.name === selectedLever)
+                          ?.icon
+                      }{" "}
+                      {selectedLever} Strategies
+                    </h3>
+                    <div className="grid sm:grid-cols-2 gap-3">
+                      {WEALTH_LEVERS.find(
+                        (l) => l.name === selectedLever,
+                      )?.examples.map((ex) => (
+                        <div
+                          key={ex}
+                          className="flex items-center gap-2 font-body text-text/70 text-sm"
+                        >
+                          <span
+                            className="w-1.5 h-1.5 rounded-full bg-primary"
+                            aria-hidden="true"
+                          />
+                          {ex}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </MotionReveal>
+              )}
+            </section>
+
+            {/* ── Wealth Archetypes Preview ────────────────────────────── */}
+            <section className="mb-12" aria-labelledby="archetypes-heading">
+              <MotionReveal delay={0.05}>
+                <h2 id="archetypes-heading" className="section-heading-sm mb-2">
+                  Wealth Archetypes
+                </h2>
+                <hr className="rule-gold my-5 max-w-[60px]" />
+                <p className="font-body text-text/40 mb-6 text-sm">
+                  Your wealth archetype is derived from your numerology Life
+                  Path and Jungian archetype. Complete your profile to discover
+                  yours.
                 </p>
               </MotionReveal>
 
-              <MotionStagger staggerDelay={0.12} className="space-y-6">
-                {/* Debt Payoff Timeline */}
-                <MotionStaggerItem>
-                  <Card title="">
-                    <DebtPayoffTimeline debts={DEMO_DEBTS} />
-                  </Card>
-                </MotionStaggerItem>
-
-                {/* Budget Breakdown */}
-                <MotionStaggerItem>
-                  <Card title="">
-                    <BudgetBreakdown
-                      income={DEMO_BUDGET.income}
-                      categories={DEMO_BUDGET.categories}
-                    />
-                  </Card>
-                </MotionStaggerItem>
-
-                {/* Net Worth Tracker */}
-                <MotionStaggerItem>
-                  <Card title="">
-                    <NetWorthTracker
-                      assets={DEMO_NET_WORTH.assets}
-                      liabilities={DEMO_NET_WORTH.liabilities}
-                    />
-                  </Card>
-                </MotionStaggerItem>
-              </MotionStagger>
-            </section>
-          )}
-
-          {/* ── Five Wealth Levers ───────────────────────────────────── */}
-          <section className="mb-12" aria-labelledby="levers-heading">
-            <MotionReveal delay={0.05}>
-              <h2 id="levers-heading" className="section-heading-sm mb-2">
-                Five Wealth Levers
-              </h2>
-              <hr className="rule-gold my-5 max-w-[60px]" />
-            </MotionReveal>
-
-            <MotionStagger
-              staggerDelay={0.09}
-              className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6"
-            >
-              {WEALTH_LEVERS.map((lever) => (
-                <MotionStaggerItem key={lever.name}>
-                  <button
-                    onClick={() =>
-                      setSelectedLever(
-                        selectedLever === lever.name ? null : lever.name,
-                      )
-                    }
-                    aria-pressed={selectedLever === lever.name}
-                    className={`card-surface p-4 text-left w-full transition-all duration-300 hover:-translate-y-1 touch-target ${
-                      selectedLever === lever.name
-                        ? "glow-gold ring-1 ring-primary/30"
-                        : "hover:glow-gold"
-                    }`}
-                  >
-                    <div className="text-3xl mb-2" aria-hidden="true">
-                      {lever.icon}
-                    </div>
-                    <h3 className="font-display font-medium text-sm mb-1">
-                      {lever.name}
-                    </h3>
-                    <p className="font-body text-text/40 text-xs">
-                      {lever.description}
-                    </p>
-                  </button>
-                </MotionStaggerItem>
-              ))}
-            </MotionStagger>
-
-            {selectedLever && (
-              <MotionReveal duration={0.4}>
-                <div className="card-surface-elevated p-6 mb-6 animate-fade-in">
-                  <h3 className="font-display text-xl font-light text-primary mb-4">
-                    {WEALTH_LEVERS.find((l) => l.name === selectedLever)?.icon}{" "}
-                    {selectedLever} Strategies
-                  </h3>
-                  <div className="grid sm:grid-cols-2 gap-3">
-                    {WEALTH_LEVERS.find(
-                      (l) => l.name === selectedLever,
-                    )?.examples.map((ex) => (
-                      <div
-                        key={ex}
-                        className="flex items-center gap-2 font-body text-text/70 text-sm"
-                      >
-                        <span
-                          className="w-1.5 h-1.5 rounded-full bg-primary"
-                          aria-hidden="true"
-                        />
-                        {ex}
+              <MotionStagger
+                staggerDelay={0.08}
+                className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4"
+              >
+                {WEALTH_ARCHETYPES_PREVIEW.map((archetype) => (
+                  <MotionStaggerItem key={archetype.name}>
+                    <div className="card-surface p-4 h-full transition-all duration-300 hover:glow-gold hover:-translate-y-1">
+                      <div className="text-2xl mb-2" aria-hidden="true">
+                        {archetype.icon}
                       </div>
-                    ))}
-                  </div>
-                </div>
-              </MotionReveal>
-            )}
-          </section>
-
-          {/* ── Wealth Archetypes Preview ────────────────────────────── */}
-          <section className="mb-12" aria-labelledby="archetypes-heading">
-            <MotionReveal delay={0.05}>
-              <h2 id="archetypes-heading" className="section-heading-sm mb-2">
-                Wealth Archetypes
-              </h2>
-              <hr className="rule-gold my-5 max-w-[60px]" />
-              <p className="font-body text-text/40 mb-6 text-sm">
-                Your wealth archetype is derived from your numerology Life Path
-                and Jungian archetype. Complete your profile to discover yours.
-              </p>
-            </MotionReveal>
-
-            <MotionStagger
-              staggerDelay={0.08}
-              className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4"
-            >
-              {WEALTH_ARCHETYPES_PREVIEW.map((archetype) => (
-                <MotionStaggerItem key={archetype.name}>
-                  <div className="card-surface p-4 h-full transition-all duration-300 hover:glow-gold hover:-translate-y-1">
-                    <div className="text-2xl mb-2" aria-hidden="true">
-                      {archetype.icon}
-                    </div>
-                    <h3 className="font-display font-medium text-sm text-primary">
-                      {archetype.name}
-                    </h3>
-                    <p className="font-body text-text/40 text-xs mt-1">
-                      {archetype.description}
-                    </p>
-                  </div>
-                </MotionStaggerItem>
-              ))}
-            </MotionStagger>
-          </section>
-
-          {/* ── 90-Day Activation Plan — demo data only ──────────────── */}
-          {isDemoUser && (
-            <section className="mb-12" aria-labelledby="plan-heading">
-              <MotionReveal delay={0.05}>
-                <h2 id="plan-heading" className="section-heading-sm mb-2">
-                  90-Day Activation Plan
-                </h2>
-                <hr className="rule-gold my-5 max-w-[60px]" />
-              </MotionReveal>
-
-              <MotionReveal delay={0.12}>
-                <div className="card-surface-elevated p-6">
-                  <div className="flex items-start justify-between mb-6">
-                    <div>
-                      <h3 className="font-display text-lg font-light text-text">
-                        Your Personalized Roadmap
+                      <h3 className="font-display font-medium text-sm text-primary">
+                        {archetype.name}
                       </h3>
-                      <p className="font-body text-sm text-text/50 mt-1">
-                        Three-phase wealth-building activation plan
+                      <p className="font-body text-text/40 text-xs mt-1">
+                        {archetype.description}
                       </p>
                     </div>
-                    <span className="px-3 py-1 rounded-full font-body text-[0.7rem] font-medium tracking-wider uppercase bg-primary/20 text-primary">
-                      Phase 2
-                    </span>
+                  </MotionStaggerItem>
+                ))}
+              </MotionStagger>
+            </section>
+
+            {/* ── 90-Day Activation Plan — demo data only ──────────────── */}
+            {isDemoUser && (
+              <section className="mb-12" aria-labelledby="plan-heading">
+                <MotionReveal delay={0.05}>
+                  <h2 id="plan-heading" className="section-heading-sm mb-2">
+                    90-Day Activation Plan
+                  </h2>
+                  <hr className="rule-gold my-5 max-w-[60px]" />
+                </MotionReveal>
+
+                <MotionReveal delay={0.12}>
+                  <div className="card-surface-elevated p-6">
+                    <div className="flex items-start justify-between mb-6">
+                      <div>
+                        <h3 className="font-display text-lg font-light text-text">
+                          Your Personalized Roadmap
+                        </h3>
+                        <p className="font-body text-sm text-text/50 mt-1">
+                          Three-phase wealth-building activation plan
+                        </p>
+                      </div>
+                      <span className="px-3 py-1 rounded-full font-body text-[0.7rem] font-medium tracking-wider uppercase bg-primary/20 text-primary">
+                        Phase 2
+                      </span>
+                    </div>
+                    <div className="space-y-4">
+                      <div>
+                        <div className="flex justify-between font-body text-sm mb-1.5">
+                          <span className="text-text/60">
+                            Phase 1: Foundation (Days 1–30)
+                          </span>
+                          <span className="text-primary font-medium">EARN</span>
+                        </div>
+                        <ProgressBar
+                          value={100}
+                          variant="gold"
+                          size="sm"
+                          aria-label="Phase 1 Foundation: 100% complete"
+                        />
+                      </div>
+                      <div>
+                        <div className="flex justify-between font-body text-sm mb-1.5">
+                          <span className="text-text/60">
+                            Phase 2: Building (Days 31–60)
+                          </span>
+                          <span className="text-secondary font-medium">
+                            KEEP
+                          </span>
+                        </div>
+                        <ProgressBar
+                          value={60}
+                          variant="purple"
+                          size="sm"
+                          aria-label="Phase 2 Building: 60% complete"
+                        />
+                      </div>
+                      <div>
+                        <div className="flex justify-between font-body text-sm mb-1.5">
+                          <span className="text-text/60">
+                            Phase 3: Acceleration (Days 61–90)
+                          </span>
+                          <span className="text-accent font-medium">GROW</span>
+                        </div>
+                        <ProgressBar
+                          value={20}
+                          variant="teal"
+                          size="sm"
+                          aria-label="Phase 3 Acceleration: 20% complete"
+                        />
+                      </div>
+                    </div>
                   </div>
-                  <div className="space-y-4">
-                    <div>
-                      <div className="flex justify-between font-body text-sm mb-1.5">
-                        <span className="text-text/60">
-                          Phase 1: Foundation (Days 1–30)
-                        </span>
-                        <span className="text-primary font-medium">EARN</span>
-                      </div>
-                      <ProgressBar
-                        value={100}
-                        variant="gold"
-                        size="sm"
-                        aria-label="Phase 1 Foundation: 100% complete"
-                      />
-                    </div>
-                    <div>
-                      <div className="flex justify-between font-body text-sm mb-1.5">
-                        <span className="text-text/60">
-                          Phase 2: Building (Days 31–60)
-                        </span>
-                        <span className="text-secondary font-medium">KEEP</span>
-                      </div>
-                      <ProgressBar
-                        value={60}
-                        variant="purple"
-                        size="sm"
-                        aria-label="Phase 2 Building: 60% complete"
-                      />
-                    </div>
-                    <div>
-                      <div className="flex justify-between font-body text-sm mb-1.5">
-                        <span className="text-text/60">
-                          Phase 3: Acceleration (Days 61–90)
-                        </span>
-                        <span className="text-accent font-medium">GROW</span>
-                      </div>
-                      <ProgressBar
-                        value={20}
-                        variant="teal"
-                        size="sm"
-                        aria-label="Phase 3 Acceleration: 20% complete"
-                      />
-                    </div>
-                  </div>
-                </div>
+                </MotionReveal>
+              </section>
+            )}
+
+            {/* ── Methodology Panel ────────────────────────────────────── */}
+            <section className="mb-12">
+              <MotionReveal delay={0.05}>
+                <MethodologyPanel
+                  title="Wealth Engine"
+                  methodology="All financial calculations in the Wealth Engine use deterministic mathematical formulas. Debt payoff uses the avalanche method (highest interest first) or snowball method (lowest balance first) with standard amortization formulas. Compound growth projections use the formula A = P(1 + r/n)^(nt). Wealth archetype mapping is derived from numerology Life Path numbers cross-referenced with Jungian archetype theory. No financial data is ever sent to an LLM."
+                  evidenceLevel="strong"
+                  calculationType="deterministic"
+                  sources={[
+                    "Standard amortization and compound interest formulas (mathematical constants)",
+                    'Avalanche vs. Snowball debt payoff methods - Gathergood (2012) "Self-control, financial literacy and consumer over-indebtedness"',
+                    "Five Wealth Levers framework adapted from Kiyosaki, Ramsey, and Sethi personal finance methodologies",
+                    "Financial data classification: Sensitive (encrypted, isolated, never sent to LLM) per ADR-002",
+                  ]}
+                />
               </MotionReveal>
             </section>
-          )}
 
-          {/* ── Methodology Panel ────────────────────────────────────── */}
-          <section className="mb-12">
+            {/* ── CTA ─────────────────────────────────────────────────── */}
             <MotionReveal delay={0.05}>
-              <MethodologyPanel
-                title="Wealth Engine"
-                methodology="All financial calculations in the Wealth Engine use deterministic mathematical formulas. Debt payoff uses the avalanche method (highest interest first) or snowball method (lowest balance first) with standard amortization formulas. Compound growth projections use the formula A = P(1 + r/n)^(nt). Wealth archetype mapping is derived from numerology Life Path numbers cross-referenced with Jungian archetype theory. No financial data is ever sent to an LLM."
-                evidenceLevel="strong"
-                calculationType="deterministic"
-                sources={[
-                  "Standard amortization and compound interest formulas (mathematical constants)",
-                  'Avalanche vs. Snowball debt payoff methods - Gathergood (2012) "Self-control, financial literacy and consumer over-indebtedness"',
-                  "Five Wealth Levers framework adapted from Kiyosaki, Ramsey, and Sethi personal finance methodologies",
-                  "Financial data classification: Sensitive (encrypted, isolated, never sent to LLM) per ADR-002",
-                ]}
-              />
+              <div className="text-center">
+                <Link href="/discover/intake">
+                  <Button variant="primary" size="lg">
+                    {hasIntake
+                      ? "Update Your Wealth Profile"
+                      : "Discover Your Wealth Archetype"}
+                  </Button>
+                </Link>
+              </div>
             </MotionReveal>
-          </section>
-
-          {/* ── CTA ─────────────────────────────────────────────────── */}
-          <MotionReveal delay={0.05}>
-            <div className="text-center">
-              <Link href="/discover/intake">
-                <Button variant="primary" size="lg">
-                  {hasIntake
-                    ? "Update Your Wealth Profile"
-                    : "Discover Your Wealth Archetype"}
-                </Button>
-              </Link>
-            </div>
-          </MotionReveal>
-        </div>
-      </main>
-    </div>
+          </div>
+        </main>
+      </div>
     </ProtectedRoute>
   );
 }

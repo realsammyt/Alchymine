@@ -493,8 +493,7 @@ export default function DashboardPage() {
                         {
                           href: "/healing",
                           label: "Ethical Healing",
-                          description:
-                            "Evidence-based modalities & breathwork",
+                          description: "Evidence-based modalities & breathwork",
                           accentText: "text-accent",
                           accentBg: "bg-accent/[0.07]",
                           accentBorder: "border-accent/[0.15]",
@@ -512,8 +511,7 @@ export default function DashboardPage() {
                         {
                           href: "/creative",
                           label: "Creative Forge",
-                          description:
-                            "Guilford assessment & creative DNA",
+                          description: "Guilford assessment & creative DNA",
                           accentText: "text-secondary-light",
                           accentBg: "bg-secondary/[0.07]",
                           accentBorder: "border-secondary/[0.15]",
