@@ -26,8 +26,8 @@ async def send_password_reset_email(to: str, reset_token: str) -> bool:
 
     if not settings.resend_api_key:
         logger.warning(
-            "RESEND_API_KEY not set — skipping email delivery. Reset URL: %s",
-            reset_url,
+            "RESEND_API_KEY not set — skipping email delivery for %s",
+            to,
         )
         return False
 
