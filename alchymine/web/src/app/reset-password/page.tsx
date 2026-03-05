@@ -148,7 +148,9 @@ function ResetPasswordForm() {
               className="block text-sm font-body font-medium text-text/60 mb-2"
             >
               New Password{" "}
-              <span className="text-primary/60" aria-hidden="true">*</span>
+              <span className="text-primary/60" aria-hidden="true">
+                *
+              </span>
             </label>
             <input
               id="password"
@@ -170,7 +172,9 @@ function ResetPasswordForm() {
               className="block text-sm font-body font-medium text-text/60 mb-2"
             >
               Confirm New Password{" "}
-              <span className="text-primary/60" aria-hidden="true">*</span>
+              <span className="text-primary/60" aria-hidden="true">
+                *
+              </span>
             </label>
             <input
               id="confirm-password"

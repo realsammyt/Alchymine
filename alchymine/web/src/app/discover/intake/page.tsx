@@ -195,14 +195,18 @@ export default function IntakePage() {
                 className="block text-sm font-body font-medium text-text/60 mb-2"
               >
                 Full Name{" "}
-                <span className="text-primary" aria-hidden="true">*</span>
+                <span className="text-primary" aria-hidden="true">
+                  *
+                </span>
               </label>
               <input
                 id="fullName"
                 type="text"
                 required
                 aria-required="true"
-                aria-describedby={errors.fullName ? "fullName-error" : undefined}
+                aria-describedby={
+                  errors.fullName ? "fullName-error" : undefined
+                }
                 placeholder="e.g. Maya Angelou"
                 value={formData.fullName}
                 onChange={(e) =>
@@ -211,7 +215,11 @@ export default function IntakePage() {
                 className={inputClass}
               />
               {errors.fullName && (
-                <p id="fullName-error" role="alert" className="mt-1.5 text-sm font-body text-primary-dark">
+                <p
+                  id="fullName-error"
+                  role="alert"
+                  className="mt-1.5 text-sm font-body text-primary-dark"
+                >
                   {errors.fullName}
                 </p>
               )}
@@ -224,14 +232,18 @@ export default function IntakePage() {
                 className="block text-sm font-body font-medium text-text/60 mb-2"
               >
                 Birth Date{" "}
-                <span className="text-primary" aria-hidden="true">*</span>
+                <span className="text-primary" aria-hidden="true">
+                  *
+                </span>
               </label>
               <input
                 id="birthDate"
                 type="date"
                 required
                 aria-required="true"
-                aria-describedby={errors.birthDate ? "birthDate-error" : undefined}
+                aria-describedby={
+                  errors.birthDate ? "birthDate-error" : undefined
+                }
                 value={formData.birthDate}
                 onChange={(e) =>
                   setFormData((prev) => ({
@@ -242,7 +254,11 @@ export default function IntakePage() {
                 className={inputClass}
               />
               {errors.birthDate && (
-                <p id="birthDate-error" role="alert" className="mt-1.5 text-sm font-body text-primary-dark">
+                <p
+                  id="birthDate-error"
+                  role="alert"
+                  className="mt-1.5 text-sm font-body text-primary-dark"
+                >
                   {errors.birthDate}
                 </p>
               )}
@@ -303,9 +319,14 @@ export default function IntakePage() {
             <fieldset>
               <legend className="block text-sm font-body font-medium text-text/60 mb-1">
                 What brings you here?{" "}
-                <span className="text-primary" aria-hidden="true">*</span>
+                <span className="text-primary" aria-hidden="true">
+                  *
+                </span>
               </legend>
-              <p id="intentions-hint" className="text-xs font-body text-text/30 mb-3">
+              <p
+                id="intentions-hint"
+                className="text-xs font-body text-text/30 mb-3"
+              >
                 Select up to {MAX_INTENTIONS} that resonate most
               </p>
               <MotionStagger
@@ -348,7 +369,10 @@ export default function IntakePage() {
                         />
                         <span className="flex-1">{intent.label}</span>
                         {selected && (
-                          <span className="text-xs text-primary/60 font-medium" aria-hidden="true">
+                          <span
+                            className="text-xs text-primary/60 font-medium"
+                            aria-hidden="true"
+                          >
                             {formData.intentions.indexOf(intent.value) + 1}
                           </span>
                         )}
@@ -358,7 +382,11 @@ export default function IntakePage() {
                 })}
               </MotionStagger>
               {errors.intentions && (
-                <p id="intentions-error" role="alert" className="mt-1.5 text-sm font-body text-primary-dark">
+                <p
+                  id="intentions-error"
+                  role="alert"
+                  className="mt-1.5 text-sm font-body text-primary-dark"
+                >
                   {errors.intentions}
                 </p>
               )}

@@ -496,7 +496,9 @@ function CrossInsightCard({ insight }: { insight: BridgeInsightResponse }) {
         {insight.insight}
       </p>
       {insight.action && (
-        <p className="font-body text-xs text-text/40 italic">{insight.action}</p>
+        <p className="font-body text-xs text-text/40 italic">
+          {insight.action}
+        </p>
       )}
       <Link
         href={accent.href}
@@ -531,9 +533,7 @@ export default function DashboardPage() {
   );
 
   const crossInsights = useApi<BridgeInsightResponse[]>(
-    intake
-      ? () => synthesizeCrossSystems({})
-      : null,
+    intake ? () => synthesizeCrossSystems({}) : null,
     [!!intake],
   );
 
@@ -866,25 +866,30 @@ export default function DashboardPage() {
                           title="Cross-System Insights"
                           subtitle="Connections across your five systems"
                         >
-                          <div
-                            data-testid="cross-system-insights"
-                          >
+                          <div data-testid="cross-system-insights">
                             {crossInsights.loading ? (
                               <Spinner />
-                            ) : crossInsights.error || !crossInsights.data || crossInsights.data.length === 0 ? (
+                            ) : crossInsights.error ||
+                              !crossInsights.data ||
+                              crossInsights.data.length === 0 ? (
                               <p className="font-body text-text/40 text-sm text-center py-4">
-                                Complete more system assessments to unlock cross-system insights.
+                                Complete more system assessments to unlock
+                                cross-system insights.
                               </p>
                             ) : (
                               <MotionStagger
                                 staggerDelay={0.08}
                                 className="grid grid-cols-1 sm:grid-cols-2 gap-3"
                               >
-                                {crossInsights.data.slice(0, 4).map((insight, i) => (
-                                  <MotionStaggerItem key={`${insight.bridge_type}-${i}`}>
-                                    <CrossInsightCard insight={insight} />
-                                  </MotionStaggerItem>
-                                ))}
+                                {crossInsights.data
+                                  .slice(0, 4)
+                                  .map((insight, i) => (
+                                    <MotionStaggerItem
+                                      key={`${insight.bridge_type}-${i}`}
+                                    >
+                                      <CrossInsightCard insight={insight} />
+                                    </MotionStaggerItem>
+                                  ))}
                               </MotionStagger>
                             )}
                           </div>

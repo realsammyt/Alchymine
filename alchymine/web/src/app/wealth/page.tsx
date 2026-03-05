@@ -882,8 +882,8 @@ export default function WealthPage() {
                 </h2>
                 <hr className="rule-gold my-5 max-w-[60px]" />
                 <p className="font-body text-text/40 text-sm mb-6">
-                  Compare avalanche vs. snowball strategies side-by-side.
-                  All calculations run client-side — your data never leaves your
+                  Compare avalanche vs. snowball strategies side-by-side. All
+                  calculations run client-side — your data never leaves your
                   browser.
                 </p>
               </MotionReveal>
@@ -1014,7 +1014,10 @@ export default function WealthPage() {
             {(isDemoUser || hasIntake) && (
               <section className="mb-12" aria-labelledby="plan-heading">
                 <MotionReveal delay={0.05}>
-                  <h2 id="plan-heading" className="section-heading-sm mb-2 flex items-center gap-3">
+                  <h2
+                    id="plan-heading"
+                    className="section-heading-sm mb-2 flex items-center gap-3"
+                  >
                     <span
                       className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center text-xl"
                       aria-hidden="true"
@@ -1075,10 +1078,12 @@ export default function WealthPage() {
                       Connected: Wealth &amp; Numerology Cycles
                     </h2>
                     <p className="font-body text-sm text-text/50 leading-relaxed mb-3">
-                      Your numerology Personal Year cycle influences your optimal wealth-building
-                      timing. Years 1 and 8 favor bold financial moves and new ventures, while
-                      Years 4 and 6 are best for consolidation, protecting assets, and strengthening
-                      foundations. Align your lever focus with your current cycle for maximum impact.
+                      Your numerology Personal Year cycle influences your
+                      optimal wealth-building timing. Years 1 and 8 favor bold
+                      financial moves and new ventures, while Years 4 and 6 are
+                      best for consolidation, protecting assets, and
+                      strengthening foundations. Align your lever focus with
+                      your current cycle for maximum impact.
                     </p>
                     <Link
                       href="/intelligence"

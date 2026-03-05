@@ -770,7 +770,9 @@ export async function synthesizeCrossSystems(
 // ─── Profile API functions ────────────────────────────────────────
 
 export async function getProfile(userId: string): Promise<ProfileResponse> {
-  return request<ProfileResponse>(`${BASE}/profile/${encodeURIComponent(userId)}`);
+  return request<ProfileResponse>(
+    `${BASE}/profile/${encodeURIComponent(userId)}`,
+  );
 }
 
 export { ApiError };

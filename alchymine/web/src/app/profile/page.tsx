@@ -15,7 +15,11 @@ import {
 
 function Spinner() {
   return (
-    <div className="flex justify-center py-12" role="status" aria-label="Loading">
+    <div
+      className="flex justify-center py-12"
+      role="status"
+      aria-label="Loading"
+    >
       <div className="w-8 h-8 rounded-full border-2 border-primary/20 border-t-primary animate-spin" />
     </div>
   );
@@ -58,7 +62,13 @@ function ProfileSection({
 
 // ── Field row ─────────────────────────────────────────────────────
 
-function FieldRow({ label, value }: { label: string; value: string | number | null | undefined }) {
+function FieldRow({
+  label,
+  value,
+}: {
+  label: string;
+  value: string | number | null | undefined;
+}) {
   if (value === null || value === undefined || value === "") return null;
   return (
     <div className="flex items-start justify-between gap-4 py-2 border-b border-white/[0.05] last:border-0">
@@ -112,7 +122,10 @@ function EmptyLayer({
   return (
     <p className="font-body text-sm text-text/40">
       No data yet.{" "}
-      <Link href={href} className={`${accentText} underline underline-offset-2`}>
+      <Link
+        href={href}
+        className={`${accentText} underline underline-offset-2`}
+      >
         {linkText}
       </Link>
     </p>
@@ -134,7 +147,16 @@ function IdentitySection({ profile }: { profile: ProfileResponse }) {
       accentBg="bg-primary/10"
       accentBorder="border-primary/20"
       icon={
-        <svg className="w-5 h-5 text-primary" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <svg
+          className="w-5 h-5 text-primary"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          aria-hidden="true"
+        >
           <circle cx="12" cy="12" r="10" />
           <path d="M12 16v-4" />
           <path d="M12 8h.01" />
@@ -142,7 +164,11 @@ function IdentitySection({ profile }: { profile: ProfileResponse }) {
       }
     >
       {!hasData ? (
-        <EmptyLayer href="/intelligence" accentText="text-primary" linkText="Explore Personal Intelligence" />
+        <EmptyLayer
+          href="/intelligence"
+          accentText="text-primary"
+          linkText="Explore Personal Intelligence"
+        />
       ) : (
         <div className="space-y-1">
           {intake && (
@@ -154,12 +180,27 @@ function IdentitySection({ profile }: { profile: ProfileResponse }) {
           )}
           {identity && (
             <>
-              <FieldRow label="Life Path" value={identity.life_path as number} />
-              <FieldRow label="Expression" value={identity.expression as number} />
-              <FieldRow label="Soul Urge" value={identity.soul_urge as number} />
+              <FieldRow
+                label="Life Path"
+                value={identity.life_path as number}
+              />
+              <FieldRow
+                label="Expression"
+                value={identity.expression as number}
+              />
+              <FieldRow
+                label="Soul Urge"
+                value={identity.soul_urge as number}
+              />
               <FieldRow label="Sun Sign" value={identity.sun_sign as string} />
-              <FieldRow label="Moon Sign" value={identity.moon_sign as string} />
-              <FieldRow label="Archetype" value={identity.primary_archetype as string} />
+              <FieldRow
+                label="Moon Sign"
+                value={identity.moon_sign as string}
+              />
+              <FieldRow
+                label="Archetype"
+                value={identity.primary_archetype as string}
+              />
             </>
           )}
         </div>
@@ -180,30 +221,52 @@ function HealingSection({ profile }: { profile: ProfileResponse }) {
       accentBg="bg-accent/10"
       accentBorder="border-accent/20"
       icon={
-        <svg className="w-5 h-5 text-accent" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <svg
+          className="w-5 h-5 text-accent"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          aria-hidden="true"
+        >
           <path d="M11 20A7 7 0 0 1 9.8 6.9C15.5 4.9 17 3.5 19 2c1 2 2 4.5 2 8 0 5.5-4.78 10-10 10Z" />
           <path d="M2 21c0-3 1.85-5.36 5.08-6C9.5 14.52 12 13 13 12" />
         </svg>
       }
     >
       {!healing ? (
-        <EmptyLayer href="/healing" accentText="text-accent" linkText="Start Healing Journey" />
+        <EmptyLayer
+          href="/healing"
+          accentText="text-accent"
+          linkText="Start Healing Journey"
+        />
       ) : (
         <div className="space-y-4">
           <div className="space-y-1">
-            <FieldRow label="Breathwork Preference" value={healing.breathwork_preference as string} />
-            <FieldRow label="Attachment Style" value={healing.attachment_style as string} />
+            <FieldRow
+              label="Breathwork Preference"
+              value={healing.breathwork_preference as string}
+            />
+            <FieldRow
+              label="Attachment Style"
+              value={healing.attachment_style as string}
+            />
           </div>
-          {Array.isArray(healing.active_modalities) && healing.active_modalities.length > 0 && (
-            <div>
-              <p className="font-body text-xs text-text/40 uppercase tracking-wide mb-2">Active Modalities</p>
-              <TagList
-                items={healing.active_modalities as string[]}
-                accentBg="bg-accent/10"
-                accentText="text-accent"
-              />
-            </div>
-          )}
+          {Array.isArray(healing.active_modalities) &&
+            healing.active_modalities.length > 0 && (
+              <div>
+                <p className="font-body text-xs text-text/40 uppercase tracking-wide mb-2">
+                  Active Modalities
+                </p>
+                <TagList
+                  items={healing.active_modalities as string[]}
+                  accentBg="bg-accent/10"
+                  accentText="text-accent"
+                />
+              </div>
+            )}
         </div>
       )}
     </ProfileSection>
@@ -222,7 +285,16 @@ function WealthSection({ profile }: { profile: ProfileResponse }) {
       accentBg="bg-primary/10"
       accentBorder="border-primary/20"
       icon={
-        <svg className="w-5 h-5 text-primary" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <svg
+          className="w-5 h-5 text-primary"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          aria-hidden="true"
+        >
           <line x1="12" y1="20" x2="12" y2="10" />
           <line x1="18" y1="20" x2="18" y2="4" />
           <line x1="6" y1="20" x2="6" y2="16" />
@@ -230,23 +302,33 @@ function WealthSection({ profile }: { profile: ProfileResponse }) {
       }
     >
       {!wealth ? (
-        <EmptyLayer href="/wealth" accentText="text-primary" linkText="Discover Your Wealth Archetype" />
+        <EmptyLayer
+          href="/wealth"
+          accentText="text-primary"
+          linkText="Discover Your Wealth Archetype"
+        />
       ) : (
         <div className="space-y-4">
           <div className="space-y-1">
-            <FieldRow label="Wealth Archetype" value={wealth.wealth_archetype as string} />
+            <FieldRow
+              label="Wealth Archetype"
+              value={wealth.wealth_archetype as string}
+            />
             <FieldRow label="Plan Phase" value={wealth.plan_phase as string} />
           </div>
-          {Array.isArray(wealth.primary_levers) && wealth.primary_levers.length > 0 && (
-            <div>
-              <p className="font-body text-xs text-text/40 uppercase tracking-wide mb-2">Lever Focus</p>
-              <TagList
-                items={wealth.primary_levers as string[]}
-                accentBg="bg-primary/10"
-                accentText="text-primary"
-              />
-            </div>
-          )}
+          {Array.isArray(wealth.primary_levers) &&
+            wealth.primary_levers.length > 0 && (
+              <div>
+                <p className="font-body text-xs text-text/40 uppercase tracking-wide mb-2">
+                  Lever Focus
+                </p>
+                <TagList
+                  items={wealth.primary_levers as string[]}
+                  accentBg="bg-primary/10"
+                  accentText="text-primary"
+                />
+              </div>
+            )}
         </div>
       )}
     </ProfileSection>
@@ -274,7 +356,16 @@ function CreativeSection({ profile }: { profile: ProfileResponse }) {
       accentBg="bg-secondary/10"
       accentBorder="border-secondary/20"
       icon={
-        <svg className="w-5 h-5 text-secondary-light" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <svg
+          className="w-5 h-5 text-secondary-light"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          aria-hidden="true"
+        >
           <circle cx="13.5" cy="6.5" r=".5" fill="currentColor" />
           <circle cx="17.5" cy="10.5" r=".5" fill="currentColor" />
           <circle cx="8.5" cy="7.5" r=".5" fill="currentColor" />
@@ -284,12 +375,26 @@ function CreativeSection({ profile }: { profile: ProfileResponse }) {
       }
     >
       {!creative ? (
-        <EmptyLayer href="/creative" accentText="text-secondary-light" linkText="Explore Creative Forge" />
+        <EmptyLayer
+          href="/creative"
+          accentText="text-secondary-light"
+          linkText="Explore Creative Forge"
+        />
       ) : (
         <div className="space-y-4">
           <div className="space-y-1">
-            <FieldRow label="Creative Style" value={creative.creative_style as string} />
-            <FieldRow label="Overall Score" value={typeof creative.overall_score === "number" ? (creative.overall_score as number).toFixed(1) : undefined} />
+            <FieldRow
+              label="Creative Style"
+              value={creative.creative_style as string}
+            />
+            <FieldRow
+              label="Overall Score"
+              value={
+                typeof creative.overall_score === "number"
+                  ? (creative.overall_score as number).toFixed(1)
+                  : undefined
+              }
+            />
           </div>
           <div className="space-y-1">
             {guilfordFields.map(({ label, key }) =>
@@ -297,9 +402,13 @@ function CreativeSection({ profile }: { profile: ProfileResponse }) {
                 <FieldRow
                   key={key}
                   label={`Guilford: ${label}`}
-                  value={typeof creative[key] === "number" ? (creative[key] as number).toFixed(1) : (creative[key] as string)}
+                  value={
+                    typeof creative[key] === "number"
+                      ? (creative[key] as number).toFixed(1)
+                      : (creative[key] as string)
+                  }
                 />
-              ) : null
+              ) : null,
             )}
           </div>
         </div>
@@ -320,30 +429,52 @@ function PerspectiveSection({ profile }: { profile: ProfileResponse }) {
       accentBg="bg-accent/10"
       accentBorder="border-accent/20"
       icon={
-        <svg className="w-5 h-5 text-accent" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <svg
+          className="w-5 h-5 text-accent"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          aria-hidden="true"
+        >
           <circle cx="11" cy="11" r="8" />
           <path d="m21 21-4.35-4.35" />
         </svg>
       }
     >
       {!perspective ? (
-        <EmptyLayer href="/perspective" accentText="text-accent" linkText="Map Your Perspective" />
+        <EmptyLayer
+          href="/perspective"
+          accentText="text-accent"
+          linkText="Map Your Perspective"
+        />
       ) : (
         <div className="space-y-4">
           <div className="space-y-1">
-            <FieldRow label="Kegan Stage" value={perspective.kegan_stage as string | number} />
-            <FieldRow label="Stage Name" value={perspective.kegan_stage_name as string} />
+            <FieldRow
+              label="Kegan Stage"
+              value={perspective.kegan_stage as string | number}
+            />
+            <FieldRow
+              label="Stage Name"
+              value={perspective.kegan_stage_name as string}
+            />
           </div>
-          {Array.isArray(perspective.detected_biases) && perspective.detected_biases.length > 0 && (
-            <div>
-              <p className="font-body text-xs text-text/40 uppercase tracking-wide mb-2">Detected Biases</p>
-              <TagList
-                items={perspective.detected_biases as string[]}
-                accentBg="bg-accent/10"
-                accentText="text-accent"
-              />
-            </div>
-          )}
+          {Array.isArray(perspective.detected_biases) &&
+            perspective.detected_biases.length > 0 && (
+              <div>
+                <p className="font-body text-xs text-text/40 uppercase tracking-wide mb-2">
+                  Detected Biases
+                </p>
+                <TagList
+                  items={perspective.detected_biases as string[]}
+                  accentBg="bg-accent/10"
+                  accentText="text-accent"
+                />
+              </div>
+            )}
         </div>
       )}
     </ProfileSection>
@@ -376,10 +507,7 @@ export default function ProfilePage() {
   const userId = user?.id ?? null;
 
   const profileState = useApi<ProfileResponse>(
-    () =>
-      userId
-        ? getProfile(userId)
-        : Promise.reject(new Error("No user")),
+    () => (userId ? getProfile(userId) : Promise.reject(new Error("No user"))),
     [userId],
   );
 
@@ -396,8 +524,7 @@ export default function ProfilePage() {
                     Personal Command Center
                   </p>
                   <h1 className="font-display text-display-md font-light">
-                    Your{" "}
-                    <span className="text-gradient-gold">Profile</span>
+                    Your <span className="text-gradient-gold">Profile</span>
                   </h1>
                   <p className="font-body text-text/40 text-sm mt-2">
                     All five systems in one place

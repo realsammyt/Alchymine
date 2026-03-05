@@ -138,7 +138,10 @@ export default function IntelligencePage() {
   );
 
   return (
-    <main id="main-content" className="grain-overlay bg-atmosphere min-h-screen px-4 sm:px-6 lg:px-8 py-8">
+    <main
+      id="main-content"
+      className="grain-overlay bg-atmosphere min-h-screen px-4 sm:px-6 lg:px-8 py-8"
+    >
       <div className="max-w-5xl mx-auto">
         {/* Page Header */}
         <MotionReveal delay={0}>

@@ -410,9 +410,7 @@ function HealingProgressDashboard({ summary }: { summary: OutcomeSummary }) {
           >
             {engagementScore}
           </div>
-          <div className="font-body text-xs text-text/40 mt-1">
-            Engagement
-          </div>
+          <div className="font-body text-xs text-text/40 mt-1">Engagement</div>
         </div>
         <div className="text-center">
           <div
@@ -473,9 +471,7 @@ export default function HealingPage() {
 
   // Fetch outcomes summary for progress dashboard (non-demo users)
   const outcomeSummary = useApi<OutcomeSummary>(
-    user?.id && !isDemoUser
-      ? () => getOutcomeSummary(user.id)
-      : null,
+    user?.id && !isDemoUser ? () => getOutcomeSummary(user.id) : null,
     [user?.id ?? ""],
   );
 
@@ -487,7 +483,10 @@ export default function HealingPage() {
 
   return (
     <ProtectedRoute>
-      <main id="main-content" className="min-h-screen grain-overlay bg-atmosphere px-4 sm:px-6 lg:px-8 py-8">
+      <main
+        id="main-content"
+        className="min-h-screen grain-overlay bg-atmosphere px-4 sm:px-6 lg:px-8 py-8"
+      >
         <div className="max-w-5xl mx-auto">
           {/* Crisis Resources — ALWAYS visible, prominent, at top */}
           <MotionReveal duration={0.5}>
@@ -899,10 +898,11 @@ export default function HealingPage() {
                     Connected: Healing &amp; Perspective
                   </h2>
                   <p className="font-body text-sm text-text/50 leading-relaxed mb-3">
-                    Your healing practices directly prime your capacity for perspective shifts.
-                    Breathwork and somatic work soften rigid thinking patterns, making Kegan
-                    stage transitions more accessible. Start with a breathwork session before
-                    doing perspective work for deeper integration.
+                    Your healing practices directly prime your capacity for
+                    perspective shifts. Breathwork and somatic work soften rigid
+                    thinking patterns, making Kegan stage transitions more
+                    accessible. Start with a breathwork session before doing
+                    perspective work for deeper integration.
                   </p>
                   <Link
                     href="/perspective"

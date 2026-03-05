@@ -125,19 +125,16 @@ export default function CreativeProjects({
   projects,
   orientation,
 }: CreativeProjectsProps) {
-  const handleStartProject = useCallback(
-    async (project: ProjectResponse) => {
-      await createJournalEntry({
-        system: "creative",
-        entry_type: "project_start",
-        title: `Started: ${project.title}`,
-        content: `Beginning the creative project "${project.title}".\n\nDescription: ${project.description}\n\nMedium: ${project.medium}\nSkill level: ${project.skill_level}\nType: ${project.type}`,
-        tags: ["creative", "project", project.medium, project.type],
-        mood_score: null,
-      });
-    },
-    [],
-  );
+  const handleStartProject = useCallback(async (project: ProjectResponse) => {
+    await createJournalEntry({
+      system: "creative",
+      entry_type: "project_start",
+      title: `Started: ${project.title}`,
+      content: `Beginning the creative project "${project.title}".\n\nDescription: ${project.description}\n\nMedium: ${project.medium}\nSkill level: ${project.skill_level}\nType: ${project.type}`,
+      tags: ["creative", "project", project.medium, project.type],
+      mood_score: null,
+    });
+  }, []);
 
   if (projects.length === 0) {
     return (

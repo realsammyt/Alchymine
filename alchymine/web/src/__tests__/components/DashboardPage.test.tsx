@@ -58,9 +58,7 @@ jest.mock("@/lib/useApi", () => ({
 describe("DashboardPage", () => {
   it("renders without crashing", () => {
     render(<DashboardPage />);
-    expect(
-      screen.getByRole("heading", { level: 1 }),
-    ).toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 1 })).toBeInTheDocument();
   });
 
   it("displays no-intake message when intake is missing", () => {

@@ -206,12 +206,8 @@ interface DebtCalculatorProps {
   initialDebts?: DebtEntry[];
 }
 
-export default function DebtCalculator({
-  initialDebts,
-}: DebtCalculatorProps) {
-  const [debts, setDebts] = useState<DebtEntry[]>(
-    initialDebts ?? [newDebt()],
-  );
+export default function DebtCalculator({ initialDebts }: DebtCalculatorProps) {
+  const [debts, setDebts] = useState<DebtEntry[]>(initialDebts ?? [newDebt()]);
   const [extraPayment, setExtraPayment] = useState(0);
 
   const avalanche = useMemo(
@@ -251,7 +247,9 @@ export default function DebtCalculator({
     [],
   );
 
-  const hasValidDebts = debts.some((d) => d.balance > 0 && d.minimumPayment > 0);
+  const hasValidDebts = debts.some(
+    (d) => d.balance > 0 && d.minimumPayment > 0,
+  );
 
   return (
     <div data-testid="debt-calculator">
@@ -306,9 +304,7 @@ export default function DebtCalculator({
                 min="0"
                 step="100"
                 value={debt.balance || ""}
-                onChange={(e) =>
-                  updateDebt(debt.id, "balance", e.target.value)
-                }
+                onChange={(e) => updateDebt(debt.id, "balance", e.target.value)}
                 placeholder="0"
                 className="w-full bg-surface border border-white/10 rounded-lg px-3 py-2 font-body text-sm text-text placeholder-text/20 focus:outline-none focus:ring-1 focus:ring-primary/40 min-h-[44px]"
                 aria-label={`Balance for ${debt.name || `entry ${idx + 1}`}`}
@@ -443,7 +439,8 @@ export default function DebtCalculator({
       {/* Disclaimer */}
       <div className="mt-4 text-center">
         <p className="font-body text-xs text-text/30">
-          Calculations are estimates only. Consult a financial professional before making decisions.
+          Calculations are estimates only. Consult a financial professional
+          before making decisions.
         </p>
       </div>
     </div>

@@ -73,11 +73,16 @@ function TextInstructions({
 
   if (!isRunning) {
     return (
-      <div className="card-surface p-8 text-center" data-testid="breathwork-ready">
+      <div
+        className="card-surface p-8 text-center"
+        data-testid="breathwork-ready"
+      >
         <h2 className="font-display text-2xl font-light mb-2 text-text">
           {pattern.name}
         </h2>
-        <p className="font-body text-sm text-text/50 mb-4">{pattern.description}</p>
+        <p className="font-body text-sm text-text/50 mb-4">
+          {pattern.description}
+        </p>
         <div className="card-surface-elevated p-4 rounded-xl mb-6 text-left">
           <p className="font-body text-xs text-text/40 mb-3 uppercase tracking-wider">
             Instructions
@@ -197,7 +202,9 @@ export default function BreathworkTimer({
 }: BreathworkTimerProps) {
   const [isRunning, setIsRunning] = useState(false);
   const [currentPhaseIndex, setCurrentPhaseIndex] = useState(0);
-  const [timeRemaining, setTimeRemaining] = useState(pattern.phases[0].duration);
+  const [timeRemaining, setTimeRemaining] = useState(
+    pattern.phases[0].duration,
+  );
   const [currentCycle, setCurrentCycle] = useState(1);
   const [sessionComplete, setSessionComplete] = useState(false);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
@@ -207,10 +214,15 @@ export default function BreathworkTimer({
   const startTimeRef = useRef<number>(0);
 
   useEffect(() => {
-    if (typeof window === "undefined" || typeof window.matchMedia !== "function") return;
+    if (
+      typeof window === "undefined" ||
+      typeof window.matchMedia !== "function"
+    )
+      return;
     const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
     setPrefersReducedMotion(mq.matches);
-    const handler = (e: MediaQueryListEvent) => setPrefersReducedMotion(e.matches);
+    const handler = (e: MediaQueryListEvent) =>
+      setPrefersReducedMotion(e.matches);
     if (mq.addEventListener) {
       mq.addEventListener("change", handler);
       return () => mq.removeEventListener("change", handler);
@@ -328,7 +340,9 @@ export default function BreathworkTimer({
             >
               {formatDuration(elapsedSeconds)}
             </div>
-            <div className="font-body text-xs text-text/40 mt-0.5">Duration</div>
+            <div className="font-body text-xs text-text/40 mt-0.5">
+              Duration
+            </div>
           </div>
           <div className="bg-white/[0.03] rounded-xl p-3">
             <div className="font-display text-xl font-light text-gradient-teal">

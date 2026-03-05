@@ -54,7 +54,9 @@ export default function QualityGateDisplay({
           Verified:{" "}
           <span
             className={
-              allPassed ? "text-accent/70 font-medium" : "text-primary/70 font-medium"
+              allPassed
+                ? "text-accent/70 font-medium"
+                : "text-primary/70 font-medium"
             }
           >
             {checksPassed}/{checksTotal}

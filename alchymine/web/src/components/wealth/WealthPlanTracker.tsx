@@ -38,10 +38,25 @@ function isWeeklyReviewDay(day: number): boolean {
   return day > 0 && day % 7 === 0;
 }
 
-const PHASE_COLORS: Record<number, { variant: "gold" | "purple" | "teal"; text: string; badge: string }> = {
-  0: { variant: "gold", text: "text-primary", badge: "bg-primary/20 text-primary" },
-  1: { variant: "purple", text: "text-secondary", badge: "bg-secondary/20 text-secondary" },
-  2: { variant: "teal", text: "text-accent", badge: "bg-accent/20 text-accent" },
+const PHASE_COLORS: Record<
+  number,
+  { variant: "gold" | "purple" | "teal"; text: string; badge: string }
+> = {
+  0: {
+    variant: "gold",
+    text: "text-primary",
+    badge: "bg-primary/20 text-primary",
+  },
+  1: {
+    variant: "purple",
+    text: "text-secondary",
+    badge: "bg-secondary/20 text-secondary",
+  },
+  2: {
+    variant: "teal",
+    text: "text-accent",
+    badge: "bg-accent/20 text-accent",
+  },
 };
 
 // ── Demo plan used when API has no data ────────────────────────────
@@ -157,9 +172,7 @@ export default function WealthPlanTracker({
   const weeklyPrompt = WEEKLY_PROMPTS[weekNumber % WEEKLY_PROMPTS.length];
 
   // Habits for today — use daily_habits from plan, keyed by today's date
-  const today = mounted
-    ? new Date().toISOString().split("T")[0]
-    : "0000-00-00";
+  const today = mounted ? new Date().toISOString().split("T")[0] : "0000-00-00";
 
   return (
     <div data-testid="wealth-plan-tracker">
@@ -219,7 +232,9 @@ export default function WealthPlanTracker({
                     </span>
                   )}
                 </div>
-                <span className={`font-body text-xs font-medium ${colors.text}`}>
+                <span
+                  className={`font-body text-xs font-medium ${colors.text}`}
+                >
                   {phase.focus_lever}
                 </span>
               </div>
@@ -287,7 +302,14 @@ export default function WealthPlanTracker({
                       fill="currentColor"
                       aria-hidden="true"
                     >
-                      <path d="M10 3L4.5 8.5 2 6" stroke="currentColor" strokeWidth="1.5" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+                      <path
+                        d="M10 3L4.5 8.5 2 6"
+                        stroke="currentColor"
+                        strokeWidth="1.5"
+                        fill="none"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
                     </svg>
                   )}
                 </div>

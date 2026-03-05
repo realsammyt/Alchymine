@@ -48,7 +48,9 @@ export default function DiscoverLayout({
       </header>
 
       {/* Page content */}
-      <main id="main-content" className="flex-1 flex flex-col">{children}</main>
+      <main id="main-content" className="flex-1 flex flex-col">
+        {children}
+      </main>
     </div>
   );
 }

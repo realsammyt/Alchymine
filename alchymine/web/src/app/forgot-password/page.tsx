@@ -113,7 +113,9 @@ export default function ForgotPasswordPage() {
                 className="block text-sm font-body font-medium text-text/60 mb-2"
               >
                 Email{" "}
-                <span className="text-primary/60" aria-hidden="true">*</span>
+                <span className="text-primary/60" aria-hidden="true">
+                  *
+                </span>
               </label>
               <input
                 id="email"

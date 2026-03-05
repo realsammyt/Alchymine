@@ -371,8 +371,15 @@ export default function LandingPage() {
   // Show nothing while checking auth (prevents flash)
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center" role="status" aria-label="Loading">
-        <div className="w-8 h-8 border-2 border-primary/30 border-t-primary rounded-full animate-spin" aria-hidden="true" />
+      <div
+        className="min-h-screen flex items-center justify-center"
+        role="status"
+        aria-label="Loading"
+      >
+        <div
+          className="w-8 h-8 border-2 border-primary/30 border-t-primary rounded-full animate-spin"
+          aria-hidden="true"
+        />
       </div>
     );
   }
