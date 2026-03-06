@@ -50,6 +50,7 @@ class Settings(BaseSettings):
     access_token_expire_minutes: int = 30
     refresh_token_expire_days: int = 7
     signup_promo_code: str = ""
+    admin_email: str = ""  # Used by bootstrap_admin CLI to grant initial admin access
 
     # ── Database ─────────────────────────────────────────────────────────
     database_url: str = "postgresql+asyncpg://alchymine:alchymine@localhost:5432/alchymine"
@@ -71,6 +72,9 @@ class Settings(BaseSettings):
     resend_api_key: str = ""
     email_from: str = "noreply@alchymine.app"
     frontend_url: str = "http://localhost:3000"
+
+    # ── Misc ──────────────────────────────────────────────────────────────
+    auto_create_tables: bool = False
 
     # ── Encryption ───────────────────────────────────────────────────────
     alchymine_encryption_key: str = ""
