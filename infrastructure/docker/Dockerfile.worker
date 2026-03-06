@@ -21,34 +21,23 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 WORKDIR /build
 
-COPY pyproject.toml ./
+COPY pyproject.toml README.md ./
+
+# Create stub package so hatchling can resolve the package metadata.
+# This lets `pip install .` read deps from pyproject.toml without needing
+# the full source tree — no more fragile fallback dependency lists.
+RUN mkdir -p alchymine && echo '__version__ = "0.1.0"' > alchymine/__init__.py
 
 # Install Python dependencies into a virtual environment
 RUN python -m venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
 
-RUN pip install --no-cache-dir . 2>/dev/null || \
-    pip install --no-cache-dir \
-    "fastapi>=0.115.0" \
-    "uvicorn[standard]>=0.32.0" \
-    "pydantic[email]>=2.10.0" \
-    "pydantic-settings>=2.6.0" \
-    "celery[redis]>=5.4.0" \
-    "redis>=5.2.0" \
-    "sqlalchemy>=2.0.0" \
-    "asyncpg>=0.30.0" \
-    "alembic>=1.14.0" \
-    "pyswisseph>=2.10.0" \
-    "cryptography>=43.0.0" \
-    "python-jose[cryptography]>=3.3.0" \
-    "passlib[bcrypt]>=1.7.4" \
-    "anthropic>=0.40.0" \
-    "httpx>=0.28.0" \
-    "resend>=2.0.0" \
-    "pyyaml>=6.0.0" \
-    "python-multipart>=0.0.12" \
-    "jinja2>=3.1.0" \
-    "watchdog"
+# Upgrade build tools
+RUN pip install --no-cache-dir --upgrade pip setuptools wheel
+
+# Install all project dependencies from pyproject.toml (single source of truth)
+RUN pip install --no-cache-dir . && \
+    pip install --no-cache-dir watchdog
 
 # ─── Stage 2: Runtime ─────────────────────────────────────────────────────
 FROM python:3.11-slim AS runtime
