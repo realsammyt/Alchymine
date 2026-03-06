@@ -139,6 +139,36 @@ jobs:
           cache-to: type=gha,mode=max,scope=${{ matrix.image }}
 
   # ──────────────────────────────────────────────
+  # Smoke test: verify built images actually start
+  # ──────────────────────────────────────────────
+  smoke-test:
+    name: "Smoke test: images"
+    runs-on: ubuntu-latest
+    needs: [validate, build-release]
+    permissions:
+      packages: read
+    steps:
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3.3.0
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Pull and verify API image starts
+        run: |
+          IMAGE="${{ env.IMAGE_PREFIX }}-api:${{ needs.validate.outputs.version }}"
+          docker pull "$IMAGE"
+          # Verify the app module can be imported (catches missing deps, syntax errors)
+          docker run --rm "$IMAGE" python -c "from alchymine.api.main import app; print('API smoke test passed')"
+
+      - name: Pull and verify Worker image starts
+        run: |
+          IMAGE="${{ env.IMAGE_PREFIX }}-worker:${{ needs.validate.outputs.version }}"
+          docker pull "$IMAGE"
+          docker run --rm "$IMAGE" python -c "from alchymine.workers.celery_app import app; print('Worker smoke test passed')"
+
+  # ──────────────────────────────────────────────
   # Update GitHub Release with Docker image info
   # ──────────────────────────────────────────────
   update-release:
@@ -175,7 +205,7 @@ jobs:
   deploy:
     name: "Deploy to production"
     runs-on: ubuntu-latest
-    needs: [validate, build-release]
+    needs: [validate, build-release, smoke-test]
     environment: production
     permissions:
       contents: read
@@ -189,7 +219,7 @@ jobs:
           passphrase: ${{ secrets.DEPLOY_SSH_PASSPHRASE }}
           command_timeout: 20m
           script: |
-            set -e
+            set -euo pipefail
             TAG="${{ github.event.release.tag_name }}"
             VERSION="${TAG#v}"
             echo "Deploying Alchymine ${TAG} (zero-downtime)..."
@@ -197,11 +227,24 @@ jobs:
             cd /home/alchymine/Alchymine
 
             # Download release tarball for updated compose files, scripts, nginx config
+            # --fail: return exit code 22 on HTTP errors (instead of saving error HTML)
+            # --retry: retry transient failures
             echo "Downloading ${TAG} tarball..."
-            curl -sL "https://github.com/realsammyt/Alchymine/archive/refs/tags/${TAG}.tar.gz" \
-              -o "/tmp/alchymine-${TAG}.tar.gz"
-            tar xzf "/tmp/alchymine-${TAG}.tar.gz" --strip-components=1 -C /home/alchymine/Alchymine
-            rm -f "/tmp/alchymine-${TAG}.tar.gz"
+            TARBALL="/tmp/alchymine-${TAG}.tar.gz"
+            curl --fail --silent --show-error --location --retry 3 --retry-delay 5 \
+              "https://github.com/realsammyt/Alchymine/archive/refs/tags/${TAG}.tar.gz" \
+              -o "${TARBALL}"
+
+            # Validate the tarball is actually a gzip file before extracting
+            if ! file "${TARBALL}" | grep -q 'gzip'; then
+              echo "ERROR: Downloaded file is not a valid gzip tarball."
+              echo "Content: $(head -c 200 "${TARBALL}")"
+              rm -f "${TARBALL}"
+              exit 1
+            fi
+
+            tar xzf "${TARBALL}" --strip-components=1 -C /home/alchymine/Alchymine
+            rm -f "${TARBALL}"
 
             # Verify production env file exists
             if [ ! -f .env.production ]; then
