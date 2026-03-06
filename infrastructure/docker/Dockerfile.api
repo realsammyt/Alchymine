@@ -80,7 +80,7 @@ WORKDIR /app
 # ARG busts Docker layer cache so source changes are always picked up
 ARG CACHE_BUST=1
 COPY alchymine/ ./alchymine/
-COPY pyproject.toml README.md ./
+COPY pyproject.toml README.md alembic.ini ./
 
 # Install the project in the venv (editable-like, just the package reference)
 RUN pip install --no-cache-dir --no-deps -e .
