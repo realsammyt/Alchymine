@@ -172,7 +172,7 @@ jobs:
           docker run --rm \
             -e JWT_SECRET_KEY="smoke-test-dummy-key-that-is-at-least-32-chars-long" \
             -e SIGNUP_PROMO_CODE="smoke-test-code" \
-            "$IMAGE" python -c "from alchymine.workers.celery_app import app; print('Worker smoke test passed')"
+            "$IMAGE" python -c "from alchymine.workers.celery_app import celery_app; print('Worker smoke test passed')"
 
   # ──────────────────────────────────────────────
   # Update GitHub Release with Docker image info
