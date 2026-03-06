@@ -195,19 +195,17 @@ async def register(
         if invite_code_row is None:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail="Invalid promo code",
+                detail="Invalid invitation code",
             )
-        # Check uses remaining
-        if invite_code_row.uses_count >= invite_code_row.max_uses:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Invite code has reached its usage limit",
-            )
-        # Check expiry
         if invite_code_row.expires_at and invite_code_row.expires_at < datetime.now(UTC):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail="Invite code has expired",
+                detail="This invitation code has expired",
+            )
+        if invite_code_row.uses_count >= invite_code_row.max_uses:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="This invitation code has reached its usage limit",
             )
 
     # Check for existing user
@@ -231,6 +229,13 @@ async def register(
     if invite_code_row is not None:
         invite_code_row.uses_count += 1
         db.add(invite_code_row)
+        logger.info(
+            "Invite code '%s' used by %s (%d/%d uses)",
+            invite_code_row.code,
+            body.email,
+            invite_code_row.uses_count,
+            invite_code_row.max_uses,
+        )
 
     await db.commit()
     await db.refresh(user)
