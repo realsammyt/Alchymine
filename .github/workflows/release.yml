@@ -159,14 +159,20 @@ jobs:
         run: |
           IMAGE="${{ env.IMAGE_PREFIX }}-api:${{ needs.validate.outputs.version }}"
           docker pull "$IMAGE"
-          # Verify the app module can be imported (catches missing deps, syntax errors)
-          docker run --rm "$IMAGE" python -c "from alchymine.api.main import app; print('API smoke test passed')"
+          # Dummy env vars satisfy pydantic-settings validators at import time
+          docker run --rm \
+            -e JWT_SECRET_KEY="smoke-test-dummy-key-that-is-at-least-32-chars-long" \
+            -e SIGNUP_PROMO_CODE="smoke-test-code" \
+            "$IMAGE" python -c "from alchymine.api.main import app; print('API smoke test passed')"
 
       - name: Pull and verify Worker image starts
         run: |
           IMAGE="${{ env.IMAGE_PREFIX }}-worker:${{ needs.validate.outputs.version }}"
           docker pull "$IMAGE"
-          docker run --rm "$IMAGE" python -c "from alchymine.workers.celery_app import app; print('Worker smoke test passed')"
+          docker run --rm \
+            -e JWT_SECRET_KEY="smoke-test-dummy-key-that-is-at-least-32-chars-long" \
+            -e SIGNUP_PROMO_CODE="smoke-test-code" \
+            "$IMAGE" python -c "from alchymine.workers.celery_app import app; print('Worker smoke test passed')"
 
   # ──────────────────────────────────────────────
   # Update GitHub Release with Docker image info
