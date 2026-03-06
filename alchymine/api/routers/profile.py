@@ -6,6 +6,7 @@ endpoints under ``/api/v1/profile``.
 
 from __future__ import annotations
 
+import logging
 from datetime import date, datetime, time
 from typing import Any
 
@@ -17,6 +18,8 @@ from alchymine.api.auth import get_current_user
 from alchymine.api.deps import get_db_session
 from alchymine.db import repository
 from alchymine.db.models import User
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -109,7 +112,15 @@ def _user_to_response(user: User) -> ProfileResponse:
         result = {}
         for col in layer.__table__.columns:
             if col.name not in ("id", "user_id"):
-                result[col.name] = getattr(layer, col.name)
+                try:
+                    result[col.name] = getattr(layer, col.name)
+                except Exception:
+                    logger.warning(
+                        "Failed to read column %s.%s",
+                        layer.__tablename__,
+                        col.name,
+                    )
+                    result[col.name] = None
         return result
 
     return ProfileResponse(
@@ -147,7 +158,11 @@ async def create_profile(
         assessment_responses=request.assessment_responses,
         family_structure=request.family_structure,
     )
-    return _user_to_response(user)
+    try:
+        return _user_to_response(user)
+    except Exception:
+        logger.exception("Failed to serialize profile for new user %s", user.id)
+        raise
 
 
 @router.get("/profile/{user_id}")
@@ -160,7 +175,11 @@ async def get_profile(
     user = await repository.get_profile(session, user_id)
     if user is None:
         raise HTTPException(status_code=404, detail="Profile not found")
-    return _user_to_response(user)
+    try:
+        return _user_to_response(user)
+    except Exception:
+        logger.exception("Failed to serialize profile %s", user_id)
+        raise
 
 
 @router.get("/profiles")
@@ -183,8 +202,13 @@ async def list_profiles(
         )
 
     users = await repository.list_profiles(session, offset=offset, limit=limit)
+    try:
+        profiles = [_user_to_response(u) for u in users]
+    except Exception:
+        logger.exception("Failed to serialize profile list (offset=%s, limit=%s)", offset, limit)
+        raise
     return ProfileListResponse(
-        profiles=[_user_to_response(u) for u in users],
+        profiles=profiles,
         count=len(users),
         offset=offset,
         limit=limit,
