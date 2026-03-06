@@ -94,6 +94,8 @@ RUN groupadd --gid 1001 alchymine && \
 WORKDIR /app
 
 # Copy application code
+# ARG busts Docker layer cache so source changes are always picked up
+ARG CACHE_BUST=1
 COPY alchymine/ ./alchymine/
 COPY pyproject.toml README.md ./
 
