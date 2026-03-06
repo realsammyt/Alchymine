@@ -229,9 +229,13 @@ async def register(
     if invite_code_row is not None:
         invite_code_row.uses_count += 1
         db.add(invite_code_row)
-        logger.info("Invite code '%s' used by %s (%d/%d uses)",
-                     invite_code_row.code, body.email,
-                     invite_code_row.uses_count, invite_code_row.max_uses)
+        logger.info(
+            "Invite code '%s' used by %s (%d/%d uses)",
+            invite_code_row.code,
+            body.email,
+            invite_code_row.uses_count,
+            invite_code_row.max_uses,
+        )
 
     await db.commit()
     await db.refresh(user)

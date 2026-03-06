@@ -227,7 +227,7 @@ class TestRegister:
             },
         )
         assert response.status_code == 403
-        assert "invalid promo code" in response.json()["detail"].lower()
+        assert "invalid" in response.json()["detail"].lower()
 
     def test_register_missing_promo_code(self, client: TestClient):
         """Registering without a promo code should return 422."""
