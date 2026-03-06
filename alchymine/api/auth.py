@@ -18,8 +18,12 @@ import bcrypt
 from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError, jwt
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from alchymine.config import get_settings
+from alchymine.db.base import get_async_engine, get_async_session_factory
+from alchymine.db.models import User
 
 # ─── Configuration ────────────────────────────────────────────────────────
 # Convenience aliases so existing call-sites (and tests that import these
@@ -194,3 +198,67 @@ async def get_current_user(
             headers={"WWW-Authenticate": "Bearer"},
         )
     return payload
+
+
+# ─── Admin Dependency ─────────────────────────────────────────────────────
+
+# Lazily-initialized session factory for the admin dependency.  Kept separate
+# from the router-level engine so this module stays self-contained.
+_admin_engine = None
+_admin_session_factory = None
+
+
+async def _get_admin_session() -> AsyncSession:
+    """Return a database session for admin dependency checks."""
+    global _admin_engine, _admin_session_factory  # noqa: PLW0603
+    if _admin_engine is None:
+        _admin_engine = get_async_engine()
+        _admin_session_factory = get_async_session_factory(_admin_engine)
+    return _admin_session_factory()
+
+
+async def get_current_admin(
+    request: Request,
+    bearer_token: str | None = Depends(oauth2_scheme),
+) -> User:
+    """FastAPI dependency that requires the current user to be an active admin.
+
+    Re-reads the User from the database on every request to ensure admin
+    status hasn't been revoked since the JWT was issued.
+
+    Returns the full User ORM object.
+
+    Raises
+    ------
+    HTTPException
+        401 if not authenticated, 403 if not an active admin.
+    """
+    payload = await get_current_user(request, bearer_token)
+    user_id = payload.get("sub")
+
+    session = await _get_admin_session()
+    try:
+        result = await session.execute(select(User).where(User.id == user_id))
+        user = result.scalar_one_or_none()
+    finally:
+        await session.close()
+
+    if user is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="User not found",
+        )
+
+    if not user.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Account is disabled",
+        )
+
+    if not user.is_admin:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Admin access required",
+        )
+
+    return user

@@ -660,6 +660,7 @@ export interface AuthUser {
   email: string;
   version: string;
   created_at: string;
+  is_admin: boolean;
 }
 
 export async function registerUser(
@@ -773,6 +774,199 @@ export async function getProfile(userId: string): Promise<ProfileResponse> {
   return request<ProfileResponse>(
     `${BASE}/profile/${encodeURIComponent(userId)}`,
   );
+}
+
+// ─── Admin types ──────────────────────────────────────────────────
+
+export interface AdminUser {
+  id: string;
+  email: string | null;
+  is_admin: boolean;
+  is_active: boolean;
+  created_at: string;
+  last_login_at: string | null;
+  invite_code_used: string | null;
+}
+
+export interface AdminUserDetail extends AdminUser {
+  version: string;
+  updated_at: string;
+  has_intake: boolean;
+  has_identity: boolean;
+  has_healing: boolean;
+  has_wealth: boolean;
+  has_creative: boolean;
+  has_perspective: boolean;
+}
+
+export interface PaginatedUsers {
+  users: AdminUser[];
+  total: number;
+  page: number;
+  per_page: number;
+}
+
+export interface InviteCode {
+  id: number;
+  code: string;
+  created_by: string | null;
+  max_uses: number;
+  uses_count: number;
+  expires_at: string | null;
+  is_active: boolean;
+  note: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface PaginatedInviteCodes {
+  codes: InviteCode[];
+  total: number;
+  page: number;
+  per_page: number;
+}
+
+export interface AnalyticsOverview {
+  total_users: number;
+  active_users: number;
+  admin_users: number;
+  new_users_today: number;
+  new_users_week: number;
+  new_users_month: number;
+  total_invite_codes: number;
+  active_invite_codes: number;
+  total_reports: number;
+  total_journal_entries: number;
+}
+
+export interface DailyUserCount {
+  date: string;
+  count: number;
+}
+
+export interface UserAnalytics {
+  daily_counts: DailyUserCount[];
+  period_days: number;
+}
+
+// ─── Admin API functions ──────────────────────────────────────────
+
+export async function adminGetUsers(opts?: {
+  page?: number;
+  perPage?: number;
+  search?: string;
+  sortBy?: string;
+  sortOrder?: string;
+  activeOnly?: boolean;
+}): Promise<PaginatedUsers> {
+  const params = new URLSearchParams();
+  if (opts?.page) params.set("page", String(opts.page));
+  if (opts?.perPage) params.set("per_page", String(opts.perPage));
+  if (opts?.search) params.set("search", opts.search);
+  if (opts?.sortBy) params.set("sort_by", opts.sortBy);
+  if (opts?.sortOrder) params.set("sort_order", opts.sortOrder);
+  if (opts?.activeOnly) params.set("active_only", "true");
+  const query = params.toString();
+  return request<PaginatedUsers>(
+    `${BASE}/admin/users${query ? `?${query}` : ""}`,
+  );
+}
+
+export async function adminGetUser(userId: string): Promise<AdminUserDetail> {
+  return request<AdminUserDetail>(`${BASE}/admin/users/${userId}`);
+}
+
+export async function adminUpdateUserStatus(
+  userId: string,
+  isActive: boolean,
+): Promise<AdminUser> {
+  return request<AdminUser>(`${BASE}/admin/users/${userId}/status`, {
+    method: "PATCH",
+    body: JSON.stringify({ is_active: isActive }),
+  });
+}
+
+export async function adminToggleAdmin(
+  userId: string,
+  isAdmin: boolean,
+): Promise<AdminUser> {
+  return request<AdminUser>(`${BASE}/admin/users/${userId}/admin`, {
+    method: "PATCH",
+    body: JSON.stringify({ is_admin: isAdmin }),
+  });
+}
+
+export async function adminGetInviteCodes(opts?: {
+  page?: number;
+  perPage?: number;
+  activeOnly?: boolean;
+}): Promise<PaginatedInviteCodes> {
+  const params = new URLSearchParams();
+  if (opts?.page) params.set("page", String(opts.page));
+  if (opts?.perPage) params.set("per_page", String(opts.perPage));
+  if (opts?.activeOnly) params.set("active_only", "true");
+  const query = params.toString();
+  return request<PaginatedInviteCodes>(
+    `${BASE}/admin/invite-codes${query ? `?${query}` : ""}`,
+  );
+}
+
+export async function adminCreateInviteCode(data: {
+  code?: string;
+  max_uses?: number;
+  expires_at?: string;
+  note?: string;
+}): Promise<InviteCode> {
+  return request<InviteCode>(`${BASE}/admin/invite-codes`, {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+}
+
+export async function adminBulkCreateInviteCodes(data: {
+  count: number;
+  max_uses?: number;
+  expires_at?: string;
+  note?: string;
+}): Promise<InviteCode[]> {
+  return request<InviteCode[]>(`${BASE}/admin/invite-codes/bulk`, {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+}
+
+export async function adminUpdateInviteCode(
+  codeId: number,
+  data: {
+    is_active?: boolean;
+    max_uses?: number;
+    expires_at?: string;
+    note?: string;
+  },
+): Promise<InviteCode> {
+  return request<InviteCode>(`${BASE}/admin/invite-codes/${codeId}`, {
+    method: "PATCH",
+    body: JSON.stringify(data),
+  });
+}
+
+export async function adminDeleteInviteCode(
+  codeId: number,
+): Promise<{ message: string }> {
+  return request<{ message: string }>(`${BASE}/admin/invite-codes/${codeId}`, {
+    method: "DELETE",
+  });
+}
+
+export async function adminGetAnalyticsOverview(): Promise<AnalyticsOverview> {
+  return request<AnalyticsOverview>(`${BASE}/admin/analytics/overview`);
+}
+
+export async function adminGetUserAnalytics(
+  days?: number,
+): Promise<UserAnalytics> {
+  const params = days ? `?days=${days}` : "";
+  return request<UserAnalytics>(`${BASE}/admin/analytics/users${params}`);
 }
 
 export { ApiError };

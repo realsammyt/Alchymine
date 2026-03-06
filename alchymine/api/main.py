@@ -17,6 +17,7 @@ from alchymine.api.middleware import (
     RequestLoggingMiddleware,
 )
 from alchymine.api.routers import (
+    admin,
     astrology,
     auth,
     biorhythm,
@@ -95,3 +96,4 @@ app.include_router(outcomes.router, prefix="/api/v1", tags=["outcomes"])
 app.include_router(streaming.router, prefix="/api/v1", tags=["streaming"])
 app.include_router(spiral.router, prefix="/api/v1", tags=["spiral"])
 app.include_router(integration.router, prefix="/api/v1", tags=["integration"])
+app.include_router(admin.router, prefix="/api/v1", tags=["admin"])

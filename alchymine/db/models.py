@@ -26,6 +26,7 @@ import uuid
 from datetime import date, datetime, time
 
 from sqlalchemy import (
+    BigInteger,
     Boolean,
     Date,
     DateTime,
@@ -90,6 +91,12 @@ class User(Base):
         DateTime(timezone=True), nullable=True
     )
 
+    # Admin panel
+    is_admin: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    last_login_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    invite_code_used: Mapped[str | None] = mapped_column(String(64), nullable=True)
+
     # Cross-system fields
     active_plan_day: Mapped[int | None] = mapped_column(Integer, nullable=True)
     systems_engaged: Mapped[dict | None] = mapped_column(JSONColumn, nullable=True)
@@ -117,6 +124,57 @@ class User(Base):
 
     def __repr__(self) -> str:
         return f"<User id={self.id!r} version={self.version!r}>"
+
+
+# ─── InviteCode ─────────────────────────────────────────────────────────
+
+
+class InviteCode(Base):
+    """Invite code for gated registration."""
+
+    __tablename__ = "invite_codes"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    code: Mapped[str] = mapped_column(String(64), unique=True, nullable=False, index=True)
+    created_by: Mapped[str | None] = mapped_column(
+        String(36), ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    max_uses: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
+    uses_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    note: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+    def __repr__(self) -> str:
+        return f"<InviteCode code={self.code!r} uses={self.uses_count}/{self.max_uses}>"
+
+
+# ─── AdminAuditLog ──────────────────────────────────────────────────────
+
+
+class AdminAuditLog(Base):
+    """Audit trail for admin actions."""
+
+    __tablename__ = "admin_audit_log"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    admin_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    action: Mapped[str] = mapped_column(String(100), nullable=False)
+    target_type: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    target_id: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    detail: Mapped[dict | None] = mapped_column(JSONColumn, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), index=True
+    )
+
+    def __repr__(self) -> str:
+        return f"<AdminAuditLog id={self.id!r} action={self.action!r}>"
 
 
 # ─── IntakeData ─────────────────────────────────────────────────────────

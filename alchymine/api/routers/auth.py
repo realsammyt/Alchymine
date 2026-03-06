@@ -102,6 +102,7 @@ class UserResponse(BaseModel):
     email: str
     version: str
     created_at: str
+    is_admin: bool = False
 
 
 # ─── Database Session Dependency ──────────────────────────────────────────
@@ -246,6 +247,9 @@ async def login(
             detail="Invalid email or password",
         )
 
+    user.last_login_at = datetime.now(UTC)
+    await db.commit()
+
     # Generate tokens
     token_data = {"sub": user.id, "email": user.email}
     access_token = create_access_token(token_data)
@@ -375,6 +379,7 @@ async def get_me(
         email=user.email or "",
         version=user.version,
         created_at=str(user.created_at),
+        is_admin=user.is_admin,
     )
 
 
