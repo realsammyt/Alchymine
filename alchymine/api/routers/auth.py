@@ -33,7 +33,7 @@ from alchymine.api.auth import (
 )
 from alchymine.config import get_settings
 from alchymine.db.base import Base, get_async_engine, get_async_session_factory
-from alchymine.db.models import User
+from alchymine.db.models import InviteCode, User
 from alchymine.email import send_password_reset_email
 
 logger = logging.getLogger(__name__)
@@ -180,13 +180,35 @@ async def register(
     Returns 403 if the promo code is invalid.
     Returns 409 if the email is already registered.
     """
-    # Validate promo code
+    # Validate promo code — accept static env var OR a valid invite code from DB
     settings = get_settings()
+    invite_code_row = None
     if body.promo_code != settings.signup_promo_code:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Invalid promo code",
+        # Check invite_codes table
+        result = await db.execute(
+            select(InviteCode).where(
+                InviteCode.code == body.promo_code,
+                InviteCode.is_active.is_(True),
+            )
         )
+        invite_code_row = result.scalar_one_or_none()
+        if invite_code_row is None:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Invalid promo code",
+            )
+        # Check uses remaining
+        if invite_code_row.uses_count >= invite_code_row.max_uses:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Invite code has reached its usage limit",
+            )
+        # Check expiry
+        if invite_code_row.expires_at and invite_code_row.expires_at < datetime.now(UTC):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Invite code has expired",
+            )
 
     # Check for existing user
     result = await db.execute(select(User).where(User.email == body.email))
@@ -201,8 +223,15 @@ async def register(
     user = User(
         email=body.email,
         password_hash=hash_password(body.password),
+        invite_code_used=invite_code_row.code if invite_code_row else None,
     )
     db.add(user)
+
+    # Increment invite code usage
+    if invite_code_row is not None:
+        invite_code_row.uses_count += 1
+        db.add(invite_code_row)
+
     await db.commit()
     await db.refresh(user)
 
