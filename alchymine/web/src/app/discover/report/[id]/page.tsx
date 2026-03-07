@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { getReport, ApiError, ReportResponse, IdentityLayer } from "@/lib/api";
 import Card from "@/components/shared/Card";
@@ -63,22 +63,33 @@ function NumberCard({
   );
 }
 
-function ComingSoonSection({ title }: { title: string }) {
+function SystemSummaryCard({
+  title,
+  children,
+  disclaimers,
+}: {
+  title: string;
+  children: React.ReactNode;
+  disclaimers?: string[];
+}) {
   return (
-    <div className="card-surface p-6 relative overflow-hidden">
-      <div className="absolute inset-0 bg-surface/80 backdrop-blur-sm z-10 flex items-center justify-center">
-        <span className="px-4 py-2 bg-secondary/[0.08] text-secondary-light font-body text-[0.7rem] font-medium tracking-wider uppercase rounded-full border border-secondary/[0.15]">
-          Coming Soon
-        </span>
-      </div>
-      <h3 className="font-display text-lg font-light text-text/20 mb-3">
+    <div className="card-surface p-6">
+      <h3 className="font-display text-lg font-light text-text/80 mb-4">
         {title}
       </h3>
-      <div className="space-y-2">
-        <div className="h-3 bg-white/[0.03] rounded w-3/4" />
-        <div className="h-3 bg-white/[0.03] rounded w-1/2" />
-        <div className="h-3 bg-white/[0.03] rounded w-2/3" />
-      </div>
+      <div className="space-y-3">{children}</div>
+      {disclaimers && disclaimers.length > 0 && (
+        <div className="mt-4 pt-3 border-t border-white/[0.04]">
+          {disclaimers.map((d, i) => (
+            <p
+              key={i}
+              className="text-[0.65rem] font-body text-text/25 leading-relaxed"
+            >
+              {d}
+            </p>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -165,6 +176,39 @@ export default function ReportPage() {
 
   const identity = report?.profile_summary?.identity as
     | IdentityLayer
+    | undefined;
+
+  const profileSummary = report?.profile_summary as
+    | Record<string, unknown>
+    | undefined;
+  const healingSummary = profileSummary?.healing as
+    | {
+        recommended_modalities?: Array<{
+          modality: string;
+          preference_score?: number;
+        }>;
+        crisis_flag?: boolean;
+        disclaimers?: string[];
+      }
+    | undefined;
+  const wealthSummary = profileSummary?.wealth as
+    | {
+        wealth_archetype?: { name: string; description?: string };
+        lever_priorities?: string[];
+        disclaimers?: string[];
+      }
+    | undefined;
+  const creativeSummary = profileSummary?.creative as
+    | {
+        creative_orientation?: { style?: string; summary?: string };
+        strengths?: string[];
+      }
+    | undefined;
+  const perspectiveSummary = profileSummary?.perspective as
+    | {
+        detected_biases?: Array<{ bias_name: string }>;
+        kegan_stage?: { stage?: number; name?: string; description?: string };
+      }
     | undefined;
 
   return (
@@ -511,7 +555,7 @@ export default function ReportPage() {
               </MotionReveal>
             )}
 
-            {/* ── Coming Soon: Other Systems ─────────────────────────── */}
+            {/* ── Other Systems ──────────────────────────────────────── */}
             <MotionReveal delay={0.35}>
               <div className="pt-4">
                 <h2 className="section-heading-sm text-text/30 mb-6">
@@ -521,17 +565,203 @@ export default function ReportPage() {
                   staggerDelay={0.08}
                   className="grid grid-cols-1 sm:grid-cols-2 gap-4"
                 >
+                  {/* Healing */}
                   <MotionStaggerItem>
-                    <ComingSoonSection title="Healing — Ethical Healing System" />
+                    <SystemSummaryCard
+                      title="Healing — Ethical Healing"
+                      disclaimers={healingSummary?.disclaimers}
+                    >
+                      {healingSummary?.recommended_modalities &&
+                      healingSummary.recommended_modalities.length > 0 ? (
+                        <>
+                          <p className="text-[0.65rem] font-body text-text/30 uppercase tracking-[0.15em]">
+                            Recommended Modalities
+                          </p>
+                          <ul className="space-y-1.5">
+                            {healingSummary.recommended_modalities.map(
+                              (m, i) => (
+                                <li
+                                  key={i}
+                                  className="flex items-center justify-between text-sm font-body"
+                                >
+                                  <span className="text-text/70">
+                                    {m.modality}
+                                  </span>
+                                  {m.preference_score !== undefined && (
+                                    <span className="text-primary font-display font-medium text-xs">
+                                      {Math.round(m.preference_score)}
+                                    </span>
+                                  )}
+                                </li>
+                              ),
+                            )}
+                          </ul>
+                          {healingSummary.crisis_flag && (
+                            <div className="mt-2 px-3 py-2 bg-accent/[0.08] border border-accent/[0.15] rounded-lg">
+                              <span className="text-[0.7rem] font-body text-accent font-medium">
+                                Crisis support resources recommended
+                              </span>
+                            </div>
+                          )}
+                        </>
+                      ) : (
+                        <p className="text-sm font-body text-text/30">
+                          Data not yet available
+                        </p>
+                      )}
+                    </SystemSummaryCard>
                   </MotionStaggerItem>
+
+                  {/* Wealth */}
                   <MotionStaggerItem>
-                    <ComingSoonSection title="Wealth — Generational Wealth Engine" />
+                    <SystemSummaryCard
+                      title="Wealth — Generational Wealth"
+                      disclaimers={wealthSummary?.disclaimers}
+                    >
+                      {wealthSummary?.wealth_archetype ? (
+                        <>
+                          <div className="px-4 py-2.5 bg-primary/[0.06] border border-primary/[0.15] rounded-xl inline-block">
+                            <span className="text-[0.65rem] font-body text-primary/50 tracking-wider uppercase block">
+                              Wealth Archetype
+                            </span>
+                            <span className="font-display text-base font-medium text-primary">
+                              {wealthSummary.wealth_archetype.name}
+                            </span>
+                          </div>
+                          {wealthSummary.wealth_archetype.description && (
+                            <p className="text-sm font-body text-text/50 leading-relaxed">
+                              {wealthSummary.wealth_archetype.description}
+                            </p>
+                          )}
+                          {wealthSummary.lever_priorities &&
+                            wealthSummary.lever_priorities.length > 0 && (
+                              <div>
+                                <p className="text-[0.65rem] font-body text-text/30 mb-2 uppercase tracking-[0.15em]">
+                                  Priority Levers
+                                </p>
+                                <ol className="space-y-1">
+                                  {wealthSummary.lever_priorities.map(
+                                    (lever, i) => (
+                                      <li
+                                        key={i}
+                                        className="flex items-center gap-2 text-sm font-body text-text/60"
+                                      >
+                                        <span className="text-[0.65rem] font-display text-primary/50 w-4 text-right">
+                                          {i + 1}.
+                                        </span>
+                                        {lever}
+                                      </li>
+                                    ),
+                                  )}
+                                </ol>
+                              </div>
+                            )}
+                        </>
+                      ) : (
+                        <p className="text-sm font-body text-text/30">
+                          Data not yet available
+                        </p>
+                      )}
+                    </SystemSummaryCard>
                   </MotionStaggerItem>
+
+                  {/* Creative */}
                   <MotionStaggerItem>
-                    <ComingSoonSection title="Creative — Creative Forge" />
+                    <SystemSummaryCard title="Creative — Creative Forge">
+                      {creativeSummary?.creative_orientation ? (
+                        <>
+                          {creativeSummary.creative_orientation.style && (
+                            <div className="px-4 py-2.5 bg-secondary/[0.06] border border-secondary/[0.15] rounded-xl inline-block">
+                              <span className="text-[0.65rem] font-body text-secondary-light/50 tracking-wider uppercase block">
+                                Creative Style
+                              </span>
+                              <span className="font-display text-base font-medium text-secondary-light">
+                                {creativeSummary.creative_orientation.style}
+                              </span>
+                            </div>
+                          )}
+                          {creativeSummary.creative_orientation.summary && (
+                            <p className="text-sm font-body text-text/50 leading-relaxed">
+                              {creativeSummary.creative_orientation.summary}
+                            </p>
+                          )}
+                          {creativeSummary.strengths &&
+                            creativeSummary.strengths.length > 0 && (
+                              <div>
+                                <p className="text-[0.65rem] font-body text-text/30 mb-2 uppercase tracking-[0.15em]">
+                                  Strengths
+                                </p>
+                                <div className="flex flex-wrap gap-2">
+                                  {creativeSummary.strengths.map((s) => (
+                                    <span
+                                      key={s}
+                                      className="px-3 py-1.5 bg-primary/[0.04] border border-primary/[0.1] rounded-full text-sm font-body text-text/60"
+                                    >
+                                      {s}
+                                    </span>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                        </>
+                      ) : (
+                        <p className="text-sm font-body text-text/30">
+                          Data not yet available
+                        </p>
+                      )}
+                    </SystemSummaryCard>
                   </MotionStaggerItem>
+
+                  {/* Perspective */}
                   <MotionStaggerItem>
-                    <ComingSoonSection title="Perspective — Perspective Prism" />
+                    <SystemSummaryCard title="Perspective — Perspective Prism">
+                      {perspectiveSummary?.kegan_stage ||
+                      (perspectiveSummary?.detected_biases &&
+                        perspectiveSummary.detected_biases.length > 0) ? (
+                        <>
+                          {perspectiveSummary.kegan_stage && (
+                            <div className="px-4 py-2.5 bg-accent/[0.06] border border-accent/[0.15] rounded-xl">
+                              <span className="text-[0.65rem] font-body text-accent/50 tracking-wider uppercase block">
+                                Kegan Stage
+                              </span>
+                              <span className="font-display text-base font-medium text-accent">
+                                {perspectiveSummary.kegan_stage.name ??
+                                  `Stage ${perspectiveSummary.kegan_stage.stage}`}
+                              </span>
+                              {perspectiveSummary.kegan_stage.description && (
+                                <p className="text-[0.7rem] font-body text-text/40 mt-1 leading-relaxed">
+                                  {perspectiveSummary.kegan_stage.description}
+                                </p>
+                              )}
+                            </div>
+                          )}
+                          {perspectiveSummary.detected_biases &&
+                            perspectiveSummary.detected_biases.length > 0 && (
+                              <div>
+                                <p className="text-[0.65rem] font-body text-text/30 mb-2 uppercase tracking-[0.15em]">
+                                  Detected Biases
+                                </p>
+                                <ul className="space-y-1">
+                                  {perspectiveSummary.detected_biases.map(
+                                    (b, i) => (
+                                      <li
+                                        key={i}
+                                        className="text-sm font-body text-text/60"
+                                      >
+                                        {b.bias_name}
+                                      </li>
+                                    ),
+                                  )}
+                                </ul>
+                              </div>
+                            )}
+                        </>
+                      ) : (
+                        <p className="text-sm font-body text-text/30">
+                          Data not yet available
+                        </p>
+                      )}
+                    </SystemSummaryCard>
                   </MotionStaggerItem>
                 </MotionStagger>
               </div>
@@ -580,7 +810,7 @@ export default function ReportPage() {
               onClick={() => {
                 const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "";
                 window.open(
-                  `${apiUrl}/api/v1/reports/${reportId}/html`,
+                  `${apiUrl}/api/v1/reports/${reportId}/pdf`,
                   "_blank",
                 );
               }}

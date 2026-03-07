@@ -7,6 +7,13 @@ Provides 5 system crews with 28 total domain agents:
     - Creative (5 agents)
     - Perspective (5 agents)
 
+STATUS:
+    The production orchestrator currently bypasses these crews and delegates
+    directly to LangGraph StateGraphs for each system pipeline (see issue #27).
+    These crews are NOT actively called in the current pipeline.  They are
+    retained here for planned LLM-augmented pipeline integration, where the
+    domain agents will enrich outputs between deterministic engine steps.
+
 Public API:
     get_crew(system)       — Get a single crew by system name.
     get_all_crews()        — Get all 5 system crews.

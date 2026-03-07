@@ -7,15 +7,35 @@ with individual ``data:`` frames for each chunk.
 
 from __future__ import annotations
 
+import re
 from collections.abc import AsyncGenerator
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
 
 from alchymine.api.auth import get_current_user
 from alchymine.llm.client import LLMClient
 
 router = APIRouter()
+
+_BLOCKED_PATTERNS = [
+    # Prompt injection
+    r"ignore\s+(all\s+)?(previous|prior|above)\s+(instructions|prompts)",
+    r"you\s+are\s+now\s+in\s+",
+    r"system\s*:\s*",
+    # Harmful intent
+    r"(how\s+to\s+)?(make|create|build)\s+(a\s+)?(bomb|weapon|explosive)",
+    r"(how\s+to\s+)?(harm|hurt|kill|poison)",
+]
+
+
+def _check_content_safety(text: str) -> str | None:
+    """Return error message if content is unsafe, None if OK."""
+    lower = text.lower()
+    for pattern in _BLOCKED_PATTERNS:
+        if re.search(pattern, lower):
+            return "Content flagged by safety filter"
+    return None
 
 
 async def _narrative_event_stream(
@@ -62,6 +82,10 @@ async def stream_narrative(
     with automatic fallback.  When no backend is available the fallback
     message is streamed word-by-word.
     """
+    for text in (prompt, system_prompt):
+        safety_message = _check_content_safety(text)
+        if safety_message:
+            raise HTTPException(status_code=400, detail=safety_message)
     return StreamingResponse(
         _narrative_event_stream(prompt, system_prompt),
         media_type="text/event-stream",

@@ -50,7 +50,7 @@ def _make_real_admin(session_factory) -> User:
             await session.refresh(user)
             return user
 
-    return asyncio.get_event_loop().run_until_complete(_create())
+    return asyncio.run(_create())
 
 
 # ─── Fixtures ─────────────────────────────────────────────────────────────
@@ -87,7 +87,7 @@ def _override_admin_db():
         async with engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)
 
-    asyncio.get_event_loop().run_until_complete(_init_schema())
+    asyncio.run(_init_schema())
 
     async def _get_test_db():
         async with session_factory() as session:
@@ -138,7 +138,7 @@ def seeded_invite_code(_override_admin_db) -> InviteCode:
             await session.refresh(code)
             return code
 
-    return asyncio.get_event_loop().run_until_complete(_create())
+    return asyncio.run(_create())
 
 
 # ─── Analytics ────────────────────────────────────────────────────────────
@@ -245,6 +245,14 @@ class TestListUsers:
         data = response.json()
         assert data["page"] == 1
         assert data["per_page"] == 20
+
+    def test_list_users_sort_invalid_column_defaults_safely(self, client: TestClient):
+        """An invalid sort_by column should fall back to created_at, not leak model attributes."""
+        response = client.get("/api/v1/admin/users?sort_by=password_hash")
+        assert response.status_code == 200
+        # Should still return users (fell back to created_at), not error or expose password_hash
+        data = response.json()
+        assert "users" in data
 
 
 class TestListUsersWithSearch:
