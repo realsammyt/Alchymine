@@ -22,7 +22,7 @@ from .coordinator import (
     PerspectiveCoordinator,
     WealthCoordinator,
 )
-from .intent import IntentResult, SystemIntent, classify_intent
+from .intent import IntentResult, SystemIntent, classify_intent, intentions_to_systems
 
 logger = logging.getLogger(__name__)
 
@@ -124,8 +124,19 @@ class MasterOrchestrator:
 
         user_id = request_data.get("id", "anonymous")
 
-        # Determine which coordinators to invoke
-        if intent_result.intent == SystemIntent.UNKNOWN:
+        # Determine which coordinators to invoke.
+        # When explicit intentions are provided (from the intake form),
+        # use intention-based routing which maps intentions directly to
+        # system coordinators.  This bypasses keyword classification
+        # which fails for generic strings like "Generate my full report".
+        if intentions:
+            systems_to_invoke = intentions_to_systems(intentions)
+            logger.info(
+                "Intention-based routing: %s → %s",
+                intentions,
+                [s.value for s in systems_to_invoke],
+            )
+        elif intent_result.intent == SystemIntent.UNKNOWN:
             return OrchestratorResult(
                 request_id=request_id,
                 intent=intent_result,
@@ -133,8 +144,7 @@ class MasterOrchestrator:
                 synthesis=None,
                 quality_passed=True,
             )
-
-        if intent_result.intent == SystemIntent.MULTI_SYSTEM:
+        elif intent_result.intent == SystemIntent.MULTI_SYSTEM:
             systems_to_invoke = intent_result.secondary_intents
         else:
             systems_to_invoke = [intent_result.intent]

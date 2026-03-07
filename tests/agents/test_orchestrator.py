@@ -26,6 +26,7 @@ from alchymine.agents.orchestrator.intent import (
     IntentResult,
     SystemIntent,
     classify_intent,
+    intentions_to_systems,
 )
 from alchymine.agents.orchestrator.orchestrator import (
     MasterOrchestrator,
@@ -798,3 +799,70 @@ class TestOrchestratorInit:
         assert isinstance(
             orchestrator._coordinators[SystemIntent.PERSPECTIVE], PerspectiveCoordinator
         )
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# Section 11: Intention-based routing
+# ═══════════════════════════════════════════════════════════════════════
+
+
+class TestIntentionsToSystems:
+    """intentions_to_systems maps user intention values to SystemIntent lists."""
+
+    def test_health_intention_includes_healing(self) -> None:
+        systems = intentions_to_systems(["health"])
+        assert SystemIntent.INTELLIGENCE in systems
+        assert SystemIntent.HEALING in systems
+
+    def test_money_intention_includes_wealth(self) -> None:
+        systems = intentions_to_systems(["money"])
+        assert SystemIntent.INTELLIGENCE in systems
+        assert SystemIntent.WEALTH in systems
+
+    def test_multiple_intentions_deduplicated(self) -> None:
+        systems = intentions_to_systems(["health", "money"])
+        # INTELLIGENCE should appear only once even though both map to it
+        assert systems.count(SystemIntent.INTELLIGENCE) == 1
+        assert SystemIntent.HEALING in systems
+        assert SystemIntent.WEALTH in systems
+
+    def test_intelligence_always_first(self) -> None:
+        systems = intentions_to_systems(["health"])
+        assert systems[0] == SystemIntent.INTELLIGENCE
+
+    def test_unknown_intention_still_has_intelligence(self) -> None:
+        systems = intentions_to_systems(["unknown_xyz"])
+        assert systems == [SystemIntent.INTELLIGENCE]
+
+    def test_case_insensitive(self) -> None:
+        systems = intentions_to_systems(["HEALTH"])
+        assert SystemIntent.HEALING in systems
+
+
+class TestOrchestratorIntentionRouting:
+    """Orchestrator uses intentions for routing when provided."""
+
+    async def test_intentions_bypass_keyword_classification(self) -> None:
+        """When intentions are provided, keyword classification is bypassed."""
+        orchestrator = MasterOrchestrator()
+
+        mock_result = CoordinatorResult(
+            system="intelligence",
+            status=CoordinatorStatus.SUCCESS.value,
+            data={"numerology": {"life_path": 3}},
+            quality_passed=True,
+        )
+
+        # Mock all coordinators
+        for system in SystemIntent:
+            if system in orchestrator._coordinators:
+                mock_coord = MagicMock()
+                mock_coord.process = AsyncMock(return_value=mock_result)
+                orchestrator._coordinators[system] = mock_coord
+
+        # "random gibberish" would normally be UNKNOWN, but intentions override
+        result = await orchestrator.process_request(
+            "random gibberish",
+            intentions=["health"],
+        )
+        assert len(result.coordinator_results) >= 1

@@ -290,9 +290,11 @@ def generate_report(
 
     except Exception as exc:
         # Non-transient failure — record and do not retry
-        _run_async(_db_set_failed(report_id, str(exc)))
-
         logger.exception("Report %s failed: %s", report_id, exc)
+        try:
+            _run_async(_db_set_failed(report_id, str(exc)))
+        except Exception as db_exc:
+            logger.error("Failed to persist error status for %s: %s", report_id, db_exc)
         return {
             "error": str(exc),
             "report_id": report_id,
