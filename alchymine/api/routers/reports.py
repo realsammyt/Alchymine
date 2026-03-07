@@ -11,7 +11,7 @@ import uuid
 from datetime import UTC, datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from fastapi.responses import HTMLResponse, Response
+from fastapi.responses import HTMLResponse, JSONResponse, Response
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -173,9 +173,9 @@ async def get_report(
         raise HTTPException(status_code=403, detail="Access denied")
 
     if report.status in ("pending", "generating"):
-        raise HTTPException(
+        return JSONResponse(
             status_code=202,
-            detail=f"Report is {report.status}",
+            content={"status": report.status, "detail": f"Report is {report.status}"},
         )
 
     return ReportResult(
@@ -210,9 +210,9 @@ async def get_report_html(
         raise HTTPException(status_code=403, detail="Access denied")
 
     if report.status in ("pending", "generating"):
-        raise HTTPException(
+        return JSONResponse(
             status_code=202,
-            detail=f"Report is {report.status}",
+            content={"status": report.status, "detail": f"Report is {report.status}"},
         )
 
     # Build a dict compatible with render_report_html

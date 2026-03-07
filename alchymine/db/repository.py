@@ -236,7 +236,8 @@ async def update_layer(
 
     # Reload with fresh relationships
     refreshed = await get_profile(session, user_id)
-    assert refreshed is not None
+    if refreshed is None:
+        raise ValueError(f"Profile not found after update_layer for user_id={user_id}")
     return refreshed
 
 

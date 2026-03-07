@@ -79,7 +79,6 @@ class TestJournalCreate:
         response = client.post(
             "/api/v1/journal",
             json={
-                "user_id": "user-1",
                 "title": "My first reflection",
                 "content": "Today I started my journey.",
             },
@@ -90,7 +89,6 @@ class TestJournalCreate:
         response = client.post(
             "/api/v1/journal",
             json={
-                "user_id": "user-1",
                 "system": "healing",
                 "entry_type": "gratitude",
                 "title": "Grateful for progress",
@@ -112,7 +110,6 @@ class TestJournalCreate:
         response = client.post(
             "/api/v1/journal",
             json={
-                "user_id": "user-1",
                 "title": "Quick note",
                 "content": "A general reflection.",
             },
@@ -131,7 +128,6 @@ class TestJournalRead:
         create_resp = client.post(
             "/api/v1/journal",
             json={
-                "user_id": "user-1",
                 "title": "Test entry",
                 "content": "Content here.",
             },
@@ -153,7 +149,6 @@ class TestJournalUpdate:
         create_resp = client.post(
             "/api/v1/journal",
             json={
-                "user_id": "user-1",
                 "title": "Original title",
                 "content": "Original content.",
             },
@@ -185,7 +180,6 @@ class TestJournalDelete:
         create_resp = client.post(
             "/api/v1/journal",
             json={
-                "user_id": "user-1",
                 "title": "To delete",
                 "content": "Will be removed.",
             },
@@ -212,7 +206,6 @@ class TestJournalList:
             client.post(
                 "/api/v1/journal",
                 json={
-                    "user_id": "user-1",
                     "title": f"Entry {i}",
                     "content": f"Content {i}",
                 },
@@ -228,7 +221,6 @@ class TestJournalList:
         client.post(
             "/api/v1/journal",
             json={
-                "user_id": "user-1",
                 "system": "healing",
                 "title": "Healing note",
                 "content": "Healing content.",
@@ -237,7 +229,6 @@ class TestJournalList:
         client.post(
             "/api/v1/journal",
             json={
-                "user_id": "user-1",
                 "system": "wealth",
                 "title": "Wealth note",
                 "content": "Wealth content.",
@@ -253,7 +244,6 @@ class TestJournalList:
         client.post(
             "/api/v1/journal",
             json={
-                "user_id": "user-1",
                 "entry_type": "reframe",
                 "title": "Reframe",
                 "content": "A cognitive reframe.",
@@ -262,7 +252,6 @@ class TestJournalList:
         client.post(
             "/api/v1/journal",
             json={
-                "user_id": "user-1",
                 "entry_type": "gratitude",
                 "title": "Gratitude",
                 "content": "Thankful for today.",
@@ -279,7 +268,6 @@ class TestJournalList:
             client.post(
                 "/api/v1/journal",
                 json={
-                    "user_id": "user-1",
                     "title": f"Entry {i}",
                     "content": f"Content {i}",
                 },
@@ -297,7 +285,6 @@ class TestJournalList:
         client.post(
             "/api/v1/journal",
             json={
-                "user_id": "user-1",
                 "title": "User 1 only",
                 "content": "Content.",
             },
@@ -322,7 +309,6 @@ class TestJournalStats:
             client.post(
                 "/api/v1/journal",
                 json={
-                    "user_id": "user-1",
                     "system": system,
                     "title": f"{system} entry",
                     "content": "Content.",
