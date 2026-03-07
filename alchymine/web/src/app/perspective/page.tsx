@@ -134,15 +134,11 @@ export default function PerspectivePage() {
 
   const intakeKey = intake?.intentions?.join(",") ?? intake?.intention ?? "";
 
-  const kegan = useApi<KeganAssessResponse>(
-    hasIntake
-      ? () =>
-          getKeganAssessment({
-            intention: intake!.intentions?.[0] ?? intake!.intention,
-          })
-      : null,
-    [intakeKey],
-  );
+  // NOTE: Kegan endpoint requires computed assessment responses
+  // (dimension scores 1-5) that only exist after report generation.
+  // Raw intake data causes 422 errors.  Disabled until we plumb
+  // report-derived data into these pages.
+  const kegan = useApi<KeganAssessResponse>(null, [intakeKey]);
 
   return (
     <ProtectedRoute>
