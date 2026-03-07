@@ -21,7 +21,6 @@ from alchymine.db import repository
 from alchymine.engine.profile import IntakeData
 from alchymine.engine.reports.html_renderer import render_report_html
 from alchymine.workers.tasks import generate_report as generate_report_task
-from alchymine.workers.tasks import pdf_store
 
 router = APIRouter()
 
@@ -256,13 +255,13 @@ async def get_report_pdf(
             detail=f"Report is not complete (status: {report.status})",
         )
 
-    if report_id not in pdf_store:
+    if not report.pdf_data:
         raise HTTPException(
             status_code=404,
             detail="PDF has not been generated for this report",
         )
 
-    pdf_bytes = pdf_store[report_id]
+    pdf_bytes = report.pdf_data
 
     return Response(
         content=pdf_bytes,
