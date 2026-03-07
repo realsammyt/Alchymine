@@ -18,7 +18,7 @@ import {
   ProjectListResponse,
   ProfileResponse,
 } from "@/lib/api";
-import { useApi, getStoredIntake } from "@/lib/useApi";
+import { useApi, useIntake } from "@/lib/useApi";
 import { useAuth } from "@/lib/AuthContext";
 import CreativeProjects from "@/components/creative/CreativeProjects";
 import EvidenceBadge from "@/components/shared/EvidenceBadge";
@@ -112,7 +112,7 @@ export default function CreativePage() {
   const [mounted, setMounted] = useState(false);
   const { user } = useAuth();
   const userId = user?.id ?? null;
-  const intake = useMemo(() => (mounted ? getStoredIntake() : null), [mounted]);
+  const intake = useIntake(userId);
   const hasIntake = !!(intake?.intentions?.length || intake?.intention);
 
   useEffect(() => {

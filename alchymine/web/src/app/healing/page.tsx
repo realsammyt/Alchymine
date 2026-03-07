@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import Button from "@/components/shared/Button";
 import MethodologyPanel from "@/components/shared/MethodologyPanel";
@@ -22,7 +22,7 @@ import {
   HealingMatchListResponse,
   OutcomeSummary,
 } from "@/lib/api";
-import { useApi, getStoredIntake } from "@/lib/useApi";
+import { useApi, useIntake } from "@/lib/useApi";
 import { useAuth } from "@/lib/AuthContext";
 import ProtectedRoute from "@/components/shared/ProtectedRoute";
 import { DEMO_ACCOUNT_EMAIL } from "@/lib/constants";
@@ -452,7 +452,7 @@ export default function HealingPage() {
   const [selectedPattern, setSelectedPattern] = useState<string | null>(null);
   const { user } = useAuth();
   const isDemoUser = user?.email === DEMO_ACCOUNT_EMAIL;
-  const intake = useMemo(() => getStoredIntake(), []);
+  const intake = useIntake(user?.id);
   const hasIntake = !!(intake?.intentions?.length || intake?.intention);
 
   // Fetch modalities from API

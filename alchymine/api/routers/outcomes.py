@@ -16,15 +16,59 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from alchymine.api.auth import get_current_user
 from alchymine.api.deps import get_db_session
 from alchymine.db import repository
+from alchymine.db.models import MilestoneDBRecord, OutcomeMetricRecord
 from alchymine.outcomes.tracker import (
     MilestoneRecord,
     OutcomeSummary,
     OutcomeTracker,
+    _activity_log,
+    _milestones,
     calculate_outcome_summary,
     record_activity,
 )
 
 router = APIRouter()
+
+
+def _hydrate_from_db(
+    user_id: str,
+    db_milestones: list[MilestoneDBRecord],
+    db_metrics: list[OutcomeMetricRecord],
+) -> None:
+    """Populate in-memory stores from DB records before calculating summary.
+
+    This bridges the gap between DB-persisted milestones/activities and the
+    in-memory ``calculate_outcome_summary`` function.
+    """
+    # Hydrate milestones — merge DB records with any in-memory ones
+    existing_ids = {m.id for m in _milestones.get(user_id, []) if m.id}
+    hydrated: list[MilestoneRecord] = list(_milestones.get(user_id, []))
+    for m in db_milestones:
+        if str(m.id) not in existing_ids:
+            hydrated.append(
+                MilestoneRecord(
+                    id=str(m.id),
+                    system=m.system,
+                    name=m.name,
+                    completed=m.completed,
+                    completed_at=m.completed_at.isoformat() if m.completed_at else None,
+                    notes=m.notes,
+                )
+            )
+    _milestones[user_id] = hydrated
+
+    # Hydrate activity log from outcome metrics
+    existing_count = len(_activity_log.get(user_id, []))
+    if len(db_metrics) > existing_count:
+        _activity_log[user_id] = [
+            {
+                "system": m.system,
+                "activity_type": m.metric_name,
+                "timestamp": m.recorded_at.isoformat() if m.recorded_at else "",
+                "detail": "",
+            }
+            for m in db_metrics
+        ]
 
 
 # ── Request models ──────────────────────────────────────────────────────
@@ -174,14 +218,25 @@ async def list_milestones(
 async def log_activity(
     req: ActivityRequest,
     current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db_session),
 ) -> dict[str, str]:
     """Log a user activity event for engagement tracking.
 
     Activities are lightweight events (sessions, assessments, practices)
     that contribute to the user's engagement score in their outcome summary.
+    Persisted as an outcome metric record for durability.
     """
     if current_user["sub"] != req.user_id:
         raise HTTPException(status_code=403, detail="Access denied")
+    # Persist to DB as an outcome metric (value=1 for each event)
+    await repository.record_outcome_metric(
+        db,
+        user_id=req.user_id,
+        system=req.system,
+        metric_name=req.activity_type,
+        value=1.0,
+    )
+    # Also update in-memory for current-session reads
     record_activity(
         user_id=req.user_id,
         system=req.system,
@@ -197,6 +252,7 @@ async def get_outcome_summary(
     journal_count: int = Query(0, ge=0, description="Number of journal entries"),
     active_plan_day: int | None = Query(None, ge=0, le=90, description="Current plan day"),
     current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db_session),
 ) -> OutcomeSummary:
     """Calculate a cross-system outcome summary for a user.
 
@@ -207,9 +263,18 @@ async def get_outcome_summary(
     - 10%: Journaling consistency
 
     All calculations are deterministic and auditable.
+    Reads milestones and activity metrics from the database.
     """
     if current_user["sub"] != user_id:
         raise HTTPException(status_code=403, detail="Access denied")
+
+    # Hydrate in-memory stores from DB so calculate_outcome_summary
+    # works with persisted data (not just current-session activity)
+    db_milestones = await repository.get_milestones(db, user_id)
+    db_metrics = await repository.get_outcome_metrics(db, user_id)
+
+    _hydrate_from_db(user_id, db_milestones, db_metrics)
+
     return calculate_outcome_summary(
         user_id=user_id,
         journal_count=journal_count,

@@ -36,7 +36,7 @@ jest.mock("@/lib/AuthContext", () => ({
   }),
 }));
 
-// Mock the useApi and getStoredIntake
+// Mock the useApi and useIntake
 jest.mock("@/lib/useApi", () => ({
   useApi: () => ({
     data: null,
@@ -45,6 +45,7 @@ jest.mock("@/lib/useApi", () => ({
     refetch: jest.fn(),
   }),
   getStoredIntake: () => null,
+  useIntake: () => null,
 }));
 
 // Mock the API functions

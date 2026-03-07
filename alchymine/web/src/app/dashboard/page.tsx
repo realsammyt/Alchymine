@@ -5,7 +5,7 @@ import Link from "next/link";
 import Card from "@/components/shared/Card";
 import Button from "@/components/shared/Button";
 import ProtectedRoute from "@/components/shared/ProtectedRoute";
-import { useApi, getStoredIntake } from "@/lib/useApi";
+import { useApi, useIntake } from "@/lib/useApi";
 import { useAuth } from "@/lib/AuthContext";
 import {
   MotionReveal,
@@ -513,9 +513,9 @@ function CrossInsightCard({ insight }: { insight: BridgeInsightResponse }) {
 // ─── Main Dashboard ──────────────────────────────────────────────────
 
 export default function DashboardPage() {
-  const intake = getStoredIntake();
   const { user } = useAuth();
   const userId = user?.id ?? null;
+  const intake = useIntake(userId);
   const [activeTab, setActiveTab] = useState<"overview" | "journal">(
     "overview",
   );

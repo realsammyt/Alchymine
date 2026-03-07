@@ -347,7 +347,10 @@ def generate_report(
 
         # ── Populate profile layer tables from coordinator results ────
         try:
-            _user_id = (user_profile or {}).get("id")
+            # Resolve user_id from the Report row (set at creation by the API).
+            # The user_profile dict does NOT contain "id" — it has intake fields.
+            report_row = _run_async(_db_get_report(report_id))
+            _user_id = report_row.user_id if report_row else None
             _coordinator_results = serialised.get("coordinator_results", [])
             _run_async(_db_populate_profiles(_user_id, _coordinator_results))
         except Exception as exc:
