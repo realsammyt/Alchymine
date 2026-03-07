@@ -306,6 +306,16 @@ class TestProtectedEndpoint:
         )
         assert response.status_code == 401
 
+    def test_me_with_refresh_token_rejected(self, client: TestClient, registered_user: dict):
+        """GET /me with a refresh token (instead of access token) should return 401."""
+        refresh_token = registered_user["refresh_token"]
+        response = client.get(
+            "/api/v1/auth/me",
+            headers={"Authorization": f"Bearer {refresh_token}"},
+        )
+        assert response.status_code == 401
+        assert "token type" in response.json()["detail"].lower()
+
     def test_me_with_expired_token(self, client: TestClient, registered_user: dict):
         """GET /me with an expired token should return 401."""
         # Decode the original token to get the user's sub claim

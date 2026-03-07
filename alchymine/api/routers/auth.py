@@ -19,7 +19,7 @@ from datetime import UTC, datetime, timedelta
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request, Response, status
 from pydantic import BaseModel, EmailStr, Field
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from alchymine.api.auth import (
@@ -167,28 +167,34 @@ async def register(
     settings = get_settings()
     invite_code_row = None
     if body.promo_code != settings.signup_promo_code:
-        # Check invite_codes table
+        # Atomic: SELECT + check + increment in one UPDATE
         result = await db.execute(
-            select(InviteCode).where(
+            update(InviteCode)
+            .where(
                 InviteCode.code == body.promo_code,
                 InviteCode.is_active.is_(True),
+                InviteCode.uses_count < InviteCode.max_uses,
             )
+            .values(uses_count=InviteCode.uses_count + 1)
+            .returning(InviteCode)
         )
         invite_code_row = result.scalar_one_or_none()
         if invite_code_row is None:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail="Invalid invitation code",
+                detail="Invalid or expired invitation code",
             )
+        # Check expiry separately
         if invite_code_row.expires_at and invite_code_row.expires_at < datetime.now(UTC):
+            # Roll back the increment
+            await db.execute(
+                update(InviteCode)
+                .where(InviteCode.code == body.promo_code)
+                .values(uses_count=InviteCode.uses_count - 1)
+            )
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="This invitation code has expired",
-            )
-        if invite_code_row.uses_count >= invite_code_row.max_uses:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="This invitation code has reached its usage limit",
             )
 
     # Check for existing user
@@ -208,10 +214,7 @@ async def register(
     )
     db.add(user)
 
-    # Increment invite code usage
     if invite_code_row is not None:
-        invite_code_row.uses_count += 1
-        db.add(invite_code_row)
         logger.info(
             "Invite code '%s' used by %s (%d/%d uses)",
             invite_code_row.code,

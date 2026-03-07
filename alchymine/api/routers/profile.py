@@ -14,7 +14,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from alchymine.api.auth import get_current_user
+from alchymine.api.auth import get_current_admin, get_current_user
 from alchymine.api.deps import get_db_session
 from alchymine.db import repository
 from alchymine.db.models import User
@@ -190,11 +190,9 @@ async def list_profiles(
     offset: int = 0,
     limit: int = 20,
     session: AsyncSession = Depends(get_db_session),
-    current_user: dict = Depends(get_current_user),
+    admin: User = Depends(get_current_admin),
 ) -> ProfileListResponse:
     """List user profiles with pagination. Restricted to admin users."""
-    if not current_user.get("is_admin", False):
-        raise HTTPException(status_code=403, detail="Access denied")
     if limit < 1 or limit > 100:
         raise HTTPException(
             status_code=422,

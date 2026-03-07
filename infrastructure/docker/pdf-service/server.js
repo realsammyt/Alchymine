@@ -1,5 +1,6 @@
 "use strict";
 
+const crypto = require("crypto");
 const express = require("express");
 const puppeteer = require("puppeteer-core");
 
@@ -18,7 +19,15 @@ if (!PDF_SERVICE_TOKEN) {
 function requireBearerToken(req, res, next) {
   const authHeader = req.headers["authorization"] || "";
   const [scheme, token] = authHeader.split(" ");
-  if (scheme !== "Bearer" || token !== PDF_SERVICE_TOKEN) {
+  if (scheme !== "Bearer") {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+  const tokenBuffer = Buffer.from(token || "");
+  const expectedBuffer = Buffer.from(PDF_SERVICE_TOKEN || "");
+  if (
+    tokenBuffer.length !== expectedBuffer.length ||
+    !crypto.timingSafeEqual(tokenBuffer, expectedBuffer)
+  ) {
     return res.status(401).json({ error: "Unauthorized" });
   }
   next();
@@ -64,6 +73,7 @@ app.post("/generate", requireBearerToken, async (req, res) => {
     const b = await getBrowser();
     page = await b.newPage();
 
+    await page.setJavaScriptEnabled(false);
     await page.setContent(html, {
       waitUntil: "networkidle0",
       timeout: 30000,
@@ -88,7 +98,7 @@ app.post("/generate", requireBearerToken, async (req, res) => {
     res.send(pdf);
   } catch (err) {
     console.error("PDF generation error:", err);
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: "PDF generation failed" });
   } finally {
     if (page) {
       await page.close().catch(() => {});
