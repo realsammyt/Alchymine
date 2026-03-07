@@ -104,6 +104,7 @@ async def create_report(
         status="pending",
         user_input=request.user_input,
         user_profile=request.user_profile,
+        user_id=current_user["sub"],
     )
     await session.commit()
 

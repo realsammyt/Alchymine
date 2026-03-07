@@ -277,6 +277,18 @@ def generate_report(
 
         serialised = _serialise_orchestrator_result(result)
 
+        # Build profile_summary in the shape the HTML renderer expects
+        try:
+            from alchymine.agents.orchestrator.synthesis import (
+                transform_to_profile_summary,
+            )
+
+            serialised["profile_summary"] = transform_to_profile_summary(
+                result.coordinator_results
+            )
+        except Exception as exc:
+            logger.warning("Failed to build profile_summary: %s", exc)
+
         # ── Store success ─────────────────────────────────────────────
         _run_async(_db_set_complete(report_id, serialised))
 

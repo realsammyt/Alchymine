@@ -216,6 +216,152 @@ def _intelligence_astrology(state: CoordinatorState) -> CoordinatorState:
     return {**state, "results": results, "errors": errors}
 
 
+def _intelligence_personality(state: CoordinatorState) -> CoordinatorState:
+    """Personality (Big Five) scoring node for the Intelligence graph."""
+    results = dict(state.get("results", {}))
+    errors = list(state.get("errors", []))
+    request_data = state.get("request_data", {})
+
+    try:
+        from alchymine.engine.personality.big_five import score_big_five
+
+        bf_responses = request_data.get("assessment_responses", {})
+        # Filter to only Big Five items (bf_* keys)
+        bf_items = {k: v for k, v in bf_responses.items() if k.startswith("bf_")}
+
+        if len(bf_items) >= 20:
+            scores = score_big_five(bf_items)
+            results["personality"] = {
+                "openness": scores.openness,
+                "conscientiousness": scores.conscientiousness,
+                "extraversion": scores.extraversion,
+                "agreeableness": scores.agreeableness,
+                "neuroticism": scores.neuroticism,
+            }
+        else:
+            errors.append(
+                f"Intelligence: insufficient Big Five responses ({len(bf_items)}/20)"
+            )
+    except ImportError:
+        errors.append("Intelligence: personality engine not available")
+    except Exception as exc:
+        errors.append(f"Intelligence: personality error — {exc!s}")
+
+    return {**state, "results": results, "errors": errors}
+
+
+def _intelligence_archetype(state: CoordinatorState) -> CoordinatorState:
+    """Archetype mapping node for the Intelligence graph."""
+    results = dict(state.get("results", {}))
+    errors = list(state.get("errors", []))
+
+    try:
+        from alchymine.engine.archetype.mapper import map_archetype
+        from alchymine.engine.profile import (
+            AstrologyProfile,
+            BigFiveScores,
+            NumerologyProfile,
+        )
+
+        numerology_data = results.get("numerology")
+        astrology_data = results.get("astrology")
+        personality_data = results.get("personality")
+
+        if numerology_data and astrology_data and personality_data:
+            # Reconstruct profile objects from upstream node results
+            numerology = NumerologyProfile(
+                life_path=numerology_data["life_path"],
+                expression=numerology_data["expression"],
+                soul_urge=numerology_data["soul_urge"],
+                personality=numerology_data["personality"],
+                personal_year=numerology_data["personal_year"],
+                personal_month=numerology_data["personal_month"],
+            )
+            astrology = AstrologyProfile(
+                sun_sign=astrology_data["sun_sign"],
+                sun_degree=astrology_data["sun_degree"],
+                moon_sign=astrology_data.get("moon_sign", "Unknown"),
+                moon_degree=astrology_data.get("moon_degree", 0.0),
+            )
+            big_five = BigFiveScores(
+                openness=personality_data["openness"],
+                conscientiousness=personality_data["conscientiousness"],
+                extraversion=personality_data["extraversion"],
+                agreeableness=personality_data["agreeableness"],
+                neuroticism=personality_data["neuroticism"],
+            )
+
+            archetype = map_archetype(numerology, astrology, big_five)
+            results["archetype"] = {
+                "primary": archetype.primary.value,
+                "secondary": archetype.secondary.value if archetype.secondary else None,
+                "shadow": archetype.shadow,
+                "shadow_secondary": archetype.shadow_secondary,
+                "light_qualities": archetype.light_qualities,
+                "shadow_qualities": archetype.shadow_qualities,
+            }
+        else:
+            missing = []
+            if not numerology_data:
+                missing.append("numerology")
+            if not astrology_data:
+                missing.append("astrology")
+            if not personality_data:
+                missing.append("personality")
+            errors.append(
+                f"Intelligence: archetype requires {', '.join(missing)} — skipped"
+            )
+    except ImportError:
+        errors.append("Intelligence: archetype engine not available")
+    except Exception as exc:
+        errors.append(f"Intelligence: archetype error — {exc!s}")
+
+    return {**state, "results": results, "errors": errors}
+
+
+def _intelligence_biorhythm(state: CoordinatorState) -> CoordinatorState:
+    """Biorhythm calculation node for the Intelligence graph."""
+    results = dict(state.get("results", {}))
+    errors = list(state.get("errors", []))
+    request_data = state.get("request_data", {})
+
+    try:
+        from datetime import date as date_type
+
+        from alchymine.engine.biorhythm.calculator import calculate_biorhythm
+
+        birth_date = request_data.get("birth_date")
+        if birth_date:
+            # Handle string dates
+            if isinstance(birth_date, str):
+                birth_date = date_type.fromisoformat(birth_date)
+            today = date_type.today()
+            bio = calculate_biorhythm(birth_date, today)
+            results["biorhythm"] = {
+                "physical": bio.physical,
+                "emotional": bio.emotional,
+                "intellectual": bio.intellectual,
+                "physical_percentage": bio.physical_percentage,
+                "emotional_percentage": bio.emotional_percentage,
+                "intellectual_percentage": bio.intellectual_percentage,
+                "days_alive": bio.days_alive,
+                "is_physical_critical": bio.is_physical_critical,
+                "is_emotional_critical": bio.is_emotional_critical,
+                "is_intellectual_critical": bio.is_intellectual_critical,
+                "target_date": bio.target_date.isoformat(),
+                "evidence_rating": bio.evidence_rating,
+                "methodology_note": bio.methodology_note,
+            }
+        else:
+            errors.append("Intelligence: missing birth_date for biorhythm")
+    except ImportError:
+        errors.append("Intelligence: biorhythm engine not available")
+    except Exception as exc:
+        errors.append(f"Intelligence: biorhythm error — {exc!s}")
+
+    return {**state, "results": results, "errors": errors}
+
+
 def _intelligence_status(state: CoordinatorState) -> CoordinatorState:
     """Compute final status for the Intelligence graph."""
     results = state.get("results", {})
@@ -599,7 +745,7 @@ def build_intelligence_graph(
 ) -> Any:  # noqa: ANN401
     """Build and compile the Intelligence system StateGraph.
 
-    Node order: numerology -> astrology -> status [-> quality_gate] -> END
+    Node order: numerology -> astrology -> personality -> archetype -> biorhythm -> status [-> quality_gate] -> END
 
     Parameters
     ----------
@@ -617,6 +763,9 @@ def build_intelligence_graph(
     nodes: list[tuple[str, Any]] = [
         ("numerology", _intelligence_numerology),
         ("astrology", _intelligence_astrology),
+        ("personality", _intelligence_personality),
+        ("archetype", _intelligence_archetype),
+        ("biorhythm", _intelligence_biorhythm),
         ("status", _intelligence_status),
     ]
     if include_quality_gate:
@@ -630,7 +779,10 @@ def build_intelligence_graph(
         graph.add_node(name, func)
     graph.set_entry_point("numerology")
     graph.add_edge("numerology", "astrology")
-    graph.add_edge("astrology", "status")
+    graph.add_edge("astrology", "personality")
+    graph.add_edge("personality", "archetype")
+    graph.add_edge("archetype", "biorhythm")
+    graph.add_edge("biorhythm", "status")
     if include_quality_gate:
         graph.add_edge("status", "quality_gate")
         graph.add_edge("quality_gate", END)
