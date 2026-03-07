@@ -45,7 +45,7 @@ def _override_db():
 
     app.dependency_overrides[get_db] = _get_test_db
     yield
-    app.dependency_overrides.clear()
+    app.dependency_overrides.pop(get_db, None)
 
 
 @pytest.fixture
@@ -305,6 +305,16 @@ class TestProtectedEndpoint:
             headers={"Authorization": "Bearer invalid-token-here"},
         )
         assert response.status_code == 401
+
+    def test_me_with_refresh_token_rejected(self, client: TestClient, registered_user: dict):
+        """GET /me with a refresh token (instead of access token) should return 401."""
+        refresh_token = registered_user["refresh_token"]
+        response = client.get(
+            "/api/v1/auth/me",
+            headers={"Authorization": f"Bearer {refresh_token}"},
+        )
+        assert response.status_code == 401
+        assert "token type" in response.json()["detail"].lower()
 
     def test_me_with_expired_token(self, client: TestClient, registered_user: dict):
         """GET /me with an expired token should return 401."""
@@ -649,11 +659,16 @@ class TestTokenRevocationOnPasswordReset:
             json={"token": raw_token, "new_password": "post-reset-password"},
         )
 
-        # Wait so the new login token's ``iat`` (integer seconds) falls
-        # strictly after the password_changed_at second.
-        import time
+        # Shift password_changed_at 2 seconds into the past so the next
+        # login token's ``iat`` falls strictly after it — no sleep needed.
+        async def _backdate_password_changed() -> None:
+            async for db in app.dependency_overrides[get_db]():
+                result = await db.execute(select(User).where(User.email == "test@example.com"))
+                user = result.scalar_one()
+                user.password_changed_at = user.password_changed_at - timedelta(seconds=2)
+                await db.commit()
 
-        time.sleep(1.1)
+        asyncio.run(_backdate_password_changed())
 
         # Log in with the new password to get a fresh refresh token
         login_resp = client.post(
@@ -678,9 +693,7 @@ class TestTokenRevocationOnPasswordReset:
 class TestPasswordResetEmail:
     """Tests that the forgot-password endpoint integrates with the email service."""
 
-    def test_forgot_password_calls_email_service(
-        self, client: TestClient, registered_user: dict
-    ):
+    def test_forgot_password_calls_email_service(self, client: TestClient, registered_user: dict):
         """Requesting a reset for an existing email should schedule the email task."""
         from unittest.mock import AsyncMock, patch
 

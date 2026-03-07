@@ -311,19 +311,22 @@ class TestRateLimitAuthRoutes:
 class TestRateLimitRedisFallback:
     """Tests for graceful degradation when Redis is unavailable."""
 
-    def test_redis_unavailable_allows_traffic(self):
-        """When Redis is down, requests are allowed through."""
-        app = _make_rate_limit_app(max_requests=1, window_seconds=60)
+    def test_redis_unavailable_uses_local_fallback(self):
+        """When Redis is down, in-process rate limiting kicks in."""
+        app = _make_rate_limit_app(max_requests=2, window_seconds=60)
         # Patch from_url to raise — simulates Redis being down
         with patch(
             "redis.asyncio.from_url",
             side_effect=ConnectionError("Connection refused"),
         ):
             client = TestClient(app)
-            # Even with limit=1, all should pass because Redis is "down"
-            for _ in range(10):
+            # First 2 requests should pass (within limit)
+            for _ in range(2):
                 response = client.get("/ping")
                 assert response.status_code == 200
+            # 3rd request should be rate-limited by in-process fallback
+            response = client.get("/ping")
+            assert response.status_code == 429
 
     def test_redis_unavailable_logs_warning(self, caplog):
         """When Redis is unavailable, a warning is logged."""

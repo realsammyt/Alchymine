@@ -206,7 +206,8 @@ async def update_layer(
 
     # Ensure the user exists
     user_check = await session.execute(select(User).where(User.id == user_id))
-    if user_check.scalar_one_or_none() is None:
+    user_obj = user_check.scalar_one_or_none()
+    if user_obj is None:
         raise LookupError(f"No user with id {user_id!r}")
 
     # Check if the layer row already exists by querying the child table directly.
@@ -231,12 +232,11 @@ async def update_layer(
 
     await session.flush()
 
-    # Expire any cached User so relationships are reloaded
-    session.expire_all()
-
-    # Reload with fresh relationships
+    # Expire cached User so relationships are reloaded
+    session.expire(user_obj)
     refreshed = await get_profile(session, user_id)
-    assert refreshed is not None
+    if refreshed is None:
+        raise ValueError(f"Profile not found after update_layer for user_id={user_id}")
     return refreshed
 
 
@@ -333,6 +333,14 @@ async def list_reports_by_user(
         .limit(limit)
     )
     return list(result.scalars().all())
+
+
+async def count_reports_by_user(session: AsyncSession, user_id: str) -> int:
+    """Return total number of reports for *user_id*."""
+    result = await session.execute(
+        select(func.count()).select_from(Report).where(Report.user_id == user_id)
+    )
+    return result.scalar_one()
 
 
 async def update_report_status(
@@ -547,20 +555,18 @@ async def delete_journal_entry(session: AsyncSession, entry_id: str) -> bool:
 async def get_journal_stats(session: AsyncSession, user_id: str) -> dict[str, Any]:
     """Return summary statistics for a user's journal.
 
-    Returns a dict with:
-    - ``total_entries`` — total entry count
-    - ``entries_by_system`` — count per system name
-    - ``entries_by_type`` — count per entry type
-    - ``average_mood`` — mean mood_score (or ``None`` if no scored entries)
-    - ``tags_used`` — sorted list of unique tags
-    - ``streak_days`` — consecutive days with at least one entry ending today
+    Uses SQL aggregation for counts and averages, only fetching
+    individual dates for streak calculation.
     """
-    entries_result = await session.execute(
-        select(JournalEntry).where(JournalEntry.user_id == user_id)
-    )
-    entries = list(entries_result.scalars().all())
+    base_filter = JournalEntry.user_id == user_id
 
-    if not entries:
+    # Total count
+    total_result = await session.execute(
+        select(func.count()).select_from(JournalEntry).where(base_filter)
+    )
+    total = total_result.scalar_one()
+
+    if total == 0:
         return {
             "total_entries": 0,
             "entries_by_system": {},
@@ -570,28 +576,47 @@ async def get_journal_stats(session: AsyncSession, user_id: str) -> dict[str, An
             "tags_used": [],
         }
 
-    by_system: dict[str, int] = {}
-    by_type: dict[str, int] = {}
+    # Counts by system
+    system_result = await session.execute(
+        select(JournalEntry.system, func.count()).where(base_filter).group_by(JournalEntry.system)
+    )
+    by_system: dict[str, int] = {row[0]: row[1] for row in system_result.all()}
+
+    # Counts by type
+    type_result = await session.execute(
+        select(JournalEntry.entry_type, func.count())
+        .where(base_filter)
+        .group_by(JournalEntry.entry_type)
+    )
+    by_type: dict[str, int] = {row[0]: row[1] for row in type_result.all()}
+
+    # Average mood
+    mood_result = await session.execute(
+        select(func.avg(JournalEntry.mood_score))
+        .where(base_filter)
+        .where(JournalEntry.mood_score.isnot(None))
+    )
+    avg_mood_raw = mood_result.scalar_one()
+    avg_mood = round(float(avg_mood_raw), 2) if avg_mood_raw is not None else None
+
+    # Tags — must fetch all since JSON arrays can't be aggregated in SQL
+    tags_result = await session.execute(
+        select(JournalEntry.tags).where(base_filter).where(JournalEntry.tags.isnot(None))
+    )
     all_tags: set[str] = set()
-    moods: list[int] = []
+    for (tags,) in tags_result.all():
+        if isinstance(tags, list):
+            all_tags.update(tags)
 
-    for entry in entries:
-        by_system[entry.system] = by_system.get(entry.system, 0) + 1
-        by_type[entry.entry_type] = by_type.get(entry.entry_type, 0) + 1
-        if entry.mood_score is not None:
-            moods.append(entry.mood_score)
-        if entry.tags:
-            all_tags.update(entry.tags if isinstance(entry.tags, list) else [])
-
-    avg_mood = sum(moods) / len(moods) if moods else None
-
-    # Streak: consecutive days with entries ending today
+    # Streak — only fetch dates
+    dates_result = await session.execute(
+        select(JournalEntry.created_at).where(base_filter).order_by(JournalEntry.created_at.desc())
+    )
     dates = sorted(
         {
-            e.created_at.strftime("%Y-%m-%d")
-            if hasattr(e.created_at, "strftime")
-            else str(e.created_at)[:10]
-            for e in entries
+            ts.strftime("%Y-%m-%d") if hasattr(ts, "strftime") else str(ts)[:10]
+            for (ts,) in dates_result.all()
+            if ts is not None
         },
         reverse=True,
     )
@@ -608,7 +633,7 @@ async def get_journal_stats(session: AsyncSession, user_id: str) -> dict[str, An
                 break
 
     return {
-        "total_entries": len(entries),
+        "total_entries": total,
         "entries_by_system": by_system,
         "entries_by_type": by_type,
         "average_mood": avg_mood,

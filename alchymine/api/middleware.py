@@ -11,7 +11,9 @@ from __future__ import annotations
 import ipaddress
 import logging
 import os
+import re
 import time
+import uuid
 from collections.abc import Callable
 from typing import Any
 
@@ -20,6 +22,11 @@ from starlette.requests import Request
 from starlette.responses import JSONResponse, Response
 
 logger = logging.getLogger("alchymine.api")
+
+_UUID_RE = re.compile(
+    r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+    re.IGNORECASE,
+)
 
 
 def _get_redis_url() -> str:
@@ -35,6 +42,29 @@ def _get_redis_url() -> str:
         return str(get_settings().redis_url)
     except Exception:  # noqa: BLE001
         return os.environ.get("REDIS_URL", "redis://localhost:6379/0")
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Request ID Middleware
+# ═══════════════════════════════════════════════════════════════════════════
+
+
+class RequestIdMiddleware(BaseHTTPMiddleware):
+    """Add a unique request ID to each request for log correlation.
+
+    Sets X-Request-ID header on responses. If the incoming request
+    already has X-Request-ID, it is preserved.
+    """
+
+    async def dispatch(self, request: Request, call_next: Callable) -> Response:
+        incoming = request.headers.get("x-request-id", "")
+        request_id = incoming if _UUID_RE.match(incoming) else str(uuid.uuid4())
+        # Store on request state for access by other middleware/handlers
+        request.state.request_id = request_id
+
+        response = await call_next(request)
+        response.headers["X-Request-ID"] = request_id
+        return response
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -80,12 +110,14 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
         response = await call_next(request)
         duration_ms = (time.monotonic() - start) * 1000
 
+        request_id = getattr(request.state, "request_id", "-")
         logger.info(
-            "%s %s %d %.1fms",
+            "%s %s %d %.1fms [%s]",
             request.method,
             request.url.path,
             response.status_code,
             duration_ms,
+            request_id,
         )
         return response
 
@@ -151,6 +183,8 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         self.route_limits = route_limits if route_limits is not None else DEFAULT_ROUTE_LIMITS
         self._redis: Any = None
         self._redis_failed = False
+        self._local_counts: dict[str, tuple[int, float]] = {}  # key -> (count, window_start)
+        self._max_local_entries = 10_000
 
     async def _get_redis(self) -> Any:
         """Lazily connect to Redis.  Returns ``None`` if unavailable."""
@@ -206,7 +240,39 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
 
         redis_conn = await self._get_redis()
         if redis_conn is None:
-            # Graceful fallback — Redis unavailable, allow traffic
+            # In-process fallback — not shared across workers but better than nothing
+            import time as _time
+
+            now = _time.monotonic()
+            bucket = "default"
+            for prefix in self.route_limits:
+                if path.startswith(prefix):
+                    bucket = prefix.replace("/", "_").strip("_")
+                    break
+            key = f"{client_ip}:{bucket}"
+
+            if len(self._local_counts) > self._max_local_entries:
+                self._local_counts.clear()
+
+            count, window_start = self._local_counts.get(key, (0, now))
+            if now - window_start >= window:
+                # Window expired — reset
+                count = 0
+                window_start = now
+
+            count += 1
+            self._local_counts[key] = (count, window_start)
+
+            if count > max_req:
+                return JSONResponse(
+                    status_code=429,
+                    content={
+                        "detail": "Rate limit exceeded. Please try again later.",
+                        "status_code": 429,
+                    },
+                    headers={"Retry-After": str(window)},
+                )
+
             return await call_next(request)
 
         bucket = "default"

@@ -26,7 +26,6 @@ router = APIRouter()
 class JournalEntryCreate(BaseModel):
     """Request to create a new journal entry."""
 
-    user_id: str = Field(..., description="User identifier")
     system: str = Field(
         "general",
         description="System this entry relates to: general | healing | wealth | creative | perspective",
@@ -129,12 +128,11 @@ async def create_journal_entry(
     Supports reflections, cognitive reframes, gratitude notes,
     milestone celebrations, and system-specific insights.
     """
-    if current_user["sub"] != entry.user_id:
-        raise HTTPException(status_code=403, detail="Access denied")
+    user_id = current_user["sub"]
 
     db_entry = await repository.create_journal_entry(
         session,
-        user_id=entry.user_id,
+        user_id=user_id,
         title=entry.title,
         content=entry.content,
         system=entry.system,

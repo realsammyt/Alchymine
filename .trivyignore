@@ -11,8 +11,9 @@ CVE-2024-23342
 CVE-2026-27903
 CVE-2026-27904
 
-# tar GHSA-qffp-2rhf-9h96: Hardlink path traversal via drive-relative linkpath
+# tar GHSA-qffp-2rhf-9h96 / CVE-2026-29786: Hardlink path traversal via drive-relative linkpath
 # Affects tar 7.5.9 bundled inside system npm (/usr/local/lib/node_modules/npm/).
 # Our web container only runs `node server.js` and never invokes npm/tar at runtime,
 # so this is not exploitable in our deployment context.
 GHSA-qffp-2rhf-9h96
+CVE-2026-29786

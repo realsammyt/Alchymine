@@ -100,7 +100,7 @@ def client(engine):
 
     yield TestClient(app)
 
-    app.dependency_overrides.clear()
+    app.dependency_overrides.pop(get_db_session, None)
     set_db_engine(None)
     _set_task_engine(None)
 
@@ -306,9 +306,7 @@ class TestReportOwnershipIDOR:
 
         _run_async(_insert())
 
-    def test_get_status_other_user_report_returns_403(
-        self, client: TestClient, engine
-    ) -> None:
+    def test_get_status_other_user_report_returns_403(self, client: TestClient, engine) -> None:
         """GET /reports/{id}/status for another user's report returns 403."""
         report_id = "foreign-report-001"
         self._seed_report_for_other_user(engine, report_id)
@@ -317,9 +315,7 @@ class TestReportOwnershipIDOR:
         assert response.status_code == 403
         assert response.json()["detail"] == "Access denied"
 
-    def test_get_report_other_user_returns_403(
-        self, client: TestClient, engine
-    ) -> None:
+    def test_get_report_other_user_returns_403(self, client: TestClient, engine) -> None:
         """GET /reports/{id} for another user's report returns 403."""
         report_id = "foreign-report-002"
         self._seed_report_for_other_user(engine, report_id)
@@ -328,9 +324,7 @@ class TestReportOwnershipIDOR:
         assert response.status_code == 403
         assert response.json()["detail"] == "Access denied"
 
-    def test_get_html_other_user_report_returns_403(
-        self, client: TestClient, engine
-    ) -> None:
+    def test_get_html_other_user_report_returns_403(self, client: TestClient, engine) -> None:
         """GET /reports/{id}/html for another user's report returns 403."""
         report_id = "foreign-report-003"
         self._seed_report_for_other_user(engine, report_id)
@@ -339,9 +333,7 @@ class TestReportOwnershipIDOR:
         assert response.status_code == 403
         assert response.json()["detail"] == "Access denied"
 
-    def test_get_pdf_other_user_report_returns_403(
-        self, client: TestClient, engine
-    ) -> None:
+    def test_get_pdf_other_user_report_returns_403(self, client: TestClient, engine) -> None:
         """GET /reports/{id}/pdf for another user's report returns 403."""
         report_id = "foreign-report-004"
         self._seed_report_for_other_user(engine, report_id)

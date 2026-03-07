@@ -50,11 +50,21 @@ def get_async_engine(
     if db_url.startswith("sqlite"):
         connect_args["check_same_thread"] = False
 
-    return create_async_engine(
-        db_url,
-        echo=echo,
-        connect_args=connect_args,
-    )
+    kwargs: dict = {
+        "echo": echo,
+        "connect_args": connect_args,
+    }
+    if not db_url.startswith("sqlite"):
+        kwargs.update(
+            {
+                "pool_size": 10,
+                "max_overflow": 20,
+                "pool_pre_ping": True,
+                "pool_recycle": 3600,
+            }
+        )
+
+    return create_async_engine(db_url, **kwargs)
 
 
 # ─── Session Factory ───────────────────────────────────────────────────
@@ -74,15 +84,14 @@ def get_async_session_factory(
 async def get_async_session(
     engine: AsyncEngine | None = None,
 ) -> AsyncGenerator[AsyncSession, None]:
-    """Dependency-injectable async session generator.
+    """Yield an async session.
 
-    Usage with FastAPI::
+    Prefer :func:`alchymine.api.deps.get_db_session` for FastAPI
+    dependency injection — it uses a cached singleton engine.
 
-        @app.get("/")
-        async def root(session: AsyncSession = Depends(get_async_session)):
-            ...
-
-    For standalone scripts, pass an explicit *engine*.
+    This function is provided for standalone scripts and tests that
+    need to pass an explicit engine.  When *engine* is ``None``, a
+    new engine is created from settings (not cached).
     """
     _engine = engine or get_async_engine()
     factory = get_async_session_factory(_engine)

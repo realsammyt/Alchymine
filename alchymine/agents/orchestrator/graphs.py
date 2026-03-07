@@ -217,7 +217,7 @@ def _intelligence_astrology(state: CoordinatorState) -> CoordinatorState:
 
 
 def _intelligence_personality(state: CoordinatorState) -> CoordinatorState:
-    """Personality (Big Five) scoring node for the Intelligence graph."""
+    """Personality (Big Five + attachment + enneagram) scoring node for the Intelligence graph."""
     results = dict(state.get("results", {}))
     errors = list(state.get("errors", []))
     request_data = state.get("request_data", {})
@@ -231,13 +231,43 @@ def _intelligence_personality(state: CoordinatorState) -> CoordinatorState:
 
         if len(bf_items) >= 20:
             scores = score_big_five(bf_items)
-            results["personality"] = {
-                "openness": scores.openness,
-                "conscientiousness": scores.conscientiousness,
-                "extraversion": scores.extraversion,
-                "agreeableness": scores.agreeableness,
-                "neuroticism": scores.neuroticism,
+            personality: dict[str, Any] = {
+                "big_five": {
+                    "openness": scores.openness,
+                    "conscientiousness": scores.conscientiousness,
+                    "extraversion": scores.extraversion,
+                    "agreeableness": scores.agreeableness,
+                    "neuroticism": scores.neuroticism,
+                },
+                "attachment_style": None,
+                "enneagram_type": None,
+                "enneagram_wing": None,
             }
+
+            # Score attachment style if items are present
+            att_items = {k: v for k, v in bf_responses.items() if k.startswith("att_")}
+            if att_items:
+                try:
+                    from alchymine.engine.personality.attachment import score_attachment
+
+                    attachment = score_attachment(att_items)
+                    personality["attachment_style"] = attachment.value
+                except Exception as att_exc:
+                    errors.append(f"Intelligence: attachment scoring error — {att_exc!s}")
+
+            # Score enneagram type if items are present
+            enn_items = {k: v for k, v in bf_responses.items() if k.startswith("enn_")}
+            if enn_items:
+                try:
+                    from alchymine.engine.personality.enneagram import score_enneagram
+
+                    primary_type, wing = score_enneagram(enn_items)
+                    personality["enneagram_type"] = primary_type
+                    personality["enneagram_wing"] = wing
+                except Exception as enn_exc:
+                    errors.append(f"Intelligence: enneagram scoring error — {enn_exc!s}")
+
+            results["personality"] = personality
         else:
             errors.append(f"Intelligence: insufficient Big Five responses ({len(bf_items)}/20)")
     except ImportError:
@@ -291,12 +321,13 @@ def _intelligence_archetype(state: CoordinatorState) -> CoordinatorState:
                 venus_retrograde=astrology_data.get("venus_retrograde", False),
                 mercury_retrograde=astrology_data.get("mercury_retrograde", False),
             )
+            bf_data = personality_data.get("big_five", personality_data)
             big_five = BigFiveScores(
-                openness=personality_data["openness"],
-                conscientiousness=personality_data["conscientiousness"],
-                extraversion=personality_data["extraversion"],
-                agreeableness=personality_data["agreeableness"],
-                neuroticism=personality_data["neuroticism"],
+                openness=bf_data["openness"],
+                conscientiousness=bf_data["conscientiousness"],
+                extraversion=bf_data["extraversion"],
+                agreeableness=bf_data["agreeableness"],
+                neuroticism=bf_data["neuroticism"],
             )
 
             archetype = map_archetype(numerology, astrology, big_five)

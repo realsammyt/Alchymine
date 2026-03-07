@@ -231,8 +231,11 @@ class NarrativeGenerator:
         dict
             Map of system name → NarrativeResult.
         """
-        results: dict[str, NarrativeResult] = {}
-        for system in systems:
+        import asyncio
+
+        async def _gen(system: str) -> tuple[str, NarrativeResult]:
             system_data = engine_data.get(system, engine_data)
-            results[system] = await self.generate(system, system_data)
-        return results
+            return system, await self.generate(system, system_data)
+
+        pairs = await asyncio.gather(*[_gen(s) for s in systems])
+        return dict(pairs)

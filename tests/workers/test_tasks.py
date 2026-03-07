@@ -41,6 +41,7 @@ from alchymine.workers.tasks import (  # noqa: E402
     _run_async,
     _serialise_orchestrator_result,
     _set_task_engine,
+    generate_pdf_report,
     generate_report,
 )
 
@@ -343,8 +344,8 @@ class TestGenerateReportTask:
                 intentions=["career", "money"],
             )
 
-    def test_connection_error_marks_failed(self, engine):
-        """ConnectionError should mark the report as failed."""
+    def test_connection_error_stays_generating_on_retry(self, engine):
+        """ConnectionError should keep status 'generating' when retries remain."""
         with patch("alchymine.workers.tasks.MasterOrchestrator") as MockOrch:
             instance = MockOrch.return_value
             instance.process_request = AsyncMock(side_effect=ConnectionError("Redis down"))
@@ -358,10 +359,11 @@ class TestGenerateReportTask:
                 _get_report_from_db(engine, "test-conn-err")
             )
             assert report is not None
-            assert report.status == "failed"
+            # On first retry attempt, status should stay "generating", not "failed"
+            assert report.status == "generating"
 
-    def test_timeout_error_marks_failed(self, engine):
-        """TimeoutError should mark the report as failed."""
+    def test_timeout_error_stays_generating_on_retry(self, engine):
+        """TimeoutError should keep status 'generating' when retries remain."""
         with patch("alchymine.workers.tasks.MasterOrchestrator") as MockOrch:
             instance = MockOrch.return_value
             instance.process_request = AsyncMock(side_effect=TimeoutError("Operation timed out"))
@@ -373,7 +375,8 @@ class TestGenerateReportTask:
                 _get_report_from_db(engine, "test-timeout")
             )
             assert report is not None
-            assert report.status == "failed"
+            # On first retry attempt, status should stay "generating", not "failed"
+            assert report.status == "generating"
 
     def test_multiple_reports_independent(self, engine, mock_orchestrator_result):
         """Multiple reports should not interfere with each other."""

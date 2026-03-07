@@ -95,6 +95,7 @@ ignore = [
 "tests/**/*.py" = ["S101", "ANN"]
 "alchymine/db/migrations/**/*.py" = ["ANN", "E501"]
 "alchymine/config.py" = ["S105"]  # dev-default secrets are intentional
+"alchymine/api/auth.py" = ["B008"]  # FastAPI Depends() in defaults is standard
 "alchymine/api/routers/**/*.py" = ["B008"]  # FastAPI Depends() in defaults is standard
 
 [tool.mypy]

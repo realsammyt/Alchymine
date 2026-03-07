@@ -69,6 +69,9 @@ def _clear_rate_limit_state(obj: object) -> None:
         requests_dict = getattr(obj, "_requests", None)
         if requests_dict is not None:
             requests_dict.clear()
+        local_counts = getattr(obj, "_local_counts", None)
+        if local_counts is not None:
+            local_counts.clear()
         return
 
     # BaseHTTPMiddleware stores the next app in .app

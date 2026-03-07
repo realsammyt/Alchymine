@@ -240,8 +240,10 @@ class MasterOrchestrator:
             else:
                 synthesis_result = synthesize_full_profile(coordinator_results)
 
-            # Convert SynthesisResult to dict for backward compatibility
-            # while adding the richer structure
+            # synthesize_results() provides the base dict shape (systems,
+            # participating_systems, overall_status, errors) expected by
+            # downstream consumers. The synthesis_detail enriches it with
+            # cross-system insights from the structured synthesis.
             base = synthesize_results(coordinator_results)
             base["synthesis_detail"] = {
                 "unified_insights": synthesis_result.unified_insights,

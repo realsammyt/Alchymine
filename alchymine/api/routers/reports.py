@@ -11,7 +11,7 @@ import uuid
 from datetime import UTC, datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from fastapi.responses import HTMLResponse, Response
+from fastapi.responses import HTMLResponse, JSONResponse, Response, StreamingResponse
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -154,12 +154,12 @@ async def get_report_status(
     )
 
 
-@router.get("/reports/{report_id}")
+@router.get("/reports/{report_id}", response_model=None)
 async def get_report(
     report_id: str,
     session: AsyncSession = Depends(get_db_session),
     current_user: dict = Depends(get_current_user),
-) -> ReportResult:
+) -> ReportResult | JSONResponse:
     """Retrieve a completed report by ID.
 
     - **200** -- report is complete (or failed) and data is returned.
@@ -173,9 +173,9 @@ async def get_report(
         raise HTTPException(status_code=403, detail="Access denied")
 
     if report.status in ("pending", "generating"):
-        raise HTTPException(
+        return JSONResponse(
             status_code=202,
-            detail=f"Report is {report.status}",
+            content={"status": report.status, "detail": f"Report is {report.status}"},
         )
 
     return ReportResult(
@@ -188,12 +188,12 @@ async def get_report(
     )
 
 
-@router.get("/reports/{report_id}/html")
+@router.get("/reports/{report_id}/html", response_model=None)
 async def get_report_html(
     report_id: str,
     session: AsyncSession = Depends(get_db_session),
     current_user: dict = Depends(get_current_user),
-) -> HTMLResponse:
+) -> HTMLResponse | JSONResponse:
     """Render a completed report as a styled HTML page.
 
     The HTML is self-contained (inline CSS) and includes a "Save as PDF"
@@ -210,9 +210,9 @@ async def get_report_html(
         raise HTTPException(status_code=403, detail="Access denied")
 
     if report.status in ("pending", "generating"):
-        raise HTTPException(
+        return JSONResponse(
             status_code=202,
-            detail=f"Report is {report.status}",
+            content={"status": report.status, "detail": f"Report is {report.status}"},
         )
 
     # Build a dict compatible with render_report_html
@@ -261,13 +261,16 @@ async def get_report_pdf(
             detail="PDF has not been generated for this report",
         )
 
+    import io
+
     pdf_bytes = report.pdf_data
 
-    return Response(
-        content=pdf_bytes,
+    return StreamingResponse(
+        io.BytesIO(pdf_bytes),
         media_type="application/pdf",
         headers={
             "Content-Disposition": f'attachment; filename="alchymine-report-{report_id}.pdf"',
+            "Content-Length": str(len(pdf_bytes)),
         },
     )
 
@@ -287,19 +290,20 @@ async def list_user_reports(
     if current_user["sub"] != user_id:
         raise HTTPException(status_code=403, detail="Access denied")
     reports = await repository.list_reports_by_user(session, user_id, skip=skip, limit=limit)
+    total = await repository.count_reports_by_user(session, user_id)
     return ReportListResponse(
         reports=[
             ReportResult(
                 id=r.id,
                 status=r.status,
-                result=r.result,
+                result=None,
                 error=r.error,
                 created_at=r.created_at.isoformat() if r.created_at else "",
                 updated_at=r.updated_at.isoformat() if r.updated_at else None,
             )
             for r in reports
         ],
-        count=len(reports),
+        count=total,
         skip=skip,
         limit=limit,
     )

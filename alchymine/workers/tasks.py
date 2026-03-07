@@ -196,22 +196,23 @@ async def _db_populate_profiles(
         "perspective": "perspective",
     }
 
-    for cr in coordinator_results:
-        system = cr.get("system", "")
-        data = cr.get("data", {})
-        if not data or cr.get("status") == "error":
-            continue
+    async with factory() as session:
+        for cr in coordinator_results:
+            system = cr.get("system", "")
+            data = cr.get("data", {})
+            if not data or cr.get("status") == "error":
+                continue
 
-        layer = layer_map.get(system)
-        if not layer:
-            continue
+            layer = layer_map.get(system)
+            if not layer:
+                continue
 
-        try:
-            async with factory() as session:
+            try:
                 await repository.update_layer(session, user_id, layer, data)
-                await session.commit()
-        except Exception as exc:
-            logger.warning("Failed to populate %s profile for %s: %s", layer, user_id, exc)
+            except Exception as exc:
+                logger.warning("Failed to populate %s profile for %s: %s", layer, user_id, exc)
+
+        await session.commit()
 
 
 async def _db_store_pdf(report_id: str, pdf_bytes: bytes) -> None:
@@ -237,6 +238,8 @@ async def _db_store_pdf(report_id: str, pdf_bytes: bytes) -> None:
     retry_backoff=True,
     retry_backoff_max=60,
     acks_late=True,
+    time_limit=600,
+    soft_time_limit=540,
 )
 def generate_report(
     self: Any,
@@ -360,8 +363,9 @@ def generate_report(
         return serialised
 
     except (ConnectionError, OSError, TimeoutError):
-        # Transient failures — let Celery retry via autoretry_for
-        _run_async(_db_set_failed(report_id, traceback.format_exc()))
+        # Transient failures — only mark failed when all retries exhausted
+        if self.request.retries >= self.max_retries:
+            _run_async(_db_set_failed(report_id, traceback.format_exc()))
         raise
 
     except Exception as exc:
@@ -387,6 +391,8 @@ def generate_report(
     max_retries=2,
     default_retry_delay=5,
     acks_late=True,
+    time_limit=600,
+    soft_time_limit=540,
 )
 def generate_pdf_report(self: Any, report_id: str) -> dict[str, Any]:
     """Render a completed report as a PDF via Playwright.
@@ -480,6 +486,10 @@ def generate_pdf_report(self: Any, report_id: str) -> dict[str, Any]:
             "status": "complete",
             "size_bytes": len(pdf_bytes),
         }
+
+    except (ConnectionError, OSError, TimeoutError) as exc:
+        logger.warning("PDF generation for report %s transient error: %s", report_id, exc)
+        raise self.retry(exc=exc) from exc
 
     except Exception as exc:
         logger.exception("PDF generation for report %s failed: %s", report_id, exc)
