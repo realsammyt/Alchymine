@@ -46,8 +46,8 @@ async def _narrative_event_stream(
 
 @router.get("/stream/narrative")
 async def stream_narrative(
-    prompt: str = Query(..., description="The prompt to generate a narrative for"),
-    system_prompt: str = Query("", description="Optional system-level instructions"),
+    prompt: str = Query(..., max_length=2000, description="The prompt to generate a narrative for"),
+    system_prompt: str = Query("", max_length=2000, description="Optional system-level instructions"),
     current_user: dict = Depends(get_current_user),
 ) -> StreamingResponse:
     """Stream a narrative LLM response as Server-Sent Events.

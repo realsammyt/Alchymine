@@ -56,9 +56,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     sessionStorage.clear();
     // Tokens are returned in the JSON body for the migration fallback path
     // and also set as httpOnly cookies by the server automatically.
-    const tokens = await loginUser(email, password);
-    localStorage.setItem("access_token", tokens.access_token);
-    localStorage.setItem("refresh_token", tokens.refresh_token);
+    // Tokens are set as httpOnly cookies by the server automatically.
+    // We no longer store tokens in localStorage (XSS risk).
+    await loginUser(email, password);
     const me = await getMe();
     setUser(me);
   }, []);
@@ -67,9 +67,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     async (email: string, password: string, promoCode: string) => {
       // Clean slate for new accounts
       sessionStorage.clear();
-      const tokens = await registerUser(email, password, promoCode);
-      localStorage.setItem("access_token", tokens.access_token);
-      localStorage.setItem("refresh_token", tokens.refresh_token);
+      // Tokens are set as httpOnly cookies by the server automatically.
+      await registerUser(email, password, promoCode);
       const me = await getMe();
       setUser(me);
     },

@@ -144,6 +144,8 @@ async def get_report_status(
     report = await repository.get_report(session, report_id)
     if report is None:
         raise HTTPException(status_code=404, detail="Report not found")
+    if report.user_id and report.user_id != current_user["sub"]:
+        raise HTTPException(status_code=403, detail="Access denied")
 
     return ReportStatus(
         id=report.id,
@@ -168,6 +170,8 @@ async def get_report(
     report = await repository.get_report(session, report_id)
     if report is None:
         raise HTTPException(status_code=404, detail="Report not found")
+    if report.user_id and report.user_id != current_user["sub"]:
+        raise HTTPException(status_code=403, detail="Access denied")
 
     if report.status in ("pending", "generating"):
         raise HTTPException(
@@ -203,6 +207,8 @@ async def get_report_html(
     report = await repository.get_report(session, report_id)
     if report is None:
         raise HTTPException(status_code=404, detail="Report not found")
+    if report.user_id and report.user_id != current_user["sub"]:
+        raise HTTPException(status_code=403, detail="Access denied")
 
     if report.status in ("pending", "generating"):
         raise HTTPException(
@@ -241,6 +247,8 @@ async def get_report_pdf(
     report = await repository.get_report(session, report_id)
     if report is None:
         raise HTTPException(status_code=404, detail="Report not found")
+    if report.user_id and report.user_id != current_user["sub"]:
+        raise HTTPException(status_code=403, detail="Access denied")
 
     if report.status != "complete":
         raise HTTPException(

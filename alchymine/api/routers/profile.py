@@ -172,6 +172,8 @@ async def get_profile(
     current_user: dict = Depends(get_current_user),
 ) -> ProfileResponse:
     """Retrieve a user profile by ID."""
+    if current_user["sub"] != user_id:
+        raise HTTPException(status_code=403, detail="Access denied")
     user = await repository.get_profile(session, user_id)
     if user is None:
         raise HTTPException(status_code=404, detail="Profile not found")
@@ -189,7 +191,9 @@ async def list_profiles(
     session: AsyncSession = Depends(get_db_session),
     current_user: dict = Depends(get_current_user),
 ) -> ProfileListResponse:
-    """List user profiles with pagination."""
+    """List user profiles with pagination. Restricted to admin users."""
+    if not current_user.get("is_admin", False):
+        raise HTTPException(status_code=403, detail="Access denied")
     if limit < 1 or limit > 100:
         raise HTTPException(
             status_code=422,
@@ -228,6 +232,8 @@ async def update_layer(
     Valid layers: ``intake``, ``identity``, ``healing``, ``wealth``,
     ``creative``, ``perspective``.
     """
+    if current_user["sub"] != user_id:
+        raise HTTPException(status_code=403, detail="Access denied")
     try:
         user = await repository.update_layer(session, user_id, layer, request.data)
     except ValueError as exc:
@@ -244,6 +250,8 @@ async def delete_profile(
     current_user: dict = Depends(get_current_user),
 ) -> dict[str, str]:
     """Delete a user profile and all associated data."""
+    if current_user["sub"] != user_id:
+        raise HTTPException(status_code=403, detail="Access denied")
     deleted = await repository.delete_profile(session, user_id)
     if not deleted:
         raise HTTPException(status_code=404, detail="Profile not found")
