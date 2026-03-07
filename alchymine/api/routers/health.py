@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 
 from fastapi import APIRouter
+from fastapi.responses import JSONResponse
 from sqlalchemy import text
 
 from alchymine import __version__
@@ -14,8 +15,8 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
-@router.get("/health")
-async def health_check() -> dict:
+@router.get("/health", response_model=None)
+async def health_check() -> dict | JSONResponse:
     """Health check for load balancers and monitoring.
 
     Checks database and Redis connectivity. Returns 503 if any
@@ -51,15 +52,13 @@ async def health_check() -> dict:
         try:
             await r.ping()
         finally:
-            await r.aclose()
+            await r.close()
     except Exception as exc:
         logger.warning("Health check: Redis unavailable: %s", exc)
         checks["redis"] = "unavailable"
         checks["status"] = "degraded"
 
     if checks["status"] != "healthy":
-        from fastapi.responses import JSONResponse
-
         return JSONResponse(content=checks, status_code=503)
 
     return checks

@@ -154,12 +154,12 @@ async def get_report_status(
     )
 
 
-@router.get("/reports/{report_id}")
+@router.get("/reports/{report_id}", response_model=None)
 async def get_report(
     report_id: str,
     session: AsyncSession = Depends(get_db_session),
     current_user: dict = Depends(get_current_user),
-) -> ReportResult:
+) -> ReportResult | JSONResponse:
     """Retrieve a completed report by ID.
 
     - **200** -- report is complete (or failed) and data is returned.
@@ -188,12 +188,12 @@ async def get_report(
     )
 
 
-@router.get("/reports/{report_id}/html")
+@router.get("/reports/{report_id}/html", response_model=None)
 async def get_report_html(
     report_id: str,
     session: AsyncSession = Depends(get_db_session),
     current_user: dict = Depends(get_current_user),
-) -> HTMLResponse:
+) -> HTMLResponse | JSONResponse:
     """Render a completed report as a styled HTML page.
 
     The HTML is self-contained (inline CSS) and includes a "Save as PDF"

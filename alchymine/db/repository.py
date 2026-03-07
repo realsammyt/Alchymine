@@ -580,7 +580,7 @@ async def get_journal_stats(session: AsyncSession, user_id: str) -> dict[str, An
     system_result = await session.execute(
         select(JournalEntry.system, func.count()).where(base_filter).group_by(JournalEntry.system)
     )
-    by_system = dict(system_result.all())
+    by_system: dict[str, int] = {row[0]: row[1] for row in system_result.all()}
 
     # Counts by type
     type_result = await session.execute(
@@ -588,7 +588,7 @@ async def get_journal_stats(session: AsyncSession, user_id: str) -> dict[str, An
         .where(base_filter)
         .group_by(JournalEntry.entry_type)
     )
-    by_type = dict(type_result.all())
+    by_type: dict[str, int] = {row[0]: row[1] for row in type_result.all()}
 
     # Average mood
     mood_result = await session.execute(
