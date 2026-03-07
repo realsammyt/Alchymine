@@ -669,18 +669,22 @@ export default function WealthPage() {
   const intakeIntentions =
     intake?.intentions ?? (intake?.intention ? [intake.intention] : []);
 
+  // NOTE: Wealth endpoints require computed profile data (life_path,
+  // archetype_primary, risk_tolerance) that only exists after report
+  // generation.  Raw intake data causes 422 errors.  Disabled until we
+  // plumb report-derived data into these pages.
   const wealthProfile = useApi<WealthProfileResponse>(
-    hasIntake ? () => getWealthProfile({ intentions: intakeIntentions }) : null,
+    null,
     [intakeIntentions.join(",")],
   );
 
   const levers = useApi<LeverResponse>(
-    hasIntake ? () => getWealthLevers({ intentions: intakeIntentions }) : null,
+    null,
     [intakeIntentions.join(",")],
   );
 
   const wealthPlan = useApi<WealthPlanResponse>(
-    hasIntake ? () => getWealthPlan({ intentions: intakeIntentions }) : null,
+    null,
     [intakeIntentions.join(",")],
   );
 

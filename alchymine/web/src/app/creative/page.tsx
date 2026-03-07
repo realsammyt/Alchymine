@@ -116,24 +116,14 @@ export default function CreativePage() {
 
   const intakeKey = intake?.intentions?.join(",") ?? intake?.intention ?? "";
 
-  const style = useApi<StyleFingerprintResponse>(
-    hasIntake
-      ? () =>
-          getCreativeStyle({
-            intention: intake!.intentions?.[0] ?? intake!.intention,
-          })
-      : null,
-    [intakeKey],
-  );
+  // NOTE: Creative endpoints require computed profile data (guilford_scores,
+  // creative_dna) that only exists after report generation.  Raw intake data
+  // causes 422 errors.  Disabled until we plumb report-derived data into
+  // these pages.
+  const style = useApi<StyleFingerprintResponse>(null, [intakeKey]);
 
   const projects = useApi<ProjectListResponse>(
-    hasIntake
-      ? () =>
-          getCreativeProjects({
-            intention: intake!.intentions?.[0] ?? intake!.intention,
-            style: style.data?.creative_style,
-          })
-      : null,
+    null,
     [intakeKey, style.data?.creative_style],
   );
 

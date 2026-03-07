@@ -124,7 +124,7 @@ export default function GeneratingPage() {
     pollRef.current = setInterval(async () => {
       try {
         const report = await getReport(reportId);
-        if (report.status === "completed") {
+        if (report.status === "complete") {
           setOverallProgress(100);
           if (pollRef.current) clearInterval(pollRef.current);
           if (animationRef.current) clearInterval(animationRef.current);

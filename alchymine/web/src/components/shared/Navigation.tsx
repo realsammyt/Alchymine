@@ -21,6 +21,12 @@ const NAV_ITEMS: NavItem[] = [
     label: "Dashboard overview",
   },
   {
+    name: "Discover",
+    href: "/discover",
+    icon: "spiral",
+    label: "Intake and assessment flow",
+  },
+  {
     name: "Intelligence",
     href: "/intelligence",
     icon: "brain",
@@ -88,6 +94,24 @@ function NavIcon({
         >
           <path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
           <polyline points="9 22 9 12 15 12 15 22" />
+        </svg>
+      );
+    case "spiral":
+      return (
+        <svg
+          className={baseClass}
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          aria-hidden="true"
+        >
+          <path d="M12 22c-4.97 0-9-4.03-9-9 0-3.87 2.55-7.16 6-8.27" />
+          <path d="M12 18a6 6 0 0 1-6-6c0-2.58 1.67-4.78 4-5.6" />
+          <path d="M12 14a2 2 0 0 1-2-2c0-.87.56-1.61 1.33-1.89" />
+          <circle cx="12" cy="12" r="1" fill="currentColor" />
         </svg>
       );
     case "brain":
@@ -515,6 +539,7 @@ export default function Navigation() {
                     {(
                       {
                         Dashboard: "Home",
+                        Discover: "Discover",
                         Intelligence: "Mind",
                         Healing: "Heal",
                         Wealth: "Wealth",

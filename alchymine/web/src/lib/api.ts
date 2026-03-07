@@ -24,7 +24,7 @@ export interface ReportRequest {
 
 export interface ReportStatus {
   id: string;
-  status: "queued" | "generating" | "completed" | "failed";
+  status: "pending" | "generating" | "complete" | "failed";
   progress: number;
   created_at: string;
   completed_at: string | null;
