@@ -3,7 +3,7 @@
 import { useState, useEffect, FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/AuthContext";
-import { getProfile } from "@/lib/api";
+import { getProfile, saveIntake } from "@/lib/api";
 import Button from "@/components/shared/Button";
 import {
   MotionReveal,
@@ -189,6 +189,20 @@ export default function IntakePage() {
         intention: formData.intentions[0],
       }),
     );
+
+    // Persist to server profile for cross-device sync and durability.
+    // Best-effort — don't block navigation if the API call fails.
+    if (user?.id) {
+      saveIntake(user.id, {
+        full_name: formData.fullName,
+        birth_date: formData.birthDate,
+        birth_time: formData.birthTime || null,
+        birth_city: formData.birthCity || null,
+        intention: formData.intentions[0],
+        intentions: formData.intentions,
+      }).catch(() => {});
+    }
+
     router.push("/discover/assessment");
   }
 

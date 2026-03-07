@@ -136,13 +136,19 @@ async def create_report(
     profile_data.update(intake_dict)
 
     # Dispatch Celery task with intention(s) + full intake context
-    generate_report_task.delay(
-        report_id,
-        request.user_input,
-        profile_data,
-        request.intake.intention.value,
-        [i.value for i in request.intake.intentions],
-    )
+    try:
+        generate_report_task.delay(
+            report_id,
+            request.user_input,
+            profile_data,
+            request.intake.intention.value,
+            [i.value for i in request.intake.intentions],
+        )
+    except Exception:
+        logger.error(
+            "Failed to dispatch report task for %s — Celery/Redis may be unavailable",
+            report_id,
+        )
 
     return ReportStatus(
         id=report_id,
