@@ -9,8 +9,11 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel, Field
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from alchymine.api.auth import get_current_user
+from alchymine.api.deps import get_db_session
+from alchymine.db import repository
 from alchymine.engine.integration.bridges import (
     BridgeInsight,
     archetype_to_creative_style,
@@ -162,14 +165,48 @@ async def check_system_coherence(
 async def synthesize_user_profile(
     request: ProfileSynthesisRequest,
     current_user: dict = Depends(get_current_user),
+    session: AsyncSession = Depends(get_db_session),
 ) -> list[BridgeInsightResponse]:
-    """XS-07: Synthesize cross-system insights from user profile."""
+    """XS-07: Synthesize cross-system insights from user profile.
+
+    When request fields are empty, fetches the user's saved profile
+    from the database to provide data for synthesis.
+    """
+    numerology = request.numerology
+    archetype = request.archetype
+    personality = request.personality
+    wealth_archetype = request.wealth_archetype
+    creative_style = request.creative_style
+    kegan_stage = request.kegan_stage
+
+    # Fill from DB profile when request fields are empty
+    if not any([numerology, archetype, personality, wealth_archetype, creative_style, kegan_stage]):
+        try:
+            profile = await repository.get_profile(session, current_user["sub"])
+            if profile:
+                if profile.identity:
+                    numerology = numerology or profile.identity.numerology
+                    archetype = archetype or profile.identity.archetype
+                    personality = personality or profile.identity.personality
+                if profile.wealth:
+                    wealth_archetype = wealth_archetype or profile.wealth.wealth_archetype
+                if profile.creative:
+                    creative_style = creative_style or profile.creative.creative_orientation
+                if profile.perspective:
+                    kegan_stage = kegan_stage or (
+                        int(profile.perspective.kegan_stage)
+                        if profile.perspective.kegan_stage and profile.perspective.kegan_stage.isdigit()
+                        else None
+                    )
+        except Exception:
+            pass  # Profile lookup is best-effort; fall through with empty fields
+
     insights = synthesize_profile(
-        numerology=request.numerology,
-        archetype=request.archetype,
-        personality=request.personality,
-        wealth_archetype=request.wealth_archetype,
-        creative_style=request.creative_style,
-        kegan_stage=request.kegan_stage,
+        numerology=numerology,
+        archetype=archetype,
+        personality=personality,
+        wealth_archetype=wealth_archetype,
+        creative_style=creative_style,
+        kegan_stage=kegan_stage,
     )
     return [_insight_to_response(i) for i in insights]

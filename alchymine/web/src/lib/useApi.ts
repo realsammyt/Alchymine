@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
+import { getProfile } from "@/lib/api";
 
 /**
  * Async state for API calls — tracks loading, data, and error.
@@ -88,4 +89,40 @@ export function getStoredIntake(): {
 export function getStoredReportId(): string | null {
   if (typeof window === "undefined") return null;
   return sessionStorage.getItem("alchymine_report_id");
+}
+
+export type StoredIntake = ReturnType<typeof getStoredIntake>;
+
+/**
+ * Hook that returns intake data with cross-device sync.
+ *
+ * Tries sessionStorage first (fast, same-tab), then falls back to the
+ * server profile (persisted across devices). This enables a user to
+ * complete intake on one device and see results on another.
+ */
+export function useIntake(userId: string | null | undefined): StoredIntake {
+  const sessionIntake = useMemo(() => getStoredIntake(), []);
+  const [intake, setIntake] = useState(sessionIntake);
+
+  useEffect(() => {
+    if (intake?.fullName && intake?.birthDate) return;
+    if (!userId) return;
+    getProfile(userId)
+      .then((profile) => {
+        if (profile.intake) {
+          const fromProfile = {
+            fullName: profile.intake.full_name,
+            birthDate: profile.intake.birth_date,
+            birthTime: profile.intake.birth_time ?? undefined,
+            birthCity: profile.intake.birth_city ?? undefined,
+            intentions: profile.intake.intentions,
+            intention: profile.intake.intention,
+          };
+          setIntake(fromProfile);
+        }
+      })
+      .catch(() => {});
+  }, [userId, intake?.fullName, intake?.birthDate]);
+
+  return intake;
 }

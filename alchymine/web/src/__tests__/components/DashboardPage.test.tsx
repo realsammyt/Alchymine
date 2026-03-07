@@ -53,6 +53,7 @@ jest.mock("@/lib/useApi", () => ({
     error: new Error("No data"),
   }),
   getStoredIntake: jest.fn().mockReturnValue(null),
+  useIntake: jest.fn().mockReturnValue(null),
 }));
 
 describe("DashboardPage", () => {

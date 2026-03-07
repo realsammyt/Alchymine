@@ -1,6 +1,5 @@
 "use client";
 
-import { useMemo } from "react";
 import MethodologyPanel from "@/components/shared/MethodologyPanel";
 import ApiStateView from "@/components/shared/ApiStateView";
 import {
@@ -14,7 +13,8 @@ import {
   NumerologyResponse,
   AstrologyResponse,
 } from "@/lib/api";
-import { useApi, getStoredIntake } from "@/lib/useApi";
+import { useApi, useIntake } from "@/lib/useApi";
+import { useAuth } from "@/lib/AuthContext";
 import EvidenceBadge from "@/components/shared/EvidenceBadge";
 
 const NUMEROLOGY_NUMBERS = [
@@ -115,7 +115,8 @@ function NumberResult({
 }
 
 export default function IntelligencePage() {
-  const intake = useMemo(() => getStoredIntake(), []);
+  const { user } = useAuth();
+  const intake = useIntake(user?.id);
   const hasIntake = !!intake?.fullName && !!intake?.birthDate;
 
   const numerology = useApi<NumerologyResponse>(

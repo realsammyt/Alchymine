@@ -21,7 +21,7 @@ import {
   WealthPlanResponse,
   ProfileResponse,
 } from "@/lib/api";
-import { useApi, getStoredIntake } from "@/lib/useApi";
+import { useApi, useIntake } from "@/lib/useApi";
 import { useAuth } from "@/lib/AuthContext";
 import ProtectedRoute from "@/components/shared/ProtectedRoute";
 import { DEMO_ACCOUNT_EMAIL } from "@/lib/constants";
@@ -667,7 +667,7 @@ export default function WealthPage() {
   const { user } = useAuth();
   const isDemoUser = user?.email === DEMO_ACCOUNT_EMAIL;
   const userId = user?.id ?? null;
-  const intake = useMemo(() => getStoredIntake(), []);
+  const intake = useIntake(userId);
   const hasIntake = !!(intake?.intentions?.length || intake?.intention);
   const intakeIntentions =
     intake?.intentions ?? (intake?.intention ? [intake.intention] : []);
