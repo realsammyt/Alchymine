@@ -192,6 +192,56 @@ _SYSTEM_KEYWORDS: dict[SystemIntent, list[str]] = {
     ],
 }
 
+# ─── Intention → System mapping ──────────────────────────────────────
+
+# Maps user-facing intention values (from the Intention enum in
+# alchymine.engine.profile) to the system coordinators that should
+# process them.  Used when the report endpoint provides explicit
+# intentions so we can skip keyword-based classification.
+
+_INTENTION_TO_SYSTEMS: dict[str, list[SystemIntent]] = {
+    "career": [SystemIntent.INTELLIGENCE, SystemIntent.PERSPECTIVE],
+    "love": [SystemIntent.INTELLIGENCE, SystemIntent.HEALING],
+    "purpose": [SystemIntent.INTELLIGENCE, SystemIntent.CREATIVE, SystemIntent.PERSPECTIVE],
+    "money": [SystemIntent.WEALTH, SystemIntent.INTELLIGENCE],
+    "health": [SystemIntent.HEALING, SystemIntent.INTELLIGENCE],
+    "family": [SystemIntent.HEALING, SystemIntent.PERSPECTIVE],
+    "business": [SystemIntent.WEALTH, SystemIntent.CREATIVE],
+    "legacy": [SystemIntent.WEALTH, SystemIntent.PERSPECTIVE, SystemIntent.CREATIVE],
+}
+
+
+def intentions_to_systems(intentions: list[str]) -> list[SystemIntent]:
+    """Map a list of user intention strings to unique SystemIntents.
+
+    Always includes INTELLIGENCE as the base system (numerology/astrology
+    are computed for every report).
+
+    Parameters
+    ----------
+    intentions:
+        List of intention value strings (e.g. ``["health", "money"]``).
+
+    Returns
+    -------
+    list[SystemIntent]
+        Deduplicated list of systems to invoke, with INTELLIGENCE first.
+    """
+    systems: list[SystemIntent] = []
+    seen: set[SystemIntent] = set()
+    # Always include intelligence (numerology/astrology are core)
+    systems.append(SystemIntent.INTELLIGENCE)
+    seen.add(SystemIntent.INTELLIGENCE)
+
+    for intention in intentions:
+        for system in _INTENTION_TO_SYSTEMS.get(intention.lower(), []):
+            if system not in seen:
+                systems.append(system)
+                seen.add(system)
+
+    return systems
+
+
 # Threshold: if the top score and runner-up are within this ratio,
 # classify as MULTI_SYSTEM.
 _MULTI_SYSTEM_RATIO_THRESHOLD = 0.7

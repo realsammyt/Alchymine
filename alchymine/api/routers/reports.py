@@ -107,11 +107,17 @@ async def create_report(
     )
     await session.commit()
 
-    # Dispatch Celery task with intention(s)
+    # Build a profile dict from the intake data so the orchestrator's
+    # engine nodes have the fields they need (full_name, birth_date, etc.)
+    intake_dict = request.intake.model_dump(mode="json")
+    profile_data = request.user_profile or {}
+    profile_data.update(intake_dict)
+
+    # Dispatch Celery task with intention(s) + full intake context
     generate_report_task.delay(
         report_id,
         request.user_input,
-        request.user_profile,
+        profile_data,
         request.intake.intention.value,
         [i.value for i in request.intake.intentions],
     )
