@@ -3,26 +3,55 @@
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { ALL_QUESTIONS, LIKERT_LABELS, TOTAL_QUESTIONS } from "@/lib/questions";
-import { createReport, IntakePayload } from "@/lib/api";
+import { createReport, getProfile, IntakePayload } from "@/lib/api";
+import { useAuth } from "@/lib/AuthContext";
 import Button from "@/components/shared/Button";
 import ProgressBar from "@/components/shared/ProgressBar";
 import { MotionReveal } from "@/components/shared/MotionReveal";
 
 export default function AssessmentPage() {
   const router = useRouter();
+  const { user } = useAuth();
   const [currentIndex, setCurrentIndex] = useState(0);
   const [responses, setResponses] = useState<Record<string, number>>({});
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [direction, setDirection] = useState<"next" | "prev">("next");
 
-  // Verify intake data exists
+  // Verify intake data exists — try sessionStorage first, then fall back
+  // to the server profile (supports cross-device sync).
   useEffect(() => {
     const intake = sessionStorage.getItem("alchymine_intake");
-    if (!intake) {
+    if (intake) return;
+
+    if (!user?.id) {
       router.replace("/discover/intake");
+      return;
     }
-  }, [router]);
+
+    // Try loading from saved profile
+    getProfile(user.id)
+      .then((profile) => {
+        if (profile.intake) {
+          sessionStorage.setItem(
+            "alchymine_intake",
+            JSON.stringify({
+              fullName: profile.intake.full_name,
+              birthDate: profile.intake.birth_date,
+              birthTime: profile.intake.birth_time || "",
+              birthCity: profile.intake.birth_city || "",
+              intentions: profile.intake.intentions,
+              intention: profile.intake.intention,
+            }),
+          );
+        } else {
+          router.replace("/discover/intake");
+        }
+      })
+      .catch(() => {
+        router.replace("/discover/intake");
+      });
+  }, [router, user?.id]);
 
   const question = ALL_QUESTIONS[currentIndex];
   const progress = (Object.keys(responses).length / TOTAL_QUESTIONS) * 100;

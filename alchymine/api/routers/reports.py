@@ -7,6 +7,7 @@ All report data is persisted to PostgreSQL.
 
 from __future__ import annotations
 
+import logging
 import uuid
 from datetime import UTC, datetime
 
@@ -21,6 +22,8 @@ from alchymine.db import repository
 from alchymine.engine.profile import IntakeData
 from alchymine.engine.reports.html_renderer import render_report_html
 from alchymine.workers.tasks import generate_report as generate_report_task
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -105,6 +108,25 @@ async def create_report(
         user_profile=request.user_profile,
         user_id=current_user["sub"],
     )
+
+    # Persist the intake data to the user's profile so it survives across
+    # devices and sessions (sessionStorage is browser-tab-scoped).
+    try:
+        intake_persist = request.intake.model_dump(mode="json")
+        # Convert date/time strings back to proper types for the ORM
+        from datetime import date as date_type
+        from datetime import time as time_type
+
+        intake_persist["birth_date"] = date_type.fromisoformat(intake_persist["birth_date"])
+        if intake_persist.get("birth_time"):
+            intake_persist["birth_time"] = time_type.fromisoformat(intake_persist["birth_time"])
+        # Convert intention enum value to plain string
+        if hasattr(intake_persist.get("intention"), "value"):
+            intake_persist["intention"] = intake_persist["intention"]
+        await repository.update_layer(session, current_user["sub"], "intake", intake_persist)
+    except Exception:
+        logger.warning("Failed to persist intake data for user %s", current_user["sub"])
+
     await session.commit()
 
     # Build a profile dict from the intake data so the orchestrator's
