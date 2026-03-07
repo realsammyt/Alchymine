@@ -316,7 +316,11 @@ function getLegacyAuthHeaders(): Record<string, string> {
   return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
-async function request<T>(url: string, options?: RequestInit): Promise<T> {
+async function request<T>(
+  url: string,
+  options?: RequestInit,
+  allow202 = false,
+): Promise<T> {
   const res = await fetch(url, {
     ...options,
     credentials: "include",
@@ -327,8 +331,10 @@ async function request<T>(url: string, options?: RequestInit): Promise<T> {
     },
   });
 
-  // 202 is used for "still generating" status — we handle it differently
-  if (res.status === 202) {
+  // 202 is used for "still generating" status — throw so callers can
+  // handle polling.  Callers that expect 202 as a success (e.g. report
+  // creation) pass allow202=true to receive the parsed body instead.
+  if (res.status === 202 && !allow202) {
     const body = await res.json();
     throw new ApiError(202, body.detail || "Still processing");
   }
@@ -389,10 +395,14 @@ export async function createReport(
   modules: string[] = ["full"],
   tone: string = "balanced",
 ): Promise<ReportStatus> {
-  return request<ReportStatus>(`${BASE}/reports`, {
-    method: "POST",
-    body: JSON.stringify({ intake, modules, tone }),
-  });
+  return request<ReportStatus>(
+    `${BASE}/reports`,
+    {
+      method: "POST",
+      body: JSON.stringify({ intake, modules, tone }),
+    },
+    true, // POST /reports returns 202 on success — don't throw
+  );
 }
 
 export async function getReport(id: string): Promise<ReportResponse> {
