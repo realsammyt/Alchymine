@@ -10,8 +10,14 @@ import {
   MotionStagger,
   MotionStaggerItem,
 } from "@/components/shared/MotionReveal";
-import { getKeganAssessment, KeganAssessResponse } from "@/lib/api";
+import {
+  getKeganAssessment,
+  getProfile,
+  KeganAssessResponse,
+  ProfileResponse,
+} from "@/lib/api";
 import { useApi, getStoredIntake } from "@/lib/useApi";
+import { useAuth } from "@/lib/AuthContext";
 import EvidenceBadge from "@/components/shared/EvidenceBadge";
 
 const KEGAN_STAGES = [
@@ -125,6 +131,8 @@ const SCENARIO_TYPES = [
 
 export default function PerspectivePage() {
   const [mounted, setMounted] = useState(false);
+  const { user } = useAuth();
+  const userId = user?.id ?? null;
   const intake = useMemo(() => (mounted ? getStoredIntake() : null), [mounted]);
   const hasIntake = !!(intake?.intentions?.length || intake?.intention);
 
@@ -134,11 +142,31 @@ export default function PerspectivePage() {
 
   const intakeKey = intake?.intentions?.join(",") ?? intake?.intention ?? "";
 
-  // NOTE: Kegan endpoint requires computed assessment responses
-  // (dimension scores 1-5) that only exist after report generation.
-  // Raw intake data causes 422 errors.  Disabled until we plumb
-  // report-derived data into these pages.
-  const kegan = useApi<KeganAssessResponse>(null, [intakeKey]);
+  // Fetch the stored profile — populated by the report pipeline after
+  // generation completes.  The Kegan endpoint requires computed assessment
+  // responses (dimension scores 1-5) from the perspective layer.
+  const profileState = useApi<ProfileResponse>(
+    () =>
+      userId
+        ? getProfile(userId)
+        : Promise.reject(new Error("Not authenticated")),
+    [userId],
+  );
+
+  const perspectiveLayerData = profileState.data?.perspective as
+    | Record<string, unknown>
+    | null
+    | undefined;
+
+  const keganPayload = useMemo((): Record<string, unknown> | null => {
+    if (!perspectiveLayerData) return null;
+    return { ...perspectiveLayerData };
+  }, [perspectiveLayerData]);
+
+  const kegan = useApi<KeganAssessResponse>(
+    keganPayload ? () => getKeganAssessment(keganPayload) : null,
+    [JSON.stringify(keganPayload)],
+  );
 
   return (
     <ProtectedRoute>
@@ -162,27 +190,40 @@ export default function PerspectivePage() {
           </MotionReveal>
 
           {/* Personalized Kegan Assessment */}
-          {hasIntake && (
-            <MotionReveal delay={0.1}>
-              <section
-                className="mb-12"
-                aria-labelledby="your-perspective-heading"
+          <MotionReveal delay={0.1}>
+            <section
+              className="mb-12"
+              aria-labelledby="your-perspective-heading"
+            >
+              <h2
+                id="your-perspective-heading"
+                className="section-heading-sm mb-2 flex items-center gap-3"
               >
-                <h2
-                  id="your-perspective-heading"
-                  className="section-heading-sm mb-2 flex items-center gap-3"
+                <span
+                  className="w-10 h-10 rounded-xl bg-accent/10 flex items-center justify-center text-xl"
+                  aria-hidden="true"
                 >
-                  <span
-                    className="w-10 h-10 rounded-xl bg-accent/10 flex items-center justify-center text-xl"
-                    aria-hidden="true"
+                  {"\u{2728}"}
+                </span>
+                Your Developmental Stage
+              </h2>
+              <hr className="rule-gold mb-6" aria-hidden="true" />
+              {!profileState.loading && !keganPayload ? (
+                <div className="card-surface p-6 text-center space-y-3">
+                  <p className="font-body text-text/60 text-sm">
+                    Complete your Alchymine report first to see personalized
+                    perspective insights.
+                  </p>
+                  <Link
+                    href="/discover"
+                    className="inline-flex items-center gap-2 px-4 py-2 bg-accent/10 text-accent font-body text-sm rounded-lg hover:bg-accent/20 transition-colors"
                   >
-                    {"\u{2728}"}
-                  </span>
-                  Your Developmental Stage
-                </h2>
-                <hr className="rule-gold mb-6" aria-hidden="true" />
+                    Generate your report &rarr;
+                  </Link>
+                </div>
+              ) : (
                 <ApiStateView
-                  loading={kegan.loading}
+                  loading={kegan.loading || profileState.loading}
                   error={kegan.error}
                   empty={!kegan.data}
                   loadingText="Assessing your developmental stage..."
@@ -270,9 +311,9 @@ export default function PerspectivePage() {
                     </div>
                   )}
                 </ApiStateView>
-              </section>
-            </MotionReveal>
-          )}
+              )}
+            </section>
+          </MotionReveal>
 
           {/* Developmental Frameworks Section */}
           <MotionReveal delay={0.2}>

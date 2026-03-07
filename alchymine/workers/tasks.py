@@ -26,6 +26,7 @@ from datetime import UTC, datetime
 from typing import Any
 
 from alchymine.agents.orchestrator.orchestrator import MasterOrchestrator
+from alchymine.db import repository
 from alchymine.db.base import get_async_engine, get_async_session_factory
 from alchymine.db.repository import (
     create_report as db_create_report,
@@ -200,6 +201,55 @@ async def _db_get_report(report_id: str) -> Any:
         return report
 
 
+async def _db_populate_profiles(
+    user_id: str | None,
+    coordinator_results: list,
+) -> None:
+    """Persist coordinator results to the 5 profile layer tables."""
+    if not user_id:
+        return
+    engine = _get_task_engine()
+    factory = get_async_session_factory(engine)
+
+    layer_map = {
+        "intelligence": "identity",
+        "healing": "healing",
+        "wealth": "wealth",
+        "creative": "creative",
+        "perspective": "perspective",
+    }
+
+    for cr in coordinator_results:
+        system = cr.get("system", "")
+        data = cr.get("data", {})
+        if not data or cr.get("status") == "error":
+            continue
+
+        layer = layer_map.get(system)
+        if not layer:
+            continue
+
+        try:
+            async with factory() as session:
+                await repository.update_layer(session, user_id, layer, data)
+                await session.commit()
+        except Exception as exc:
+            logger.warning(
+                "Failed to populate %s profile for %s: %s", layer, user_id, exc
+            )
+
+
+async def _db_store_pdf(report_id: str, pdf_bytes: bytes) -> None:
+    """Persist generated PDF bytes to the ``pdf_data`` column of the report row."""
+    engine = _get_task_engine()
+    factory = get_async_session_factory(engine)
+    async with factory() as session:
+        report = await db_get_report(session, report_id)
+        if report is not None:
+            report.pdf_data = pdf_bytes
+            await session.commit()
+
+
 # ── Celery task ──────────────────────────────────────────────────────────
 
 
@@ -289,8 +339,49 @@ def generate_report(
         except Exception as exc:
             logger.warning("Failed to build profile_summary: %s", exc)
 
+        # Generate LLM narratives (optional — reports work without them)
+        try:
+            from alchymine.llm.narrative import NarrativeGenerator
+
+            generator = NarrativeGenerator()
+
+            systems = []
+            engine_data = {}
+            for cr in result.coordinator_results:
+                if cr.status != "error":
+                    systems.append(cr.system)
+                    engine_data[cr.system] = cr.data
+
+            if systems:
+                narratives = _run_async(generator.generate_all(systems, engine_data))
+                serialised["narratives"] = {
+                    system: {
+                        "text": nr.narrative,
+                        "disclaimers": nr.disclaimers,
+                        "ethics_passed": nr.ethics_passed,
+                    }
+                    for system, nr in narratives.items()
+                    if nr.narrative
+                }
+        except Exception as exc:
+            logger.warning("Narrative generation failed (non-fatal): %s", exc)
+
         # ── Store success ─────────────────────────────────────────────
         _run_async(_db_set_complete(report_id, serialised))
+
+        # ── Populate profile layer tables from coordinator results ────
+        try:
+            _user_id = (user_profile or {}).get("id")
+            _coordinator_results = serialised.get("coordinator_results", [])
+            _run_async(_db_populate_profiles(_user_id, _coordinator_results))
+        except Exception as exc:
+            logger.warning("Failed to populate profile tables: %s", exc)
+
+        # ── Trigger PDF generation ────────────────────────────────────
+        try:
+            generate_pdf_report.delay(report_id)
+        except Exception as exc:
+            logger.warning("Failed to queue PDF generation for %s: %s", report_id, exc)
 
         logger.info("Report %s completed successfully.", report_id)
         return serialised
@@ -410,7 +501,8 @@ def generate_pdf_report(self: Any, report_id: str) -> dict[str, Any]:
         )
 
         # ── Store result ──────────────────────────────────────────────
-        pdf_store[report_id] = pdf_bytes
+        _run_async(_db_store_pdf(report_id, pdf_bytes))
+        pdf_store[report_id] = pdf_bytes  # compatibility shim — removed in Phase 5
 
         logger.info(
             "PDF for report %s generated successfully (%d bytes).",

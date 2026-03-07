@@ -15,9 +15,11 @@ import {
   getWealthProfile,
   getWealthLevers,
   getWealthPlan,
+  getProfile,
   WealthProfileResponse,
   LeverResponse,
   WealthPlanResponse,
+  ProfileResponse,
 } from "@/lib/api";
 import { useApi, getStoredIntake } from "@/lib/useApi";
 import { useAuth } from "@/lib/AuthContext";
@@ -664,28 +666,55 @@ export default function WealthPage() {
   const [selectedLever, setSelectedLever] = useState<string | null>(null);
   const { user } = useAuth();
   const isDemoUser = user?.email === DEMO_ACCOUNT_EMAIL;
+  const userId = user?.id ?? null;
   const intake = useMemo(() => getStoredIntake(), []);
   const hasIntake = !!(intake?.intentions?.length || intake?.intention);
   const intakeIntentions =
     intake?.intentions ?? (intake?.intention ? [intake.intention] : []);
 
-  // NOTE: Wealth endpoints require computed profile data (life_path,
-  // archetype_primary, risk_tolerance) that only exists after report
-  // generation.  Raw intake data causes 422 errors.  Disabled until we
-  // plumb report-derived data into these pages.
+  // Fetch the stored profile — populated by the report pipeline after
+  // generation completes.  Wealth endpoints require computed data (life_path,
+  // archetype_primary, risk_tolerance) from the identity layer.
+  const profileState = useApi<ProfileResponse>(
+    () =>
+      userId
+        ? getProfile(userId)
+        : Promise.reject(new Error("Not authenticated")),
+    [userId],
+  );
+
+  const wealthLayerData = profileState.data?.wealth as
+    | Record<string, unknown>
+    | null
+    | undefined;
+  const identityLayerData = profileState.data?.identity as
+    | Record<string, unknown>
+    | null
+    | undefined;
+
+  // Build the payload the wealth endpoints expect from stored profile data
+  const wealthPayload = useMemo((): Record<string, unknown> | null => {
+    if (!identityLayerData && !wealthLayerData) return null;
+    return {
+      ...(identityLayerData ?? {}),
+      ...(wealthLayerData ?? {}),
+      intentions: intakeIntentions,
+    };
+  }, [identityLayerData, wealthLayerData, intakeIntentions]);
+
   const wealthProfile = useApi<WealthProfileResponse>(
-    null,
-    [intakeIntentions.join(",")],
+    wealthPayload ? () => getWealthProfile(wealthPayload) : null,
+    [JSON.stringify(wealthPayload)],
   );
 
   const levers = useApi<LeverResponse>(
-    null,
-    [intakeIntentions.join(",")],
+    wealthPayload ? () => getWealthLevers(wealthPayload) : null,
+    [JSON.stringify(wealthPayload)],
   );
 
   const wealthPlan = useApi<WealthPlanResponse>(
-    null,
-    [intakeIntentions.join(",")],
+    wealthPayload ? () => getWealthPlan(wealthPayload) : null,
+    [JSON.stringify(wealthPayload)],
   );
 
   return (
@@ -719,24 +748,39 @@ export default function WealthPage() {
             </header>
 
             {/* ── Personalized Wealth Profile ──────────────────────────── */}
-            {hasIntake && (
-              <section className="mb-12" aria-labelledby="your-wealth-heading">
-                <MotionReveal delay={0.1}>
-                  <h2
-                    id="your-wealth-heading"
-                    className="section-heading-sm mb-6 flex items-center gap-3"
+            <section className="mb-12" aria-labelledby="your-wealth-heading">
+              <MotionReveal delay={0.1}>
+                <h2
+                  id="your-wealth-heading"
+                  className="section-heading-sm mb-6 flex items-center gap-3"
+                >
+                  <span
+                    className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center text-xl"
+                    aria-hidden="true"
                   >
-                    <span
-                      className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center text-xl"
-                      aria-hidden="true"
+                    {"\u{2728}"}
+                  </span>
+                  Your Wealth Profile
+                </h2>
+              </MotionReveal>
+              {!profileState.loading && !wealthPayload ? (
+                <MotionReveal delay={0.15}>
+                  <div className="card-surface p-6 text-center space-y-3">
+                    <p className="font-body text-text/60 text-sm">
+                      Complete your Alchymine report first to unlock
+                      personalized wealth insights.
+                    </p>
+                    <Link
+                      href="/discover"
+                      className="inline-flex items-center gap-2 px-4 py-2 bg-primary/10 text-primary font-body text-sm rounded-lg hover:bg-primary/20 transition-colors"
                     >
-                      {"\u{2728}"}
-                    </span>
-                    Your Wealth Profile
-                  </h2>
+                      Generate your report &rarr;
+                    </Link>
+                  </div>
                 </MotionReveal>
+              ) : (
                 <ApiStateView
-                  loading={wealthProfile.loading}
+                  loading={wealthProfile.loading || profileState.loading}
                   error={wealthProfile.error}
                   empty={!wealthProfile.data}
                   loadingText="Analyzing your wealth archetype..."
@@ -808,8 +852,8 @@ export default function WealthPage() {
                     </MotionReveal>
                   )}
                 </ApiStateView>
-              </section>
-            )}
+              )}
+            </section>
 
             {/* ── Financial Dashboard Cards — demo data only ─────────────── */}
             {isDemoUser && (

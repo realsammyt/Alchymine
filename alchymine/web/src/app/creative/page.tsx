@@ -13,10 +13,13 @@ import {
 import {
   getCreativeStyle,
   getCreativeProjects,
+  getProfile,
   StyleFingerprintResponse,
   ProjectListResponse,
+  ProfileResponse,
 } from "@/lib/api";
 import { useApi, getStoredIntake } from "@/lib/useApi";
+import { useAuth } from "@/lib/AuthContext";
 import CreativeProjects from "@/components/creative/CreativeProjects";
 import EvidenceBadge from "@/components/shared/EvidenceBadge";
 
@@ -107,6 +110,8 @@ function ScoreBar({ label, value }: { label: string; value: number }) {
 
 export default function CreativePage() {
   const [mounted, setMounted] = useState(false);
+  const { user } = useAuth();
+  const userId = user?.id ?? null;
   const intake = useMemo(() => (mounted ? getStoredIntake() : null), [mounted]);
   const hasIntake = !!(intake?.intentions?.length || intake?.intention);
 
@@ -116,15 +121,41 @@ export default function CreativePage() {
 
   const intakeKey = intake?.intentions?.join(",") ?? intake?.intention ?? "";
 
-  // NOTE: Creative endpoints require computed profile data (guilford_scores,
-  // creative_dna) that only exists after report generation.  Raw intake data
-  // causes 422 errors.  Disabled until we plumb report-derived data into
-  // these pages.
-  const style = useApi<StyleFingerprintResponse>(null, [intakeKey]);
+  // Fetch the stored profile — populated by the report pipeline after
+  // generation completes.  Creative endpoints require computed data
+  // (guilford_scores, creative_dna) from the creative layer.
+  const profileState = useApi<ProfileResponse>(
+    () =>
+      userId
+        ? getProfile(userId)
+        : Promise.reject(new Error("Not authenticated")),
+    [userId],
+  );
+
+  const creativeLayerData = profileState.data?.creative as
+    | Record<string, unknown>
+    | null
+    | undefined;
+
+  const creativePayload = useMemo((): Record<string, unknown> | null => {
+    if (!creativeLayerData) return null;
+    return { ...creativeLayerData, intentions: intakeKey ? [intakeKey] : [] };
+  }, [creativeLayerData, intakeKey]);
+
+  const style = useApi<StyleFingerprintResponse>(
+    creativePayload ? () => getCreativeStyle(creativePayload) : null,
+    [JSON.stringify(creativePayload)],
+  );
 
   const projects = useApi<ProjectListResponse>(
-    null,
-    [intakeKey, style.data?.creative_style],
+    creativePayload
+      ? () =>
+          getCreativeProjects({
+            ...creativePayload,
+            creative_style: style.data?.creative_style,
+          })
+      : null,
+    [JSON.stringify(creativePayload), style.data?.creative_style],
   );
 
   return (
@@ -149,27 +180,40 @@ export default function CreativePage() {
           </MotionReveal>
 
           {/* Personalized Style Fingerprint */}
-          {hasIntake && (
-            <MotionReveal delay={0.1}>
-              <section
-                className="mb-12"
-                aria-labelledby="your-creative-heading"
+          <MotionReveal delay={0.1}>
+            <section
+              className="mb-12"
+              aria-labelledby="your-creative-heading"
+            >
+              <h2
+                id="your-creative-heading"
+                className="section-heading-sm mb-2 flex items-center gap-3"
               >
-                <h2
-                  id="your-creative-heading"
-                  className="section-heading-sm mb-2 flex items-center gap-3"
+                <span
+                  className="w-10 h-10 rounded-xl bg-secondary/10 flex items-center justify-center text-xl"
+                  aria-hidden="true"
                 >
-                  <span
-                    className="w-10 h-10 rounded-xl bg-secondary/10 flex items-center justify-center text-xl"
-                    aria-hidden="true"
+                  {"\u{2728}"}
+                </span>
+                Your Creative Fingerprint
+              </h2>
+              <hr className="rule-gold mb-6" aria-hidden="true" />
+              {!profileState.loading && !creativePayload ? (
+                <div className="card-surface p-6 text-center space-y-3">
+                  <p className="font-body text-text/60 text-sm">
+                    Complete your Alchymine report first to see personalized
+                    creative insights.
+                  </p>
+                  <Link
+                    href="/discover"
+                    className="inline-flex items-center gap-2 px-4 py-2 bg-secondary/10 text-secondary font-body text-sm rounded-lg hover:bg-secondary/20 transition-colors"
                   >
-                    {"\u{2728}"}
-                  </span>
-                  Your Creative Fingerprint
-                </h2>
-                <hr className="rule-gold mb-6" aria-hidden="true" />
+                    Generate your report &rarr;
+                  </Link>
+                </div>
+              ) : (
                 <ApiStateView
-                  loading={style.loading}
+                  loading={style.loading || profileState.loading}
                   error={style.error}
                   empty={!style.data}
                   loadingText="Analyzing your creative profile..."
@@ -271,9 +315,9 @@ export default function CreativePage() {
                     </div>
                   )}
                 </ApiStateView>
-              </section>
-            </MotionReveal>
-          )}
+              )}
+            </section>
+          </MotionReveal>
 
           {/* Creative Assessment Section */}
           <MotionReveal delay={0.2}>
@@ -398,13 +442,13 @@ export default function CreativePage() {
               </h2>
               <hr className="rule-gold mb-6" aria-hidden="true" />
 
-              {hasIntake ? (
+              {creativePayload ? (
                 <ApiStateView
-                  loading={projects.loading}
+                  loading={projects.loading || profileState.loading}
                   error={projects.error}
                   empty={!projects.data}
                   loadingText="Generating project recommendations..."
-                  emptyText="Complete your intake to receive personalized project recommendations."
+                  emptyText="Complete your report to receive personalized project recommendations."
                   onRetry={projects.refetch}
                 >
                   {projects.data && (

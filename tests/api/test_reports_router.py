@@ -30,11 +30,16 @@ import alchymine.workers.celery_app as celery_app_mod  # noqa: E402
 
 importlib.reload(celery_app_mod)
 
+from alchymine.api.auth import get_current_user  # noqa: E402
 from alchymine.api.deps import get_db_session, set_db_engine  # noqa: E402
 from alchymine.api.main import app  # noqa: E402
 from alchymine.db import repository  # noqa: E402
 from alchymine.db.base import Base  # noqa: E402
 from alchymine.workers.tasks import _set_task_engine  # noqa: E402
+
+# The test user sub used in the global conftest override.
+_TEST_USER_ID = "user-1"
+_OTHER_USER_ID = "other-user-99"
 
 
 # ── Fixtures ─────────────────────────────────────────────────────────────
@@ -275,3 +280,72 @@ class TestListUserReports:
         data = response.json()
         assert data["skip"] == 5
         assert data["limit"] == 10
+
+
+# ── IDOR: ownership checks on report endpoints ────────────────────────────
+
+
+class TestReportOwnershipIDOR:
+    """Tests that report endpoints enforce ownership (IDOR protection)."""
+
+    def _seed_report_for_other_user(self, engine, report_id: str) -> None:
+        """Directly insert a report owned by _OTHER_USER_ID into the DB."""
+        from alchymine.workers.tasks import _run_async
+        from alchymine.db.base import get_async_session_factory
+
+        async def _insert():
+            factory = get_async_session_factory(engine)
+            async with factory() as sess:
+                await repository.create_report(
+                    sess,
+                    report_id=report_id,
+                    status="complete",
+                    user_id=_OTHER_USER_ID,
+                )
+                await sess.commit()
+
+        _run_async(_insert())
+
+    def test_get_status_other_user_report_returns_403(
+        self, client: TestClient, engine
+    ) -> None:
+        """GET /reports/{id}/status for another user's report returns 403."""
+        report_id = "foreign-report-001"
+        self._seed_report_for_other_user(engine, report_id)
+
+        response = client.get(f"/api/v1/reports/{report_id}/status")
+        assert response.status_code == 403
+        assert response.json()["detail"] == "Access denied"
+
+    def test_get_report_other_user_returns_403(
+        self, client: TestClient, engine
+    ) -> None:
+        """GET /reports/{id} for another user's report returns 403."""
+        report_id = "foreign-report-002"
+        self._seed_report_for_other_user(engine, report_id)
+
+        response = client.get(f"/api/v1/reports/{report_id}")
+        assert response.status_code == 403
+        assert response.json()["detail"] == "Access denied"
+
+    def test_get_html_other_user_report_returns_403(
+        self, client: TestClient, engine
+    ) -> None:
+        """GET /reports/{id}/html for another user's report returns 403."""
+        report_id = "foreign-report-003"
+        self._seed_report_for_other_user(engine, report_id)
+
+        response = client.get(f"/api/v1/reports/{report_id}/html")
+        assert response.status_code == 403
+        assert response.json()["detail"] == "Access denied"
+
+    def test_get_pdf_other_user_report_returns_403(
+        self, client: TestClient, engine
+    ) -> None:
+        """GET /reports/{id}/pdf for another user's report returns 403."""
+        report_id = "foreign-report-004"
+        self._seed_report_for_other_user(engine, report_id)
+
+        response = client.get(f"/api/v1/reports/{report_id}/pdf")
+        assert response.status_code == 403
+        assert response.json()["detail"] == "Access denied"

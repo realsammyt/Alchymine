@@ -21,10 +21,15 @@ from sqlalchemy.ext.asyncio import (
 
 # Import all models so Base.metadata is populated
 import alchymine.db.models  # noqa: F401
+from alchymine.api.auth import get_current_user
 from alchymine.api.deps import get_db_session
 from alchymine.db.base import Base
+from alchymine.db import repository
 
 # ─── Test fixtures ─────────────────────────────────────────────────────
+
+TEST_USER_ID = "user-1"
+OTHER_USER_ID = "user-2"
 
 
 @pytest.fixture(autouse=True)
@@ -78,6 +83,42 @@ async def client(
                 raise
 
     app.dependency_overrides[get_db_session] = _override_get_db_session
+    set_db_engine(engine)
+    _set_task_engine(engine)
+
+    transport = ASGITransport(app=app)  # type: ignore[arg-type]
+    async with AsyncClient(transport=transport, base_url="http://testserver") as ac:
+        yield ac
+
+    app.dependency_overrides.clear()
+    set_db_engine(None)
+    _set_task_engine(None)
+
+
+@pytest_asyncio.fixture
+async def admin_client(
+    engine: AsyncEngine,
+    session_factory: async_sessionmaker[AsyncSession],
+) -> AsyncGenerator[AsyncClient, None]:
+    """Provide an async HTTP test client authenticated as an admin user."""
+    from alchymine.api.deps import set_db_engine
+    from alchymine.api.main import app
+    from alchymine.workers.tasks import _set_task_engine
+
+    async def _override_get_db_session() -> AsyncGenerator[AsyncSession, None]:
+        async with session_factory() as session:
+            try:
+                yield session
+                await session.commit()
+            except Exception:
+                await session.rollback()
+                raise
+
+    async def _admin_user() -> dict:
+        return {"sub": TEST_USER_ID, "email": "admin@example.com", "is_admin": True}
+
+    app.dependency_overrides[get_db_session] = _override_get_db_session
+    app.dependency_overrides[get_current_user] = _admin_user
     set_db_engine(engine)
     _set_task_engine(engine)
 
@@ -247,19 +288,35 @@ async def test_get_profile_found(client: AsyncClient) -> None:
 
 @pytest.mark.asyncio
 async def test_get_profile_not_found(client: AsyncClient) -> None:
-    """GET for non-existent user returns 404."""
-    resp = await client.get("/api/v1/profile/nonexistent-uuid")
+    """GET for the authenticated user's ID when no profile exists returns 404."""
+    resp = await client.get(f"/api/v1/profile/{TEST_USER_ID}")
     assert resp.status_code == 404
     assert "not found" in resp.json()["detail"].lower()
 
 
-# ─── GET /api/v1/profiles — List ──────────────────────────────────────
+@pytest.mark.asyncio
+async def test_get_profile_other_user_returns_403(client: AsyncClient) -> None:
+    """GET for another user's profile ID returns 403 (IDOR protection)."""
+    resp = await client.get(f"/api/v1/profile/{OTHER_USER_ID}")
+    assert resp.status_code == 403
+    assert resp.json()["detail"] == "Access denied"
+
+
+# ─── GET /api/v1/profiles — List (admin only) ─────────────────────────
 
 
 @pytest.mark.asyncio
-async def test_list_profiles_empty(client: AsyncClient) -> None:
-    """GET /profiles returns empty list when no profiles exist."""
+async def test_list_profiles_non_admin_returns_403(client: AsyncClient) -> None:
+    """GET /profiles by a non-admin user returns 403."""
     resp = await client.get("/api/v1/profiles")
+    assert resp.status_code == 403
+    assert resp.json()["detail"] == "Access denied"
+
+
+@pytest.mark.asyncio
+async def test_list_profiles_empty(admin_client: AsyncClient) -> None:
+    """GET /profiles returns empty list when no profiles exist."""
+    resp = await admin_client.get("/api/v1/profiles")
     assert resp.status_code == 200
     data = resp.json()
     assert data["profiles"] == []
@@ -267,19 +324,25 @@ async def test_list_profiles_empty(client: AsyncClient) -> None:
 
 
 @pytest.mark.asyncio
-async def test_list_profiles_populated(client: AsyncClient) -> None:
-    """GET /profiles returns all created profiles."""
-    for i in range(3):
-        await client.post(
-            "/api/v1/profile",
-            json={
-                "full_name": f"User {i}",
-                "birth_date": "2000-01-01",
-                "intention": "career",
-            },
-        )
+async def test_list_profiles_populated(
+    admin_client: AsyncClient,
+    session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    """GET /profiles returns all profiles (seeded directly to avoid PK conflicts)."""
+    from datetime import date
 
-    resp = await client.get("/api/v1/profiles")
+    async with session_factory() as session:
+        for i in range(3):
+            await repository.create_profile(
+                session,
+                full_name=f"User {i}",
+                birth_date=date(2000, 1, 1),
+                intention="career",
+                user_id=f"seed-user-{i}",
+            )
+        await session.commit()
+
+    resp = await admin_client.get("/api/v1/profiles")
     assert resp.status_code == 200
     data = resp.json()
     assert data["count"] == 3
@@ -287,19 +350,25 @@ async def test_list_profiles_populated(client: AsyncClient) -> None:
 
 
 @pytest.mark.asyncio
-async def test_list_profiles_pagination(client: AsyncClient) -> None:
+async def test_list_profiles_pagination(
+    admin_client: AsyncClient,
+    session_factory: async_sessionmaker[AsyncSession],
+) -> None:
     """GET /profiles with offset and limit paginates correctly."""
-    for i in range(5):
-        await client.post(
-            "/api/v1/profile",
-            json={
-                "full_name": f"User {i}",
-                "birth_date": "2000-01-01",
-                "intention": "career",
-            },
-        )
+    from datetime import date
 
-    resp = await client.get("/api/v1/profiles?offset=2&limit=2")
+    async with session_factory() as session:
+        for i in range(5):
+            await repository.create_profile(
+                session,
+                full_name=f"User {i}",
+                birth_date=date(2000, 1, 1),
+                intention="career",
+                user_id=f"page-user-{i}",
+            )
+        await session.commit()
+
+    resp = await admin_client.get("/api/v1/profiles?offset=2&limit=2")
     assert resp.status_code == 200
     data = resp.json()
     assert data["count"] == 2
@@ -368,10 +437,21 @@ async def test_update_layer_invalid_layer_name(client: AsyncClient) -> None:
 
 
 @pytest.mark.asyncio
-async def test_update_layer_user_not_found(client: AsyncClient) -> None:
-    """PUT for non-existent user returns 404."""
+async def test_update_layer_other_user_returns_403(client: AsyncClient) -> None:
+    """PUT for another user's profile returns 403 (IDOR protection)."""
     resp = await client.put(
-        "/api/v1/profile/fake-uuid/identity",
+        f"/api/v1/profile/{OTHER_USER_ID}/identity",
+        json={"data": {"numerology": {"life_path": 1}}},
+    )
+    assert resp.status_code == 403
+    assert resp.json()["detail"] == "Access denied"
+
+
+@pytest.mark.asyncio
+async def test_update_layer_user_not_found(client: AsyncClient) -> None:
+    """PUT for the authenticated user's own ID when no profile exists returns 404."""
+    resp = await client.put(
+        f"/api/v1/profile/{TEST_USER_ID}/identity",
         json={"data": {"numerology": {"life_path": 1}}},
     )
     assert resp.status_code == 404
@@ -391,16 +471,24 @@ async def test_delete_profile_success(client: AsyncClient) -> None:
     assert resp.status_code == 200
     assert resp.json()["detail"] == "Profile deleted"
 
-    # Verify deleted
+    # Verify deleted (user_id matches sub so IDOR check passes, then 404)
     get_resp = await client.get(f"/api/v1/profile/{user_id}")
     assert get_resp.status_code == 404
 
 
 @pytest.mark.asyncio
 async def test_delete_profile_not_found(client: AsyncClient) -> None:
-    """DELETE for non-existent user returns 404."""
-    resp = await client.delete("/api/v1/profile/nonexistent-uuid")
+    """DELETE for the authenticated user's own ID when no profile exists returns 404."""
+    resp = await client.delete(f"/api/v1/profile/{TEST_USER_ID}")
     assert resp.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_delete_profile_other_user_returns_403(client: AsyncClient) -> None:
+    """DELETE for another user's profile returns 403 (IDOR protection)."""
+    resp = await client.delete(f"/api/v1/profile/{OTHER_USER_ID}")
+    assert resp.status_code == 403
+    assert resp.json()["detail"] == "Access denied"
 
 
 # ─── Full lifecycle ───────────────────────────────────────────────────
@@ -408,7 +496,7 @@ async def test_delete_profile_not_found(client: AsyncClient) -> None:
 
 @pytest.mark.asyncio
 async def test_full_crud_lifecycle(client: AsyncClient) -> None:
-    """End-to-end: create, read, update layer, list, delete."""
+    """End-to-end: create, read, update layer, delete."""
     # 1. Create
     create_resp = await client.post("/api/v1/profile", json=_FULL_PROFILE)
     assert create_resp.status_code == 201
@@ -444,19 +532,13 @@ async def test_full_crud_lifecycle(client: AsyncClient) -> None:
     )
     assert put_resp2.status_code == 200
 
-    # 5. List — should contain 1 profile
-    list_resp = await client.get("/api/v1/profiles")
-    assert list_resp.status_code == 200
-    assert list_resp.json()["count"] == 1
-
-    # 6. Delete
+    # 5. Delete
     del_resp = await client.delete(f"/api/v1/profile/{user_id}")
     assert del_resp.status_code == 200
 
-    # 7. List — should be empty
-    list_resp2 = await client.get("/api/v1/profiles")
-    assert list_resp2.status_code == 200
-    assert list_resp2.json()["count"] == 0
+    # 6. Verify deleted
+    get_deleted = await client.get(f"/api/v1/profile/{user_id}")
+    assert get_deleted.status_code == 404
 
 
 # ─── Reports endpoint still works with DB ─────────────────────────────

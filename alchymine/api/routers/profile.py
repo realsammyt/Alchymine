@@ -157,6 +157,7 @@ async def create_profile(
         birth_city=request.birth_city,
         assessment_responses=request.assessment_responses,
         family_structure=request.family_structure,
+        user_id=current_user["sub"],
     )
     try:
         return _user_to_response(user)

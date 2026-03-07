@@ -93,15 +93,17 @@ async def create_profile(
     assessment_responses: dict[str, Any] | None = None,
     family_structure: str | None = None,
     intentions: list[str] | None = None,
+    user_id: str | None = None,
 ) -> User:
     """Create a new user with intake data.
 
     Returns the newly created ``User`` with its ``intake`` relationship
-    populated.
+    populated.  When ``user_id`` is provided it is used as the primary key
+    (e.g. to tie the profile to the authenticated user's JWT sub).
     """
-    user = User()
+    user = User(id=user_id) if user_id else User()
     session.add(user)
-    await session.flush()  # generate user.id
+    await session.flush()  # generate user.id (if not already set)
 
     # Derive primary intention from the list when provided
     _primary = intentions[0] if intentions else intention
