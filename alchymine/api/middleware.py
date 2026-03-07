@@ -11,6 +11,7 @@ from __future__ import annotations
 import ipaddress
 import logging
 import os
+import re
 import time
 import uuid
 from collections.abc import Callable
@@ -21,6 +22,11 @@ from starlette.requests import Request
 from starlette.responses import JSONResponse, Response
 
 logger = logging.getLogger("alchymine.api")
+
+_UUID_RE = re.compile(
+    r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+    re.IGNORECASE,
+)
 
 
 def _get_redis_url() -> str:
@@ -51,7 +57,8 @@ class RequestIdMiddleware(BaseHTTPMiddleware):
     """
 
     async def dispatch(self, request: Request, call_next: Callable) -> Response:
-        request_id = request.headers.get("x-request-id") or str(uuid.uuid4())
+        incoming = request.headers.get("x-request-id", "")
+        request_id = incoming if _UUID_RE.match(incoming) else str(uuid.uuid4())
         # Store on request state for access by other middleware/handlers
         request.state.request_id = request_id
 
@@ -177,6 +184,7 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         self._redis: Any = None
         self._redis_failed = False
         self._local_counts: dict[str, tuple[int, float]] = {}  # key -> (count, window_start)
+        self._max_local_entries = 10_000
 
     async def _get_redis(self) -> Any:
         """Lazily connect to Redis.  Returns ``None`` if unavailable."""
@@ -242,6 +250,9 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
                     bucket = prefix.replace("/", "_").strip("_")
                     break
             key = f"{client_ip}:{bucket}"
+
+            if len(self._local_counts) > self._max_local_entries:
+                self._local_counts.clear()
 
             count, window_start = self._local_counts.get(key, (0, now))
             if now - window_start >= window:
