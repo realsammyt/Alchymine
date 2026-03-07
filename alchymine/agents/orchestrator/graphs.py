@@ -161,12 +161,16 @@ def _intelligence_numerology(state: CoordinatorState) -> CoordinatorState:
     request_data = state.get("request_data", {})
 
     try:
+        from datetime import date as date_type
+
         from alchymine.engine.numerology import calculate_pythagorean_profile
 
         full_name = request_data.get("full_name", "")
         birth_date = request_data.get("birth_date")
 
         if full_name and birth_date:
+            if isinstance(birth_date, str):
+                birth_date = date_type.fromisoformat(birth_date)
             profile = calculate_pythagorean_profile(full_name, birth_date)
             results["numerology"] = {
                 "life_path": profile.life_path,
@@ -193,6 +197,8 @@ def _intelligence_astrology(state: CoordinatorState) -> CoordinatorState:
     request_data = state.get("request_data", {})
 
     try:
+        from datetime import date as date_type
+
         from alchymine.engine.astrology import (
             approximate_sun_degree,
             approximate_sun_sign,
@@ -200,6 +206,8 @@ def _intelligence_astrology(state: CoordinatorState) -> CoordinatorState:
 
         birth_date = request_data.get("birth_date")
         if birth_date:
+            if isinstance(birth_date, str):
+                birth_date = date_type.fromisoformat(birth_date)
             sun_sign = approximate_sun_sign(birth_date)
             sun_degree = approximate_sun_degree(birth_date)
             results["astrology"] = {

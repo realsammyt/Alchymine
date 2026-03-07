@@ -1,7 +1,9 @@
 "use client";
 
-import { useState, FormEvent } from "react";
+import { useState, useEffect, FormEvent } from "react";
 import { useRouter } from "next/navigation";
+import { useAuth } from "@/lib/AuthContext";
+import { getProfile } from "@/lib/api";
 import Button from "@/components/shared/Button";
 import {
   MotionReveal,
@@ -121,6 +123,7 @@ function IntentionIcon({
 
 export default function IntakePage() {
   const router = useRouter();
+  const { user } = useAuth();
   const [formData, setFormData] = useState<IntakeFormData>({
     fullName: "",
     birthDate: "",
@@ -131,6 +134,29 @@ export default function IntakePage() {
   const [errors, setErrors] = useState<
     Partial<Record<keyof IntakeFormData | "intentions", string>>
   >({});
+
+  // Pre-fill from saved profile (enables cross-device sync)
+  useEffect(() => {
+    if (!user?.id) return;
+    getProfile(user.id)
+      .then((profile) => {
+        if (profile.intake) {
+          setFormData((prev) => ({
+            fullName: profile.intake!.full_name || prev.fullName,
+            birthDate: profile.intake!.birth_date || prev.birthDate,
+            birthTime: profile.intake!.birth_time || prev.birthTime,
+            birthCity: profile.intake!.birth_city || prev.birthCity,
+            intentions:
+              profile.intake!.intentions?.length
+                ? profile.intake!.intentions
+                : prev.intentions,
+          }));
+        }
+      })
+      .catch(() => {
+        // No saved profile yet — that's fine, user fills in fresh
+      });
+  }, [user?.id]);
 
   function validate(): boolean {
     const newErrors: Partial<Record<keyof IntakeFormData, string>> = {};
