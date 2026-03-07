@@ -11,7 +11,9 @@ from __future__ import annotations
 import ipaddress
 import logging
 import os
+import re
 import time
+import uuid
 from collections.abc import Callable
 from typing import Any
 
@@ -20,6 +22,11 @@ from starlette.requests import Request
 from starlette.responses import JSONResponse, Response
 
 logger = logging.getLogger("alchymine.api")
+
+_UUID_RE = re.compile(
+    r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+    re.IGNORECASE,
+)
 
 
 def _get_redis_url() -> str:
@@ -135,6 +142,8 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         If ``None``, uses :data:`DEFAULT_ROUTE_LIMITS`.
     """
 
+    _MAX_LOCAL_ENTRIES = 10_000
+
     def __init__(  # type: ignore[no-untyped-def]
         self,
         app,
@@ -151,6 +160,7 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         self.route_limits = route_limits if route_limits is not None else DEFAULT_ROUTE_LIMITS
         self._redis: Any = None
         self._redis_failed = False
+        self._local_counts: dict[str, int] = {}
 
     async def _get_redis(self) -> Any:
         """Lazily connect to Redis.  Returns ``None`` if unavailable."""
@@ -206,7 +216,24 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
 
         redis_conn = await self._get_redis()
         if redis_conn is None:
-            # Graceful fallback — Redis unavailable, allow traffic
+            # Graceful degraded-mode fallback — Redis unavailable.
+            # Use an in-process counter dict. Evict all entries when it grows
+            # too large to prevent unbounded memory growth. Resetting counters
+            # in degraded mode is acceptable.
+            key = f"local:{client_ip}:{path}"
+            if len(self._local_counts) > self._MAX_LOCAL_ENTRIES:
+                self._local_counts.clear()
+            count = self._local_counts.get(key, 0) + 1
+            self._local_counts[key] = count
+            if count > max_req:
+                return JSONResponse(
+                    status_code=429,
+                    content={
+                        "detail": "Rate limit exceeded. Please try again later.",
+                        "status_code": 429,
+                    },
+                    headers={"Retry-After": str(window)},
+                )
             return await call_next(request)
 
         bucket = "default"
@@ -250,4 +277,26 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
             return await call_next(request)
 
         response = await call_next(request)
+        return response
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Request ID Middleware
+# ═══════════════════════════════════════════════════════════════════════════
+
+
+class RequestIdMiddleware(BaseHTTPMiddleware):
+    """Attach a UUID request ID to every request and response.
+
+    If the incoming ``X-Request-ID`` header contains a valid UUID v4 (case-
+    insensitive), it is reused.  Any other value (missing, malformed, or
+    potentially injected) is replaced with a freshly generated UUID so that
+    log correlation IDs are always trustworthy.
+    """
+
+    async def dispatch(self, request: Request, call_next: Callable) -> Response:
+        incoming = request.headers.get("x-request-id", "")
+        request_id = incoming if _UUID_RE.match(incoming) else str(uuid.uuid4())
+        response = await call_next(request)
+        response.headers["X-Request-ID"] = request_id
         return response

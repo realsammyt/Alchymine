@@ -6,7 +6,7 @@ Covers:
 - RateLimitMiddleware (Redis-backed):
   - Rate limiting with mocked Redis
   - Stricter auth route limits
-  - Redis-unavailable fallback (logs warning, allows traffic)
+  - Redis-unavailable fallback (logs warning, applies in-process rate limit)
   - Sliding window expiry
 """
 
@@ -311,19 +311,21 @@ class TestRateLimitAuthRoutes:
 class TestRateLimitRedisFallback:
     """Tests for graceful degradation when Redis is unavailable."""
 
-    def test_redis_unavailable_allows_traffic(self):
-        """When Redis is down, requests are allowed through."""
-        app = _make_rate_limit_app(max_requests=1, window_seconds=60)
+    def test_redis_unavailable_applies_local_rate_limit(self):
+        """When Redis is down, in-process fallback rate limiting applies."""
+        app = _make_rate_limit_app(max_requests=3, window_seconds=60)
         # Patch from_url to raise — simulates Redis being down
         with patch(
             "redis.asyncio.from_url",
             side_effect=ConnectionError("Connection refused"),
         ):
             client = TestClient(app)
-            # Even with limit=1, all should pass because Redis is "down"
-            for _ in range(10):
+            # First 3 requests should succeed; subsequent ones are rate-limited
+            for _ in range(3):
                 response = client.get("/ping")
                 assert response.status_code == 200
+            response = client.get("/ping")
+            assert response.status_code == 429
 
     def test_redis_unavailable_logs_warning(self, caplog):
         """When Redis is unavailable, a warning is logged."""
