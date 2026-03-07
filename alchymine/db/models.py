@@ -507,3 +507,52 @@ class JournalEntry(Base):
 
     def __repr__(self) -> str:
         return f"<JournalEntry id={self.id!r} user_id={self.user_id!r}>"
+
+
+# ─── OutcomeMetricRecord ──────────────────────────────────────────────
+
+
+class OutcomeMetricRecord(Base):
+    """Persisted outcome metric measurement."""
+
+    __tablename__ = "outcome_metrics"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    user_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    system: Mapped[str] = mapped_column(String(50), nullable=False)
+    metric_name: Mapped[str] = mapped_column(String(100), nullable=False)
+    value: Mapped[float] = mapped_column(Float, nullable=False)
+    period: Mapped[str] = mapped_column(String(20), default="weekly")
+    recorded_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), index=True
+    )
+
+    def __repr__(self) -> str:
+        return f"<OutcomeMetricRecord id={self.id!r} system={self.system!r} metric={self.metric_name!r}>"
+
+
+# ─── MilestoneRecord (ORM) ────────────────────────────────────────────
+
+
+class MilestoneDBRecord(Base):
+    """Persisted milestone completion record."""
+
+    __tablename__ = "milestones"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    user_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    system: Mapped[str] = mapped_column(String(50), nullable=False)
+    name: Mapped[str] = mapped_column(String(200), nullable=False)
+    completed: Mapped[bool] = mapped_column(Boolean, default=False)
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+    def __repr__(self) -> str:
+        return f"<MilestoneDBRecord id={self.id!r} system={self.system!r} name={self.name!r}>"

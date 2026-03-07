@@ -613,3 +613,91 @@ async def get_journal_stats(session: AsyncSession, user_id: str) -> dict[str, An
         "streak_days": streak,
         "tags_used": sorted(all_tags),
     }
+
+
+# ── Outcome Metrics ──────────────────────────────────────────────────────
+
+
+async def record_outcome_metric(
+    session: AsyncSession,
+    user_id: str,
+    system: str,
+    metric_name: str,
+    value: float,
+    period: str = "weekly",
+) -> "OutcomeMetricRecord":
+    """Persist an outcome metric measurement."""
+    from alchymine.db.models import OutcomeMetricRecord
+
+    record = OutcomeMetricRecord(
+        user_id=user_id,
+        system=system,
+        metric_name=metric_name,
+        value=value,
+        period=period,
+    )
+    session.add(record)
+    await session.flush()
+    return record
+
+
+async def get_outcome_metrics(
+    session: AsyncSession,
+    user_id: str,
+    system: str | None = None,
+    limit: int = 100,
+) -> list["OutcomeMetricRecord"]:
+    """Query outcome metrics for a user, optionally filtered by system."""
+    from alchymine.db.models import OutcomeMetricRecord
+
+    stmt = select(OutcomeMetricRecord).where(OutcomeMetricRecord.user_id == user_id)
+    if system:
+        stmt = stmt.where(OutcomeMetricRecord.system == system)
+    stmt = stmt.order_by(OutcomeMetricRecord.recorded_at.desc()).limit(limit)
+    result = await session.execute(stmt)
+    return list(result.scalars().all())
+
+
+# ── Milestones ────────────────────────────────────────────────────────────
+
+
+async def record_milestone(
+    session: AsyncSession,
+    user_id: str,
+    system: str,
+    name: str,
+    completed: bool = True,
+    notes: str | None = None,
+) -> "MilestoneDBRecord":
+    """Persist a milestone record."""
+    from datetime import UTC, datetime
+
+    from alchymine.db.models import MilestoneDBRecord
+
+    record = MilestoneDBRecord(
+        user_id=user_id,
+        system=system,
+        name=name,
+        completed=completed,
+        completed_at=datetime.now(UTC) if completed else None,
+        notes=notes,
+    )
+    session.add(record)
+    await session.flush()
+    return record
+
+
+async def get_milestones(
+    session: AsyncSession,
+    user_id: str,
+    system: str | None = None,
+) -> list["MilestoneDBRecord"]:
+    """Query milestones for a user, optionally filtered by system."""
+    from alchymine.db.models import MilestoneDBRecord
+
+    stmt = select(MilestoneDBRecord).where(MilestoneDBRecord.user_id == user_id)
+    if system:
+        stmt = stmt.where(MilestoneDBRecord.system == system)
+    stmt = stmt.order_by(MilestoneDBRecord.created_at.desc())
+    result = await session.execute(stmt)
+    return list(result.scalars().all())
