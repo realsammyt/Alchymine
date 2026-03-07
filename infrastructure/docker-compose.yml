@@ -172,6 +172,7 @@ services:
       dockerfile: infrastructure/docker/Dockerfile.api
     container_name: alchymine-worker
     restart: unless-stopped
+    stop_grace_period: 120s
     command: >
       celery -A alchymine.workers.celery_app worker
       --loglevel=${LOG_LEVEL:-warning}

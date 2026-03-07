@@ -50,11 +50,21 @@ def get_async_engine(
     if db_url.startswith("sqlite"):
         connect_args["check_same_thread"] = False
 
-    return create_async_engine(
-        db_url,
-        echo=echo,
-        connect_args=connect_args,
-    )
+    kwargs: dict = {
+        "echo": echo,
+        "connect_args": connect_args,
+    }
+    if not db_url.startswith("sqlite"):
+        kwargs.update(
+            {
+                "pool_size": 10,
+                "max_overflow": 20,
+                "pool_pre_ping": True,
+                "pool_recycle": 3600,
+            }
+        )
+
+    return create_async_engine(db_url, **kwargs)
 
 
 # ─── Session Factory ───────────────────────────────────────────────────

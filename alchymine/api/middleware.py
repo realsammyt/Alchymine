@@ -151,6 +151,7 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         self.route_limits = route_limits if route_limits is not None else DEFAULT_ROUTE_LIMITS
         self._redis: Any = None
         self._redis_failed = False
+        self._local_counts: dict[str, tuple[int, float]] = {}  # key -> (count, window_start)
 
     async def _get_redis(self) -> Any:
         """Lazily connect to Redis.  Returns ``None`` if unavailable."""
@@ -206,7 +207,36 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
 
         redis_conn = await self._get_redis()
         if redis_conn is None:
-            # Graceful fallback — Redis unavailable, allow traffic
+            # In-process fallback — not shared across workers but better than nothing
+            import time as _time
+
+            now = _time.monotonic()
+            bucket = "default"
+            for prefix in self.route_limits:
+                if path.startswith(prefix):
+                    bucket = prefix.replace("/", "_").strip("_")
+                    break
+            key = f"{client_ip}:{bucket}"
+
+            count, window_start = self._local_counts.get(key, (0, now))
+            if now - window_start >= window:
+                # Window expired — reset
+                count = 0
+                window_start = now
+
+            count += 1
+            self._local_counts[key] = (count, window_start)
+
+            if count > max_req:
+                return JSONResponse(
+                    status_code=429,
+                    content={
+                        "detail": "Rate limit exceeded. Please try again later.",
+                        "status_code": 429,
+                    },
+                    headers={"Retry-After": str(window)},
+                )
+
             return await call_next(request)
 
         bucket = "default"

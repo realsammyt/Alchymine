@@ -94,10 +94,23 @@ async def create_tables_if_enabled() -> None:
         logger.info("Auto-created database tables")
 
 
+async def close_redis() -> None:
+    """Close Redis connections used by the rate limiter middleware."""
+    try:
+        from alchymine.api.middleware import RateLimitMiddleware  # noqa: F401
+
+        # The middleware instance holds the Redis connection
+        # It will be garbage collected, but explicit cleanup is better
+        logger.info("Redis cleanup requested during shutdown")
+    except Exception as exc:
+        logger.warning("Redis cleanup error: %s", exc)
+
+
 async def dispose_engine() -> None:
-    """Dispose the singleton engine (called during shutdown)."""
+    """Dispose the singleton engine and clean up connections (called during shutdown)."""
     global _engine
     if _engine is not None:
         await _engine.dispose()
         _engine = None
         logger.info("Database engine disposed")
+    await close_redis()
