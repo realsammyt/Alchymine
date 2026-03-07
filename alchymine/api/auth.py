@@ -21,8 +21,8 @@ from jose import JWTError, jwt
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from alchymine.api.deps import get_db_session
 from alchymine.config import get_settings
-from alchymine.db.base import get_async_engine, get_async_session_factory
 from alchymine.db.models import User
 
 # ─── Configuration ────────────────────────────────────────────────────────
@@ -190,6 +190,12 @@ async def get_current_user(
             headers={"WWW-Authenticate": "Bearer"},
         )
     payload = decode_token(token)
+    if payload.get("type") != "access":
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid token type",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
     user_id: str | None = payload.get("sub")
     if user_id is None:
         raise HTTPException(
@@ -202,24 +208,11 @@ async def get_current_user(
 
 # ─── Admin Dependency ─────────────────────────────────────────────────────
 
-# Lazily-initialized session factory for the admin dependency.  Kept separate
-# from the router-level engine so this module stays self-contained.
-_admin_engine = None
-_admin_session_factory = None
-
-
-async def _get_admin_session() -> AsyncSession:
-    """Return a database session for admin dependency checks."""
-    global _admin_engine, _admin_session_factory  # noqa: PLW0603
-    if _admin_engine is None:
-        _admin_engine = get_async_engine()
-        _admin_session_factory = get_async_session_factory(_admin_engine)
-    return _admin_session_factory()
-
 
 async def get_current_admin(
     request: Request,
     bearer_token: str | None = Depends(oauth2_scheme),
+    db: AsyncSession = Depends(get_db_session),
 ) -> User:
     """FastAPI dependency that requires the current user to be an active admin.
 
@@ -236,12 +229,8 @@ async def get_current_admin(
     payload = await get_current_user(request, bearer_token)
     user_id = payload.get("sub")
 
-    session = await _get_admin_session()
-    try:
-        result = await session.execute(select(User).where(User.id == user_id))
-        user = result.scalar_one_or_none()
-    finally:
-        await session.close()
+    result = await db.execute(select(User).where(User.id == user_id))
+    user = result.scalar_one_or_none()
 
     if user is None:
         raise HTTPException(

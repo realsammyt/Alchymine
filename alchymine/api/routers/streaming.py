@@ -18,6 +18,12 @@ from alchymine.llm.client import LLMClient
 
 router = APIRouter()
 
+_NARRATIVE_SYSTEM_PROMPT = (
+    "You are Alchymine, a compassionate personal transformation guide. "
+    "Provide insightful, evidence-aware narrative responses. "
+    "Never provide medical, financial, or legal advice."
+)
+
 _BLOCKED_PATTERNS = [
     # Prompt injection
     r"ignore\s+(all\s+)?(previous|prior|above)\s+(instructions|prompts)",
@@ -40,7 +46,6 @@ def _check_content_safety(text: str) -> str | None:
 
 async def _narrative_event_stream(
     prompt: str,
-    system_prompt: str,
 ) -> AsyncGenerator[str, None]:
     """Yield SSE-formatted chunks from the LLM streaming backend.
 
@@ -51,13 +56,11 @@ async def _narrative_event_stream(
     ----------
     prompt:
         The user prompt to send to the LLM.
-    system_prompt:
-        Optional system-level instructions.
     """
     client = LLMClient()
     async for chunk in client.stream_generate(
         prompt=prompt,
-        system_prompt=system_prompt,
+        system_prompt=_NARRATIVE_SYSTEM_PROMPT,
     ):
         yield f"data: {chunk}\n\n"
 
@@ -67,9 +70,6 @@ async def _narrative_event_stream(
 @router.get("/stream/narrative")
 async def stream_narrative(
     prompt: str = Query(..., max_length=2000, description="The prompt to generate a narrative for"),
-    system_prompt: str = Query(
-        "", max_length=2000, description="Optional system-level instructions"
-    ),
     current_user: dict = Depends(get_current_user),
 ) -> StreamingResponse:
     """Stream a narrative LLM response as Server-Sent Events.
@@ -82,12 +82,11 @@ async def stream_narrative(
     with automatic fallback.  When no backend is available the fallback
     message is streamed word-by-word.
     """
-    for text in (prompt, system_prompt):
-        safety_message = _check_content_safety(text)
-        if safety_message:
-            raise HTTPException(status_code=400, detail=safety_message)
+    safety_message = _check_content_safety(prompt)
+    if safety_message:
+        raise HTTPException(status_code=400, detail=safety_message)
     return StreamingResponse(
-        _narrative_event_stream(prompt, system_prompt),
+        _narrative_event_stream(prompt),
         media_type="text/event-stream",
         headers={
             "Cache-Control": "no-cache",

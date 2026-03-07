@@ -134,9 +134,9 @@ class Settings(BaseSettings):
         """Require encryption key in production."""
         data: dict = getattr(info, "data", {})
         env = data.get("environment", "development")
-        if env == "production" and not v:
+        if env in ("production", "staging") and not v:
             raise ValueError(
-                "ALCHYMINE_ENCRYPTION_KEY must be set in production. "
+                "ALCHYMINE_ENCRYPTION_KEY must be set in production/staging. "
                 "Generate one with: python -c 'from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())'"
             )
         return v

@@ -807,12 +807,22 @@ export default function ReportPage() {
           <div className="mt-12 flex flex-col sm:flex-row items-center justify-center gap-4">
             <Button
               variant="ghost"
-              onClick={() => {
+              onClick={async () => {
                 const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "";
-                window.open(
+                const response = await fetch(
                   `${apiUrl}/api/v1/reports/${reportId}/pdf`,
-                  "_blank",
+                  { credentials: "include" },
                 );
+                if (!response.ok) return;
+                const blob = await response.blob();
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement("a");
+                a.href = url;
+                a.download = `alchymine-report-${reportId}.pdf`;
+                document.body.appendChild(a);
+                a.click();
+                URL.revokeObjectURL(url);
+                a.remove();
               }}
             >
               <svg
