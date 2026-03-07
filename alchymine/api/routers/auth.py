@@ -15,7 +15,6 @@ from __future__ import annotations
 import hashlib
 import logging
 import secrets
-from collections.abc import AsyncGenerator
 from datetime import UTC, datetime, timedelta
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request, Response, status
@@ -31,8 +30,8 @@ from alchymine.api.auth import (
     hash_password,
     verify_password,
 )
+from alchymine.api.deps import get_db_session
 from alchymine.config import get_settings
-from alchymine.db.base import Base, get_async_engine, get_async_session_factory
 from alchymine.db.models import InviteCode, User
 from alchymine.email import send_password_reset_email
 
@@ -106,25 +105,9 @@ class UserResponse(BaseModel):
 
 
 # ─── Database Session Dependency ──────────────────────────────────────────
-
-_engine = None
-_session_factory = None
-
-
-async def get_db() -> AsyncGenerator[AsyncSession, None]:
-    """Yield an async database session.
-
-    Lazily creates the engine and session factory on first call,
-    and creates all tables (for development / testing convenience).
-    """
-    global _engine, _session_factory  # noqa: PLW0603
-    if _engine is None:
-        _engine = get_async_engine()
-        _session_factory = get_async_session_factory(_engine)
-        async with _engine.begin() as conn:
-            await conn.run_sync(Base.metadata.create_all)
-    async with _session_factory() as session:
-        yield session
+# Uses the centralized get_db_session from alchymine.api.deps.
+# Alias kept for backward compatibility with tests that import get_db.
+get_db = get_db_session
 
 
 # ─── Cookie helpers ───────────────────────────────────────────────────────

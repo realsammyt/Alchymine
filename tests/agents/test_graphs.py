@@ -112,7 +112,7 @@ class TestIntelligenceGraphTransitions:
     """Intelligence graph processes numerology + astrology correctly."""
 
     def test_success_with_both_engines(self) -> None:
-        """Both numerology and astrology succeed -> status=success."""
+        """All intelligence engines succeed -> status=success."""
         mock_profile = MagicMock()
         mock_profile.life_path = 7
         mock_profile.expression = 3
@@ -123,8 +123,19 @@ class TestIntelligenceGraphTransitions:
 
         from datetime import date
 
+        # Provide Big Five assessment responses so personality node succeeds
+        bf_responses = {
+            f"bf_{t}{i}": 3
+            for t in ("e", "a", "c", "n", "o")
+            for i in (1, 2, 3, 4)
+        }
+
         state = _make_initial_state(
-            request_data={"full_name": "Test User", "birth_date": date(1990, 6, 15)}
+            request_data={
+                "full_name": "Test User",
+                "birth_date": date(1990, 6, 15),
+                "assessment_responses": bf_responses,
+            }
         )
 
         with (
@@ -147,6 +158,9 @@ class TestIntelligenceGraphTransitions:
         assert result["status"] == "success"
         assert "numerology" in result["results"]
         assert "astrology" in result["results"]
+        assert "personality" in result["results"]
+        assert "archetype" in result["results"]
+        assert "biorhythm" in result["results"]
         assert result["results"]["numerology"]["life_path"] == 7
         assert result["results"]["astrology"]["sun_sign"] == "Gemini"
         assert result["errors"] == []
@@ -636,42 +650,46 @@ class TestNodeOrdering:
     """Verify that nodes execute in the correct order."""
 
     def test_intelligence_node_order(self) -> None:
-        """Intelligence: numerology runs before astrology."""
+        """Intelligence: numerology -> astrology -> personality -> archetype -> biorhythm -> status."""
         execution_log = []
 
-        def mock_numerology(state):
-            execution_log.append("numerology")
-            return {**state, "results": {**state.get("results", {}), "numerology": True}}
-
-        def mock_astrology(state):
-            execution_log.append("astrology")
-            # Verify numerology ran first
-            assert state.get("results", {}).get("numerology") is True
-            return {**state, "results": {**state.get("results", {}), "astrology": True}}
-
-        def mock_status(state):
-            execution_log.append("status")
-            return {**state, "status": "success"}
+        def log_node(name):
+            def _node(state):
+                execution_log.append(name)
+                return state
+            return _node
 
         with (
             patch(
                 "alchymine.agents.orchestrator.graphs._intelligence_numerology",
-                side_effect=mock_numerology,
+                side_effect=log_node("numerology"),
             ),
             patch(
                 "alchymine.agents.orchestrator.graphs._intelligence_astrology",
-                side_effect=mock_astrology,
+                side_effect=log_node("astrology"),
+            ),
+            patch(
+                "alchymine.agents.orchestrator.graphs._intelligence_personality",
+                side_effect=log_node("personality"),
+            ),
+            patch(
+                "alchymine.agents.orchestrator.graphs._intelligence_archetype",
+                side_effect=log_node("archetype"),
+            ),
+            patch(
+                "alchymine.agents.orchestrator.graphs._intelligence_biorhythm",
+                side_effect=log_node("biorhythm"),
             ),
             patch(
                 "alchymine.agents.orchestrator.graphs._intelligence_status",
-                side_effect=mock_status,
+                side_effect=log_node("status"),
             ),
         ):
             graph = build_intelligence_graph(include_quality_gate=False)
             state = _make_initial_state()
             graph.invoke(state)
 
-        assert execution_log == ["numerology", "astrology", "status"]
+        assert execution_log == ["numerology", "astrology", "personality", "archetype", "biorhythm", "status"]
 
     def test_healing_node_order(self) -> None:
         """Healing: init -> crisis_detection -> modality_matching -> status."""
@@ -833,16 +851,22 @@ class TestSequentialFallback:
         # Build with langgraph
         langgraph_result = build_intelligence_graph(include_quality_gate=False).invoke(state)
 
-        # Build sequential fallback
+        # Build sequential fallback with all intelligence nodes
         from alchymine.agents.orchestrator.graphs import (
+            _intelligence_archetype,
             _intelligence_astrology,
+            _intelligence_biorhythm,
             _intelligence_numerology,
+            _intelligence_personality,
             _intelligence_status,
         )
 
         seq = _SequentialGraph()
         seq.add_node("numerology", _intelligence_numerology)
         seq.add_node("astrology", _intelligence_astrology)
+        seq.add_node("personality", _intelligence_personality)
+        seq.add_node("archetype", _intelligence_archetype)
+        seq.add_node("biorhythm", _intelligence_biorhythm)
         seq.add_node("status", _intelligence_status)
         seq_result = seq.invoke(dict(state))
 

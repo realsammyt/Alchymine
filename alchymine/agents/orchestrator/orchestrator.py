@@ -159,6 +159,23 @@ class MasterOrchestrator:
             result = await coordinator.process(user_id, request_data)
             coordinator_results.append(result)
 
+            # After Intelligence completes, enrich request_data with
+            # computed results so downstream coordinators (Healing,
+            # Wealth, Creative, Perspective) receive life_path,
+            # archetype, big_five, etc.
+            if system == SystemIntent.INTELLIGENCE and result.status != "error":
+                numerology = result.data.get("numerology", {})
+                archetype_data = result.data.get("archetype", {})
+                personality_data = result.data.get("personality", {})
+                if numerology.get("life_path"):
+                    request_data["life_path"] = numerology["life_path"]
+                if archetype_data.get("primary"):
+                    request_data["archetype"] = archetype_data["primary"]
+                    request_data["archetype_primary"] = archetype_data["primary"]
+                    request_data["archetype_secondary"] = archetype_data.get("secondary")
+                if personality_data:
+                    request_data["big_five"] = personality_data
+
         # Synthesize if multi-system
         synthesis = None
         if len(coordinator_results) > 1:

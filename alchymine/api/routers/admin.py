@@ -18,7 +18,6 @@ from __future__ import annotations
 
 import logging
 import secrets
-from collections.abc import AsyncGenerator
 from datetime import UTC, datetime, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -28,7 +27,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from alchymine.api.auth import get_current_admin
-from alchymine.db.base import Base, get_async_engine, get_async_session_factory
+from alchymine.api.deps import get_db_session
 from alchymine.db.models import AdminAuditLog, InviteCode, JournalEntry, Report, User
 
 logger = logging.getLogger(__name__)
@@ -36,25 +35,9 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/admin")
 
 # ─── Database Session Dependency ──────────────────────────────────────────
-
-_engine = None
-_session_factory = None
-
-
-async def get_db() -> AsyncGenerator[AsyncSession, None]:
-    """Yield an async database session.
-
-    Lazily creates the engine and session factory on first call,
-    and creates all tables (for development / testing convenience).
-    """
-    global _engine, _session_factory  # noqa: PLW0603
-    if _engine is None:
-        _engine = get_async_engine()
-        _session_factory = get_async_session_factory(_engine)
-        async with _engine.begin() as conn:
-            await conn.run_sync(Base.metadata.create_all)
-    async with _session_factory() as session:
-        yield session
+# Uses the centralized get_db_session from alchymine.api.deps.
+# Alias kept for backward compatibility with tests that import get_db.
+get_db = get_db_session
 
 
 # ─── Audit Log Helper ─────────────────────────────────────────────────────
@@ -273,7 +256,10 @@ async def list_users(
     total_result = await db.execute(count_query)
     total = total_result.scalar_one()
 
-    # Sorting
+    # Sorting — validate against allowlist to prevent attribute injection
+    _ALLOWED_SORT_COLUMNS = {"created_at", "email", "is_admin", "is_active", "last_login_at"}
+    if sort_by not in _ALLOWED_SORT_COLUMNS:
+        sort_by = "created_at"
     sort_col = getattr(User, sort_by, User.created_at)
     order_fn = desc if sort_order.lower() == "desc" else asc
     query = query.order_by(order_fn(sort_col))

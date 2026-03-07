@@ -56,6 +56,8 @@ def render_report_html(report_data: dict[str, Any]) -> str:
         "coordinator_results": coordinator_results,
         # Quality gates
         "quality_passed": result.get("quality_passed", False),
+        # LLM narratives (optional — absent when LLM is unavailable)
+        "narratives": result.get("narratives", {}),
     }
 
     return template.render(**context)

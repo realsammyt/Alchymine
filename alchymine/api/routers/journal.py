@@ -205,7 +205,8 @@ async def update_journal_entry(
         changes["mood_score"] = update.mood_score
 
     updated = await repository.update_journal_entry(session, entry_id, **changes)
-    assert updated is not None
+    if updated is None:
+        raise HTTPException(status_code=404, detail="Journal entry not found")
     return _entry_to_response(updated)
 
 

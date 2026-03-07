@@ -525,7 +525,7 @@ class TestResetPassword:
                 user.password_reset_expires = datetime.now(UTC) + timedelta(hours=1)
                 await db.commit()
 
-        asyncio.get_event_loop().run_until_complete(_set_token())
+        asyncio.run(_set_token())
 
         # Step 3: Reset the password
         reset_resp = client.post(
@@ -601,7 +601,7 @@ class TestTokenRevocationOnPasswordReset:
                 user.password_reset_expires = datetime.now(UTC) + timedelta(hours=1)
                 await db.commit()
 
-        asyncio.get_event_loop().run_until_complete(_set_reset_token())
+        asyncio.run(_set_reset_token())
 
         reset_resp = client.post(
             "/api/v1/auth/reset-password",
@@ -642,7 +642,7 @@ class TestTokenRevocationOnPasswordReset:
                 user.password_reset_expires = datetime.now(UTC) + timedelta(hours=1)
                 await db.commit()
 
-        asyncio.get_event_loop().run_until_complete(_set_reset_token())
+        asyncio.run(_set_reset_token())
 
         client.post(
             "/api/v1/auth/reset-password",

@@ -328,6 +328,52 @@ def _get_bridge_connections(
 # ─── Public API ────────────────────────────────────────────────────
 
 
+def transform_to_profile_summary(
+    coordinator_results: list[CoordinatorResult],
+) -> dict[str, Any]:
+    """Transform coordinator results into the profile_summary shape expected by the HTML renderer.
+
+    The renderer expects:
+        profile_summary.identity.{numerology, astrology, archetype, personality, strengths_map}
+        profile_summary.healing.{...}
+        profile_summary.wealth.{...}
+        profile_summary.creative.{...}
+        profile_summary.perspective.{...}
+
+    Each coordinator result has .system (str) and .data (dict).
+    """
+    summary: dict[str, Any] = {}
+
+    for result in coordinator_results:
+        if result.status == CoordinatorStatus.ERROR.value:
+            continue
+
+        system = result.system
+        data = dict(result.data)
+
+        if system == "intelligence":
+            summary["identity"] = {
+                "numerology": data.get("numerology", {}),
+                "astrology": data.get("astrology", {}),
+                "archetype": data.get("archetype", {}),
+                "personality": data.get("personality", {}),
+                "biorhythm": data.get("biorhythm", {}),
+                "strengths_map": [],
+            }
+        elif system == "healing":
+            summary["healing"] = {k: v for k, v in data.items() if k != "disclaimers"}
+            summary["healing"]["disclaimers"] = data.get("disclaimers", [])
+        elif system == "wealth":
+            summary["wealth"] = {k: v for k, v in data.items() if k != "disclaimers"}
+            summary["wealth"]["disclaimers"] = data.get("disclaimers", [])
+        elif system == "creative":
+            summary["creative"] = data
+        elif system == "perspective":
+            summary["perspective"] = data
+
+    return summary
+
+
 def detect_conflicts(
     results: list[CoordinatorResult],
 ) -> list[dict[str, Any]]:

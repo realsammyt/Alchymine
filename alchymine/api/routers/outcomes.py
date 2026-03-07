@@ -11,16 +11,17 @@ from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from alchymine.api.auth import get_current_user
+from alchymine.api.deps import get_db_session
+from alchymine.db import repository
 from alchymine.outcomes.tracker import (
     MilestoneRecord,
     OutcomeSummary,
+    OutcomeTracker,
     calculate_outcome_summary,
-    get_milestones,
-    get_outcome_tracker,
     record_activity,
-    record_milestone,
 )
 
 router = APIRouter()
@@ -117,6 +118,7 @@ class ProgressSummaryResponse(BaseModel):
 async def create_milestone(
     req: MilestoneRequest,
     current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db_session),
 ) -> MilestoneRecord:
     """Record a milestone completion or creation.
 
@@ -125,12 +127,21 @@ async def create_milestone(
     """
     if current_user["sub"] != req.user_id:
         raise HTTPException(status_code=403, detail="Access denied")
-    return record_milestone(
+    record = await repository.record_milestone(
+        db,
         user_id=req.user_id,
         system=req.system,
         name=req.name,
         completed=req.completed,
         notes=req.notes,
+    )
+    return MilestoneRecord(
+        id=str(record.id),
+        system=record.system,
+        name=record.name,
+        completed=record.completed,
+        completed_at=record.completed_at.isoformat() if record.completed_at else None,
+        notes=record.notes,
     )
 
 
@@ -139,11 +150,23 @@ async def list_milestones(
     user_id: str = Query(..., description="User ID"),
     system: str | None = Query(None, description="Optional system filter"),
     current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db_session),
 ) -> MilestoneListResponse:
     """List milestones for a user, optionally filtered by system."""
     if current_user["sub"] != user_id:
         raise HTTPException(status_code=403, detail="Access denied")
-    records = get_milestones(user_id, system)
+    db_records = await repository.get_milestones(db, user_id, system)
+    records = [
+        MilestoneRecord(
+            id=str(r.id),
+            system=r.system,
+            name=r.name,
+            completed=r.completed,
+            completed_at=r.completed_at.isoformat() if r.completed_at else None,
+            notes=r.notes,
+        )
+        for r in db_records
+    ]
     return MilestoneListResponse(milestones=records, total=len(records))
 
 
@@ -201,6 +224,7 @@ async def get_outcome_summary(
 async def record_outcome_metric(
     req: MetricRecordRequest,
     current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db_session),
 ) -> MetricResponse:
     """Record an outcome metric measurement.
 
@@ -212,8 +236,8 @@ async def record_outcome_metric(
     """
     if current_user["sub"] != req.user_id:
         raise HTTPException(status_code=403, detail="Access denied")
-    tracker = get_outcome_tracker()
-    metric = tracker.record_metric(
+    record = await repository.record_outcome_metric(
+        db,
         user_id=req.user_id,
         system=req.system,
         metric_name=req.metric_name,
@@ -221,12 +245,12 @@ async def record_outcome_metric(
         period=req.period,
     )
     return MetricResponse(
-        user_id=metric.user_id,
-        system=metric.system,
-        metric_name=metric.metric_name,
-        value=metric.value,
-        timestamp=metric.timestamp,
-        period=metric.period,
+        user_id=record.user_id,
+        system=record.system,
+        metric_name=record.metric_name,
+        value=record.value,
+        timestamp=record.recorded_at.isoformat(),
+        period=record.period,
     )
 
 
@@ -237,6 +261,7 @@ async def get_user_metrics(
     start_date: str | None = Query(None, description="Start date (ISO format)"),
     end_date: str | None = Query(None, description="End date (ISO format)"),
     current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db_session),
 ) -> MetricsListResponse:
     """Query outcome metrics for a user.
 
@@ -245,26 +270,20 @@ async def get_user_metrics(
     """
     if current_user["sub"] != user_id:
         raise HTTPException(status_code=403, detail="Access denied")
-    tracker = get_outcome_tracker()
-    metrics = tracker.get_metrics(
-        user_id=user_id,
-        system=system,
-        start_date=start_date,
-        end_date=end_date,
-    )
+    records = await repository.get_outcome_metrics(db, user_id, system)
     return MetricsListResponse(
         metrics=[
             MetricResponse(
-                user_id=m.user_id,
-                system=m.system,
-                metric_name=m.metric_name,
-                value=m.value,
-                timestamp=m.timestamp,
-                period=m.period,
+                user_id=r.user_id,
+                system=r.system,
+                metric_name=r.metric_name,
+                value=r.value,
+                timestamp=r.recorded_at.isoformat(),
+                period=r.period,
             )
-            for m in metrics
+            for r in records
         ],
-        total=len(metrics),
+        total=len(records),
     )
 
 
@@ -273,6 +292,7 @@ async def get_user_trends(
     user_id: str,
     system: str = Query(..., description="System to analyze"),
     current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db_session),
 ) -> TrendResponse:
     """Calculate trend analysis for a user's metrics in a specific system.
 
@@ -283,7 +303,10 @@ async def get_user_trends(
     """
     if current_user["sub"] != user_id:
         raise HTTPException(status_code=403, detail="Access denied")
-    tracker = get_outcome_tracker()
+    records = await repository.get_outcome_metrics(db, user_id, system)
+    tracker = OutcomeTracker()
+    for r in records:
+        tracker.record_metric(r.user_id, r.system, r.metric_name, r.value, r.period)
     trend = tracker.calculate_trends(user_id=user_id, system=system)
     return TrendResponse(
         system=trend.system,
@@ -299,6 +322,7 @@ async def get_user_progress_summary(
     journal_count: int = Query(0, ge=0, description="Number of journal entries"),
     active_plan_day: int | None = Query(None, ge=0, le=90, description="Current plan day"),
     current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db_session),
 ) -> ProgressSummaryResponse:
     """Generate a comprehensive progress summary across all systems.
 
@@ -309,7 +333,10 @@ async def get_user_progress_summary(
     """
     if current_user["sub"] != user_id:
         raise HTTPException(status_code=403, detail="Access denied")
-    tracker = get_outcome_tracker()
+    records = await repository.get_outcome_metrics(db, user_id)
+    tracker = OutcomeTracker()
+    for r in records:
+        tracker.record_metric(r.user_id, r.system, r.metric_name, r.value, r.period)
     summary = tracker.get_progress_summary(
         user_id=user_id,
         journal_count=journal_count,

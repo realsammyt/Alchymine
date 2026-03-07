@@ -236,6 +236,29 @@ class TestHtmlRenderer:
         assert isinstance(result, str)
         assert "<!doctype html>" in result
 
+    def test_render_escapes_user_content(self) -> None:
+        """Jinja2 autoescape should prevent XSS via user-supplied data."""
+        xss_payload = '<script>alert("xss")</script>'
+        data = {
+            "report_id": xss_payload,
+            "status": "complete",
+            "result": {
+                "profile_summary": {
+                    "identity": {
+                        "numerology": {"life_path": 7},
+                        "astrology": {"sun_sign": xss_payload},
+                        "archetype": {"primary": xss_payload},
+                        "personality": {},
+                        "strengths_map": [xss_payload],
+                    },
+                },
+            },
+        }
+        result = render_report_html(data)
+        # The raw <script> tag must NOT appear — it should be escaped
+        assert "<script>" not in result
+        assert "&lt;script&gt;" in result or "alert" not in result
+
 
 class TestHtmlExportEndpoint:
     """Tests for GET /api/v1/reports/{report_id}/html"""

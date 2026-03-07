@@ -46,7 +46,7 @@ from alchymine.engine.reports.pdf_renderer import (  # noqa: E402
     inject_evidence_footer,
     inject_financial_disclaimer,
 )
-from alchymine.workers.tasks import _set_task_engine, pdf_store  # noqa: E402
+from alchymine.workers.tasks import _set_task_engine  # noqa: E402
 
 
 # ── Fixtures ──────────────────────────────────────────────────────────
@@ -109,11 +109,6 @@ def client(engine):
     app.dependency_overrides.clear()
     set_db_engine(None)
     _set_task_engine(None)
-
-
-@pytest.fixture(autouse=True)
-def _clear_pdf_store():
-    pdf_store.clear()
 
 
 @pytest.fixture
@@ -195,9 +190,12 @@ def _patch_pw(mock_fn):
     return patch.dict(sys.modules, {"playwright": fake, "playwright.async_api": fake_async})
 
 
-async def _seed_report(session, rid, result):
+async def _seed_report(session, rid, result, pdf_data=None):
     await repository.create_report(session, report_id=rid, status="complete", user_input="test")
     await repository.update_report_content(session, rid, result=result, status="complete")
+    if pdf_data is not None:
+        report = await repository.get_report(session, rid)
+        report.pdf_data = pdf_data
     await session.commit()
 
 
@@ -295,24 +293,21 @@ class TestPDFRenderer:
 class TestPdfEndpoint:
     @pytest.mark.asyncio
     async def test_pdf_returns_200(self, client, session, sample_report_result, fake_pdf_bytes):
-        await _seed_report(session, "pdf-123", sample_report_result)
-        pdf_store["pdf-123"] = fake_pdf_bytes
+        await _seed_report(session, "pdf-123", sample_report_result, pdf_data=fake_pdf_bytes)
         resp = client.get("/api/v1/reports/pdf-123/pdf")
         assert resp.status_code == 200
         assert resp.headers["content-type"] == "application/pdf"
 
     @pytest.mark.asyncio
     async def test_pdf_attachment_header(self, client, session, sample_report_result, fake_pdf_bytes):
-        await _seed_report(session, "pdf-123", sample_report_result)
-        pdf_store["pdf-123"] = fake_pdf_bytes
+        await _seed_report(session, "pdf-123", sample_report_result, pdf_data=fake_pdf_bytes)
         resp = client.get("/api/v1/reports/pdf-123/pdf")
         assert "attachment" in resp.headers["content-disposition"]
         assert "pdf-123" in resp.headers["content-disposition"]
 
     @pytest.mark.asyncio
     async def test_pdf_returns_bytes(self, client, session, sample_report_result, fake_pdf_bytes):
-        await _seed_report(session, "pdf-123", sample_report_result)
-        pdf_store["pdf-123"] = fake_pdf_bytes
+        await _seed_report(session, "pdf-123", sample_report_result, pdf_data=fake_pdf_bytes)
         assert client.get("/api/v1/reports/pdf-123/pdf").content == fake_pdf_bytes
 
     def test_pdf_404_missing_report(self, client):
@@ -376,8 +371,12 @@ class TestGeneratePdfReportTask:
         async def render(*a, **kw):
             return fake_pdf_bytes
 
+        async def noop_store(rid, data):
+            pass
+
         with (
             patch("alchymine.workers.tasks._db_get_report", side_effect=ret),
+            patch("alchymine.workers.tasks._db_store_pdf", side_effect=noop_store),
             patch("alchymine.engine.reports.pdf_renderer.PDFRenderer") as cls,
         ):
             cls.return_value.render_pdf = render
@@ -385,7 +384,6 @@ class TestGeneratePdfReportTask:
 
         assert result["status"] == "complete"
         assert result["size_bytes"] == len(fake_pdf_bytes)
-        assert pdf_store["pdf-123"] == fake_pdf_bytes
 
     def test_task_detects_wealth(self, wealth_report_result, fake_pdf_bytes):
         from alchymine.workers.tasks import generate_pdf_report
@@ -401,8 +399,12 @@ class TestGeneratePdfReportTask:
             kw_cap.update(kw)
             return fake_pdf_bytes
 
+        async def noop_store(rid, data):
+            pass
+
         with (
             patch("alchymine.workers.tasks._db_get_report", side_effect=ret),
+            patch("alchymine.workers.tasks._db_store_pdf", side_effect=noop_store),
             patch("alchymine.engine.reports.pdf_renderer.PDFRenderer") as cls,
         ):
             cls.return_value.render_pdf = render

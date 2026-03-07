@@ -216,6 +216,13 @@ class TestCoordinatorSuccessMode:
         mock_profile.personal_year = 7
         mock_profile.personal_month = 3
 
+        # Provide Big Five assessment responses for the personality node
+        bf_responses = {
+            f"bf_{t}{i}": 3
+            for t in ("e", "a", "c", "n", "o")
+            for i in (1, 2, 3, 4)
+        }
+
         with (
             patch(
                 "alchymine.engine.numerology.calculate_pythagorean_profile",
@@ -234,11 +241,18 @@ class TestCoordinatorSuccessMode:
 
             result = await coordinator.process(
                 "user-1",
-                {"full_name": "Maria", "birth_date": date(1992, 3, 15)},
+                {
+                    "full_name": "Maria",
+                    "birth_date": date(1992, 3, 15),
+                    "assessment_responses": bf_responses,
+                },
             )
         assert result.status == CoordinatorStatus.SUCCESS.value
         assert result.system == "intelligence"
         assert "numerology" in result.data
+        assert "personality" in result.data
+        assert "archetype" in result.data
+        assert "biorhythm" in result.data
 
     async def test_healing_coordinator_success(self) -> None:
         coordinator = HealingCoordinator()
