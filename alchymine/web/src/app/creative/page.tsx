@@ -181,10 +181,7 @@ export default function CreativePage() {
 
           {/* Personalized Style Fingerprint */}
           <MotionReveal delay={0.1}>
-            <section
-              className="mb-12"
-              aria-labelledby="your-creative-heading"
-            >
+            <section className="mb-12" aria-labelledby="your-creative-heading">
               <h2
                 id="your-creative-heading"
                 className="section-heading-sm mb-2 flex items-center gap-3"
