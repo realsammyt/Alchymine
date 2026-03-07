@@ -12,6 +12,7 @@ import ipaddress
 import logging
 import os
 import time
+import uuid
 from collections.abc import Callable
 from typing import Any
 
@@ -35,6 +36,28 @@ def _get_redis_url() -> str:
         return str(get_settings().redis_url)
     except Exception:  # noqa: BLE001
         return os.environ.get("REDIS_URL", "redis://localhost:6379/0")
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Request ID Middleware
+# ═══════════════════════════════════════════════════════════════════════════
+
+
+class RequestIdMiddleware(BaseHTTPMiddleware):
+    """Add a unique request ID to each request for log correlation.
+
+    Sets X-Request-ID header on responses. If the incoming request
+    already has X-Request-ID, it is preserved.
+    """
+
+    async def dispatch(self, request: Request, call_next: Callable) -> Response:
+        request_id = request.headers.get("x-request-id") or str(uuid.uuid4())
+        # Store on request state for access by other middleware/handlers
+        request.state.request_id = request_id
+
+        response = await call_next(request)
+        response.headers["X-Request-ID"] = request_id
+        return response
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -80,12 +103,14 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
         response = await call_next(request)
         duration_ms = (time.monotonic() - start) * 1000
 
+        request_id = getattr(request.state, "request_id", "-")
         logger.info(
-            "%s %s %d %.1fms",
+            "%s %s %d %.1fms [%s]",
             request.method,
             request.url.path,
             response.status_code,
             duration_ms,
+            request_id,
         )
         return response
 

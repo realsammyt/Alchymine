@@ -177,6 +177,7 @@ services:
       --loglevel=${LOG_LEVEL:-warning}
       --concurrency=${CELERY_WORKER_CONCURRENCY:-4}
       --max-tasks-per-child=1000
+      --queues=celery,reports
     environment:
       - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER:-alchymine}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}@db:5432/${POSTGRES_DB:-alchymine}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
