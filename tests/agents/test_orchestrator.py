@@ -205,6 +205,8 @@ class TestIntentClassificationEdgeCases:
 class TestCoordinatorSuccessMode:
     """Coordinators return SUCCESS with valid data from engine calls."""
 
+    pytestmark = pytest.mark.asyncio
+
     async def test_intelligence_coordinator_success(self) -> None:
         coordinator = IntelligenceCoordinator()
         # Mock the engine imports so the coordinator can run
@@ -298,6 +300,8 @@ class TestCoordinatorSuccessMode:
 class TestCoordinatorFailureMode:
     """Coordinators handle errors gracefully without crashing."""
 
+    pytestmark = pytest.mark.asyncio
+
     async def test_coordinator_returns_error_on_exception(self) -> None:
         """If _execute raises, process() should catch it and return ERROR."""
 
@@ -323,6 +327,8 @@ class TestCoordinatorFailureMode:
 
 class TestCoordinatorDegradedMode:
     """Coordinators enter degraded mode when partial data is available."""
+
+    pytestmark = pytest.mark.asyncio
 
     async def test_intelligence_degraded_when_astrology_fails(self) -> None:
         """Intelligence coordinator degrades when astrology is unavailable but numerology works."""
@@ -375,6 +381,8 @@ class TestCoordinatorDegradedMode:
 
 class TestQualityGateIntegration:
     """Coordinators run quality gates on their output."""
+
+    pytestmark = pytest.mark.asyncio
 
     async def test_quality_gate_failure_degrades_status(self) -> None:
         """If quality gate fails, coordinator result is degraded."""
@@ -445,6 +453,8 @@ class TestQualityGateIntegration:
 
 class TestOrchestratorEndToEnd:
     """End-to-end tests: classify -> delegate -> validate -> result."""
+
+    pytestmark = pytest.mark.asyncio
 
     async def test_single_system_request(self) -> None:
         """A single-system request routes to one coordinator."""
@@ -529,6 +539,8 @@ class TestOrchestratorEndToEnd:
 class TestMultiSystemProcessing:
     """Multi-system requests invoke multiple coordinators and synthesize."""
 
+    pytestmark = pytest.mark.asyncio
+
     async def test_multi_system_invokes_multiple_coordinators(self) -> None:
         orchestrator = MasterOrchestrator()
 
@@ -596,6 +608,8 @@ class TestMultiSystemProcessing:
 
 class TestGracefulDegradation:
     """Orchestrator continues when individual coordinators fail."""
+
+    pytestmark = pytest.mark.asyncio
 
     async def test_one_coordinator_fails_others_continue(self) -> None:
         orchestrator = MasterOrchestrator()
@@ -855,6 +869,8 @@ class TestIntentionsToSystems:
 
 class TestOrchestratorIntentionRouting:
     """Orchestrator uses intentions for routing when provided."""
+
+    pytestmark = pytest.mark.asyncio
 
     async def test_intentions_bypass_keyword_classification(self) -> None:
         """When intentions are provided, keyword classification is bypassed."""

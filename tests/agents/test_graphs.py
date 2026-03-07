@@ -163,7 +163,69 @@ class TestIntelligenceGraphTransitions:
         assert "biorhythm" in result["results"]
         assert result["results"]["numerology"]["life_path"] == 7
         assert result["results"]["astrology"]["sun_sign"] == "Gemini"
+        # Personality now nests Big Five under "big_five"
+        assert "big_five" in result["results"]["personality"]
+        assert result["results"]["personality"]["big_five"]["openness"] is not None
         assert result["errors"] == []
+
+    def test_personality_full_shape_with_all_assessments(self) -> None:
+        """Personality output contains big_five, attachment_style, enneagram when all data provided."""
+        from datetime import date
+
+        bf_responses = {
+            f"bf_{t}{i}": 3
+            for t in ("e", "a", "c", "n", "o")
+            for i in (1, 2, 3, 4)
+        }
+        att_responses = {
+            "att_closeness": 4,
+            "att_abandonment": 2,
+            "att_trust": 4,
+            "att_self_reliance": 3,
+        }
+        enn_responses = {f"enn_{i}": (3 if i != 4 else 5) for i in range(1, 10)}
+
+        all_responses = {**bf_responses, **att_responses, **enn_responses}
+
+        state = _make_initial_state(
+            request_data={
+                "full_name": "Test User",
+                "birth_date": date(1990, 6, 15),
+                "assessment_responses": all_responses,
+            }
+        )
+
+        mock_profile = MagicMock()
+        mock_profile.life_path = 7
+        mock_profile.expression = 3
+        mock_profile.soul_urge = 9
+        mock_profile.personality = 4
+        mock_profile.personal_year = 1
+        mock_profile.personal_month = 5
+
+        with (
+            patch(
+                "alchymine.engine.numerology.calculate_pythagorean_profile",
+                return_value=mock_profile,
+            ),
+            patch(
+                "alchymine.engine.astrology.approximate_sun_sign",
+                return_value="Gemini",
+            ),
+            patch(
+                "alchymine.engine.astrology.approximate_sun_degree",
+                return_value=84.5,
+            ),
+        ):
+            graph = build_intelligence_graph(include_quality_gate=False)
+            result = graph.invoke(state)
+
+        personality = result["results"]["personality"]
+        assert "big_five" in personality
+        assert personality["big_five"]["openness"] is not None
+        assert personality["attachment_style"] is not None
+        assert personality["enneagram_type"] is not None
+        assert personality["enneagram_wing"] is not None
 
     def test_degraded_when_astrology_fails(self) -> None:
         """Numerology succeeds, astrology fails -> status=degraded."""
