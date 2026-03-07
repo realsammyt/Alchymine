@@ -196,22 +196,23 @@ async def _db_populate_profiles(
         "perspective": "perspective",
     }
 
-    for cr in coordinator_results:
-        system = cr.get("system", "")
-        data = cr.get("data", {})
-        if not data or cr.get("status") == "error":
-            continue
+    async with factory() as session:
+        for cr in coordinator_results:
+            system = cr.get("system", "")
+            data = cr.get("data", {})
+            if not data or cr.get("status") == "error":
+                continue
 
-        layer = layer_map.get(system)
-        if not layer:
-            continue
+            layer = layer_map.get(system)
+            if not layer:
+                continue
 
-        try:
-            async with factory() as session:
+            try:
                 await repository.update_layer(session, user_id, layer, data)
-                await session.commit()
-        except Exception as exc:
-            logger.warning("Failed to populate %s profile for %s: %s", layer, user_id, exc)
+            except Exception as exc:
+                logger.warning("Failed to populate %s profile for %s: %s", layer, user_id, exc)
+
+        await session.commit()
 
 
 async def _db_store_pdf(report_id: str, pdf_bytes: bytes) -> None:
