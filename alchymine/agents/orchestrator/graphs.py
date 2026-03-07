@@ -277,9 +277,7 @@ def _intelligence_archetype(state: CoordinatorState) -> CoordinatorState:
                 maturity=numerology_data.get("maturity"),
                 is_master_number=numerology_data.get("is_master_number", False),
                 chaldean_name=numerology_data.get("chaldean_name"),
-                calculation_system=numerology_data.get(
-                    "calculation_system", "pythagorean"
-                ),
+                calculation_system=numerology_data.get("calculation_system", "pythagorean"),
             )
             astrology = AstrologyProfile(
                 sun_sign=astrology_data["sun_sign"],
@@ -291,9 +289,7 @@ def _intelligence_archetype(state: CoordinatorState) -> CoordinatorState:
                 house_placements=astrology_data.get("house_placements"),
                 current_transits=astrology_data.get("current_transits"),
                 venus_retrograde=astrology_data.get("venus_retrograde", False),
-                mercury_retrograde=astrology_data.get(
-                    "mercury_retrograde", False
-                ),
+                mercury_retrograde=astrology_data.get("mercury_retrograde", False),
             )
             big_five = BigFiveScores(
                 openness=personality_data["openness"],
