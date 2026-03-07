@@ -7,6 +7,8 @@ systems through deterministic mapping logic.
 
 from __future__ import annotations
 
+import logging
+
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -24,6 +26,8 @@ from alchymine.engine.integration.bridges import (
     synthesize_profile,
     wealth_creative_alignment,
 )
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -199,7 +203,7 @@ async def synthesize_user_profile(
                         else None
                     )
         except Exception:
-            pass  # Profile lookup is best-effort; fall through with empty fields
+            logger.debug("Profile lookup failed for synthesis; proceeding with request fields")
 
     insights = synthesize_profile(
         numerology=numerology,
