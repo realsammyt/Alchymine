@@ -14,8 +14,11 @@ from alchymine.config import Settings
 # ─── Default Settings ──────────────────────────────────────────────────────
 
 
+from cryptography.fernet import Fernet
+
 _SAFE_JWT_KEY = "test-secret-key-minimum-32-characters-long"
 _SAFE_PROMO_CODE = "alchyours"
+_SAFE_ENCRYPTION_KEY = Fernet.generate_key().decode()
 
 
 class TestDefaults:
@@ -109,6 +112,7 @@ class TestEnvOverrides:
     def test_override_environment(self, monkeypatch):
         monkeypatch.setenv("JWT_SECRET_KEY", _SAFE_JWT_KEY)
         monkeypatch.setenv("SIGNUP_PROMO_CODE", _SAFE_PROMO_CODE)
+        monkeypatch.setenv("ALCHYMINE_ENCRYPTION_KEY", _SAFE_ENCRYPTION_KEY)
         monkeypatch.setenv("ENVIRONMENT", "staging")
         s = Settings()
         assert s.environment == "staging"
