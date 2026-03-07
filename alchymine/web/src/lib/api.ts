@@ -786,6 +786,26 @@ export async function getProfile(userId: string): Promise<ProfileResponse> {
   );
 }
 
+export async function saveIntake(
+  userId: string,
+  data: {
+    full_name: string;
+    birth_date: string;
+    birth_time?: string | null;
+    birth_city?: string | null;
+    intention: string;
+    intentions: string[];
+  },
+): Promise<ProfileResponse> {
+  return request<ProfileResponse>(
+    `${BASE}/profile/${encodeURIComponent(userId)}/intake`,
+    {
+      method: "PUT",
+      body: JSON.stringify({ data }),
+    },
+  );
+}
+
 // ─── Admin types ──────────────────────────────────────────────────
 
 export interface AdminUser {

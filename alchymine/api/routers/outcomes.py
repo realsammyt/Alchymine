@@ -7,6 +7,7 @@ across all five Alchymine systems.
 
 from __future__ import annotations
 
+import logging
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -26,6 +27,8 @@ from alchymine.outcomes.tracker import (
     calculate_outcome_summary,
     record_activity,
 )
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -270,10 +273,12 @@ async def get_outcome_summary(
 
     # Hydrate in-memory stores from DB so calculate_outcome_summary
     # works with persisted data (not just current-session activity)
-    db_milestones = await repository.get_milestones(db, user_id)
-    db_metrics = await repository.get_outcome_metrics(db, user_id)
-
-    _hydrate_from_db(user_id, db_milestones, db_metrics)
+    try:
+        db_milestones = await repository.get_milestones(db, user_id)
+        db_metrics = await repository.get_outcome_metrics(db, user_id)
+        _hydrate_from_db(user_id, db_milestones, db_metrics)
+    except Exception:
+        logger.debug("Failed to hydrate outcomes from DB for %s", user_id)
 
     return calculate_outcome_summary(
         user_id=user_id,
@@ -368,7 +373,11 @@ async def get_user_trends(
     """
     if current_user["sub"] != user_id:
         raise HTTPException(status_code=403, detail="Access denied")
-    records = await repository.get_outcome_metrics(db, user_id, system)
+    records = []
+    try:
+        records = await repository.get_outcome_metrics(db, user_id, system)
+    except Exception:
+        logger.debug("Failed to fetch outcome metrics from DB for %s", user_id)
     tracker = OutcomeTracker()
     for r in records:
         tracker.record_metric(r.user_id, r.system, r.metric_name, r.value, r.period)
@@ -398,7 +407,16 @@ async def get_user_progress_summary(
     """
     if current_user["sub"] != user_id:
         raise HTTPException(status_code=403, detail="Access denied")
-    records = await repository.get_outcome_metrics(db, user_id)
+
+    # Hydrate in-memory stores and fetch metrics from DB
+    records = []
+    try:
+        db_milestones = await repository.get_milestones(db, user_id)
+        records = await repository.get_outcome_metrics(db, user_id)
+        _hydrate_from_db(user_id, db_milestones, records)
+    except Exception:
+        logger.debug("Failed to hydrate outcomes from DB for %s", user_id)
+
     tracker = OutcomeTracker()
     for r in records:
         tracker.record_metric(r.user_id, r.system, r.metric_name, r.value, r.period)
