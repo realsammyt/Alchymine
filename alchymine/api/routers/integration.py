@@ -199,7 +199,8 @@ async def synthesize_user_profile(
                 if profile.perspective:
                     kegan_stage = kegan_stage or (
                         int(profile.perspective.kegan_stage)
-                        if profile.perspective.kegan_stage and profile.perspective.kegan_stage.isdigit()
+                        if profile.perspective.kegan_stage
+                        and profile.perspective.kegan_stage.isdigit()
                         else None
                     )
         except Exception:
