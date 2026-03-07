@@ -239,9 +239,7 @@ def _intelligence_personality(state: CoordinatorState) -> CoordinatorState:
                 "neuroticism": scores.neuroticism,
             }
         else:
-            errors.append(
-                f"Intelligence: insufficient Big Five responses ({len(bf_items)}/20)"
-            )
+            errors.append(f"Intelligence: insufficient Big Five responses ({len(bf_items)}/20)")
     except ImportError:
         errors.append("Intelligence: personality engine not available")
     except Exception as exc:
@@ -276,12 +274,26 @@ def _intelligence_archetype(state: CoordinatorState) -> CoordinatorState:
                 personality=numerology_data["personality"],
                 personal_year=numerology_data["personal_year"],
                 personal_month=numerology_data["personal_month"],
+                maturity=numerology_data.get("maturity"),
+                is_master_number=numerology_data.get("is_master_number", False),
+                chaldean_name=numerology_data.get("chaldean_name"),
+                calculation_system=numerology_data.get(
+                    "calculation_system", "pythagorean"
+                ),
             )
             astrology = AstrologyProfile(
                 sun_sign=astrology_data["sun_sign"],
                 sun_degree=astrology_data["sun_degree"],
                 moon_sign=astrology_data.get("moon_sign", "Unknown"),
                 moon_degree=astrology_data.get("moon_degree", 0.0),
+                rising_sign=astrology_data.get("rising_sign"),
+                rising_degree=astrology_data.get("rising_degree"),
+                house_placements=astrology_data.get("house_placements"),
+                current_transits=astrology_data.get("current_transits"),
+                venus_retrograde=astrology_data.get("venus_retrograde", False),
+                mercury_retrograde=astrology_data.get(
+                    "mercury_retrograde", False
+                ),
             )
             big_five = BigFiveScores(
                 openness=personality_data["openness"],
@@ -308,9 +320,7 @@ def _intelligence_archetype(state: CoordinatorState) -> CoordinatorState:
                 missing.append("astrology")
             if not personality_data:
                 missing.append("personality")
-            errors.append(
-                f"Intelligence: archetype requires {', '.join(missing)} — skipped"
-            )
+            errors.append(f"Intelligence: archetype requires {', '.join(missing)} — skipped")
     except ImportError:
         errors.append("Intelligence: archetype engine not available")
     except Exception as exc:

@@ -361,14 +361,10 @@ def transform_to_profile_summary(
                 "strengths_map": [],
             }
         elif system == "healing":
-            summary["healing"] = {
-                k: v for k, v in data.items() if k != "disclaimers"
-            }
+            summary["healing"] = {k: v for k, v in data.items() if k != "disclaimers"}
             summary["healing"]["disclaimers"] = data.get("disclaimers", [])
         elif system == "wealth":
-            summary["wealth"] = {
-                k: v for k, v in data.items() if k != "disclaimers"
-            }
+            summary["wealth"] = {k: v for k, v in data.items() if k != "disclaimers"}
             summary["wealth"]["disclaimers"] = data.get("disclaimers", [])
         elif system == "creative":
             summary["creative"] = data

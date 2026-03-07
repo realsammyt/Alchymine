@@ -42,29 +42,6 @@ from alchymine.workers.celery_app import celery_app
 
 logger = logging.getLogger(__name__)
 
-# ── In-memory report store (compatibility shim) ─────────────────────────
-
-report_store: dict[str, dict[str, Any]] = {}
-"""Module-level dict holding report status and data.
-
-Retained for backward compatibility with the API router and tests while
-the DB migration is completed.  New code should use the database via
-``_db_*`` helpers instead.
-
-Each entry has the shape::
-
-    {
-        "report_id": str,
-        "status": "queued" | "processing" | "complete" | "failed",
-        "user_input": str,
-        "user_profile": dict | None,
-        "result": dict | None,
-        "error": str | None,
-        "created_at": str (ISO-8601),
-        "updated_at": str (ISO-8601),
-    }
-"""
-
 
 # ── Helpers ──────────────────────────────────────────────────────────────
 
@@ -234,9 +211,7 @@ async def _db_populate_profiles(
                 await repository.update_layer(session, user_id, layer, data)
                 await session.commit()
         except Exception as exc:
-            logger.warning(
-                "Failed to populate %s profile for %s: %s", layer, user_id, exc
-            )
+            logger.warning("Failed to populate %s profile for %s: %s", layer, user_id, exc)
 
 
 async def _db_store_pdf(report_id: str, pdf_bytes: bytes) -> None:
@@ -333,9 +308,7 @@ def generate_report(
                 transform_to_profile_summary,
             )
 
-            serialised["profile_summary"] = transform_to_profile_summary(
-                result.coordinator_results
-            )
+            serialised["profile_summary"] = transform_to_profile_summary(result.coordinator_results)
         except Exception as exc:
             logger.warning("Failed to build profile_summary: %s", exc)
 
@@ -405,12 +378,6 @@ def generate_report(
         }
 
 
-# ── PDF store ────────────────────────────────────────────────────────────
-
-pdf_store: dict[str, bytes] = {}
-"""Module-level dict holding generated PDF bytes keyed by report_id."""
-
-
 # ── PDF generation task ──────────────────────────────────────────────────
 
 
@@ -427,7 +394,7 @@ def generate_pdf_report(self: Any, report_id: str) -> dict[str, Any]:
     This Celery task retrieves the report from the database, renders
     its result data to HTML, then to PDF using
     :class:`~alchymine.engine.reports.pdf_renderer.PDFRenderer`,
-    and stores the resulting bytes in ``pdf_store``.
+    and stores the resulting bytes in the database.
 
     Parameters
     ----------
@@ -502,7 +469,6 @@ def generate_pdf_report(self: Any, report_id: str) -> dict[str, Any]:
 
         # ── Store result ──────────────────────────────────────────────
         _run_async(_db_store_pdf(report_id, pdf_bytes))
-        pdf_store[report_id] = pdf_bytes  # compatibility shim — removed in Phase 5
 
         logger.info(
             "PDF for report %s generated successfully (%d bytes).",

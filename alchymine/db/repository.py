@@ -46,6 +46,8 @@ from alchymine.db.models import (
     IdentityProfile,
     IntakeData,
     JournalEntry,
+    MilestoneDBRecord,
+    OutcomeMetricRecord,
     PerspectiveProfile,
     Report,
     User,
@@ -625,10 +627,8 @@ async def record_outcome_metric(
     metric_name: str,
     value: float,
     period: str = "weekly",
-) -> "OutcomeMetricRecord":
+) -> OutcomeMetricRecord:
     """Persist an outcome metric measurement."""
-    from alchymine.db.models import OutcomeMetricRecord
-
     record = OutcomeMetricRecord(
         user_id=user_id,
         system=system,
@@ -646,10 +646,8 @@ async def get_outcome_metrics(
     user_id: str,
     system: str | None = None,
     limit: int = 100,
-) -> list["OutcomeMetricRecord"]:
+) -> list[OutcomeMetricRecord]:
     """Query outcome metrics for a user, optionally filtered by system."""
-    from alchymine.db.models import OutcomeMetricRecord
-
     stmt = select(OutcomeMetricRecord).where(OutcomeMetricRecord.user_id == user_id)
     if system:
         stmt = stmt.where(OutcomeMetricRecord.system == system)
@@ -668,12 +666,8 @@ async def record_milestone(
     name: str,
     completed: bool = True,
     notes: str | None = None,
-) -> "MilestoneDBRecord":
+) -> MilestoneDBRecord:
     """Persist a milestone record."""
-    from datetime import UTC, datetime
-
-    from alchymine.db.models import MilestoneDBRecord
-
     record = MilestoneDBRecord(
         user_id=user_id,
         system=system,
@@ -691,10 +685,8 @@ async def get_milestones(
     session: AsyncSession,
     user_id: str,
     system: str | None = None,
-) -> list["MilestoneDBRecord"]:
+) -> list[MilestoneDBRecord]:
     """Query milestones for a user, optionally filtered by system."""
-    from alchymine.db.models import MilestoneDBRecord
-
     stmt = select(MilestoneDBRecord).where(MilestoneDBRecord.user_id == user_id)
     if system:
         stmt = stmt.where(MilestoneDBRecord.system == system)

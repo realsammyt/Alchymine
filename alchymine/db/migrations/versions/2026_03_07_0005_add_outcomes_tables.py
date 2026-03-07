@@ -23,17 +23,31 @@ def upgrade() -> None:
     op.create_table(
         "outcome_metrics",
         sa.Column("id", sa.String(36), primary_key=True),
-        sa.Column("user_id", sa.String(36), sa.ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True),
+        sa.Column(
+            "user_id",
+            sa.String(36),
+            sa.ForeignKey("users.id", ondelete="CASCADE"),
+            nullable=False,
+            index=True,
+        ),
         sa.Column("system", sa.String(50), nullable=False),
         sa.Column("metric_name", sa.String(100), nullable=False),
         sa.Column("value", sa.Float, nullable=False),
         sa.Column("period", sa.String(20), server_default="weekly"),
-        sa.Column("recorded_at", sa.DateTime(timezone=True), server_default=sa.func.now(), index=True),
+        sa.Column(
+            "recorded_at", sa.DateTime(timezone=True), server_default=sa.func.now(), index=True
+        ),
     )
     op.create_table(
         "milestones",
         sa.Column("id", sa.String(36), primary_key=True),
-        sa.Column("user_id", sa.String(36), sa.ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True),
+        sa.Column(
+            "user_id",
+            sa.String(36),
+            sa.ForeignKey("users.id", ondelete="CASCADE"),
+            nullable=False,
+            index=True,
+        ),
         sa.Column("system", sa.String(50), nullable=False),
         sa.Column("name", sa.String(200), nullable=False),
         sa.Column("completed", sa.Boolean, server_default=sa.text("false")),
