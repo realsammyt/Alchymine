@@ -451,6 +451,13 @@ class LLMClient:
         for word in fallback_text.split():
             yield word + " "
 
+    # Model fallback chain: Sonnet (fast/cheap) → Haiku (backup) → Opus (last resort)
+    CLAUDE_MODELS = [
+        "claude-sonnet-4-6",
+        "claude-haiku-4-5-20251001",
+        "claude-opus-4-6",
+    ]
+
     async def _stream_claude(
         self,
         prompt: str,
@@ -458,21 +465,40 @@ class LLMClient:
         max_tokens: int,
         temperature: float,
     ) -> AsyncGenerator[str, None]:
-        """Stream text from the Claude API using server-sent events."""
+        """Stream text from the Claude API using server-sent events.
+
+        Tries each model in CLAUDE_MODELS until one succeeds.
+        """
         import anthropic
 
         client = anthropic.AsyncAnthropic(api_key=self._anthropic_key, timeout=90.0)
-        model = "claude-sonnet-4-6"
+        last_exc: Exception | None = None
 
-        async with client.messages.stream(
-            model=model,
-            max_tokens=max_tokens,
-            temperature=temperature,
-            system=system_prompt,
-            messages=[{"role": "user", "content": prompt}],
-        ) as stream:
-            async for text in stream.text_stream:
-                yield text
+        for model in self.CLAUDE_MODELS:
+            try:
+                async with client.messages.stream(
+                    model=model,
+                    max_tokens=max_tokens,
+                    temperature=temperature,
+                    system=system_prompt,
+                    messages=[{"role": "user", "content": prompt}],
+                ) as stream:
+                    async for text in stream.text_stream:
+                        yield text
+                return  # Success — stop trying models
+            except anthropic.APIStatusError as exc:
+                if exc.status_code == 529:  # overloaded
+                    logger.warning("Claude model %s overloaded, trying next fallback", model)
+                    last_exc = exc
+                    continue
+                raise  # Other API errors (auth, bad request) — don't retry
+            except (anthropic.APIConnectionError, anthropic.APITimeoutError) as exc:
+                logger.warning("Claude model %s unavailable: %s, trying next fallback", model, exc)
+                last_exc = exc
+                continue
+
+        if last_exc:
+            raise last_exc
 
     async def _generate_claude(
         self,
@@ -481,32 +507,52 @@ class LLMClient:
         max_tokens: int,
         temperature: float,
     ) -> LLMResponse:
-        """Generate text using the Claude API."""
+        """Generate text using the Claude API.
+
+        Tries each model in CLAUDE_MODELS until one succeeds.
+        """
         import anthropic
 
         client = anthropic.AsyncAnthropic(api_key=self._anthropic_key, timeout=90.0)
-        model = "claude-sonnet-4-6"
+        last_exc: Exception | None = None
 
-        response = await client.messages.create(
-            model=model,
-            max_tokens=max_tokens,
-            temperature=temperature,
-            system=system_prompt,
-            messages=[{"role": "user", "content": user_prompt}],
-        )
+        for model in self.CLAUDE_MODELS:
+            try:
+                response = await client.messages.create(
+                    model=model,
+                    max_tokens=max_tokens,
+                    temperature=temperature,
+                    system=system_prompt,
+                    messages=[{"role": "user", "content": user_prompt}],
+                )
 
-        text = ""
-        for block in response.content:
-            if hasattr(block, "text"):
-                text += block.text
+                text = ""
+                for block in response.content:
+                    if hasattr(block, "text"):
+                        text += block.text
 
-        return LLMResponse(
-            text=text,
-            backend=LLMBackend.CLAUDE.value,
-            model=model,
-            input_tokens=response.usage.input_tokens,
-            output_tokens=response.usage.output_tokens,
-        )
+                logger.info("Claude generation succeeded with model %s", model)
+                return LLMResponse(
+                    text=text,
+                    backend=LLMBackend.CLAUDE.value,
+                    model=model,
+                    input_tokens=response.usage.input_tokens,
+                    output_tokens=response.usage.output_tokens,
+                )
+            except anthropic.APIStatusError as exc:
+                if exc.status_code == 529:  # overloaded
+                    logger.warning("Claude model %s overloaded, trying next fallback", model)
+                    last_exc = exc
+                    continue
+                raise
+            except (anthropic.APIConnectionError, anthropic.APITimeoutError) as exc:
+                logger.warning("Claude model %s unavailable: %s, trying next fallback", model, exc)
+                last_exc = exc
+                continue
+
+        if last_exc:
+            raise last_exc
+        raise RuntimeError("No Claude models available")
 
     async def _generate_ollama(
         self,
