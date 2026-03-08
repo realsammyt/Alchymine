@@ -17,6 +17,7 @@ export default function AssessmentPage() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [direction, setDirection] = useState<"next" | "prev">("next");
+  const [showCompletion, setShowCompletion] = useState(false);
 
   // Verify intake data exists — try sessionStorage first, then fall back
   // to the server profile (supports cross-device sync).
@@ -100,7 +101,7 @@ export default function AssessmentPage() {
   );
 
   const handleAnswer = useCallback(
-    async (value: number) => {
+    (value: number) => {
       const newResponses = { ...responses, [question.id]: value };
       setResponses(newResponses);
 
@@ -108,7 +109,8 @@ export default function AssessmentPage() {
         isLastQuestion &&
         Object.keys(newResponses).length === TOTAL_QUESTIONS
       ) {
-        await handleSubmit(newResponses);
+        // Show completion screen instead of auto-submitting
+        setShowCompletion(true);
       } else if (!isLastQuestion) {
         setDirection("next");
         setTimeout(() => {
@@ -116,7 +118,7 @@ export default function AssessmentPage() {
         }, 200);
       }
     },
-    [responses, question, isLastQuestion, handleSubmit],
+    [responses, question, isLastQuestion],
   );
 
   function goBack() {
@@ -197,6 +199,83 @@ export default function AssessmentPage() {
   }
 
   const catColor = getCategoryColor(question.category);
+
+  // ── Completion Screen ─────────────────────────────────────────────
+  if (showCompletion) {
+    return (
+      <div className="flex-1 flex flex-col items-center justify-center px-4 sm:px-6 py-12">
+        <div className="w-full max-w-lg text-center">
+          <MotionReveal>
+            <div className="mb-8">
+              <div className="w-16 h-16 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center mx-auto mb-6">
+                <svg
+                  className="w-8 h-8 text-primary"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden="true"
+                >
+                  <polyline points="20 6 9 17 4 12" />
+                </svg>
+              </div>
+              <h1 className="font-display text-display-md font-light mb-3">
+                Assessment <span className="text-gradient-gold">Complete</span>
+              </h1>
+              <hr className="rule-gold my-5 max-w-[80px] mx-auto" />
+              <p className="text-text/40 font-body leading-relaxed max-w-sm mx-auto">
+                You&apos;ve answered all {TOTAL_QUESTIONS} questions. Ready to
+                generate your personalized Alchymine report?
+              </p>
+            </div>
+          </MotionReveal>
+
+          <MotionReveal delay={0.2}>
+            <div className="space-y-3">
+              <Button
+                onClick={() => handleSubmit(responses)}
+                loading={submitting}
+                size="lg"
+                className="w-full"
+              >
+                Generate My Report
+                <svg
+                  className="w-4 h-4"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden="true"
+                >
+                  <path d="M5 12h14" />
+                  <path d="m12 5 7 7-7 7" />
+                </svg>
+              </Button>
+              <button
+                onClick={() => setShowCompletion(false)}
+                disabled={submitting}
+                className="text-sm font-body text-text/30 hover:text-text/60 transition-colors"
+              >
+                Review answers
+              </button>
+            </div>
+          </MotionReveal>
+
+          {error && (
+            <MotionReveal y={8}>
+              <div className="mt-6 p-4 rounded-xl card-surface border-primary-dark/20 text-primary-dark text-sm font-body">
+                {error}
+              </div>
+            </MotionReveal>
+          )}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex-1 flex flex-col items-center justify-center px-4 sm:px-6 py-12">
@@ -306,11 +385,10 @@ export default function AssessmentPage() {
 
           {allAnswered && (
             <Button
-              onClick={() => handleSubmit(responses)}
-              loading={submitting}
+              onClick={() => setShowCompletion(true)}
               size="md"
             >
-              Submit Assessment
+              Complete Assessment
             </Button>
           )}
         </div>

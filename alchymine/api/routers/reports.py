@@ -317,8 +317,12 @@ async def list_user_reports(
     """
     if current_user["sub"] != user_id:
         raise HTTPException(status_code=403, detail="Access denied")
-    reports = await repository.list_reports_by_user(session, user_id, skip=skip, limit=limit)
-    total = await repository.count_reports_by_user(session, user_id)
+    try:
+        reports = await repository.list_reports_by_user(session, user_id, skip=skip, limit=limit)
+        total = await repository.count_reports_by_user(session, user_id)
+    except Exception:
+        logger.exception("Failed to query reports for user %s", user_id)
+        raise
     return ReportListResponse(
         reports=[
             ReportResult(
