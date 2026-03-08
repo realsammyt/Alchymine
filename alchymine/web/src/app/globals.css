@@ -385,33 +385,3 @@
     }
   }
 }
-
-/* ── Confetti animations ──────────────────────────────────────────────────── */
-@keyframes confetti-fall {
-  0% {
-    transform: translateY(0) translateX(0) rotate(0deg);
-    opacity: 1;
-  }
-  80% {
-    opacity: 0.8;
-  }
-  100% {
-    transform: translateY(110vh) translateX(var(--drift, 0px)) rotate(720deg);
-    opacity: 0;
-  }
-}
-
-@keyframes confetti-glow {
-  0% {
-    opacity: 0;
-    transform: scale(0.5);
-  }
-  30% {
-    opacity: 1;
-    transform: scale(1.2);
-  }
-  100% {
-    opacity: 0;
-    transform: scale(2);
-  }
-}
