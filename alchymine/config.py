@@ -49,7 +49,6 @@ class Settings(BaseSettings):
     jwt_algorithm: str = "HS256"
     access_token_expire_minutes: int = 30
     refresh_token_expire_days: int = 7
-    signup_promo_code: str = ""
     admin_email: str = ""  # Used by bootstrap_admin CLI to grant initial admin access
 
     # ── Database ─────────────────────────────────────────────────────────
@@ -106,14 +105,6 @@ class Settings(BaseSettings):
                 "JWT_SECRET_KEY must be set to a secure value (min 32 chars). "
                 "Generate one with: openssl rand -hex 32"
             )
-        return v
-
-    @field_validator("signup_promo_code")
-    @classmethod
-    def validate_promo_code(cls, v: str) -> str:
-        """Require a non-empty promo code of at least 6 characters."""
-        if not v or len(v) < 6:
-            raise ValueError("SIGNUP_PROMO_CODE must be set to a value of at least 6 characters")
         return v
 
     @field_validator("resend_api_key")

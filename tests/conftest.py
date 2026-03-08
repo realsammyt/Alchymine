@@ -10,9 +10,7 @@ os.environ.setdefault("CELERY_ALWAYS_EAGER", "true")
 
 # Set required secrets before any module that imports get_settings() is loaded.
 # The JWT key must be at least 32 chars and not the default dev value.
-# The promo code must be at least 6 chars.
 os.environ.setdefault("JWT_SECRET_KEY", "test-secret-key-minimum-32-characters-long")
-os.environ.setdefault("SIGNUP_PROMO_CODE", "alchyours")
 
 from datetime import date, time
 
