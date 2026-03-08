@@ -286,8 +286,7 @@ def _filter_narratives(
                 event_type=AuditEventType.CONTENT_BLOCKED,
                 system=system,
                 summary=(
-                    f"Narrative blocked for {system} in report {report_id}: "
-                    f"{result.blocked_reason}"
+                    f"Narrative blocked for {system} in report {report_id}: {result.blocked_reason}"
                 ),
                 user_id=user_id,
                 metadata={
@@ -444,9 +443,7 @@ def generate_report(
         # ── Safety content filter on LLM-generated narratives ─────────
         # Resolve user_id early for audit logging
         _report_row_for_filter = _run_async(_db_get_report(report_id))
-        _filter_user_id = (
-            _report_row_for_filter.user_id if _report_row_for_filter else None
-        )
+        _filter_user_id = _report_row_for_filter.user_id if _report_row_for_filter else None
         try:
             _filter_narratives(serialised, report_id, _filter_user_id)
         except Exception as exc:
