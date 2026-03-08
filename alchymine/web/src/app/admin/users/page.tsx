@@ -7,11 +7,7 @@ import {
   adminUpdateUserStatus,
   adminInviteUsers,
 } from "@/lib/api";
-import type {
-  AdminUser,
-  PaginatedUsers,
-  InviteUsersResponse,
-} from "@/lib/api";
+import type { AdminUser, PaginatedUsers, InviteUsersResponse } from "@/lib/api";
 
 export default function AdminUsersPage() {
   const router = useRouter();

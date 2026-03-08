@@ -130,10 +130,7 @@ export function useReportStatus(): {
       try {
         const report = await getReport(id!);
         if (cancelled) return;
-        if (
-          report.status === "pending" ||
-          report.status === "generating"
-        ) {
+        if (report.status === "pending" || report.status === "generating") {
           setStatus(report.status as "pending" | "generating");
         } else if (report.status === "complete") {
           setStatus("complete");

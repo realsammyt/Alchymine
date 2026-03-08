@@ -204,7 +204,10 @@ export default function IntakePage() {
         intention: formData.intentions[0],
         intentions: formData.intentions,
       }).catch((err) => {
-        console.warn("Failed to save intake to server (will retry on report submit):", err);
+        console.warn(
+          "Failed to save intake to server (will retry on report submit):",
+          err,
+        );
       });
     }
 

@@ -174,12 +174,12 @@ export default function ReportPage() {
     );
   }
 
-  const identity = report?.profile_summary?.identity as
-    | IdentityLayer
+  const profileSummary = report?.result?.profile_summary as
+    | Record<string, unknown>
     | undefined;
 
-  const profileSummary = report?.profile_summary as
-    | Record<string, unknown>
+  const identity = profileSummary?.identity as
+    | IdentityLayer
     | undefined;
   const healingSummary = profileSummary?.healing as
     | {
