@@ -202,6 +202,7 @@ class OutcomeTracker:
         metric_name: str,
         value: float,
         period: str = MetricPeriod.WEEKLY,
+        timestamp: str | None = None,
     ) -> OutcomeMetric:
         """Store a new outcome metric measurement.
 
@@ -217,6 +218,8 @@ class OutcomeTracker:
             Numeric value of the measurement.
         period:
             The reporting period (weekly or monthly).
+        timestamp:
+            Optional ISO-format timestamp. If not provided, uses current time.
 
         Returns
         -------
@@ -230,6 +233,8 @@ class OutcomeTracker:
             value=value,
             period=period,
         )
+        if timestamp is not None:
+            metric.timestamp = timestamp
         self._metrics.append(metric)
         return metric
 
