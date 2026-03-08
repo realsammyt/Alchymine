@@ -176,6 +176,9 @@ class MasterOrchestrator:
                     request_data["archetype_secondary"] = archetype_data.get("secondary")
                 if personality_data:
                     request_data["big_five"] = personality_data
+                    risk_tol = personality_data.get("risk_tolerance")
+                    if risk_tol:
+                        request_data["risk_tolerance"] = risk_tol
                 if astrology_data:
                     request_data["astrology"] = astrology_data
                     if astrology_data.get("sun_sign"):

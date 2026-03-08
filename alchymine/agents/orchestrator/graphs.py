@@ -283,6 +283,17 @@ def _intelligence_personality(state: CoordinatorState) -> CoordinatorState:
                 except Exception as enn_exc:
                     errors.append(f"Intelligence: enneagram scoring error — {enn_exc!s}")
 
+            # Score risk tolerance if items are present
+            risk_items = {k: v for k, v in bf_responses.items() if k.startswith("risk_")}
+            if len(risk_items) >= 3:
+                try:
+                    from alchymine.engine.personality.enneagram import score_risk_tolerance
+
+                    risk_tol = score_risk_tolerance(risk_items)
+                    personality["risk_tolerance"] = risk_tol.value
+                except Exception as risk_exc:
+                    errors.append(f"Intelligence: risk tolerance scoring error — {risk_exc!s}")
+
             results["personality"] = personality
         else:
             errors.append(f"Intelligence: insufficient Big Five responses ({len(bf_items)}/20)")
