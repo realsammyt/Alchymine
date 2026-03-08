@@ -150,6 +150,41 @@ CITY_COORDINATES: dict[str, tuple[float, float]] = {
     "dhaka": (23.8103, 90.4125),
     "colombo": (6.9271, 79.8612),
     "kathmandu": (27.7172, 85.3240),
+    # Additional US cities
+    "st. louis": (38.6270, -90.1994),
+    "saint louis": (38.6270, -90.1994),
+    "charlotte": (35.2271, -80.8431),
+    "san antonio": (29.4241, -98.4936),
+    "san diego": (32.7157, -117.1611),
+    "austin": (30.2672, -97.7431),
+    "nashville": (36.1627, -86.7816),
+    "washington": (38.9072, -77.0369),
+    "washington dc": (38.9072, -77.0369),
+    "las vegas": (36.1699, -115.1398),
+    "baltimore": (39.2904, -76.6122),
+    "milwaukee": (43.0389, -87.9065),
+    "pittsburgh": (40.4406, -79.9959),
+    "new orleans": (29.9511, -90.0715),
+    "cleveland": (41.4993, -81.6944),
+    "indianapolis": (39.7684, -86.1581),
+    "columbus": (39.9612, -82.9988),
+    "cincinnati": (39.1031, -84.5120),
+    "kansas city": (39.0997, -94.5786),
+    "tampa": (27.9506, -82.4572),
+    "orlando": (28.5383, -81.3792),
+    "raleigh": (35.7796, -78.6382),
+    # Additional international cities
+    "vancouver": (49.2827, -123.1207),
+    "montreal": (45.5017, -73.5673),
+    "calgary": (51.0447, -114.0719),
+    "ottawa": (45.4215, -75.6972),
+    "edinburgh": (55.9533, -3.1883),
+    "manchester": (53.4808, -2.2426),
+    "dublin": (53.3498, -6.2603),
+    "brussels": (50.8503, 4.3517),
+    "munich": (48.1351, 11.5820),
+    "barcelona": (41.3874, 2.1686),
+    "milan": (45.4642, 9.1900),
 }
 
 
@@ -157,9 +192,31 @@ def _lookup_city_coordinates(city: str) -> tuple[float, float] | None:
     """Look up latitude/longitude for a city name.
 
     Returns None if the city is not in the lookup table.
-    Case-insensitive matching.
+    Case-insensitive matching with fallback strategies:
+    1. Exact match (e.g. "Toronto")
+    2. Strip country/region suffix (e.g. "Toronto, Canada" → "Toronto")
+    3. Substring match (e.g. "New York City" contains "new york")
     """
-    return CITY_COORDINATES.get(city.lower().strip())
+    normalised = city.lower().strip()
+
+    # 1. Exact match
+    result = CITY_COORDINATES.get(normalised)
+    if result is not None:
+        return result
+
+    # 2. Try the part before the first comma ("Toronto, Canada" → "Toronto")
+    if "," in normalised:
+        city_part = normalised.split(",")[0].strip()
+        result = CITY_COORDINATES.get(city_part)
+        if result is not None:
+            return result
+
+    # 3. Check if normalised input contains a known city name
+    for known_city, coords in CITY_COORDINATES.items():
+        if known_city in normalised or normalised in known_city:
+            return coords
+
+    return None
 
 
 def approximate_ascendant(
