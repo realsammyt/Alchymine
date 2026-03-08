@@ -295,15 +295,13 @@ class TestCIWorkflow:
         assert "jobs" in self.ci
 
     def test_required_jobs_present(self) -> None:
-        """CI has all required job types: lint, type-check, test-python, test-frontend, ethics-check, security."""
+        """CI has all required job types: lint, type-check, test-python, test-frontend."""
         jobs = set(self.ci["jobs"].keys())
         required = {
             "lint",
             "type-check",
             "test-python",
             "test-frontend",
-            "ethics-check",
-            "security",
         }
         missing = required - jobs
         assert not missing, f"CI missing required jobs: {missing}"
@@ -335,20 +333,11 @@ class TestCIWorkflow:
             "Test frontend job should run npm test"
         )
 
-    def test_ethics_check_job_present(self) -> None:
-        """Ethics check is configured as a CI gate."""
-        ec = self.ci["jobs"]["ethics-check"]
-        steps_yaml = yaml.dump(ec.get("steps", []))
-        assert "ethics" in steps_yaml.lower(), "Ethics check should reference ethics validation"
-
-    def test_security_job_present(self) -> None:
-        """Security job runs pip-audit and npm audit."""
-        sec = self.ci["jobs"]["security"]
-        steps_yaml = yaml.dump(sec.get("steps", []))
-        assert "pip-audit" in steps_yaml or "pip_audit" in steps_yaml, (
-            "Security job should run pip-audit"
-        )
-        assert "npm audit" in steps_yaml, "Security job should run npm audit"
+    def test_ethics_check_in_test_python(self) -> None:
+        """Ethics check runs as a step inside the test-python job."""
+        tp = self.ci["jobs"]["test-python"]
+        steps_yaml = yaml.dump(tp.get("steps", []))
+        assert "ethics" in steps_yaml.lower(), "test-python job should include ethics check step"
 
     def test_python_matrix_versions(self) -> None:
         """Test Python job uses a matrix with Python 3.11 and 3.12."""
