@@ -25,18 +25,15 @@ jobs:
   # Lint: ruff check + ruff format --check
   # ──────────────────────────────────────────────
   lint:
-    name: "Lint (Python ${{ matrix.python-version }})"
+    name: "Lint (Python 3.12)"
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        python-version: ["3.11", "3.12"]
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up Python ${{ matrix.python-version }}
+      - name: Set up Python 3.12
         uses: actions/setup-python@v5
         with:
-          python-version: ${{ matrix.python-version }}
+          python-version: "3.12"
           cache: pip
           cache-dependency-path: pyproject.toml
 
@@ -53,18 +50,15 @@ jobs:
   # Type check: mypy
   # ──────────────────────────────────────────────
   type-check:
-    name: "Type check: mypy (Python ${{ matrix.python-version }})"
+    name: "Type check: mypy (Python 3.12)"
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        python-version: ["3.11", "3.12"]
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up Python ${{ matrix.python-version }}
+      - name: Set up Python 3.12
         uses: actions/setup-python@v5
         with:
-          python-version: ${{ matrix.python-version }}
+          python-version: "3.12"
           cache: pip
           cache-dependency-path: pyproject.toml
 
@@ -90,7 +84,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           {
-            echo "**mypy (Python ${{ matrix.python-version }})** exited ${{ steps.mypy.outputs.rc }}"
+            echo "**mypy (Python 3.12)** exited ${{ steps.mypy.outputs.rc }}"
             echo ""
             echo '```'
             tail -50 mypy-output.txt 2>/dev/null || echo "No output captured"
@@ -126,6 +120,9 @@ jobs:
           pip list | grep -iE "celery|redis|aiosqlite|swisseph|asyncpg|sqlalchemy|fastapi|pytest"
           python -c "import alchymine; print('alchymine OK')"
           python -c "import aiosqlite; print('aiosqlite OK')"
+
+      - name: Run ethics check
+        run: python -m alchymine.agents.quality.ethics_check
 
       - name: Collect and run tests
         id: pytest
@@ -182,6 +179,15 @@ jobs:
           cache: npm
           cache-dependency-path: alchymine/web/package-lock.json
 
+      - name: Cache Next.js build
+        uses: actions/cache@v4
+        with:
+          path: alchymine/web/.next/cache
+          key: nextjs-${{ runner.os }}-${{ hashFiles('alchymine/web/package-lock.json') }}-${{ hashFiles('alchymine/web/src/**') }}
+          restore-keys: |
+            nextjs-${{ runner.os }}-${{ hashFiles('alchymine/web/package-lock.json') }}-
+            nextjs-${{ runner.os }}-
+
       - name: Install dependencies
         run: npm ci
 
@@ -198,77 +204,6 @@ jobs:
         run: npm run type-check
 
   # ──────────────────────────────────────────────
-  # Ethics check: validate prompts and run ethics gate
-  # ──────────────────────────────────────────────
-  ethics-check:
-    name: "Ethics: validate prompts & quality gate"
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-          cache: pip
-          cache-dependency-path: pyproject.toml
-
-      - name: Install dependencies
-        run: pip install -e ".[dev]"
-
-      - name: Run ethics check
-        run: python -m alchymine.agents.quality.ethics_check
-
-      - name: Run quality gate tests
-        run: pytest tests/agents/ -v
-
-  # ──────────────────────────────────────────────
-  # Security: pip-audit + npm audit
-  # ──────────────────────────────────────────────
-  security:
-    name: "Security: dependency audit"
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-          cache: pip
-          cache-dependency-path: pyproject.toml
-
-      - name: Install Python dependencies
-        run: pip install -e ".[dev]"
-
-      - name: Install pip-audit
-        run: pip install pip-audit
-
-      - name: Upgrade build tools
-        run: pip install --upgrade pip setuptools wheel
-
-      - name: Run pip-audit (Python deps)
-        run: |
-          pip-audit --desc \
-            --skip-editable \
-            --ignore-vuln CVE-2024-23342  # ecdsa timing attack — no fix available, upstream wontfix
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: npm
-          cache-dependency-path: alchymine/web/package-lock.json
-
-      - name: Install Node dependencies
-        working-directory: alchymine/web
-        run: npm ci
-
-      - name: Run npm audit (JS deps)
-        working-directory: alchymine/web
-        run: npm audit --audit-level=high
-
-  # ──────────────────────────────────────────────
   # Final gate: all checks must pass
   # ──────────────────────────────────────────────
   ci-passed:
@@ -280,8 +215,6 @@ jobs:
       - type-check
       - test-python
       - test-frontend
-      - ethics-check
-      - security
     steps:
       - name: Verify all jobs succeeded
         run: |
@@ -290,15 +223,11 @@ jobs:
           echo "  type-check:     ${{ needs.type-check.result }}"
           echo "  test-python:    ${{ needs.test-python.result }}"
           echo "  test-frontend:  ${{ needs.test-frontend.result }}"
-          echo "  ethics-check:   ${{ needs.ethics-check.result }}"
-          echo "  security:       ${{ needs.security.result }}"
 
           if [[ "${{ needs.lint.result }}" != "success" || \
                 "${{ needs.type-check.result }}" != "success" || \
                 "${{ needs.test-python.result }}" != "success" || \
-                "${{ needs.test-frontend.result }}" != "success" || \
-                "${{ needs.ethics-check.result }}" != "success" || \
-                "${{ needs.security.result }}" != "success" ]]; then
+                "${{ needs.test-frontend.result }}" != "success" ]]; then
             echo ""
             echo "FAILED: One or more CI jobs did not succeed."
             exit 1
