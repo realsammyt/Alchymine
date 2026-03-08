@@ -167,7 +167,7 @@ jobs:
           # Dummy env vars satisfy pydantic-settings validators at import time
           docker run --rm \
             -e JWT_SECRET_KEY="smoke-test-dummy-key-that-is-at-least-32-chars-long" \
-            -e SIGNUP_PROMO_CODE="smoke-test-code" \
+
             "$IMAGE" python -c "from alchymine.api.main import app; print('API smoke test passed')"
 
       - name: Pull and verify Worker image starts
@@ -176,7 +176,7 @@ jobs:
           docker pull "$IMAGE"
           docker run --rm \
             -e JWT_SECRET_KEY="smoke-test-dummy-key-that-is-at-least-32-chars-long" \
-            -e SIGNUP_PROMO_CODE="smoke-test-code" \
+
             "$IMAGE" python -c "from alchymine.workers.celery_app import celery_app; print('Worker smoke test passed')"
 
   # ──────────────────────────────────────────────

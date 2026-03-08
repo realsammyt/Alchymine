@@ -267,7 +267,6 @@ JWT_SECRET_KEY=${JWT_SECRET}
 JWT_ALGORITHM=HS256
 ACCESS_TOKEN_EXPIRE_MINUTES=30
 REFRESH_TOKEN_EXPIRE_DAYS=7
-SIGNUP_PROMO_CODE=CHANGEME-set-your-promo-code
 
 # ── Data Encryption ──────────────────────────────────────────────────────────
 # Fernet-compatible key for column-level encryption of PII and sensitive data.

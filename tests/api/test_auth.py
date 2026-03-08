@@ -24,18 +24,41 @@ from alchymine.api.auth import (
 from alchymine.api.main import app
 from alchymine.api.routers.auth import get_db
 from alchymine.db.base import Base
+from alchymine.db.models import InviteCode
+
+# ─── Constants ────────────────────────────────────────────────────────────
+
+_TEST_INVITE_CODE = "test-invite-code"
 
 # ─── Fixtures ─────────────────────────────────────────────────────────────
 
 
 @pytest.fixture(autouse=True)
 def _override_db():
-    """Override the DB dependency with an in-memory SQLite database for every test."""
+    """Override the DB dependency with an in-memory SQLite database for every test.
+
+    Also seeds a default invite code so registration tests work with
+    DB-only invite code validation.
+    """
+    import asyncio
+
     engine = create_async_engine(
         "sqlite+aiosqlite:///:memory:",
         connect_args={"check_same_thread": False},
     )
     session_factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+
+    # Create tables and seed a default invite code
+    async def _init_db() -> None:
+        async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
+        async with session_factory() as session:
+            session.add(
+                InviteCode(code=_TEST_INVITE_CODE, max_uses=1000, is_active=True)
+            )
+            await session.commit()
+
+    asyncio.run(_init_db())
 
     async def _get_test_db():
         async with engine.begin() as conn:
@@ -62,7 +85,7 @@ def registered_user(client: TestClient) -> dict:
         json={
             "email": "test@example.com",
             "password": "securepassword123",
-            "promo_code": "alchyours",
+            "promo_code": _TEST_INVITE_CODE,
         },
     )
     assert response.status_code == 201
@@ -177,7 +200,7 @@ class TestRegister:
         """Registering a new user should return 201 with access and refresh tokens."""
         response = client.post(
             "/api/v1/auth/register",
-            json={"email": "new@example.com", "password": "password123", "promo_code": "alchyours"},
+            json={"email": "new@example.com", "password": "password123", "promo_code": _TEST_INVITE_CODE},
         )
         assert response.status_code == 201
         data = response.json()
@@ -187,7 +210,7 @@ class TestRegister:
 
     def test_register_duplicate_email(self, client: TestClient):
         """Registering with an already-used email should return 409."""
-        payload = {"email": "dup@example.com", "password": "password123", "promo_code": "alchyours"}
+        payload = {"email": "dup@example.com", "password": "password123", "promo_code": _TEST_INVITE_CODE}
         response1 = client.post("/api/v1/auth/register", json=payload)
         assert response1.status_code == 201
 
@@ -199,7 +222,7 @@ class TestRegister:
         """Registering with a password shorter than 8 characters should return 422."""
         response = client.post(
             "/api/v1/auth/register",
-            json={"email": "short@example.com", "password": "abc", "promo_code": "alchyours"},
+            json={"email": "short@example.com", "password": "abc", "promo_code": _TEST_INVITE_CODE},
         )
         assert response.status_code == 422
 
@@ -207,7 +230,7 @@ class TestRegister:
         """Registering with an invalid email should return 422."""
         response = client.post(
             "/api/v1/auth/register",
-            json={"email": "not-an-email", "password": "password123", "promo_code": "alchyours"},
+            json={"email": "not-an-email", "password": "password123", "promo_code": _TEST_INVITE_CODE},
         )
         assert response.status_code == 422
 
@@ -415,7 +438,7 @@ class TestAuthCookies:
             json={
                 "email": "cookie@example.com",
                 "password": "password123",
-                "promo_code": "alchyours",
+                "promo_code": _TEST_INVITE_CODE,
             },
         )
         assert response.status_code == 201

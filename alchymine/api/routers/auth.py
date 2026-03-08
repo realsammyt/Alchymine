@@ -163,28 +163,24 @@ async def register(
     Returns 403 if the promo code is invalid.
     Returns 409 if the email is already registered.
     """
-    # Validate promo code — accept static env var OR a valid invite code from DB
-    settings = get_settings()
-    invite_code_row = None
-    if body.promo_code != settings.signup_promo_code:
-        # Atomic: validate + increment in one UPDATE (no race on expiry)
-        result = await db.execute(
-            update(InviteCode)
-            .where(
-                InviteCode.code == body.promo_code,
-                InviteCode.is_active.is_(True),
-                InviteCode.uses_count < InviteCode.max_uses,
-                or_(InviteCode.expires_at.is_(None), InviteCode.expires_at > func.now()),
-            )
-            .values(uses_count=InviteCode.uses_count + 1)
-            .returning(InviteCode)
+    # Validate invite code from DB (atomic: validate + increment in one UPDATE)
+    result = await db.execute(
+        update(InviteCode)
+        .where(
+            InviteCode.code == body.promo_code,
+            InviteCode.is_active.is_(True),
+            InviteCode.uses_count < InviteCode.max_uses,
+            or_(InviteCode.expires_at.is_(None), InviteCode.expires_at > func.now()),
         )
-        invite_code_row = result.scalar_one_or_none()
-        if invite_code_row is None:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Invalid, expired, or fully used invitation code",
-            )
+        .values(uses_count=InviteCode.uses_count + 1)
+        .returning(InviteCode)
+    )
+    invite_code_row = result.scalar_one_or_none()
+    if invite_code_row is None:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Invalid, expired, or fully used invitation code",
+        )
 
     # Check for existing user
     result = await db.execute(select(User).where(User.email == body.email))
@@ -199,18 +195,17 @@ async def register(
     user = User(
         email=body.email,
         password_hash=hash_password(body.password),
-        invite_code_used=invite_code_row.code if invite_code_row else None,
+        invite_code_used=invite_code_row.code,
     )
     db.add(user)
 
-    if invite_code_row is not None:
-        logger.info(
-            "Invite code '%s' used by %s (%d/%d uses)",
-            invite_code_row.code,
-            body.email,
-            invite_code_row.uses_count,
-            invite_code_row.max_uses,
-        )
+    logger.info(
+        "Invite code '%s' used by %s (%d/%d uses)",
+        invite_code_row.code,
+        body.email,
+        invite_code_row.uses_count,
+        invite_code_row.max_uses,
+    )
 
     await db.commit()
     await db.refresh(user)
