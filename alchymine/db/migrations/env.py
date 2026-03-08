@@ -22,9 +22,11 @@ from alchymine.db.base import Base
 # Alembic Config object
 config = context.config
 
-# Set up logging from the alembic.ini file
+# Set up logging from the alembic.ini file.
+# disable_existing_loggers=False prevents Alembic from killing other loggers
+# (e.g., alchymine.email) when running in-process during tests.
 if config.config_file_name is not None:
-    fileConfig(config.config_file_name)
+    fileConfig(config.config_file_name, disable_existing_loggers=False)
 
 # Target metadata for autogenerate
 target_metadata = Base.metadata

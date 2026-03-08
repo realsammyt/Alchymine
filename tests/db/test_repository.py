@@ -381,6 +381,29 @@ async def test_update_layer_user_not_found(session: AsyncSession) -> None:
         await update_layer(session, "fake-uuid", "identity", {})
 
 
+@pytest.mark.asyncio
+async def test_update_layer_upsert_idempotent(session: AsyncSession) -> None:
+    """update_layer can create and re-create the same layer without error (upsert)."""
+    user = await create_profile(
+        session,
+        full_name="Upsert Test",
+        birth_date=date(1990, 1, 1),
+        intention="purpose",
+    )
+
+    # First call creates the identity layer
+    await update_layer(
+        session, user.id, "identity", {"numerology": {"life_path": 7}}
+    )
+
+    # Second call with same data should succeed (upsert, not duplicate)
+    updated = await update_layer(
+        session, user.id, "identity", {"numerology": {"life_path": 7}, "archetype": {"name": "Sage"}}
+    )
+    assert updated.identity.numerology == {"life_path": 7}
+    assert updated.identity.archetype == {"name": "Sage"}
+
+
 # ─── delete_profile ─────────────────────────────────────────────────────
 
 
