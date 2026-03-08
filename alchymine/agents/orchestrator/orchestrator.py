@@ -188,6 +188,25 @@ class MasterOrchestrator:
                     if astrology_data.get("rising_sign"):
                         request_data["rising_sign"] = astrology_data["rising_sign"]
 
+                # Extract Kegan assessment responses for the Perspective
+                # coordinator. Each kegan_N question maps to a scoring
+                # dimension used by assess_kegan_stage().
+                assessment = request_data.get("assessment_responses", {})
+                _kegan_dimension_map = {
+                    "kegan_1": "self_awareness",
+                    "kegan_2": "perspective_taking",
+                    "kegan_3": "relationship_to_authority",
+                    "kegan_4": "conflict_tolerance",
+                    "kegan_5": "systems_thinking",
+                }
+                kegan_responses = {
+                    dim: assessment[qid]
+                    for qid, dim in _kegan_dimension_map.items()
+                    if qid in assessment
+                }
+                if kegan_responses:
+                    request_data["kegan_responses"] = kegan_responses
+
         # Synthesize if multi-system
         synthesis = None
         if len(coordinator_results) > 1:

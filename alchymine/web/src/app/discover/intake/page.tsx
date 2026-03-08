@@ -146,10 +146,9 @@ export default function IntakePage() {
             birthDate: profile.intake!.birth_date || prev.birthDate,
             birthTime: profile.intake!.birth_time || prev.birthTime,
             birthCity: profile.intake!.birth_city || prev.birthCity,
-            intentions:
-              profile.intake!.intentions?.length
-                ? profile.intake!.intentions
-                : prev.intentions,
+            intentions: profile.intake!.intentions?.length
+              ? profile.intake!.intentions
+              : prev.intentions,
           }));
         }
       })

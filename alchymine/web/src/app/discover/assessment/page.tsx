@@ -134,6 +134,12 @@ export default function AssessmentPage() {
         return "Attachment Style";
       case "risk_tolerance":
         return "Risk Tolerance";
+      case "enneagram":
+        return "Enneagram";
+      case "creativity":
+        return "Creativity";
+      case "perspective":
+        return "Perspective";
       default:
         return "";
     }
@@ -162,6 +168,24 @@ export default function AssessmentPage() {
           bg: "bg-secondary/[0.06]",
           text: "text-secondary-light/70",
           border: "border-secondary/[0.12]",
+        };
+      case "enneagram":
+        return {
+          bg: "bg-purple-500/[0.06]",
+          text: "text-purple-300/70",
+          border: "border-purple-500/[0.12]",
+        };
+      case "creativity":
+        return {
+          bg: "bg-rose-500/[0.06]",
+          text: "text-rose-300/70",
+          border: "border-rose-500/[0.12]",
+        };
+      case "perspective":
+        return {
+          bg: "bg-teal-500/[0.06]",
+          text: "text-teal-300/70",
+          border: "border-teal-500/[0.12]",
         };
       default:
         return {

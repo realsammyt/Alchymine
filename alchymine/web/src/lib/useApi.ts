@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo } from "react";
-import { getProfile } from "@/lib/api";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import { getProfile, getReport, ApiError } from "@/lib/api";
 
 /**
  * Async state for API calls — tracks loading, data, and error.
@@ -96,6 +96,71 @@ export type StoredIntake = ReturnType<typeof getStoredIntake>;
 export interface IntakeState {
   data: StoredIntake;
   loading: boolean;
+}
+
+/**
+ * Hook that polls for report status when a report ID is stored in sessionStorage.
+ * Returns the current status so system pages can show a generating state.
+ */
+export function useReportStatus(): {
+  status: "idle" | "pending" | "generating" | "complete" | "failed";
+  reportId: string | null;
+} {
+  const [status, setStatus] = useState<
+    "idle" | "pending" | "generating" | "complete" | "failed"
+  >("idle");
+  const [reportId, setReportId] = useState<string | null>(null);
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  useEffect(() => {
+    const id = getStoredReportId();
+    if (!id) {
+      setStatus("idle");
+      return;
+    }
+    setReportId(id);
+
+    let cancelled = false;
+
+    async function check() {
+      try {
+        const report = await getReport(id!);
+        if (cancelled) return;
+        if (
+          report.status === "pending" ||
+          report.status === "generating"
+        ) {
+          setStatus(report.status as "pending" | "generating");
+        } else if (report.status === "complete") {
+          setStatus("complete");
+          if (pollRef.current) clearInterval(pollRef.current);
+        } else if (report.status === "failed") {
+          setStatus("failed");
+          if (pollRef.current) clearInterval(pollRef.current);
+        }
+      } catch (err) {
+        if (cancelled) return;
+        // 202 means still processing
+        if (err instanceof ApiError && err.status === 202) {
+          setStatus("generating");
+          return;
+        }
+        // Other errors — treat as idle (no report or auth issue)
+        setStatus("idle");
+        if (pollRef.current) clearInterval(pollRef.current);
+      }
+    }
+
+    check();
+    pollRef.current = setInterval(check, 3000);
+
+    return () => {
+      cancelled = true;
+      if (pollRef.current) clearInterval(pollRef.current);
+    };
+  }, []);
+
+  return { status, reportId };
 }
 
 /**

@@ -16,9 +16,10 @@ import {
   KeganAssessResponse,
   ProfileResponse,
 } from "@/lib/api";
-import { useApi, useIntake } from "@/lib/useApi";
+import { useApi, useIntake, useReportStatus } from "@/lib/useApi";
 import { useAuth } from "@/lib/AuthContext";
 import EvidenceBadge from "@/components/shared/EvidenceBadge";
+import GeneratingState from "@/components/shared/GeneratingState";
 
 const KEGAN_STAGES = [
   {
@@ -135,6 +136,7 @@ export default function PerspectivePage() {
   const userId = user?.id ?? null;
   const { data: intake } = useIntake(userId);
   const hasIntake = !!(intake?.intentions?.length || intake?.intention);
+  const { status: reportStatus } = useReportStatus();
 
   useEffect(() => {
     setMounted(true);
@@ -188,6 +190,13 @@ export default function PerspectivePage() {
               </p>
             </header>
           </MotionReveal>
+
+          {/* Generation in progress */}
+          {(reportStatus === "pending" || reportStatus === "generating") && (
+            <div className="mb-12">
+              <GeneratingState systemName="Perspective" />
+            </div>
+          )}
 
           {/* Personalized Kegan Assessment */}
           <MotionReveal delay={0.1}>
