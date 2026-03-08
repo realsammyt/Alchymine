@@ -906,6 +906,18 @@ export interface UserAnalytics {
   period_days: number;
 }
 
+export interface InviteUserResult {
+  email: string;
+  invite_code: string;
+  email_sent: boolean;
+}
+
+export interface InviteUsersResponse {
+  results: InviteUserResult[];
+  total_invited: number;
+  total_emails_sent: number;
+}
+
 // ─── Admin API functions ──────────────────────────────────────────
 
 export async function adminGetUsers(opts?: {
@@ -1012,6 +1024,17 @@ export async function adminDeleteInviteCode(
 ): Promise<{ message: string }> {
   return request<{ message: string }>(`${BASE}/admin/invite-codes/${codeId}`, {
     method: "DELETE",
+  });
+}
+
+export async function adminInviteUsers(data: {
+  emails: string[];
+  note?: string;
+  expires_in_days?: number;
+}): Promise<InviteUsersResponse> {
+  return request<InviteUsersResponse>(`${BASE}/admin/invite`, {
+    method: "POST",
+    body: JSON.stringify(data),
   });
 }
 
