@@ -249,7 +249,7 @@ class TestIntelligenceGraphTransitions:
                 return_value=mock_profile,
             ),
             patch(
-                "alchymine.engine.astrology.approximate_sun_sign",
+                "alchymine.engine.astrology.calculate_natal_chart",
                 side_effect=ImportError("swisseph not installed"),
             ),
         ):

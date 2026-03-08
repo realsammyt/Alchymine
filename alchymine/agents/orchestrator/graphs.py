@@ -198,22 +198,30 @@ def _intelligence_astrology(state: CoordinatorState) -> CoordinatorState:
 
     try:
         from datetime import date as date_type
+        from datetime import time as time_type
 
-        from alchymine.engine.astrology import (
-            approximate_sun_degree,
-            approximate_sun_sign,
-        )
+        from alchymine.engine.astrology import calculate_natal_chart
 
         birth_date = request_data.get("birth_date")
         if birth_date:
             if isinstance(birth_date, str):
                 birth_date = date_type.fromisoformat(birth_date)
-            sun_sign = approximate_sun_sign(birth_date)
-            sun_degree = approximate_sun_degree(birth_date)
-            results["astrology"] = {
-                "sun_sign": sun_sign,
-                "sun_degree": sun_degree,
-            }
+
+            # Extract optional birth_time and birth_city for full chart
+            birth_time = request_data.get("birth_time")
+            if isinstance(birth_time, str) and birth_time:
+                birth_time = time_type.fromisoformat(birth_time)
+            elif not isinstance(birth_time, time_type):
+                birth_time = None
+
+            birth_city = request_data.get("birth_city")
+
+            chart = calculate_natal_chart(
+                birth_date,
+                birth_time=birth_time,
+                birth_city=birth_city,
+            )
+            results["astrology"] = chart
         else:
             errors.append("Intelligence: missing birth_date for astrology")
     except ImportError:
