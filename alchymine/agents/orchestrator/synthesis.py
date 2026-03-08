@@ -11,6 +11,8 @@ import logging
 from dataclasses import dataclass, field
 from typing import Any
 
+from alchymine.engine.intention_map import INTENTION_SYSTEM_RELEVANCE
+
 from .coordinator import CoordinatorResult, CoordinatorStatus
 
 logger = logging.getLogger(__name__)
@@ -50,25 +52,8 @@ _DATA_KEY_EVIDENCE_OVERRIDES: dict[str, str] = {
     "strengths": EVIDENCE_EXPERIENTIAL,
 }
 
-# System relevance mapping for intention-based filtering
-_INTENTION_SYSTEM_RELEVANCE: dict[str, list[str]] = {
-    "healing": ["healing", "perspective", "intelligence"],
-    "health": ["healing", "perspective", "intelligence"],
-    "wellness": ["healing", "perspective", "intelligence"],
-    "money": ["wealth", "creative", "intelligence"],
-    "wealth": ["wealth", "creative", "intelligence"],
-    "financial": ["wealth", "creative", "intelligence"],
-    "career": ["wealth", "creative", "perspective"],
-    "creativity": ["creative", "intelligence", "perspective"],
-    "art": ["creative", "intelligence", "perspective"],
-    "writing": ["creative", "intelligence", "perspective"],
-    "decision": ["perspective", "intelligence", "wealth"],
-    "growth": ["perspective", "healing", "intelligence"],
-    "self-discovery": ["intelligence", "perspective", "healing"],
-    "purpose": ["intelligence", "creative", "perspective"],
-    "relationships": ["perspective", "healing", "intelligence"],
-    "spirituality": ["intelligence", "healing", "perspective"],
-}
+# System relevance mapping imported from canonical source:
+#   alchymine.engine.intention_map.INTENTION_SYSTEM_RELEVANCE
 
 # Conflict detection: pairs of data keys and action words that may contradict
 _REST_KEYWORDS = frozenset(
@@ -616,7 +601,7 @@ def synthesize_guided_session(
     all_intentions = [i.lower().strip() for i in (intentions or [intention])]
     system_priority: list[str] = []
     for intent in all_intentions:
-        for keyword, systems in _INTENTION_SYSTEM_RELEVANCE.items():
+        for keyword, systems in INTENTION_SYSTEM_RELEVANCE.items():
             if keyword in intent:
                 for s in systems:
                     if s not in system_priority:

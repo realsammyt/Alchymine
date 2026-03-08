@@ -11,6 +11,8 @@ import re
 from dataclasses import dataclass, field
 from enum import StrEnum
 
+from alchymine.engine.intention_map import INTENTION_PRIMARY_SYSTEMS
+
 # ─── System intent enum ──────────────────────────────────────────────
 
 
@@ -194,20 +196,13 @@ _SYSTEM_KEYWORDS: dict[SystemIntent, list[str]] = {
 
 # ─── Intention → System mapping ──────────────────────────────────────
 
-# Maps user-facing intention values (from the Intention enum in
-# alchymine.engine.profile) to the system coordinators that should
-# process them.  Used when the report endpoint provides explicit
-# intentions so we can skip keyword-based classification.
+# Derived from the canonical mapping in alchymine.engine.intention_map.
+# Converts the string-based INTENTION_PRIMARY_SYSTEMS into SystemIntent
+# enums for type-safe orchestrator routing.
 
 _INTENTION_TO_SYSTEMS: dict[str, list[SystemIntent]] = {
-    "career": [SystemIntent.INTELLIGENCE, SystemIntent.PERSPECTIVE],
-    "love": [SystemIntent.INTELLIGENCE, SystemIntent.HEALING],
-    "purpose": [SystemIntent.INTELLIGENCE, SystemIntent.CREATIVE, SystemIntent.PERSPECTIVE],
-    "money": [SystemIntent.WEALTH, SystemIntent.INTELLIGENCE],
-    "health": [SystemIntent.HEALING, SystemIntent.INTELLIGENCE],
-    "family": [SystemIntent.HEALING, SystemIntent.PERSPECTIVE],
-    "business": [SystemIntent.WEALTH, SystemIntent.CREATIVE],
-    "legacy": [SystemIntent.WEALTH, SystemIntent.PERSPECTIVE, SystemIntent.CREATIVE],
+    intention: [SystemIntent(s) for s in systems]
+    for intention, systems in INTENTION_PRIMARY_SYSTEMS.items()
 }
 
 

@@ -13,6 +13,8 @@ from __future__ import annotations
 
 from pydantic import BaseModel, Field
 
+from alchymine.engine.intention_map import INTENTION_WEIGHTS
+
 # ── Models ──────────────────────────────────────────────────────────────
 
 
@@ -45,65 +47,8 @@ class SpiralRouteResult(BaseModel):
 
 # ── Routing logic ───────────────────────────────────────────────────────
 
-# Intention → system affinity weights
-_INTENTION_WEIGHTS: dict[str, dict[str, float]] = {
-    "career": {
-        "intelligence": 30,
-        "perspective": 30,
-        "wealth": 20,
-        "creative": 15,
-        "healing": 5,
-    },
-    "love": {
-        "healing": 35,
-        "intelligence": 25,
-        "perspective": 20,
-        "creative": 15,
-        "wealth": 5,
-    },
-    "purpose": {
-        "perspective": 35,
-        "intelligence": 25,
-        "creative": 20,
-        "healing": 15,
-        "wealth": 5,
-    },
-    "money": {
-        "wealth": 40,
-        "perspective": 20,
-        "intelligence": 20,
-        "creative": 15,
-        "healing": 5,
-    },
-    "health": {
-        "healing": 40,
-        "intelligence": 20,
-        "perspective": 15,
-        "creative": 15,
-        "wealth": 10,
-    },
-    "family": {
-        "wealth": 25,
-        "healing": 25,
-        "perspective": 20,
-        "intelligence": 20,
-        "creative": 10,
-    },
-    "business": {
-        "wealth": 30,
-        "creative": 25,
-        "perspective": 20,
-        "intelligence": 15,
-        "healing": 10,
-    },
-    "legacy": {
-        "wealth": 30,
-        "perspective": 25,
-        "intelligence": 20,
-        "creative": 15,
-        "healing": 10,
-    },
-}
+# Intention weights are imported from the canonical mapping module:
+#   alchymine.engine.intention_map.INTENTION_WEIGHTS
 
 # Life Path → additional system boost
 _LIFE_PATH_BOOST: dict[int, str] = {
@@ -215,11 +160,11 @@ def route_user(
         Ranked recommendations for all 5 systems.
     """
     intention = intention.lower()
-    if intention not in _INTENTION_WEIGHTS:
+    if intention not in INTENTION_WEIGHTS:
         intention = "purpose"  # Default to purpose if unknown
 
     # Start with intention-based weights
-    scores: dict[str, float] = dict(_INTENTION_WEIGHTS[intention])
+    scores: dict[str, float] = dict(INTENTION_WEIGHTS[intention])
 
     # Apply Life Path boost (+10 to the aligned system)
     if life_path is not None:
