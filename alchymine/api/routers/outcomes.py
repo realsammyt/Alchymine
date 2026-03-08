@@ -378,6 +378,8 @@ async def get_user_trends(
         records = await repository.get_outcome_metrics(db, user_id, system)
     except Exception:
         logger.debug("Failed to fetch outcome metrics from DB for %s", user_id)
+    # Sort chronologically — DB returns DESC but trend calculation needs oldest-first
+    records.sort(key=lambda r: r.recorded_at)
     tracker = OutcomeTracker()
     for r in records:
         tracker.record_metric(r.user_id, r.system, r.metric_name, r.value, r.period)
@@ -417,6 +419,8 @@ async def get_user_progress_summary(
     except Exception:
         logger.debug("Failed to hydrate outcomes from DB for %s", user_id)
 
+    # Sort chronologically for correct trend direction
+    records.sort(key=lambda r: r.recorded_at)
     tracker = OutcomeTracker()
     for r in records:
         tracker.record_metric(r.user_id, r.system, r.metric_name, r.value, r.period)

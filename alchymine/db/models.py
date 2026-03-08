@@ -23,7 +23,7 @@ Design decisions
 from __future__ import annotations
 
 import uuid
-from datetime import date, datetime, time
+from datetime import UTC, date, datetime, time
 
 from sqlalchemy import (
     BigInteger,
@@ -526,7 +526,10 @@ class OutcomeMetricRecord(Base):
     value: Mapped[float] = mapped_column(Float, nullable=False)
     period: Mapped[str] = mapped_column(String(20), default="weekly")
     recorded_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now(), index=True
+        DateTime(timezone=True),
+        default=lambda: datetime.now(UTC),
+        server_default=func.now(),
+        index=True,
     )
 
     def __repr__(self) -> str:

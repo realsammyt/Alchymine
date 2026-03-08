@@ -49,8 +49,15 @@ export default function AssessmentPage() {
           router.replace("/discover/intake");
         }
       })
-      .catch(() => {
-        router.replace("/discover/intake");
+      .catch((err) => {
+        // Only redirect to intake if the profile truly doesn't exist (404).
+        // On transient errors (500, network), stay on the page — sessionStorage
+        // may have the data from the previous page.
+        if (err?.status === 404) {
+          router.replace("/discover/intake");
+        } else {
+          console.warn("Failed to load profile (non-404):", err);
+        }
       });
   }, [router, user?.id]);
 
@@ -384,10 +391,7 @@ export default function AssessmentPage() {
           </button>
 
           {allAnswered && (
-            <Button
-              onClick={() => setShowCompletion(true)}
-              size="md"
-            >
+            <Button onClick={() => setShowCompletion(true)} size="md">
               Complete Assessment
             </Button>
           )}
