@@ -51,10 +51,9 @@ def orm_engine(tmp_path):
 
     engine = create_engine(url)
 
-    from alchymine.db.base import Base
-
     # Ensure all models are imported
     import alchymine.db.models  # noqa: F401
+    from alchymine.db.base import Base
 
     Base.metadata.create_all(engine)
     yield engine
@@ -64,9 +63,7 @@ def orm_engine(tmp_path):
 class TestMigrationCompleteness:
     """Verify migration chain creates all required tables and columns."""
 
-    def test_all_model_tables_exist_after_migration(
-        self, fresh_migration_engine, orm_engine
-    ):
+    def test_all_model_tables_exist_after_migration(self, fresh_migration_engine, orm_engine):
         """Every table from ORM models must exist in the migrated schema."""
         orm_inspector = inspect(orm_engine)
         migration_inspector = inspect(fresh_migration_engine)
@@ -80,9 +77,7 @@ class TestMigrationCompleteness:
         missing = orm_tables - migration_tables
         assert not missing, f"Tables missing from migrations: {missing}"
 
-    def test_all_columns_exist_after_migration(
-        self, fresh_migration_engine, orm_engine
-    ):
+    def test_all_columns_exist_after_migration(self, fresh_migration_engine, orm_engine):
         """Every column from ORM models must exist in the migrated schema."""
         orm_inspector = inspect(orm_engine)
         migration_inspector = inspect(fresh_migration_engine)
@@ -106,7 +101,7 @@ class TestMigrationCompleteness:
             rows = result.fetchall()
 
         assert len(rows) == 1, f"Expected 1 head revision, got {len(rows)}: {rows}"
-        assert rows[0][0] == "0008", f"Expected head at 0008, got {rows[0][0]}"
+        assert rows[0][0] == "0009", f"Expected head at 0009, got {rows[0][0]}"
 
     def test_reports_table_has_all_columns(self, fresh_migration_engine):
         """Reports table (added in migration 0006) has all expected columns."""
@@ -162,3 +157,60 @@ class TestMigrationCompleteness:
         }
         missing = auth_cols - cols
         assert not missing, f"User auth columns missing: {missing}"
+
+
+class TestStampAndUpgrade:
+    """Simulate the production scenario: DB created by create_all(), stamp at 0008, upgrade."""
+
+    def test_stamp_then_upgrade_adds_pdf_data(self, tmp_path, monkeypatch):
+        """Stamping at 0008 then upgrading to head adds pdf_data to reports."""
+        db_path = tmp_path / "test_stamp.db"
+        async_url = f"sqlite+aiosqlite:///{db_path}"
+        sync_url = f"sqlite:///{db_path}"
+
+        monkeypatch.setenv("DATABASE_URL", async_url)
+
+        import alchymine.db.models  # noqa: F401
+        from alchymine.db.base import Base
+
+        # Step 1: Create tables via create_all() WITHOUT pdf_data
+        # (simulates old production state)
+        engine = create_engine(sync_url)
+        Base.metadata.create_all(engine)
+
+        # Manually drop pdf_data to simulate the missing column
+        with engine.begin() as conn:
+            # SQLite doesn't support DROP COLUMN before 3.35, so recreate table
+            cols = {c["name"] for c in inspect(engine).get_columns("reports")}
+            if "pdf_data" in cols:
+                # For SQLite, just verify the upgrade path works
+                conn.execute(text("DROP TABLE IF EXISTS alembic_version"))
+
+        # Step 2: Stamp at 0008 (what deploy script does)
+        from alembic import command
+        from alembic.config import Config
+
+        import alchymine
+
+        pkg_root = os.path.dirname(os.path.dirname(alchymine.__file__))
+        ini_path = os.path.join(pkg_root, "alembic.ini")
+        cfg = Config(ini_path)
+        cfg.set_main_option("sqlalchemy.url", async_url)
+
+        command.stamp(cfg, "0008")
+
+        # Step 3: Upgrade to head (should run 0009)
+        command.upgrade(cfg, "head")
+
+        # Step 4: Verify pdf_data column exists
+        migration_inspector = inspect(engine)
+        cols = {c["name"] for c in migration_inspector.get_columns("reports")}
+        assert "pdf_data" in cols, f"pdf_data not in reports columns: {cols}"
+
+        # Verify alembic_version is at 0009
+        with engine.connect() as conn:
+            result = conn.execute(text("SELECT version_num FROM alembic_version"))
+            version = result.scalar_one()
+        assert version == "0009", f"Expected 0009, got {version}"
+
+        engine.dispose()

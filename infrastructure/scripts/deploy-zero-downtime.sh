@@ -116,7 +116,7 @@ fi
 
 # ── Step 1: Pull GHCR images ────────────────────────────────────────────────
 PHASE="pull"
-log "Step 1/7: Pulling GHCR images..."
+log "Step 1/8: Pulling GHCR images..."
 
 for svc in api web worker pdf; do
   log "  Pulling ${IMAGE_PREFIX}-${svc}:${VERSION}..."
@@ -125,15 +125,45 @@ done
 
 log "All images pulled successfully"
 
-# ── Step 2: Start temporary containers ───────────────────────────────────────
-PHASE="start-temps"
-log "Step 2/7: Starting temp containers..."
+# ── Step 1b: Run database migrations ─────────────────────────────────────────
+PHASE="migrations"
+log "Step 1b/8: Running database migrations..."
 
-# Source env vars for constructing service URLs
+# Source env vars for constructing DB URL
 set -a
 # shellcheck source=/dev/null
 source "$ENV_FILE"
 set +a
+
+# Run migrations in a temporary container connected to the DB network.
+# The alembic env.py uses asyncpg (async engine) — works from CLI.
+# If alembic_version table is missing (DB was bootstrapped by create_all()),
+# stamp at 0008 to skip non-idempotent early migrations, then upgrade to head.
+docker run --rm \
+  --name alchymine-migrate \
+  --network alchymine-net \
+  --env-file "$ENV_FILE" \
+  -e "DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER:-alchymine}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-alchymine}" \
+  "${IMAGE_PREFIX}-api:${VERSION}" \
+  bash -c '
+    set -euo pipefail
+    CURRENT=$(alembic current 2>/dev/null | head -1 || true)
+    if [ -z "$CURRENT" ]; then
+      echo "[migrations] No alembic_version found — stamping DB at 0008"
+      alembic stamp 0008
+    else
+      echo "[migrations] Current revision: $CURRENT"
+    fi
+    echo "[migrations] Running alembic upgrade head..."
+    alembic upgrade head
+    echo "[migrations] Complete: $(alembic current)"
+  '
+
+log "Database migrations complete"
+
+# ── Step 2: Start temporary containers ───────────────────────────────────────
+PHASE="start-temps"
+log "Step 2/8: Starting temporary containers..."
 
 # Temp API — connected to alchymine-net so it can reach db/redis via compose DNS
 docker run -d \
@@ -169,7 +199,7 @@ log "Temp containers started"
 
 # ── Step 3: Health-check temp containers ─────────────────────────────────────
 PHASE="health-check-temps"
-log "Step 3/7: Health-checking temp containers..."
+log "Step 3/8: Health-checking temp containers..."
 
 # API health check — max 60s
 for i in $(seq 1 30); do
@@ -207,7 +237,7 @@ log "All temp containers healthy"
 
 # ── Step 4: Swap nginx to temp containers ────────────────────────────────────
 PHASE="nginx-swap-to-temps"
-log "Step 4/7: Swapping nginx to temp containers..."
+log "Step 4/8: Swapping nginx to temp containers..."
 
 cp "$NGINX_CONF" "$NGINX_CONF_BAK"
 sed -i 's/server web:3000/server alchymine-web-tmp:3000/' "$NGINX_CONF"
@@ -237,7 +267,7 @@ fi
 
 # ── Step 5: Recreate compose services with new images ────────────────────────
 PHASE="compose-recreate"
-log "Step 5/7: Recreating compose services with new images..."
+log "Step 5/8: Recreating compose services with new images..."
 
 export DEPLOY_VERSION="${VERSION}"
 $DC up -d --no-deps --no-build --force-recreate api web worker pdf-service
@@ -270,7 +300,7 @@ done
 
 # ── Step 6: Swap nginx back to compose services ─────────────────────────────
 PHASE="nginx-swap-to-compose"
-log "Step 6/7: Swapping nginx back to compose services..."
+log "Step 6/8: Swapping nginx back to compose services..."
 
 cp "$NGINX_CONF_BAK" "$NGINX_CONF"
 
@@ -286,7 +316,7 @@ fi
 
 # ── Step 7: Cleanup ─────────────────────────────────────────────────────────
 PHASE="cleanup"
-log "Step 7/7: Cleanup..."
+log "Step 7/8: Cleanup..."
 
 docker rm -f alchymine-api-tmp alchymine-web-tmp 2>/dev/null || true
 TEMPS_RUNNING=false
