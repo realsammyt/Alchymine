@@ -93,6 +93,13 @@ trap rollback ERR
 # Remove leftover temp containers from a previous failed deploy
 docker rm -f alchymine-api-tmp alchymine-web-tmp 2>/dev/null || true
 
+# Free disk space: remove old images not used by running containers.
+# This prevents "no space left on device" during image pulls.
+log "Pre-flight: pruning unused Docker images..."
+docker image prune -af --filter "until=72h" 2>/dev/null || true
+DISK_AVAIL=$(df -h /var/lib/docker | awk 'NR==2{print $4}')
+log "  Available disk space: ${DISK_AVAIL}"
+
 # ── Main deploy sequence ────────────────────────────────────────────────────
 
 log "=========================================="
@@ -285,7 +292,14 @@ docker rm -f alchymine-api-tmp alchymine-web-tmp 2>/dev/null || true
 TEMPS_RUNNING=false
 
 rm -f "$NGINX_CONF_BAK"
+
+# Remove old images: dangling + any alchymine images not matching current version
 docker image prune -f
+for svc in api web worker pdf; do
+  docker images "${IMAGE_PREFIX}-${svc}" --format '{{.Tag}}' \
+    | grep -v "^${VERSION}$" \
+    | xargs -r -I{} docker rmi "${IMAGE_PREFIX}-${svc}:{}" 2>/dev/null || true
+done
 
 echo "${VERSION}" > "$VERSION_FILE"
 
