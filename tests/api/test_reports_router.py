@@ -419,9 +419,57 @@ class TestIntakePersistence:
         assert resp.status_code == 202
         assert any("user row not found" in r.message for r in caplog.records)
 
-    def test_intake_retrievable_via_profile_after_report(
-        self, seeded_client, engine
+    def test_post_reports_returns_202_when_update_layer_raises(self, client: TestClient) -> None:
+        """POST /reports must return 202 even if update_layer raises an unexpected DB error.
+
+        This is the root-cause regression test for the production 500.
+        Previously, update_layer failures would dirty the SQLAlchemy session,
+        and the subsequent session.commit() would raise PendingRollbackError,
+        turning the whole request into a 500.
+        """
+        payload = _intake_report_payload()
+        with patch(
+            "alchymine.api.routers.reports.repository.update_layer",
+            new_callable=AsyncMock,
+            side_effect=RuntimeError("simulated DB error in update_layer"),
+        ):
+            resp = client.post("/api/v1/reports", json=payload)
+        assert resp.status_code == 202, f"Expected 202, got {resp.status_code}: {resp.text}"
+        data = resp.json()
+        assert data["status"] == "pending"
+        assert "id" in data
+
+    def test_post_reports_report_persisted_despite_update_layer_failure(
+        self, client: TestClient, engine
     ) -> None:
+        """The report row must be committed even when intake persistence fails."""
+        payload = _intake_report_payload()
+        with patch(
+            "alchymine.api.routers.reports.repository.update_layer",
+            new_callable=AsyncMock,
+            side_effect=RuntimeError("simulated DB error"),
+        ):
+            resp = client.post("/api/v1/reports", json=payload)
+        assert resp.status_code == 202
+        report_id = resp.json()["id"]
+
+        # Verify the report row was actually committed to the DB
+        from alchymine.workers.tasks import _run_async
+
+        async def _check():
+            from alchymine.db.base import get_async_session_factory
+
+            factory = get_async_session_factory(engine)
+            async with factory() as sess:
+                return await repository.get_report(sess, report_id)
+
+        report = _run_async(_check())
+        assert report is not None, "Report row should exist despite update_layer failure"
+        # In eager mode, the Celery task runs synchronously and may update
+        # the status before we check.  The key assertion is the row exists.
+        assert report.status in ("pending", "generating", "complete", "failed")
+
+    def test_intake_retrievable_via_profile_after_report(self, seeded_client, engine) -> None:
         """After POST /reports, GET /profile/{id} should return saved intake data."""
         payload = _intake_report_payload()
         resp = seeded_client.post("/api/v1/reports", json=payload)

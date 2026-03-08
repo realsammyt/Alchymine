@@ -122,9 +122,10 @@ async def create_report(
     report_id = str(uuid.uuid4())
     now = datetime.now(UTC).isoformat()
 
-    # Persist the report row so status queries work immediately.
-    # Commit explicitly before dispatching the Celery task so the
-    # task (which uses its own session) can find the row.
+    # Persist the report row and commit immediately so:
+    # 1. Status queries work right away
+    # 2. The Celery task (which uses its own session) can find the row
+    # 3. Optional intake persistence below can't corrupt this transaction
     await repository.create_report(
         session,
         report_id=report_id,
@@ -133,9 +134,11 @@ async def create_report(
         user_profile=request.user_profile,
         user_id=current_user["sub"],
     )
+    await session.commit()
 
     # Persist the intake data to the user's profile so it survives across
     # devices and sessions (sessionStorage is browser-tab-scoped).
+    # This is best-effort — failures must never block report creation.
     try:
         intake_persist = request.intake.model_dump(mode="json")
         # Convert date/time strings back to proper types for the ORM
@@ -151,19 +154,20 @@ async def create_report(
         if hasattr(intake_persist.get("intention"), "value"):
             intake_persist["intention"] = intake_persist["intention"]
         await repository.update_layer(session, current_user["sub"], "intake", intake_persist)
+        await session.commit()
     except LookupError:
         # User row doesn't exist — JWT sub doesn't match a DB user.
+        await session.rollback()
         logger.warning(
             "Cannot persist intake for user %s: user row not found in DB",
             current_user["sub"],
         )
     except Exception:
+        await session.rollback()
         logger.exception(
             "Failed to persist intake data for user %s",
             current_user["sub"],
         )
-
-    await session.commit()
 
     # Build a profile dict from the intake data so the orchestrator's
     # engine nodes have the fields they need (full_name, birth_date, etc.)
