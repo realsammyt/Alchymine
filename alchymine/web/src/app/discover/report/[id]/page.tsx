@@ -808,21 +808,32 @@ export default function ReportPage() {
             <Button
               variant="ghost"
               onClick={async () => {
-                const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "";
-                const response = await fetch(
-                  `${apiUrl}/api/v1/reports/${reportId}/pdf`,
-                  { credentials: "include" },
-                );
-                if (!response.ok) return;
-                const blob = await response.blob();
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement("a");
-                a.href = url;
-                a.download = `alchymine-report-${reportId}.pdf`;
-                document.body.appendChild(a);
-                a.click();
-                URL.revokeObjectURL(url);
-                a.remove();
+                try {
+                  const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "";
+                  const response = await fetch(
+                    `${apiUrl}/api/v1/reports/${reportId}/pdf`,
+                    { credentials: "include" },
+                  );
+                  if (!response.ok) {
+                    alert(
+                      response.status === 404
+                        ? "PDF has not been generated yet. Please try again shortly."
+                        : "Failed to download PDF. Please try again.",
+                    );
+                    return;
+                  }
+                  const blob = await response.blob();
+                  const url = URL.createObjectURL(blob);
+                  const a = document.createElement("a");
+                  a.href = url;
+                  a.download = `alchymine-report-${reportId}.pdf`;
+                  document.body.appendChild(a);
+                  a.click();
+                  URL.revokeObjectURL(url);
+                  a.remove();
+                } catch {
+                  alert("Network error — could not download PDF.");
+                }
               }}
             >
               <svg

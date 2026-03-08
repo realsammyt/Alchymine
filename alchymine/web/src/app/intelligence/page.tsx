@@ -116,7 +116,7 @@ function NumberResult({
 
 export default function IntelligencePage() {
   const { user } = useAuth();
-  const intake = useIntake(user?.id);
+  const { data: intake } = useIntake(user?.id);
   const hasIntake = !!intake?.fullName && !!intake?.birthDate;
 
   const numerology = useApi<NumerologyResponse>(

@@ -209,7 +209,7 @@ def validate_wealth_output(output: dict) -> QualityGateResult:
     calculations = output.get("calculations", {})
     if isinstance(calculations, dict):
         for key, value in calculations.items():
-            if not isinstance(value, (int, float)):
+            if not isinstance(value, int | float):
                 passed = False
                 details.append(
                     f"Violation: calculation '{key}' has non-numeric value — "

@@ -218,7 +218,7 @@ def assess_kegan_stage(responses: dict) -> KeganStage:
     valid_responses: dict[str, float] = {}
     for key, value in responses.items():
         if key in VALID_DIMENSIONS:
-            if not isinstance(value, (int, float)):
+            if not isinstance(value, int | float):
                 raise ValueError(f"Score for '{key}' must be numeric, got {type(value).__name__}")
             if value < 1 or value > 5:
                 raise ValueError(f"Score for '{key}' must be between 1 and 5, got {value}")

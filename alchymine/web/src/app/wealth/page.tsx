@@ -667,7 +667,7 @@ export default function WealthPage() {
   const { user } = useAuth();
   const isDemoUser = user?.email === DEMO_ACCOUNT_EMAIL;
   const userId = user?.id ?? null;
-  const intake = useIntake(userId);
+  const { data: intake } = useIntake(userId);
   const hasIntake = !!(intake?.intentions?.length || intake?.intention);
   const intakeIntentions =
     intake?.intentions ?? (intake?.intention ? [intake.intention] : []);

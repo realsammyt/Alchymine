@@ -45,7 +45,7 @@ jest.mock("@/lib/useApi", () => ({
     refetch: jest.fn(),
   }),
   getStoredIntake: () => null,
-  useIntake: () => null,
+  useIntake: () => ({ data: null, loading: false }),
 }));
 
 // Mock the API functions
