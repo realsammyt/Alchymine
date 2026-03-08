@@ -233,13 +233,40 @@ async def update_layer(
     """
     if current_user["sub"] != user_id:
         raise HTTPException(status_code=403, detail="Access denied")
+
+    # Coerce date/time strings from JSON into Python types for the ORM.
+    coerced = dict(request.data)
+    if "birth_date" in coerced and isinstance(coerced["birth_date"], str):
+        try:
+            coerced["birth_date"] = date.fromisoformat(coerced["birth_date"])
+        except ValueError as exc:
+            raise HTTPException(
+                status_code=422,
+                detail=f"Invalid birth_date format: {coerced['birth_date']!r}",
+            ) from exc
+    if "birth_time" in coerced and isinstance(coerced["birth_time"], str):
+        if coerced["birth_time"] == "":
+            coerced["birth_time"] = None
+        else:
+            try:
+                coerced["birth_time"] = time.fromisoformat(coerced["birth_time"])
+            except ValueError as exc:
+                raise HTTPException(
+                    status_code=422,
+                    detail=f"Invalid birth_time format: {coerced['birth_time']!r}",
+                ) from exc
+
     try:
-        user = await repository.update_layer(session, user_id, layer, request.data)
+        user = await repository.update_layer(session, user_id, layer, coerced)
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     except LookupError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
-    return _user_to_response(user)
+    try:
+        return _user_to_response(user)
+    except Exception:
+        logger.exception("Failed to serialize profile %s after %s update", user_id, layer)
+        raise
 
 
 @router.delete("/profile/{user_id}", status_code=200)
