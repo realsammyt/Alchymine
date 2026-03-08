@@ -120,12 +120,23 @@ async def create_report(
         intake_persist["birth_date"] = date_type.fromisoformat(intake_persist["birth_date"])
         if intake_persist.get("birth_time"):
             intake_persist["birth_time"] = time_type.fromisoformat(intake_persist["birth_time"])
+        else:
+            intake_persist["birth_time"] = None
         # Convert intention enum value to plain string
         if hasattr(intake_persist.get("intention"), "value"):
             intake_persist["intention"] = intake_persist["intention"]
         await repository.update_layer(session, current_user["sub"], "intake", intake_persist)
+    except LookupError:
+        # User row doesn't exist — JWT sub doesn't match a DB user.
+        logger.warning(
+            "Cannot persist intake for user %s: user row not found in DB",
+            current_user["sub"],
+        )
     except Exception:
-        logger.warning("Failed to persist intake data for user %s", current_user["sub"])
+        logger.exception(
+            "Failed to persist intake data for user %s",
+            current_user["sub"],
+        )
 
     await session.commit()
 
