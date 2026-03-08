@@ -16,11 +16,16 @@ export interface ApiState<T> {
 /**
  * Hook for fetching data from the API with loading/error handling.
  *
- * @param fetcher - Async function that returns the data
+ * The fetcher receives an `AbortSignal` that is aborted when the effect
+ * cleans up (deps change or component unmounts).  Pass this signal
+ * through to `fetch()` calls to cancel in-flight requests and prevent
+ * race conditions.
+ *
+ * @param fetcher - Async function that returns the data (receives AbortSignal)
  * @param deps - Dependency array (re-fetches when deps change)
  */
 export function useApi<T>(
-  fetcher: (() => Promise<T>) | null,
+  fetcher: ((signal: AbortSignal) => Promise<T>) | null,
   deps: unknown[] = [],
 ): ApiState<T> {
   const [data, setData] = useState<T | null>(null);
@@ -36,26 +41,25 @@ export function useApi<T>(
       return;
     }
 
-    let cancelled = false;
+    const controller = new AbortController();
     setLoading(true);
     setError(null);
 
-    fetcher()
+    fetcher(controller.signal)
       .then((result) => {
-        if (!cancelled) {
+        if (!controller.signal.aborted) {
           setData(result);
           setLoading(false);
         }
       })
       .catch((err) => {
-        if (!cancelled) {
-          setError(err instanceof Error ? err.message : "An error occurred");
-          setLoading(false);
-        }
+        if (controller.signal.aborted) return;
+        setError(err instanceof Error ? err.message : "An error occurred");
+        setLoading(false);
       });
 
     return () => {
-      cancelled = true;
+      controller.abort();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [trigger, ...deps]);
