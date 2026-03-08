@@ -28,7 +28,7 @@ from sqlalchemy.orm import selectinload
 
 from alchymine.api.auth import get_current_admin
 from alchymine.api.deps import get_db_session
-from alchymine.db.models import AdminAuditLog, InviteCode, JournalEntry, Report, User
+from alchymine.db.models import AdminAuditLog, InviteCode, JournalEntry, Report, User, WaitlistEntry
 from alchymine.email import send_invitation_email
 from alchymine.safety.audit import AuditEventType
 from alchymine.safety.audit import log_event as safety_log_event
@@ -240,6 +240,52 @@ class InviteUsersResponse(BaseModel):
     total_emails_sent: int
 
 
+class WaitlistEntryResponse(BaseModel):
+    """Single waitlist entry record."""
+
+    id: int
+    email: str
+    status: str
+    invite_code_id: int | None
+    notes: str | None
+    created_at: str
+    updated_at: str
+
+
+class PaginatedWaitlistResponse(BaseModel):
+    """Paginated list of waitlist entries."""
+
+    entries: list[WaitlistEntryResponse]
+    total: int
+    page: int
+    per_page: int
+
+
+class InviteWaitlistRequest(BaseModel):
+    """Request body for inviting selected waitlist entries."""
+
+    entry_ids: list[int] = Field(..., min_length=1)
+    expires_in_days: int = Field(default=7, ge=1, le=90)
+
+
+class WaitlistInviteResult(BaseModel):
+    """Result for a single waitlist entry invitation."""
+
+    entry_id: int
+    email: str
+    invite_code: str
+    email_sent: bool
+
+
+class InviteWaitlistResponse(BaseModel):
+    """Response for waitlist invite action."""
+
+    results: list[WaitlistInviteResult]
+    total_invited: int
+    total_emails_sent: int
+    total_skipped: int
+
+
 # ─── Helpers ─────────────────────────────────────────────────────────────
 
 
@@ -256,6 +302,19 @@ def _invite_code_response(code: InviteCode) -> InviteCodeResponse:
         note=code.note,
         created_at=str(code.created_at),
         updated_at=str(code.updated_at),
+    )
+
+
+def _waitlist_entry_response(entry: WaitlistEntry) -> WaitlistEntryResponse:
+    """Convert a WaitlistEntry ORM object to its response schema."""
+    return WaitlistEntryResponse(
+        id=entry.id,
+        email=entry.email,
+        status=entry.status,
+        invite_code_id=entry.invite_code_id,
+        notes=entry.notes,
+        created_at=str(entry.created_at),
+        updated_at=str(entry.updated_at),
     )
 
 
@@ -515,7 +574,9 @@ async def invite_users_by_email(
         await db.flush()
 
         # Send inline so the admin gets immediate feedback on delivery status.
-        sent = await send_invitation_email(email, code_value, invited_by=admin.email)
+        sent = await send_invitation_email(
+            email, code_value, invited_by=admin.email, expires_at=expires_at
+        )
         if sent:
             emails_sent += 1
 
@@ -846,3 +907,153 @@ async def analytics_users(
         daily_counts.append(DailyUserCount(date=date_key, count=counts.get(date_key, 0)))
 
     return UserAnalyticsResponse(daily_counts=daily_counts, period_days=days)
+
+
+# ─── Waitlist Admin Endpoints ─────────────────────────────────────────────
+
+
+@router.get("/waitlist", response_model=PaginatedWaitlistResponse)
+async def list_waitlist(
+    page: int = Query(default=1, ge=1),
+    per_page: int = Query(default=50, ge=1, le=200),
+    status_filter: str | None = Query(default=None, alias="status"),
+    db: AsyncSession = Depends(get_db),
+    _admin: User = Depends(get_current_admin),
+) -> PaginatedWaitlistResponse:
+    """Return a paginated list of waitlist entries with optional status filter."""
+    query = select(WaitlistEntry)
+
+    if status_filter is not None:
+        query = query.where(WaitlistEntry.status == status_filter)
+
+    count_query = select(func.count()).select_from(query.subquery())
+    total_result = await db.execute(count_query)
+    total = total_result.scalar_one()
+
+    query = query.order_by(desc(WaitlistEntry.created_at))
+    offset = (page - 1) * per_page
+    query = query.offset(offset).limit(per_page)
+
+    result = await db.execute(query)
+    entries = result.scalars().all()
+
+    return PaginatedWaitlistResponse(
+        entries=[_waitlist_entry_response(e) for e in entries],
+        total=total,
+        page=page,
+        per_page=per_page,
+    )
+
+
+@router.post(
+    "/waitlist/invite", response_model=InviteWaitlistResponse, status_code=status.HTTP_201_CREATED
+)
+async def invite_waitlist_entries(
+    body: InviteWaitlistRequest,
+    db: AsyncSession = Depends(get_db),
+    admin: User = Depends(get_current_admin),
+) -> InviteWaitlistResponse:
+    """Invite selected waitlist entries by their IDs.
+
+    For each pending entry:
+    1. Creates a single-use invite code (expires after ``expires_in_days``).
+    2. Sends an invitation email (fire-and-forget with status feedback).
+    3. Updates the waitlist entry status to ``invited``.
+
+    Non-pending entries are skipped.
+    """
+    expires_at = datetime.now(UTC) + timedelta(days=body.expires_in_days)
+
+    result = await db.execute(select(WaitlistEntry).where(WaitlistEntry.id.in_(body.entry_ids)))
+    entries = result.scalars().all()
+
+    results: list[WaitlistInviteResult] = []
+    emails_sent = 0
+    skipped = 0
+
+    for entry in entries:
+        if entry.status != "pending":
+            skipped += 1
+            continue
+
+        code_value = secrets.token_urlsafe(16)
+        invite = InviteCode(
+            code=code_value,
+            created_by=admin.id,
+            max_uses=1,
+            expires_at=expires_at,
+            note=f"Waitlist invite: {entry.email}",
+        )
+        db.add(invite)
+        await db.flush()
+
+        entry.invite_code_id = invite.id
+        entry.status = "invited"
+
+        sent = await send_invitation_email(
+            entry.email, code_value, invited_by=admin.email, expires_at=expires_at
+        )
+        if sent:
+            emails_sent += 1
+
+        results.append(
+            WaitlistInviteResult(
+                entry_id=entry.id,
+                email=entry.email,
+                invite_code=code_value,
+                email_sent=sent,
+            )
+        )
+
+    await _audit(
+        db,
+        admin_id=admin.id,
+        action="invite_waitlist_entries",
+        target_type="waitlist_entry",
+        target_id=None,
+        detail={
+            "entry_ids": body.entry_ids,
+            "invited": len(results),
+            "skipped": skipped,
+            "emails_sent": emails_sent,
+        },
+    )
+    await db.commit()
+
+    return InviteWaitlistResponse(
+        results=results,
+        total_invited=len(results),
+        total_emails_sent=emails_sent,
+        total_skipped=skipped,
+    )
+
+
+@router.delete("/waitlist/{entry_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_waitlist_entry(
+    entry_id: int,
+    db: AsyncSession = Depends(get_db),
+    admin: User = Depends(get_current_admin),
+) -> None:
+    """Remove a waitlist entry.
+
+    Returns 204 on success, 404 if the entry does not exist.
+    """
+    result = await db.execute(select(WaitlistEntry).where(WaitlistEntry.id == entry_id))
+    entry = result.scalar_one_or_none()
+
+    if entry is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Waitlist entry not found",
+        )
+
+    await _audit(
+        db,
+        admin_id=admin.id,
+        action="delete_waitlist_entry",
+        target_type="waitlist_entry",
+        target_id=str(entry_id),
+        detail={"email": entry.email, "status": entry.status},
+    )
+    await db.delete(entry)
+    await db.commit()

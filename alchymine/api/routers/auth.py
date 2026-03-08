@@ -32,7 +32,7 @@ from alchymine.api.auth import (
 )
 from alchymine.api.deps import get_db_session
 from alchymine.config import get_settings
-from alchymine.db.models import InviteCode, User
+from alchymine.db.models import InviteCode, User, WaitlistEntry
 from alchymine.email import send_password_reset_email
 
 logger = logging.getLogger(__name__)
@@ -92,6 +92,19 @@ class MessageResponse(BaseModel):
     """Generic message response."""
 
     message: str
+
+
+class WaitlistRequest(BaseModel):
+    """Request body for public waitlist signup."""
+
+    email: EmailStr
+
+
+class WaitlistResponse(BaseModel):
+    """Response for waitlist signup."""
+
+    message: str
+    already_registered: bool
 
 
 class UserResponse(BaseModel):
@@ -209,6 +222,20 @@ async def register(
 
     await db.commit()
     await db.refresh(user)
+
+    # Best-effort: mark the waitlist entry as registered if the invite code matches
+    try:
+        waitlist_result = await db.execute(
+            select(WaitlistEntry).where(WaitlistEntry.email == body.email)
+        )
+        waitlist_entry = waitlist_result.scalar_one_or_none()
+        if waitlist_entry is not None and waitlist_entry.status != "registered":
+            waitlist_entry.status = "registered"
+            await db.commit()
+    except Exception:
+        logger.exception(
+            "Failed to update waitlist status for %s — registration continues", body.email
+        )
 
     # Generate tokens
     token_data = {"sub": user.id, "email": user.email}
@@ -476,3 +503,37 @@ async def reset_password(
     await db.commit()
 
     return MessageResponse(message="Password has been reset successfully.")
+
+
+# ─── Waitlist ─────────────────────────────────────────────────────────────
+
+
+@router.post("/waitlist", response_model=WaitlistResponse)
+async def join_waitlist(
+    body: WaitlistRequest,
+    db: AsyncSession = Depends(get_db),
+) -> WaitlistResponse:
+    """Add an email to the public waitlist.
+
+    Idempotent — always returns 200 to avoid email enumeration.
+    Returns ``already_registered: true`` when the email is already on the list.
+    """
+    result = await db.execute(select(WaitlistEntry).where(WaitlistEntry.email == body.email))
+    existing = result.scalar_one_or_none()
+
+    if existing is not None:
+        return WaitlistResponse(
+            message="You're already on the waitlist.",
+            already_registered=True,
+        )
+
+    entry = WaitlistEntry(email=body.email)
+    db.add(entry)
+    await db.commit()
+
+    logger.info("New waitlist signup: %s", body.email)
+
+    return WaitlistResponse(
+        message="You're on the waitlist — we'll be in touch.",
+        already_registered=False,
+    )

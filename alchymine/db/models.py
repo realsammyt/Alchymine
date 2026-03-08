@@ -557,3 +557,34 @@ class MilestoneDBRecord(Base):
 
     def __repr__(self) -> str:
         return f"<MilestoneDBRecord id={self.id!r} system={self.system!r} name={self.name!r}>"
+
+
+# ─── WaitlistEntry ────────────────────────────────────────────────────
+
+
+class WaitlistEntry(Base):
+    """Waitlist signup entry.
+
+    Tracks email signups for the public waitlist form.  Status progresses
+    from ``pending`` → ``invited`` (when an admin sends an invite code) →
+    ``registered`` (when the user completes account creation).
+    """
+
+    __tablename__ = "waitlist_entries"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    email: Mapped[str] = mapped_column(String(255), unique=True, nullable=False, index=True)
+    status: Mapped[str] = mapped_column(String(20), default="pending", nullable=False, index=True)
+    invite_code_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("invite_codes.id", ondelete="SET NULL"), nullable=True
+    )
+    notes: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), index=True
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+    def __repr__(self) -> str:
+        return f"<WaitlistEntry id={self.id!r} email={self.email!r} status={self.status!r}>"

@@ -137,7 +137,7 @@ class TestSendInvitationEmail:
         mock_send.assert_called_once()
         call_args = mock_send.call_args[0][0]
         assert call_args["to"] == ["newuser@example.com"]
-        assert call_args["subject"] == "You're Invited to Alchymine"
+        assert call_args["subject"] == "You've Been Invited to Alchymine"
         assert "INVITE-CODE" in call_args["html"]
         assert "admin@example.com" in call_args["html"]
 

@@ -1049,4 +1049,82 @@ export async function adminGetUserAnalytics(
   return request<UserAnalytics>(`${BASE}/admin/analytics/users${params}`);
 }
 
+// ─── Waitlist types ───────────────────────────────────────────────
+
+export interface WaitlistEntry {
+  id: number;
+  email: string;
+  status: "pending" | "invited" | "registered";
+  invite_code_id: number | null;
+  notes: string | null;
+  created_at: string;
+}
+
+export interface PaginatedWaitlist {
+  entries: WaitlistEntry[];
+  total: number;
+  page: number;
+  per_page: number;
+}
+
+export interface WaitlistInviteResult {
+  email: string;
+  success: boolean;
+  code?: string;
+  error?: string;
+}
+
+export interface WaitlistInviteResponse {
+  results: WaitlistInviteResult[];
+}
+
+// ─── Waitlist API functions ───────────────────────────────────────
+
+export async function joinWaitlist(
+  email: string,
+): Promise<{ message: string; already_registered: boolean }> {
+  const res = await fetch(`${BASE}/auth/waitlist`, {
+    method: "POST",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email }),
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({ detail: "Unknown error" }));
+    throw new ApiError(res.status, body.detail || `HTTP ${res.status}`);
+  }
+  return res.json();
+}
+
+export async function adminGetWaitlist(opts?: {
+  page?: number;
+  perPage?: number;
+  status?: string;
+}): Promise<PaginatedWaitlist> {
+  const params = new URLSearchParams();
+  if (opts?.page) params.set("page", String(opts.page));
+  if (opts?.perPage) params.set("per_page", String(opts.perPage));
+  if (opts?.status) params.set("status", opts.status);
+  const query = params.toString();
+  return request<PaginatedWaitlist>(
+    `${BASE}/admin/waitlist${query ? `?${query}` : ""}`,
+  );
+}
+
+export async function adminInviteWaitlistEntries(data: {
+  entry_ids: number[];
+  expires_in_days?: number;
+}): Promise<WaitlistInviteResponse> {
+  return request<WaitlistInviteResponse>(`${BASE}/admin/waitlist/invite`, {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+}
+
+export async function adminDeleteWaitlistEntry(entryId: number): Promise<void> {
+  await request<{ message: string }>(`${BASE}/admin/waitlist/${entryId}`, {
+    method: "DELETE",
+  });
+}
+
 export { ApiError };

@@ -1,7 +1,7 @@
 "use client";
 
-import { FormEvent, useState } from "react";
-import { useRouter } from "next/navigation";
+import { FormEvent, useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import Button from "@/components/shared/Button";
 import { useAuth } from "@/lib/AuthContext";
@@ -10,6 +10,7 @@ import { MotionReveal } from "@/components/shared/MotionReveal";
 
 export default function SignupPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { register } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -17,6 +18,11 @@ export default function SignupPage() {
   const [promoCode, setPromoCode] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    const invite = searchParams.get("invite");
+    if (invite) setPromoCode(invite);
+  }, [searchParams]);
 
   function validate(): string | null {
     if (password.length < 8) return "Password must be at least 8 characters";

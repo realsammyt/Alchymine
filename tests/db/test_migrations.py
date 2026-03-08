@@ -106,7 +106,7 @@ class TestMigrationCompleteness:
             rows = result.fetchall()
 
         assert len(rows) == 1, f"Expected 1 head revision, got {len(rows)}: {rows}"
-        assert rows[0][0] == "0007", f"Expected head at 0007, got {rows[0][0]}"
+        assert rows[0][0] == "0008", f"Expected head at 0008, got {rows[0][0]}"
 
     def test_reports_table_has_all_columns(self, fresh_migration_engine):
         """Reports table (added in migration 0006) has all expected columns."""
