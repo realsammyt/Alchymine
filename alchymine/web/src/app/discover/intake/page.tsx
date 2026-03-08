@@ -152,8 +152,12 @@ export default function IntakePage() {
           }));
         }
       })
-      .catch(() => {
-        // No saved profile yet — that's fine, user fills in fresh
+      .catch((err) => {
+        // 404 = no saved profile yet, which is normal for new users.
+        // Other errors (500, network) should be logged for debugging.
+        if (err?.status !== 404) {
+          console.warn("Failed to load profile:", err);
+        }
       });
   }, [user?.id]);
 
@@ -199,7 +203,9 @@ export default function IntakePage() {
         birth_city: formData.birthCity || null,
         intention: formData.intentions[0],
         intentions: formData.intentions,
-      }).catch(() => {});
+      }).catch((err) => {
+        console.warn("Failed to save intake to server (will retry on report submit):", err);
+      });
     }
 
     router.push("/discover/assessment");

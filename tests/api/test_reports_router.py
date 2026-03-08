@@ -13,6 +13,7 @@ import os
 os.environ["CELERY_ALWAYS_EAGER"] = "true"
 
 import importlib  # noqa: E402
+import logging  # noqa: E402
 from unittest.mock import AsyncMock, patch  # noqa: E402
 
 import pytest  # noqa: E402
@@ -30,7 +31,7 @@ import alchymine.workers.celery_app as celery_app_mod  # noqa: E402
 
 importlib.reload(celery_app_mod)
 
-from alchymine.api.auth import get_current_user  # noqa: E402
+from alchymine.api.auth import get_current_user  # noqa: E402,F401
 from alchymine.api.deps import get_db_session, set_db_engine  # noqa: E402
 from alchymine.api.main import app  # noqa: E402
 from alchymine.db import repository  # noqa: E402
@@ -282,107 +283,6 @@ class TestListUserReports:
         assert data["limit"] == 10
 
 
-# ── Intake persistence side-effect of POST /reports ──────────────────────
-
-
-@pytest_asyncio.fixture
-async def seeded_client(engine, client):
-    """Client with a pre-seeded User row so update_layer can find it."""
-    factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
-    async with factory() as sess:
-        from alchymine.db.models import User
-
-        user = User(id=_TEST_USER_ID, email="test@example.com", password_hash="hashed")
-        sess.add(user)
-        await sess.commit()
-    return client
-
-
-class TestIntakePersistence:
-    """Tests for intake data persistence side-effect of POST /reports."""
-
-    def test_post_reports_persists_intake_to_db(
-        self, seeded_client: TestClient, engine
-    ) -> None:
-        """POST /reports should persist intake data to the intake_data table."""
-        payload = {
-            "intake": {
-                "full_name": "Test User",
-                "birth_date": "1990-05-15",
-                "birth_time": "14:30",
-                "birth_city": "Portland",
-                "intention": "career",
-                "intentions": ["career", "money"],
-                "assessment_responses": {"bf_e1": 4, "bf_e2": 3, "bf_a1": 5},
-            },
-            "user_input": "Generate my report",
-        }
-        resp = seeded_client.post("/api/v1/reports", json=payload)
-        assert resp.status_code == 202
-
-        import asyncio
-
-        from sqlalchemy import select as sa_select
-
-        async def _verify() -> None:
-            vfactory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
-            async with vfactory() as sess:
-                from alchymine.db.models import IntakeData
-
-                result = await sess.execute(
-                    sa_select(IntakeData).where(IntakeData.user_id == _TEST_USER_ID)
-                )
-                intake = result.scalar_one_or_none()
-                assert intake is not None, "Intake data was NOT persisted to DB"
-                assert intake.full_name == "Test User"
-                assert intake.assessment_responses == {"bf_e1": 4, "bf_e2": 3, "bf_a1": 5}
-                assert intake.intention == "career"
-
-        asyncio.get_event_loop().run_until_complete(_verify())
-
-    def test_post_reports_without_user_row_still_returns_202(
-        self, client: TestClient
-    ) -> None:
-        """POST /reports should return 202 even if intake persist fails (no user row)."""
-        resp = client.post("/api/v1/reports", json=_valid_report_payload())
-        assert resp.status_code == 202
-
-    def test_post_reports_intake_persist_logs_on_failure(
-        self, client: TestClient, caplog: pytest.LogCaptureFixture
-    ) -> None:
-        """When intake persist fails, a warning should be logged with exception details."""
-        import logging
-
-        with caplog.at_level(logging.WARNING):
-            client.post("/api/v1/reports", json=_valid_report_payload())
-        assert any("Failed to persist intake" in r.message for r in caplog.records)
-
-    def test_intake_retrievable_via_profile_after_report(
-        self, seeded_client: TestClient, engine
-    ) -> None:
-        """After POST /reports, GET /profile/{id} should return the saved intake data."""
-        payload = {
-            "intake": {
-                "full_name": "Cross Device User",
-                "birth_date": "1985-12-01",
-                "intention": "family",
-                "intentions": ["family"],
-                "assessment_responses": {"bf_e1": 3},
-            },
-            "user_input": "Generate report",
-        }
-        resp = seeded_client.post("/api/v1/reports", json=payload)
-        assert resp.status_code == 202
-
-        profile_resp = seeded_client.get(f"/api/v1/profile/{_TEST_USER_ID}")
-        assert profile_resp.status_code == 200
-        data = profile_resp.json()
-        assert data["intake"] is not None
-        assert data["intake"]["full_name"] == "Cross Device User"
-        assert data["intake"]["birth_date"] == "1985-12-01"
-        assert data["intake"]["assessment_responses"] == {"bf_e1": 3}
-
-
 # ── IDOR: ownership checks on report endpoints ────────────────────────────
 
 
@@ -391,8 +291,8 @@ class TestReportOwnershipIDOR:
 
     def _seed_report_for_other_user(self, engine, report_id: str) -> None:
         """Directly insert a report owned by _OTHER_USER_ID into the DB."""
-        from alchymine.workers.tasks import _run_async
         from alchymine.db.base import get_async_session_factory
+        from alchymine.workers.tasks import _run_async
 
         async def _insert():
             factory = get_async_session_factory(engine)
@@ -442,3 +342,95 @@ class TestReportOwnershipIDOR:
         response = client.get(f"/api/v1/reports/{report_id}/pdf")
         assert response.status_code == 403
         assert response.json()["detail"] == "Access denied"
+
+
+# ── Intake persistence via POST /reports ─────────────────────────────
+
+
+@pytest_asyncio.fixture
+async def seeded_client(engine, client):
+    """Client with a pre-seeded User row so update_layer can find it."""
+    factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+    async with factory() as sess:
+        from alchymine.db.models import User
+
+        user = User(id=_TEST_USER_ID, email="test@example.com", password_hash="hashed")  # noqa: S106
+        sess.add(user)
+        await sess.commit()
+    return client
+
+
+def _intake_report_payload() -> dict:
+    """Return a report payload with full intake data including assessment responses."""
+    return {
+        "intake": {
+            "full_name": "Test User",
+            "birth_date": "1990-05-15",
+            "birth_time": "14:30",
+            "birth_city": "Portland",
+            "intention": "career",
+            "intentions": ["career", "money"],
+            "assessment_responses": {"bf_e1": 4, "bf_e2": 3, "bf_a1": 5},
+        },
+        "user_input": "Generate my report",
+    }
+
+
+class TestIntakePersistence:
+    """Tests for intake data persistence side-effect of POST /reports."""
+
+    def test_post_reports_persists_intake_to_db(self, seeded_client, engine) -> None:
+        """POST /reports should persist intake data to the intake_data table."""
+        resp = seeded_client.post("/api/v1/reports", json=_intake_report_payload())
+        assert resp.status_code == 202
+
+        import asyncio
+
+        async def _verify():
+            from sqlalchemy import select as sa_select
+
+            from alchymine.db.models import IntakeData
+
+            factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+            async with factory() as sess:
+                result = await sess.execute(
+                    sa_select(IntakeData).where(IntakeData.user_id == _TEST_USER_ID)
+                )
+                intake = result.scalar_one_or_none()
+                assert intake is not None, "Intake data was NOT persisted to DB"
+                assert intake.full_name == "Test User"
+                assert intake.intention == "career"
+                assert intake.assessment_responses == {"bf_e1": 4, "bf_e2": 3, "bf_a1": 5}
+
+        asyncio.get_event_loop().run_until_complete(_verify())
+
+    def test_post_reports_without_user_row_still_returns_202(self, client: TestClient) -> None:
+        """POST /reports should return 202 even if intake persist fails (no user row)."""
+        resp = client.post("/api/v1/reports", json=_valid_report_payload())
+        assert resp.status_code == 202
+
+    def test_post_reports_intake_persist_logs_on_failure(
+        self, client: TestClient, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """When intake persist fails (no user row), it should log a warning."""
+        payload = _intake_report_payload()
+        with caplog.at_level(logging.WARNING, logger="alchymine.api.routers.reports"):
+            resp = client.post("/api/v1/reports", json=payload)
+        assert resp.status_code == 202
+        assert any("user row not found" in r.message for r in caplog.records)
+
+    def test_intake_retrievable_via_profile_after_report(
+        self, seeded_client, engine
+    ) -> None:
+        """After POST /reports, GET /profile/{id} should return saved intake data."""
+        payload = _intake_report_payload()
+        resp = seeded_client.post("/api/v1/reports", json=payload)
+        assert resp.status_code == 202
+
+        profile_resp = seeded_client.get(f"/api/v1/profile/{_TEST_USER_ID}")
+        assert profile_resp.status_code == 200
+        data = profile_resp.json()
+        assert data["intake"] is not None, "Intake should be present in profile"
+        assert data["intake"]["full_name"] == "Test User"
+        assert data["intake"]["birth_date"] == "1990-05-15"
+        assert data["intake"]["assessment_responses"] == {"bf_e1": 4, "bf_e2": 3, "bf_a1": 5}
