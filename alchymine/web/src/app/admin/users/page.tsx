@@ -2,8 +2,16 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { adminGetUsers, adminUpdateUserStatus } from "@/lib/api";
-import type { AdminUser, PaginatedUsers } from "@/lib/api";
+import {
+  adminGetUsers,
+  adminUpdateUserStatus,
+  adminInviteUsers,
+} from "@/lib/api";
+import type {
+  AdminUser,
+  PaginatedUsers,
+  InviteUsersResponse,
+} from "@/lib/api";
 
 export default function AdminUsersPage() {
   const router = useRouter();
@@ -13,6 +21,15 @@ export default function AdminUsersPage() {
   const [page, setPage] = useState(1);
   const [sortBy, setSortBy] = useState("created_at");
   const [sortOrder, setSortOrder] = useState("desc");
+
+  // Invite form state
+  const [showInvite, setShowInvite] = useState(false);
+  const [inviteEmail, setInviteEmail] = useState("");
+  const [inviteNote, setInviteNote] = useState("");
+  const [inviting, setInviting] = useState(false);
+  const [inviteResult, setInviteResult] = useState<InviteUsersResponse | null>(
+    null,
+  );
 
   const fetchUsers = useCallback(async () => {
     setLoading(true);
@@ -55,16 +72,119 @@ export default function AdminUsersPage() {
     setPage(1);
   };
 
+  const handleInvite = async () => {
+    const emails = inviteEmail
+      .split(/[,\n]+/)
+      .map((e) => e.trim())
+      .filter(Boolean);
+    if (emails.length === 0) return;
+
+    setInviting(true);
+    setInviteResult(null);
+    try {
+      const result = await adminInviteUsers({
+        emails,
+        note: inviteNote || undefined,
+      });
+      setInviteResult(result);
+      setInviteEmail("");
+      setInviteNote("");
+      fetchUsers();
+    } catch {
+      // handle error
+    } finally {
+      setInviting(false);
+    }
+  };
+
   const totalPages = data ? Math.ceil(data.total / data.per_page) : 0;
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="font-display text-2xl text-text font-light">Users</h1>
-        <p className="font-body text-sm text-text/50 mt-1">
-          {data ? `${data.total} total users` : "Loading..."}
-        </p>
+      <div className="flex items-start justify-between">
+        <div>
+          <h1 className="font-display text-2xl text-text font-light">Users</h1>
+          <p className="font-body text-sm text-text/50 mt-1">
+            {data ? `${data.total} total users` : "Loading..."}
+          </p>
+        </div>
+        <button
+          onClick={() => {
+            setShowInvite(!showInvite);
+            setInviteResult(null);
+          }}
+          className="px-4 py-2 text-sm bg-primary/10 text-primary border border-primary/20 rounded-lg hover:bg-primary/20 transition-colors"
+        >
+          {showInvite ? "Cancel" : "Invite User"}
+        </button>
       </div>
+
+      {/* Invite Form */}
+      {showInvite && (
+        <div className="bg-surface border border-white/5 rounded-xl p-6 space-y-4">
+          <div>
+            <label className="block text-xs text-text/40 mb-1">
+              Email addresses (comma or newline separated)
+            </label>
+            <textarea
+              value={inviteEmail}
+              onChange={(e) => setInviteEmail(e.target.value)}
+              placeholder="user@example.com, another@example.com"
+              rows={3}
+              className="w-full bg-bg border border-white/10 rounded-lg px-3 py-2 text-sm text-text placeholder:text-text/20 focus:outline-none focus:border-primary/50 resize-none font-body"
+            />
+          </div>
+          <div className="max-w-sm">
+            <label className="block text-xs text-text/40 mb-1">
+              Note (optional)
+            </label>
+            <input
+              type="text"
+              value={inviteNote}
+              onChange={(e) => setInviteNote(e.target.value)}
+              maxLength={255}
+              placeholder="e.g. Beta testers"
+              className="w-full bg-bg border border-white/10 rounded-lg px-3 py-2 text-sm text-text placeholder:text-text/20 focus:outline-none focus:border-primary/50 font-body"
+            />
+          </div>
+          <button
+            onClick={handleInvite}
+            disabled={inviting || !inviteEmail.trim()}
+            className="px-4 py-2 text-sm bg-primary text-bg rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-50"
+          >
+            {inviting ? "Sending..." : "Send Invitations"}
+          </button>
+
+          {/* Results */}
+          {inviteResult && (
+            <div className="mt-4 space-y-2">
+              <p className="text-sm text-text/60">
+                {inviteResult.total_invited} invited,{" "}
+                {inviteResult.total_emails_sent} emails sent
+              </p>
+              {inviteResult.results.map((r) => (
+                <div
+                  key={r.email}
+                  className="flex items-center gap-3 text-sm py-1"
+                >
+                  <span
+                    className={`w-2 h-2 rounded-full ${r.email_sent ? "bg-green-400" : "bg-amber-400"}`}
+                  />
+                  <span className="text-text/80">{r.email}</span>
+                  <code className="text-xs font-mono text-primary/60 bg-primary/5 px-2 py-0.5 rounded">
+                    {r.invite_code}
+                  </code>
+                  {!r.email_sent && (
+                    <span className="text-xs text-amber-400">
+                      (email not sent — share code manually)
+                    </span>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Search */}
       <div className="flex gap-4">

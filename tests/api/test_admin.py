@@ -433,6 +433,138 @@ class TestDeleteInviteCode:
 # ─── Auth Guard ───────────────────────────────────────────────────────────
 
 
+# ─── Invite by Email ─────────────────────────────────────────────────────
+
+
+class TestInviteByEmail:
+    """Tests for POST /api/v1/admin/invite."""
+
+    def test_invite_single_email_returns_201(self, client: TestClient):
+        """Inviting a single email should return 201 with results."""
+        with patch.object(admin_module, "send_invitation_email", new=AsyncMock(return_value=True)):
+            response = client.post(
+                "/api/v1/admin/invite",
+                json={"emails": ["newuser@example.com"]},
+            )
+        assert response.status_code == 201
+        data = response.json()
+        assert data["total_invited"] == 1
+        assert data["total_emails_sent"] == 1
+        assert len(data["results"]) == 1
+        assert data["results"][0]["email"] == "newuser@example.com"
+        assert data["results"][0]["email_sent"] is True
+        assert len(data["results"][0]["invite_code"]) > 8
+
+    def test_invite_multiple_emails(self, client: TestClient):
+        """Inviting multiple emails should create one invite code per email."""
+        with patch.object(admin_module, "send_invitation_email", new=AsyncMock(return_value=True)):
+            response = client.post(
+                "/api/v1/admin/invite",
+                json={
+                    "emails": ["a@example.com", "b@example.com", "c@example.com"],
+                    "note": "batch test",
+                },
+            )
+        assert response.status_code == 201
+        data = response.json()
+        assert data["total_invited"] == 3
+        assert data["total_emails_sent"] == 3
+        # All invite codes should be unique
+        codes = [r["invite_code"] for r in data["results"]]
+        assert len(set(codes)) == 3
+
+    def test_invite_creates_invite_codes_in_db(self, client: TestClient):
+        """Invite codes should be visible in the invite codes list after creation."""
+        with patch.object(admin_module, "send_invitation_email", new=AsyncMock(return_value=True)):
+            invite_resp = client.post(
+                "/api/v1/admin/invite",
+                json={"emails": ["dbcheck@example.com"]},
+            )
+        assert invite_resp.status_code == 201
+        code = invite_resp.json()["results"][0]["invite_code"]
+
+        # Verify the code appears in the invite codes list
+        list_resp = client.get("/api/v1/admin/invite-codes")
+        all_codes = [c["code"] for c in list_resp.json()["codes"]]
+        assert code in all_codes
+
+    def test_invite_code_note_contains_email(self, client: TestClient):
+        """The created invite code's note should reference the invited email."""
+        with patch.object(admin_module, "send_invitation_email", new=AsyncMock(return_value=True)):
+            invite_resp = client.post(
+                "/api/v1/admin/invite",
+                json={"emails": ["noted@example.com"], "note": "VIP"},
+            )
+        code_value = invite_resp.json()["results"][0]["invite_code"]
+
+        list_resp = client.get("/api/v1/admin/invite-codes")
+        matching = [c for c in list_resp.json()["codes"] if c["code"] == code_value]
+        assert len(matching) == 1
+        assert "noted@example.com" in matching[0]["note"]
+        assert "VIP" in matching[0]["note"]
+
+    def test_invite_email_failure_still_creates_code(self, client: TestClient):
+        """If email sending fails, the invite code should still be created."""
+        with patch.object(admin_module, "send_invitation_email", new=AsyncMock(return_value=False)):
+            response = client.post(
+                "/api/v1/admin/invite",
+                json={"emails": ["noemail@example.com"]},
+            )
+        assert response.status_code == 201
+        data = response.json()
+        assert data["total_invited"] == 1
+        assert data["total_emails_sent"] == 0
+        assert data["results"][0]["email_sent"] is False
+        # Code should still exist
+        assert len(data["results"][0]["invite_code"]) > 8
+
+    def test_invite_invalid_email_returns_422(self, client: TestClient):
+        """Providing an invalid email should return 422."""
+        response = client.post(
+            "/api/v1/admin/invite",
+            json={"emails": ["not-an-email"]},
+        )
+        assert response.status_code == 422
+
+    def test_invite_empty_emails_returns_422(self, client: TestClient):
+        """Providing an empty emails list should return 422."""
+        response = client.post(
+            "/api/v1/admin/invite",
+            json={"emails": []},
+        )
+        assert response.status_code == 422
+
+    def test_invite_with_custom_expiry(self, client: TestClient):
+        """Inviting with a custom expiry should create codes that expire accordingly."""
+        with patch.object(admin_module, "send_invitation_email", new=AsyncMock(return_value=True)):
+            response = client.post(
+                "/api/v1/admin/invite",
+                json={"emails": ["expiry@example.com"], "expires_in_days": 30},
+            )
+        assert response.status_code == 201
+        code_value = response.json()["results"][0]["invite_code"]
+
+        list_resp = client.get("/api/v1/admin/invite-codes")
+        matching = [c for c in list_resp.json()["codes"] if c["code"] == code_value]
+        assert len(matching) == 1
+        assert matching[0]["expires_at"] is not None
+
+    def test_invite_calls_email_service_with_correct_args(self, client: TestClient):
+        """The email service should be called with the correct email and invite code."""
+        mock_send = AsyncMock(return_value=True)
+        with patch.object(admin_module, "send_invitation_email", new=mock_send):
+            response = client.post(
+                "/api/v1/admin/invite",
+                json={"emails": ["verify@example.com"]},
+            )
+        assert response.status_code == 201
+        mock_send.assert_called_once()
+        call_args = mock_send.call_args
+        assert call_args[0][0] == "verify@example.com"
+        assert isinstance(call_args[0][1], str)  # invite code
+        assert call_args[1]["invited_by"] == "admin@test.com"
+
+
 class TestAdminAuthGuard:
     """Verify that admin endpoints reject unauthenticated/non-admin callers."""
 

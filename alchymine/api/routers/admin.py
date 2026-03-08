@@ -21,7 +21,7 @@ import secrets
 from datetime import UTC, datetime, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, EmailStr, Field
 from sqlalchemy import asc, desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -29,6 +29,7 @@ from sqlalchemy.orm import selectinload
 from alchymine.api.auth import get_current_admin
 from alchymine.api.deps import get_db_session
 from alchymine.db.models import AdminAuditLog, InviteCode, JournalEntry, Report, User
+from alchymine.email import send_invitation_email
 
 logger = logging.getLogger(__name__)
 
@@ -191,6 +192,30 @@ class UserAnalyticsResponse(BaseModel):
 
     daily_counts: list[DailyUserCount]
     period_days: int
+
+
+class InviteUserRequest(BaseModel):
+    """Request body for inviting one or more users by email."""
+
+    emails: list[EmailStr] = Field(..., min_length=1, max_length=50)
+    note: str | None = Field(default=None, max_length=255)
+    expires_in_days: int = Field(default=7, ge=1, le=90)
+
+
+class InviteUserResult(BaseModel):
+    """Result for a single email invitation."""
+
+    email: str
+    invite_code: str
+    email_sent: bool
+
+
+class InviteUsersResponse(BaseModel):
+    """Response containing results for all invited emails."""
+
+    results: list[InviteUserResult]
+    total_invited: int
+    total_emails_sent: int
 
 
 # ─── Helpers ─────────────────────────────────────────────────────────────
@@ -426,6 +451,72 @@ async def update_user_admin(
         created_at=str(user.created_at),
         last_login_at=str(user.last_login_at) if user.last_login_at is not None else None,
         invite_code_used=user.invite_code_used,
+    )
+
+
+# ─── Invite by Email ─────────────────────────────────────────────────────
+
+
+@router.post("/invite", response_model=InviteUsersResponse, status_code=status.HTTP_201_CREATED)
+async def invite_users_by_email(
+    body: InviteUserRequest,
+    db: AsyncSession = Depends(get_db),
+    admin: User = Depends(get_current_admin),
+) -> InviteUsersResponse:
+    """Invite one or more users by email.
+
+    For each email address:
+    1. Creates a single-use invite code (expires after ``expires_in_days``).
+    2. Sends an invitation email with a registration link (fire-and-forget).
+
+    The invite code is always created and returned, even if the email service
+    is unavailable — the admin can share the code manually in that case.
+    """
+    expires_at = datetime.now(UTC) + timedelta(days=body.expires_in_days)
+    results: list[InviteUserResult] = []
+    emails_sent = 0
+
+    for email in body.emails:
+        code_value = secrets.token_urlsafe(16)
+        invite_note = f"Invited: {email}"
+        if body.note:
+            invite_note = f"Invited: {email} — {body.note}"
+
+        invite = InviteCode(
+            code=code_value,
+            created_by=admin.id,
+            max_uses=1,
+            expires_at=expires_at,
+            note=invite_note,
+        )
+        db.add(invite)
+        await db.flush()
+
+        # Send inline so the admin gets immediate feedback on delivery status.
+        sent = await send_invitation_email(email, code_value, invited_by=admin.email)
+        if sent:
+            emails_sent += 1
+
+        results.append(InviteUserResult(email=email, invite_code=code_value, email_sent=sent))
+
+    await _audit(
+        db,
+        admin_id=admin.id,
+        action="invite_users_by_email",
+        target_type="invite_code",
+        target_id=None,
+        detail={
+            "emails": [str(e) for e in body.emails],
+            "count": len(body.emails),
+            "emails_sent": emails_sent,
+        },
+    )
+    await db.commit()
+
+    return InviteUsersResponse(
+        results=results,
+        total_invited=len(results),
+        total_emails_sent=emails_sent,
     )
 
 
