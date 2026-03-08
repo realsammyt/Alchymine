@@ -14,7 +14,7 @@ Generational Wealth, Creative Development, and Perspective Enhancement.
 
 - **Engine**: Python 3.11+ (numerology, astrology, wealth, creative, perspective — all deterministic)
 - **API**: FastAPI + Celery + Redis
-- **Frontend**: Next.js 14+ (App Router), React, TypeScript, Tailwind CSS
+- **Frontend**: Next.js 15+ (App Router), React 18, TypeScript, Tailwind CSS
 - **Database**: PostgreSQL 15+
 - **Queue**: Celery with Redis broker
 - **PDF**: Puppeteer/Playwright
@@ -30,8 +30,8 @@ Generational Wealth, Creative Development, and Perspective Enhancement.
 # Install dependencies
 pip install -e ".[dev]"
 
-# Run tests
-pytest tests/engine/ tests/api/ -v
+# Run tests (all)
+pytest tests/ -v
 
 # Lint
 ruff check alchymine/
@@ -79,6 +79,9 @@ docker compose -f infrastructure/docker-compose.yml run --rm api pytest
 
 # Build production images
 docker compose -f infrastructure/docker-compose.yml build
+
+# Minimal deploy (production)
+docker compose -f infrastructure/docker-compose.yml -f infrastructure/docker-compose.deploy.yml up -d
 ```
 
 ### Ethics & Quality
@@ -92,6 +95,25 @@ python -m alchymine.agents.quality.ethics_check
 
 # Run quality gate regression tests
 pytest tests/agents/ -v
+```
+
+## Project Structure (Quick Reference)
+
+```
+alchymine/
+  engine/    # 103 files — 5 deterministic systems (astrology, numerology, wealth, creative, perspective)
+  api/       # 50 files  — FastAPI routers (24), auth, middleware, deps
+  agents/    # 34 files  — CrewAI crews (6), orchestrator, coordinators, quality
+  web/       # 110 files — Next.js App Router frontend (src/)
+  db/        # 19 files  — SQLAlchemy models, repository, encryption, 7 Alembic migrations
+  mcp/       # 14 files  — 5 MCP servers (one per system)
+  prompts/   # 11 files  — YAML narrative templates + validator
+  safety/    #  8 files  — Ethics checking, output validation
+  outcomes/  #  6 files  — Outcome tracking, analytics
+  llm/       #  6 files  — Anthropic client, narrative generation
+tests/       # 76 files  — pytest (api, engine, agents, db, integration, security, workers, mcp)
+infrastructure/           — 4 Dockerfiles, 4 docker-compose variants
+.github/workflows/        — 5 CI/CD workflows (ci, security, release, prepare-release, diagnose)
 ```
 
 ## Architecture
