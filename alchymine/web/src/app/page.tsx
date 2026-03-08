@@ -17,6 +17,7 @@ import {
   LockIcon,
   CheckIcon,
 } from "@/components/shared/Icons";
+import { joinWaitlist } from "@/lib/api";
 
 const FIVE_SYSTEMS = [
   {
@@ -139,7 +140,6 @@ const TRUST_CARDS = [
   },
 ];
 
-
 function colorClass(color: string) {
   switch (color) {
     case "primary":
@@ -178,6 +178,8 @@ export default function LandingPage() {
   const router = useRouter();
   const [waitlistEmail, setWaitlistEmail] = useState("");
   const [waitlistSubmitted, setWaitlistSubmitted] = useState(false);
+  const [waitlistLoading, setWaitlistLoading] = useState(false);
+  const [waitlistError, setWaitlistError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!isLoading && user) {
@@ -185,18 +187,19 @@ export default function LandingPage() {
     }
   }, [user, isLoading, router]);
 
-  function handleWaitlist(e: React.FormEvent) {
+  async function handleWaitlist(e: React.FormEvent) {
     e.preventDefault();
     if (!waitlistEmail.trim()) return;
-
-    const existing = JSON.parse(
-      localStorage.getItem("alchymine_waitlist") || "[]",
-    );
-    if (!existing.includes(waitlistEmail)) {
-      existing.push(waitlistEmail);
-      localStorage.setItem("alchymine_waitlist", JSON.stringify(existing));
+    setWaitlistLoading(true);
+    setWaitlistError(null);
+    try {
+      await joinWaitlist(waitlistEmail.trim());
+      setWaitlistSubmitted(true);
+    } catch {
+      setWaitlistError("Something went wrong. Please try again.");
+    } finally {
+      setWaitlistLoading(false);
     }
-    setWaitlistSubmitted(true);
   }
 
   // Show nothing while checking auth (prevents flash)
@@ -482,7 +485,10 @@ export default function LandingPage() {
                 <MotionStaggerItem key={card.title}>
                   <div className="card-surface p-6 flex items-start gap-4 h-full">
                     <div className="w-10 h-10 rounded-xl bg-primary/[0.06] border border-primary/[0.12] flex items-center justify-center flex-shrink-0">
-                      <TrustIcon icon={card.icon} className="w-5 h-5 text-primary/70" />
+                      <TrustIcon
+                        icon={card.icon}
+                        className="w-5 h-5 text-primary/70"
+                      />
                     </div>
                     <div>
                       <h3 className="font-display text-lg font-medium text-text mb-1.5">
@@ -591,26 +597,34 @@ export default function LandingPage() {
                       You&apos;re on the list — we&apos;ll be in touch.
                     </div>
                   ) : (
-                    <form onSubmit={handleWaitlist} className="flex gap-2">
-                      <label htmlFor="waitlist-email" className="sr-only">
-                        Email address for waitlist
-                      </label>
-                      <input
-                        id="waitlist-email"
-                        type="email"
-                        required
-                        value={waitlistEmail}
-                        onChange={(e) => setWaitlistEmail(e.target.value)}
-                        placeholder="you@example.com"
-                        className="flex-1 bg-white/[0.03] border border-white/[0.08] rounded-xl px-4 py-3 text-sm font-body text-text placeholder:text-text/25 focus:outline-none focus:border-accent/40 focus:ring-1 focus:ring-accent/20 transition-all duration-300"
-                      />
-                      <button
-                        type="submit"
-                        className="px-5 py-3 bg-accent/[0.08] text-accent border border-accent/[0.15] rounded-xl text-sm font-body font-medium hover:bg-accent/[0.12] transition-all duration-300 flex-shrink-0"
-                      >
-                        Join
-                      </button>
-                    </form>
+                    <div className="space-y-2">
+                      <form onSubmit={handleWaitlist} className="flex gap-2">
+                        <label htmlFor="waitlist-email" className="sr-only">
+                          Email address for waitlist
+                        </label>
+                        <input
+                          id="waitlist-email"
+                          type="email"
+                          required
+                          value={waitlistEmail}
+                          onChange={(e) => setWaitlistEmail(e.target.value)}
+                          placeholder="you@example.com"
+                          className="flex-1 bg-white/[0.03] border border-white/[0.08] rounded-xl px-4 py-3 text-sm font-body text-text placeholder:text-text/25 focus:outline-none focus:border-accent/40 focus:ring-1 focus:ring-accent/20 transition-all duration-300"
+                        />
+                        <button
+                          type="submit"
+                          disabled={waitlistLoading}
+                          className="px-5 py-3 bg-accent/[0.08] text-accent border border-accent/[0.15] rounded-xl text-sm font-body font-medium hover:bg-accent/[0.12] transition-all duration-300 flex-shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          {waitlistLoading ? "..." : "Join"}
+                        </button>
+                      </form>
+                      {waitlistError && (
+                        <p className="text-xs font-body text-red-400 text-center">
+                          {waitlistError}
+                        </p>
+                      )}
+                    </div>
                   )}
                 </div>
               </MotionStaggerItem>
