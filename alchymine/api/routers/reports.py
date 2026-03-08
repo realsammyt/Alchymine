@@ -122,61 +122,64 @@ async def create_report(
     report_id = str(uuid.uuid4())
     now = datetime.now(UTC).isoformat()
 
-    # Persist the report row and commit immediately so:
-    # 1. Status queries work right away
-    # 2. The Celery task (which uses its own session) can find the row
-    # 3. Optional intake persistence below can't corrupt this transaction
-    await repository.create_report(
-        session,
-        report_id=report_id,
-        status="pending",
-        user_input=request.user_input,
-        user_profile=request.user_profile,
-        user_id=current_user["sub"],
-    )
-    await session.commit()
-
-    # Persist the intake data to the user's profile so it survives across
-    # devices and sessions (sessionStorage is browser-tab-scoped).
-    # This is best-effort — failures must never block report creation.
+    # ── Critical section: create and commit the report row ─────────────
+    # This MUST succeed for the endpoint to return 202.  Everything after
+    # this commit is best-effort and must never cause a 500.
     try:
-        intake_persist = request.intake.model_dump(mode="json")
-        # Convert date/time strings back to proper types for the ORM
-        from datetime import date as date_type
-        from datetime import time as time_type
-
-        intake_persist["birth_date"] = date_type.fromisoformat(intake_persist["birth_date"])
-        if intake_persist.get("birth_time"):
-            intake_persist["birth_time"] = time_type.fromisoformat(intake_persist["birth_time"])
-        else:
-            intake_persist["birth_time"] = None
-        # Convert intention enum value to plain string
-        if hasattr(intake_persist.get("intention"), "value"):
-            intake_persist["intention"] = intake_persist["intention"]
-        await repository.update_layer(session, current_user["sub"], "intake", intake_persist)
+        await repository.create_report(
+            session,
+            report_id=report_id,
+            status="pending",
+            user_input=request.user_input,
+            user_profile=request.user_profile,
+            user_id=current_user["sub"],
+        )
         await session.commit()
-    except LookupError:
-        # User row doesn't exist — JWT sub doesn't match a DB user.
-        await session.rollback()
-        logger.warning(
-            "Cannot persist intake for user %s: user row not found in DB",
-            current_user["sub"],
-        )
     except Exception:
-        await session.rollback()
         logger.exception(
-            "Failed to persist intake data for user %s",
+            "CRITICAL: Failed to create report row for user %s, report %s",
             current_user["sub"],
+            report_id,
         )
+        raise  # Let FastAPI return the error — report row doesn't exist
 
-    # Build a profile dict from the intake data so the orchestrator's
-    # engine nodes have the fields they need (full_name, birth_date, etc.)
-    intake_dict = request.intake.model_dump(mode="json")
-    profile_data = request.user_profile or {}
-    profile_data.update(intake_dict)
-
-    # Dispatch Celery task with intention(s) + full intake context
+    # ── Best-effort section: intake persistence + task dispatch ─────────
+    # Nothing below may raise.  Wrap in a single try/except so any
+    # unexpected failure is logged but never surfaces as a 500.
     try:
+        # Persist intake to the user's profile (cross-device sync).
+        try:
+            intake_persist = request.intake.model_dump(mode="json")
+            from datetime import date as date_type
+            from datetime import time as time_type
+
+            intake_persist["birth_date"] = date_type.fromisoformat(intake_persist["birth_date"])
+            if intake_persist.get("birth_time"):
+                intake_persist["birth_time"] = time_type.fromisoformat(intake_persist["birth_time"])
+            else:
+                intake_persist["birth_time"] = None
+            if hasattr(intake_persist.get("intention"), "value"):
+                intake_persist["intention"] = intake_persist["intention"]
+            await repository.update_layer(session, current_user["sub"], "intake", intake_persist)
+            await session.commit()
+        except LookupError:
+            await session.rollback()
+            logger.warning(
+                "Cannot persist intake for user %s: user row not found in DB",
+                current_user["sub"],
+            )
+        except Exception:
+            await session.rollback()
+            logger.exception(
+                "Failed to persist intake data for user %s",
+                current_user["sub"],
+            )
+
+        # Build profile dict and dispatch Celery task.
+        intake_dict = request.intake.model_dump(mode="json")
+        profile_data = request.user_profile or {}
+        profile_data.update(intake_dict)
+
         generate_report_task.delay(
             report_id,
             request.user_input,
@@ -185,9 +188,13 @@ async def create_report(
             [i.value for i in request.intake.intentions],
         )
     except Exception:
-        logger.error(
-            "Failed to dispatch report task for %s — Celery/Redis may be unavailable",
+        # Catch-all: log everything but NEVER let this become a 500.
+        # The report row is already committed — the task can be retried.
+        logger.exception(
+            "Best-effort post-commit work failed for report %s (user %s). "
+            "Report row exists but task may not have been dispatched.",
             report_id,
+            current_user["sub"],
         )
 
     return ReportStatus(

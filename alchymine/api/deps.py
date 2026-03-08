@@ -72,9 +72,14 @@ async def get_db_session() -> AsyncGenerator[AsyncSession, None]:
     async with factory() as session:
         try:
             yield session
+            # Handlers that manage their own commits leave the session clean.
+            # This commit is a no-op in that case (empty transaction).
             await session.commit()
         except Exception:
-            await session.rollback()
+            try:
+                await session.rollback()
+            except Exception:
+                logger.warning("Session rollback failed during dependency cleanup", exc_info=True)
             raise
 
 
