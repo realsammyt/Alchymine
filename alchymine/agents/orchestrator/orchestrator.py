@@ -167,6 +167,7 @@ class MasterOrchestrator:
                 numerology = result.data.get("numerology", {})
                 archetype_data = result.data.get("archetype", {})
                 personality_data = result.data.get("personality", {})
+                astrology_data = result.data.get("astrology", {})
                 if numerology.get("life_path"):
                     request_data["life_path"] = numerology["life_path"]
                 if archetype_data.get("primary"):
@@ -175,6 +176,14 @@ class MasterOrchestrator:
                     request_data["archetype_secondary"] = archetype_data.get("secondary")
                 if personality_data:
                     request_data["big_five"] = personality_data
+                if astrology_data:
+                    request_data["astrology"] = astrology_data
+                    if astrology_data.get("sun_sign"):
+                        request_data["sun_sign"] = astrology_data["sun_sign"]
+                    if astrology_data.get("moon_sign"):
+                        request_data["moon_sign"] = astrology_data["moon_sign"]
+                    if astrology_data.get("rising_sign"):
+                        request_data["rising_sign"] = astrology_data["rising_sign"]
 
         # Synthesize if multi-system
         synthesis = None
