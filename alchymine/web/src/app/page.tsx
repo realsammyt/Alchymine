@@ -9,6 +9,14 @@ import {
   MotionStagger,
   MotionStaggerItem,
 } from "@/components/shared/MotionReveal";
+import {
+  SystemIcon,
+  TrustIcon,
+  ShieldIcon,
+  CodeIcon,
+  LockIcon,
+  CheckIcon,
+} from "@/components/shared/Icons";
 
 const FIVE_SYSTEMS = [
   {
@@ -131,183 +139,6 @@ const TRUST_CARDS = [
   },
 ];
 
-function SystemIcon({
-  icon,
-  className = "",
-}: {
-  icon: string;
-  className?: string;
-}) {
-  const baseClass = `w-6 h-6 ${className}`;
-  switch (icon) {
-    case "brain":
-      return (
-        <svg
-          className={baseClass}
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          aria-hidden="true"
-        >
-          <path d="M12 2a4 4 0 0 0-4 4v1a4 4 0 0 0-4 4c0 1.5.8 2.8 2 3.4V18a4 4 0 0 0 4 4h4a4 4 0 0 0 4-4v-3.6c1.2-.6 2-1.9 2-3.4a4 4 0 0 0-4-4V6a4 4 0 0 0-4-4z" />
-          <path d="M12 2v20" />
-        </svg>
-      );
-    case "leaf":
-      return (
-        <svg
-          className={baseClass}
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          aria-hidden="true"
-        >
-          <path d="M11 20A7 7 0 0 1 9.8 6.9C15.5 4.9 17 3.5 19 2c1 2 2 4.5 2 8 0 5.5-4.78 10-10 10Z" />
-          <path d="M2 21c0-3 1.85-5.36 5.08-6C9.5 14.52 12 13 13 12" />
-        </svg>
-      );
-    case "chart":
-      return (
-        <svg
-          className={baseClass}
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          aria-hidden="true"
-        >
-          <line x1="12" y1="20" x2="12" y2="10" />
-          <line x1="18" y1="20" x2="18" y2="4" />
-          <line x1="6" y1="20" x2="6" y2="16" />
-        </svg>
-      );
-    case "palette":
-      return (
-        <svg
-          className={baseClass}
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          aria-hidden="true"
-        >
-          <circle cx="13.5" cy="6.5" r=".5" fill="currentColor" />
-          <circle cx="17.5" cy="10.5" r=".5" fill="currentColor" />
-          <circle cx="8.5" cy="7.5" r=".5" fill="currentColor" />
-          <circle cx="6.5" cy="12.5" r=".5" fill="currentColor" />
-          <path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 12 2z" />
-        </svg>
-      );
-    case "telescope":
-      return (
-        <svg
-          className={baseClass}
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          aria-hidden="true"
-        >
-          <path d="m10.065 12.493-6.18 1.318a.934.934 0 0 1-1.108-.702l-.537-2.15a1.07 1.07 0 0 1 .691-1.265l13.504-4.44" />
-          <path d="m13.56 11.747 4.332-.924" />
-          <path d="m16.243 5.636 2.16.45a.93.93 0 0 1 .704 1.108l-.534 2.15a1.07 1.07 0 0 1-1.267.69l-2.455-.519" />
-          <path d="m13.56 11.747-3.495 5.245" />
-          <path d="m10.065 12.493-3.495 5.245" />
-        </svg>
-      );
-    default:
-      return null;
-  }
-}
-
-function TrustIcon({
-  icon,
-  className = "",
-}: {
-  icon: string;
-  className?: string;
-}) {
-  const baseClass = `w-5 h-5 ${className}`;
-  switch (icon) {
-    case "code":
-      return (
-        <svg
-          className={baseClass}
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          aria-hidden="true"
-        >
-          <polyline points="16 18 22 12 16 6" />
-          <polyline points="8 6 2 12 8 18" />
-        </svg>
-      );
-    case "lock":
-      return (
-        <svg
-          className={baseClass}
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          aria-hidden="true"
-        >
-          <rect width="18" height="11" x="3" y="11" rx="2" ry="2" />
-          <path d="M7 11V7a5 5 0 0 1 10 0v4" />
-        </svg>
-      );
-    case "shield":
-      return (
-        <svg
-          className={baseClass}
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          aria-hidden="true"
-        >
-          <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10" />
-        </svg>
-      );
-    case "eye":
-      return (
-        <svg
-          className={baseClass}
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          aria-hidden="true"
-        >
-          <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z" />
-          <circle cx="12" cy="12" r="3" />
-        </svg>
-      );
-    default:
-      return null;
-  }
-}
 
 function colorClass(color: string) {
   switch (color) {
@@ -491,52 +322,17 @@ export default function LandingPage() {
             <MotionReveal delay={0.8} y={8}>
               <div className="mt-16 flex flex-wrap items-center justify-center gap-6 text-xs font-body text-text/40 tracking-wide">
                 <span className="flex items-center gap-1.5">
-                  <svg
-                    className="w-3.5 h-3.5"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    aria-hidden="true"
-                  >
-                    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10" />
-                  </svg>
+                  <ShieldIcon className="w-3.5 h-3.5" />
                   Ethics-First
                 </span>
                 <span className="w-px h-3 bg-white/[0.06]" />
                 <span className="flex items-center gap-1.5">
-                  <svg
-                    className="w-3.5 h-3.5"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    aria-hidden="true"
-                  >
-                    <polyline points="16 18 22 12 16 6" />
-                    <polyline points="8 6 2 12 8 18" />
-                  </svg>
+                  <CodeIcon className="w-3.5 h-3.5" />
                   Open Source
                 </span>
                 <span className="w-px h-3 bg-white/[0.06]" />
                 <span className="flex items-center gap-1.5">
-                  <svg
-                    className="w-3.5 h-3.5"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    aria-hidden="true"
-                  >
-                    <rect width="18" height="11" x="3" y="11" rx="2" ry="2" />
-                    <path d="M7 11V7a5 5 0 0 1 10 0v4" />
-                  </svg>
+                  <LockIcon className="w-3.5 h-3.5" />
                   Your Data Stays Yours
                 </span>
                 <span className="w-px h-3 bg-white/[0.06]" />
@@ -580,7 +376,7 @@ export default function LandingPage() {
                         >
                           <SystemIcon
                             icon={system.icon}
-                            className={colors.text}
+                            className={`w-6 h-6 ${colors.text}`}
                           />
                         </div>
                         <div>
@@ -603,18 +399,9 @@ export default function LandingPage() {
                             key={feature}
                             className="flex items-center gap-2 text-xs font-body text-text/35"
                           >
-                            <svg
+                            <CheckIcon
                               className={`w-3.5 h-3.5 ${colors.text} flex-shrink-0 opacity-60`}
-                              viewBox="0 0 24 24"
-                              fill="none"
-                              stroke="currentColor"
-                              strokeWidth="2"
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              aria-hidden="true"
-                            >
-                              <polyline points="20 6 9 17 4 12" />
-                            </svg>
+                            />
                             {feature}
                           </li>
                         ))}
@@ -695,7 +482,7 @@ export default function LandingPage() {
                 <MotionStaggerItem key={card.title}>
                   <div className="card-surface p-6 flex items-start gap-4 h-full">
                     <div className="w-10 h-10 rounded-xl bg-primary/[0.06] border border-primary/[0.12] flex items-center justify-center flex-shrink-0">
-                      <TrustIcon icon={card.icon} className="text-primary/70" />
+                      <TrustIcon icon={card.icon} className="w-5 h-5 text-primary/70" />
                     </div>
                     <div>
                       <h3 className="font-display text-lg font-medium text-text mb-1.5">
@@ -800,18 +587,7 @@ export default function LandingPage() {
 
                   {waitlistSubmitted ? (
                     <div className="flex items-center justify-center gap-2 py-3 text-accent text-sm">
-                      <svg
-                        className="w-5 h-5"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="2"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        aria-hidden="true"
-                      >
-                        <polyline points="20 6 9 17 4 12" />
-                      </svg>
+                      <CheckIcon className="w-5 h-5" />
                       You&apos;re on the list — we&apos;ll be in touch.
                     </div>
                   ) : (

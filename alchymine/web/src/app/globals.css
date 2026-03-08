@@ -177,6 +177,14 @@
     animation: grainDrift 0.5s steps(1) infinite;
   }
 
+  /* Disable grain noise overlay for users who prefer reduced motion.
+     The feTurbulence SVG filter + animation causes frame drops on mobile. */
+  @media (prefers-reduced-motion: reduce) {
+    .grain-overlay::before {
+      display: none;
+    }
+  }
+
   /* ── Atmospheric background mesh ────────────────────────────────────────── */
   .bg-atmosphere {
     position: relative;

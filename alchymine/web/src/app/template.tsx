@@ -1,27 +1,20 @@
 "use client";
 
-import { motion, useReducedMotion } from "framer-motion";
+import dynamic from "next/dynamic";
 import type { ReactNode } from "react";
 
 /**
  * Next.js App Router template.tsx — runs on every route change.
- * Provides a subtle cross-fade + upward slide between pages.
- * Respects prefers-reduced-motion: skips the slide, uses a minimal fade.
+ *
+ * The actual framer-motion page transition is dynamically imported so
+ * the ~40KB (gzipped) framer-motion bundle is code-split and loaded
+ * lazily on the client, keeping the initial JS payload smaller.
  */
-export default function Template({ children }: { children: ReactNode }) {
-  const prefersReducedMotion = useReducedMotion();
+const PageTransition = dynamic(
+  () => import("@/components/shared/PageTransition"),
+  { ssr: false },
+);
 
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: prefersReducedMotion ? 0 : 10 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: prefersReducedMotion ? 0 : -10 }}
-      transition={{
-        duration: prefersReducedMotion ? 0.01 : 0.25,
-        ease: [0.22, 1, 0.36, 1],
-      }}
-    >
-      {children}
-    </motion.div>
-  );
+export default function Template({ children }: { children: ReactNode }) {
+  return <PageTransition>{children}</PageTransition>;
 }

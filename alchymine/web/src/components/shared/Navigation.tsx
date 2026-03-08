@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { useAuth } from "@/lib/AuthContext";
+import { NavIcon } from "@/components/shared/Icons";
 
 interface NavItem {
   name: string;
@@ -70,174 +71,6 @@ const NAV_ITEMS: NavItem[] = [
   },
 ];
 
-function NavIcon({
-  icon,
-  className = "",
-}: {
-  icon: string;
-  className?: string;
-}) {
-  const baseClass = `w-5 h-5 ${className}`;
-
-  switch (icon) {
-    case "home":
-      return (
-        <svg
-          className={baseClass}
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          aria-hidden="true"
-        >
-          <path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
-          <polyline points="9 22 9 12 15 12 15 22" />
-        </svg>
-      );
-    case "spiral":
-      return (
-        <svg
-          className={baseClass}
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          aria-hidden="true"
-        >
-          <path d="M12 22c-4.97 0-9-4.03-9-9 0-3.87 2.55-7.16 6-8.27" />
-          <path d="M12 18a6 6 0 0 1-6-6c0-2.58 1.67-4.78 4-5.6" />
-          <path d="M12 14a2 2 0 0 1-2-2c0-.87.56-1.61 1.33-1.89" />
-          <circle cx="12" cy="12" r="1" fill="currentColor" />
-        </svg>
-      );
-    case "brain":
-      return (
-        <svg
-          className={baseClass}
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          aria-hidden="true"
-        >
-          <path d="M12 2a4 4 0 0 0-4 4v1a4 4 0 0 0-4 4c0 1.5.8 2.8 2 3.4V18a4 4 0 0 0 4 4h4a4 4 0 0 0 4-4v-3.6c1.2-.6 2-1.9 2-3.4a4 4 0 0 0-4-4V6a4 4 0 0 0-4-4z" />
-          <path d="M12 2v20" />
-        </svg>
-      );
-    case "leaf":
-      return (
-        <svg
-          className={baseClass}
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          aria-hidden="true"
-        >
-          <path d="M11 20A7 7 0 0 1 9.8 6.9C15.5 4.9 17 3.5 19 2c1 2 2 4.5 2 8 0 5.5-4.78 10-10 10Z" />
-          <path d="M2 21c0-3 1.85-5.36 5.08-6C9.5 14.52 12 13 13 12" />
-        </svg>
-      );
-    case "chart":
-      return (
-        <svg
-          className={baseClass}
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          aria-hidden="true"
-        >
-          <line x1="12" y1="20" x2="12" y2="10" />
-          <line x1="18" y1="20" x2="18" y2="4" />
-          <line x1="6" y1="20" x2="6" y2="16" />
-        </svg>
-      );
-    case "palette":
-      return (
-        <svg
-          className={baseClass}
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          aria-hidden="true"
-        >
-          <circle cx="13.5" cy="6.5" r=".5" fill="currentColor" />
-          <circle cx="17.5" cy="10.5" r=".5" fill="currentColor" />
-          <circle cx="8.5" cy="7.5" r=".5" fill="currentColor" />
-          <circle cx="6.5" cy="12.5" r=".5" fill="currentColor" />
-          <path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 12 2z" />
-        </svg>
-      );
-    case "telescope":
-      return (
-        <svg
-          className={baseClass}
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          aria-hidden="true"
-        >
-          <path d="m10.065 12.493-6.18 1.318a.934.934 0 0 1-1.108-.702l-.537-2.15a1.07 1.07 0 0 1 .691-1.265l13.504-4.44" />
-          <path d="m13.56 11.747 4.332-.924" />
-          <path d="m16.243 5.636 2.16.45a.93.93 0 0 1 .704 1.108l-.534 2.15a1.07 1.07 0 0 1-1.267.69l-2.455-.519" />
-          <path d="m13.56 11.747-3.495 5.245" />
-          <path d="m10.065 12.493-3.495 5.245" />
-        </svg>
-      );
-    case "book":
-      return (
-        <svg
-          className={baseClass}
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          aria-hidden="true"
-        >
-          <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z" />
-          <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z" />
-        </svg>
-      );
-    case "user":
-      return (
-        <svg
-          className={baseClass}
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          aria-hidden="true"
-        >
-          <circle cx="12" cy="8" r="4" />
-          <path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" />
-        </svg>
-      );
-    default:
-      return null;
-  }
-}
-
 export default function Navigation() {
   const pathname = usePathname();
   const router = useRouter();
@@ -299,7 +132,7 @@ export default function Navigation() {
                       : "text-text/60 hover:text-text hover:bg-white/5 hover:translate-x-0.5"
                   }`}
                 >
-                  <NavIcon icon={item.icon} />
+                  <NavIcon icon={item.icon} className="w-5 h-5" />
                   {item.name}
                   {active && (
                     <span
@@ -473,7 +306,7 @@ export default function Navigation() {
                           : "text-text/60 hover:text-text hover:bg-white/5"
                       }`}
                     >
-                      <NavIcon icon={item.icon} />
+                      <NavIcon icon={item.icon} className="w-5 h-5" />
                       {item.name}
                     </Link>
                   </li>
@@ -533,7 +366,7 @@ export default function Navigation() {
                 >
                   <NavIcon
                     icon={item.icon}
-                    className={active ? "text-primary" : ""}
+                    className={`w-5 h-5 ${active ? "text-primary" : ""}`}
                   />
                   <span className="truncate max-w-[48px]">
                     {(
