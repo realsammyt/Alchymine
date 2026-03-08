@@ -134,9 +134,11 @@ TRUSTED_PROXY_NETWORKS: list[ipaddress.IPv4Network | ipaddress.IPv6Network] = [
 ]
 
 # Default per-prefix limits: (max_requests, window_seconds)
+# Order matters — first match wins.
 DEFAULT_ROUTE_LIMITS: dict[str, tuple[int, int]] = {
     "/api/v1/auth/": (20, 60),
     "/api/v1/admin/": (30, 60),
+    "/api/v1/reports/": (200, 60),  # Higher limit for report status polling
     "/api/v1/": (100, 60),
 }
 

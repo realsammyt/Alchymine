@@ -6,11 +6,11 @@ import { getReport, ApiError } from "@/lib/api";
 import { MotionReveal } from "@/components/shared/MotionReveal";
 
 const GENERATION_STEPS = [
-  { label: "Calculating numerology...", icon: "numerology", duration: 2000 },
-  { label: "Mapping astrology...", icon: "astrology", duration: 3000 },
-  { label: "Analyzing personality...", icon: "personality", duration: 2500 },
-  { label: "Mapping archetypes...", icon: "archetype", duration: 2000 },
-  { label: "Building your profile...", icon: "profile", duration: 3000 },
+  { label: "Calculating numerology...", icon: "numerology", duration: 8000 },
+  { label: "Mapping astrology...", icon: "astrology", duration: 12000 },
+  { label: "Analyzing personality...", icon: "personality", duration: 10000 },
+  { label: "Mapping archetypes...", icon: "archetype", duration: 10000 },
+  { label: "Building your profile...", icon: "profile", duration: 20000 },
 ];
 
 function StepIcon({ icon, className }: { icon: string; className?: string }) {
@@ -78,7 +78,7 @@ export default function GeneratingPage() {
   const [currentStep, setCurrentStep] = useState(0);
   const [overallProgress, setOverallProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
-  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const pollRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const animationRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Animate through the visual steps
@@ -121,31 +121,49 @@ export default function GeneratingPage() {
   useEffect(() => {
     if (!reportId) return;
 
-    pollRef.current = setInterval(async () => {
+    let delay = 4000; // Start at 4s, back off on 429
+    let stopped = false;
+
+    const poll = async () => {
+      if (stopped) return;
       try {
         const report = await getReport(reportId);
         if (report.status === "complete") {
           setOverallProgress(100);
-          if (pollRef.current) clearInterval(pollRef.current);
+          stopped = true;
           if (animationRef.current) clearInterval(animationRef.current);
           setTimeout(() => {
             router.push(`/discover/report/${reportId}`);
           }, 800);
+          return;
         } else if (report.status === "failed") {
           setError("Report generation failed. Please try again.");
-          if (pollRef.current) clearInterval(pollRef.current);
+          stopped = true;
           if (animationRef.current) clearInterval(animationRef.current);
-        }
-      } catch (err) {
-        if (err instanceof ApiError && err.status === 202) {
           return;
         }
-        console.error("Polling error:", err);
+        // Reset delay on success
+        delay = 4000;
+      } catch (err) {
+        if (err instanceof ApiError && err.status === 202) {
+          // Still generating — normal
+        } else if (err instanceof ApiError && err.status === 429) {
+          // Rate limited — back off
+          delay = Math.min(delay * 2, 30000);
+        } else {
+          console.error("Polling error:", err);
+        }
       }
-    }, 2000);
+      if (!stopped) {
+        pollRef.current = setTimeout(poll, delay);
+      }
+    };
+
+    pollRef.current = setTimeout(poll, delay);
 
     return () => {
-      if (pollRef.current) clearInterval(pollRef.current);
+      stopped = true;
+      if (pollRef.current) clearTimeout(pollRef.current);
     };
   }, [reportId, router]);
 
