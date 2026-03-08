@@ -19,6 +19,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from alchymine.api.auth import get_current_user
 from alchymine.api.deps import get_db_session
 from alchymine.db import repository
+from alchymine.db.models import User
 from alchymine.engine.profile import IntakeData
 from alchymine.engine.reports.html_renderer import render_report_html
 from alchymine.safety.audit import AuditEventType
@@ -100,31 +101,52 @@ async def create_report(
     user_id = current_user["sub"]
 
     # ── Safety guardrail: rate-limit report generation per user ───────
-    guardrail = check_guardrail(user_id, "report_generation")
-    if guardrail.action == GuardrailAction.DENY:
-        audit_log_event(
-            event_type=AuditEventType.RATE_LIMIT_HIT,
-            system="reports",
-            summary=guardrail.message,
-            user_id=user_id,
-            metadata={"operation": "report_generation"},
-        )
+    try:
+        guardrail = check_guardrail(user_id, "report_generation")
+        if guardrail.action == GuardrailAction.DENY:
+            audit_log_event(
+                event_type=AuditEventType.RATE_LIMIT_HIT,
+                system="reports",
+                summary=guardrail.message,
+                user_id=user_id,
+                metadata={"operation": "report_generation"},
+            )
+            raise HTTPException(
+                status_code=429,
+                detail=guardrail.message,
+                headers=(
+                    {"Retry-After": str(int(guardrail.retry_after_seconds))}
+                    if guardrail.retry_after_seconds
+                    else None
+                ),
+            )
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.exception("Guardrail check failed for user %s", user_id)
         raise HTTPException(
-            status_code=429,
-            detail=guardrail.message,
-            headers=(
-                {"Retry-After": str(int(guardrail.retry_after_seconds))}
-                if guardrail.retry_after_seconds
-                else None
-            ),
-        )
+            status_code=500,
+            detail=f"Guardrail check failed: {type(exc).__name__}: {exc}",
+        ) from exc
 
     report_id = str(uuid.uuid4())
     now = datetime.now(UTC).isoformat()
 
+    # ── Defensive FK check: verify user exists before INSERT ──────────
+    # If the JWT references a user that doesn't exist in the DB, the FK
+    # constraint on Report.user_id will cause an IntegrityError.  Check
+    # first and fall back to user_id=None (orphan report).
+    from sqlalchemy import select
+
+    result = await session.execute(select(User.id).where(User.id == user_id))
+    db_user_id: str | None = result.scalar_one_or_none()
+    if db_user_id is None:
+        logger.warning(
+            "User %s from JWT not found in DB — creating report with user_id=None",
+            user_id,
+        )
+
     # ── Critical section: create and commit the report row ─────────────
-    # This MUST succeed for the endpoint to return 202.  Everything after
-    # this commit is best-effort and must never cause a 500.
     try:
         await repository.create_report(
             session,
@@ -132,48 +154,54 @@ async def create_report(
             status="pending",
             user_input=request.user_input,
             user_profile=request.user_profile,
-            user_id=current_user["sub"],
+            user_id=db_user_id,  # None if user doesn't exist in DB
         )
         await session.commit()
-    except Exception:
+    except Exception as exc:
         logger.exception(
             "CRITICAL: Failed to create report row for user %s, report %s",
-            current_user["sub"],
+            user_id,
             report_id,
         )
-        raise  # Let FastAPI return the error — report row doesn't exist
+        raise HTTPException(
+            status_code=500,
+            detail=f"Report creation failed: {type(exc).__name__}: {exc}",
+        ) from exc
 
     # ── Best-effort section: intake persistence + task dispatch ─────────
     # Nothing below may raise.  Wrap in a single try/except so any
     # unexpected failure is logged but never surfaces as a 500.
     try:
         # Persist intake to the user's profile (cross-device sync).
-        try:
-            intake_persist = request.intake.model_dump(mode="json")
-            from datetime import date as date_type
-            from datetime import time as time_type
+        if db_user_id is not None:
+            try:
+                intake_persist = request.intake.model_dump(mode="json")
+                from datetime import date as date_type
+                from datetime import time as time_type
 
-            intake_persist["birth_date"] = date_type.fromisoformat(intake_persist["birth_date"])
-            if intake_persist.get("birth_time"):
-                intake_persist["birth_time"] = time_type.fromisoformat(intake_persist["birth_time"])
-            else:
-                intake_persist["birth_time"] = None
-            if hasattr(intake_persist.get("intention"), "value"):
-                intake_persist["intention"] = intake_persist["intention"]
-            await repository.update_layer(session, current_user["sub"], "intake", intake_persist)
-            await session.commit()
-        except LookupError:
-            await session.rollback()
-            logger.warning(
-                "Cannot persist intake for user %s: user row not found in DB",
-                current_user["sub"],
-            )
-        except Exception:
-            await session.rollback()
-            logger.exception(
-                "Failed to persist intake data for user %s",
-                current_user["sub"],
-            )
+                intake_persist["birth_date"] = date_type.fromisoformat(intake_persist["birth_date"])
+                if intake_persist.get("birth_time"):
+                    intake_persist["birth_time"] = time_type.fromisoformat(
+                        intake_persist["birth_time"]
+                    )
+                else:
+                    intake_persist["birth_time"] = None
+                if hasattr(intake_persist.get("intention"), "value"):
+                    intake_persist["intention"] = intake_persist["intention"]
+                await repository.update_layer(session, user_id, "intake", intake_persist)
+                await session.commit()
+            except LookupError:
+                await session.rollback()
+                logger.warning(
+                    "Cannot persist intake for user %s: user row not found in DB",
+                    user_id,
+                )
+            except Exception:
+                await session.rollback()
+                logger.exception(
+                    "Failed to persist intake data for user %s",
+                    user_id,
+                )
 
         # Build profile dict and dispatch Celery task.
         intake_dict = request.intake.model_dump(mode="json")
@@ -194,7 +222,7 @@ async def create_report(
             "Best-effort post-commit work failed for report %s (user %s). "
             "Report row exists but task may not have been dispatched.",
             report_id,
-            current_user["sub"],
+            user_id,
         )
 
     return ReportStatus(
@@ -385,4 +413,87 @@ async def list_user_reports(
         count=total,
         skip=skip,
         limit=limit,
+    )
+
+
+# ── Diagnostic endpoint ──────────────────────────────────────────────
+
+
+@router.get("/reports/diagnose")
+async def diagnose_reports(
+    session: AsyncSession = Depends(get_db_session),
+    current_user: dict = Depends(get_current_user),
+) -> JSONResponse:
+    """Diagnostic endpoint to check all components needed for report creation.
+
+    Returns a JSON object with pass/fail status for each component.
+    Requires authentication (same as POST /reports).
+    """
+    from sqlalchemy import select, text
+
+    checks: dict[str, dict[str, str]] = {}
+    user_id = current_user["sub"]
+
+    # 1. DB connectivity
+    try:
+        await session.execute(text("SELECT 1"))
+        checks["db_connection"] = {"status": "pass"}
+    except Exception as exc:
+        checks["db_connection"] = {"status": "fail", "error": f"{type(exc).__name__}: {exc}"}
+
+    # 2. User existence (FK target)
+    try:
+        result = await session.execute(select(User.id).where(User.id == user_id))
+        user_row = result.scalar_one_or_none()
+        if user_row:
+            checks["user_exists"] = {"status": "pass", "user_id": user_id}
+        else:
+            checks["user_exists"] = {
+                "status": "fail",
+                "error": f"No user row for JWT sub={user_id}",
+            }
+    except Exception as exc:
+        checks["user_exists"] = {"status": "fail", "error": f"{type(exc).__name__}: {exc}"}
+
+    # 3. Encryption key availability
+    try:
+        from alchymine.db.encryption import _get_fernet
+
+        _get_fernet()
+        checks["encryption_key"] = {"status": "pass"}
+    except Exception as exc:
+        checks["encryption_key"] = {"status": "fail", "error": f"{type(exc).__name__}: {exc}"}
+
+    # 4. Report table writable (insert + rollback)
+    try:
+        test_id = f"diag-{uuid.uuid4()}"
+        from alchymine.db.models import Report
+
+        test_report = Report(id=test_id, status="diagnostic", user_id=None)
+        session.add(test_report)
+        await session.flush()
+        await session.rollback()
+        checks["report_insert"] = {"status": "pass"}
+    except Exception as exc:
+        await session.rollback()
+        checks["report_insert"] = {"status": "fail", "error": f"{type(exc).__name__}: {exc}"}
+
+    # 5. Celery/Redis connectivity
+    try:
+        from alchymine.workers.celery_app import celery_app
+
+        insp = celery_app.control.inspect(timeout=2)
+        ping = insp.ping()
+        if ping:
+            checks["celery_workers"] = {"status": "pass", "workers": list(ping.keys())}
+        else:
+            checks["celery_workers"] = {"status": "warn", "error": "No workers responded"}
+    except Exception as exc:
+        checks["celery_workers"] = {"status": "fail", "error": f"{type(exc).__name__}: {exc}"}
+
+    all_pass = all(c["status"] == "pass" for c in checks.values())
+
+    return JSONResponse(
+        status_code=200 if all_pass else 503,
+        content={"overall": "pass" if all_pass else "fail", "checks": checks},
     )

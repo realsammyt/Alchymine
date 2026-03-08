@@ -175,6 +175,7 @@ function IdentitySection({ profile }: { profile: ProfileResponse }) {
             <>
               <FieldRow label="Name" value={intake.full_name} />
               <FieldRow label="Birth Date" value={intake.birth_date} />
+              <FieldRow label="Birth Time" value={intake.birth_time} />
               <FieldRow label="Birth City" value={intake.birth_city} />
             </>
           )}

@@ -417,7 +417,7 @@ class TestIntakePersistence:
         with caplog.at_level(logging.WARNING, logger="alchymine.api.routers.reports"):
             resp = client.post("/api/v1/reports", json=payload)
         assert resp.status_code == 202
-        assert any("user row not found" in r.message for r in caplog.records)
+        assert any("not found in DB" in r.message for r in caplog.records)
 
     def test_post_reports_returns_202_when_update_layer_raises(self, client: TestClient) -> None:
         """POST /reports must return 202 even if update_layer raises an unexpected DB error.
