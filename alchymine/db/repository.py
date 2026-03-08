@@ -37,6 +37,8 @@ from datetime import UTC, date, datetime, time
 from typing import Any
 
 from sqlalchemy import func, select
+from sqlalchemy.dialects.postgresql import insert as pg_insert
+from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -210,25 +212,44 @@ async def update_layer(
     if user_obj is None:
         raise LookupError(f"No user with id {user_id!r}")
 
-    # Check if the layer row already exists by querying the child table directly.
-    # This avoids SQLAlchemy identity-map caching issues with relationships.
+    # Filter to valid model columns
+    filtered = {
+        k: v for k, v in data.items() if hasattr(model_cls, k) and k not in ("id", "user_id")
+    }
+
+    # Check if the layer row already exists.
     existing_result: Any = await session.execute(
         select(model_cls).where(model_cls.user_id == user_id)  # type: ignore[attr-defined]
     )
     existing = existing_result.scalar_one_or_none()
 
     if existing is not None:
-        # Update existing row
-        for key, value in data.items():
-            if hasattr(existing, key) and key not in ("id", "user_id"):
-                setattr(existing, key, value)
+        # Row exists — plain UPDATE (safe, handles partial columns with NOT NULLs)
+        for key, value in filtered.items():
+            setattr(existing, key, value)
     else:
-        # Create new layer row
-        filtered = {
-            k: v for k, v in data.items() if hasattr(model_cls, k) and k not in ("id", "user_id")
-        }
-        row = model_cls(user_id=user_id, **filtered)
-        session.add(row)
+        # Row doesn't exist — use INSERT ... ON CONFLICT DO UPDATE (upsert)
+        # to handle the race where another request creates the row between
+        # our SELECT and INSERT.
+        dialect_name = session.bind.dialect.name  # type: ignore[union-attr]
+        upsert_stmt: Any
+        if dialect_name == "postgresql":
+            upsert_stmt = pg_insert(model_cls).values(user_id=user_id, **filtered)
+            if filtered:
+                upsert_stmt = upsert_stmt.on_conflict_do_update(
+                    index_elements=["user_id"], set_=filtered
+                )
+            else:
+                upsert_stmt = upsert_stmt.on_conflict_do_nothing(index_elements=["user_id"])
+        else:
+            upsert_stmt = sqlite_insert(model_cls).values(user_id=user_id, **filtered)
+            if filtered:
+                upsert_stmt = upsert_stmt.on_conflict_do_update(
+                    index_elements=["user_id"], set_=filtered
+                )
+            else:
+                upsert_stmt = upsert_stmt.on_conflict_do_nothing(index_elements=["user_id"])
+        await session.execute(upsert_stmt)
 
     await session.flush()
 

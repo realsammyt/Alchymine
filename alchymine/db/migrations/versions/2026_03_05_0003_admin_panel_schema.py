@@ -39,7 +39,7 @@ def upgrade() -> None:
     op.create_table(
         "invite_codes",
         sa.Column("id", sa.Integer(), primary_key=True, autoincrement=True),
-        sa.Column("code", sa.String(64), nullable=False),
+        sa.Column("code", sa.String(64), nullable=False, unique=True),
         sa.Column(
             "created_by",
             sa.String(36),
@@ -58,7 +58,11 @@ def upgrade() -> None:
             "updated_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()
         ),
     )
-    op.create_unique_constraint("uq_invite_codes_code", "invite_codes", ["code"])
+    # Unique constraint is inline in column definition (SQLite compatible).
+    # Named constraint added for PostgreSQL only (already applied in production).
+    conn = op.get_bind()
+    if conn.dialect.name != "sqlite":
+        op.create_unique_constraint("uq_invite_codes_code", "invite_codes", ["code"])
     op.create_index("ix_invite_codes_code", "invite_codes", ["code"])
     op.create_index("ix_invite_codes_created_by", "invite_codes", ["created_by"])
 
@@ -93,7 +97,9 @@ def downgrade() -> None:
     # ── invite_codes ─────────────────────────────────────────────────────
     op.drop_index("ix_invite_codes_created_by", table_name="invite_codes")
     op.drop_index("ix_invite_codes_code", table_name="invite_codes")
-    op.drop_constraint("uq_invite_codes_code", "invite_codes", type_="unique")
+    conn = op.get_bind()
+    if conn.dialect.name != "sqlite":
+        op.drop_constraint("uq_invite_codes_code", "invite_codes", type_="unique")
     op.drop_table("invite_codes")
 
     # ── users: remove admin-panel columns ───────────────────────────────

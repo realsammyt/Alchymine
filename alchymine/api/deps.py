@@ -82,16 +82,41 @@ async def get_db_session() -> AsyncGenerator[AsyncSession, None]:
 
 
 async def create_tables_if_enabled() -> None:
-    """Create all tables if ``AUTO_CREATE_TABLES=true``.
+    """Apply database migrations if ``AUTO_CREATE_TABLES=true``.
 
-    Called during application startup.  In production, migrations are
-    managed by Alembic; this is a convenience for dev/CI environments.
+    Called during application startup.  Runs ``alembic upgrade head``
+    programmatically so the schema is always migration-managed.  Falls
+    back to ``Base.metadata.create_all()`` only if Alembic config is
+    unavailable (e.g. minimal test environments).
     """
-    if os.environ.get("AUTO_CREATE_TABLES", "").lower() == "true":
-        engine = get_db_engine()
-        async with engine.begin() as conn:
-            await conn.run_sync(Base.metadata.create_all)
-        logger.info("Auto-created database tables")
+    if os.environ.get("AUTO_CREATE_TABLES", "").lower() != "true":
+        return
+
+    try:
+        from alembic import command
+        from alembic.config import Config
+
+        # Locate alembic.ini relative to the package
+        import alchymine
+
+        pkg_root = os.path.dirname(os.path.dirname(alchymine.__file__))
+        ini_path = os.path.join(pkg_root, "alembic.ini")
+
+        if os.path.exists(ini_path):
+            alembic_cfg = Config(ini_path)
+            # Override the DB URL to match what the app is using
+            alembic_cfg.set_main_option("sqlalchemy.url", get_settings().database_url)
+            command.upgrade(alembic_cfg, "head")
+            logger.info("Database migrated to head via Alembic")
+            return
+    except Exception as exc:
+        logger.warning("Alembic migration failed (%s), falling back to create_all()", exc)
+
+    # Fallback: create_all() for environments without Alembic config
+    engine = get_db_engine()
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+    logger.info("Auto-created database tables (create_all fallback)")
 
 
 async def close_redis() -> None:
