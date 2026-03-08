@@ -103,7 +103,7 @@ class OllamaClient:
         self,
         base_url: str | None = None,
         default_model: str = "llama3.2",
-        timeout: float = 120.0,
+        timeout: float = 10.0,
     ) -> None:
         settings = get_settings()
         self._base_url = base_url or settings.ollama_base_url
@@ -461,8 +461,8 @@ class LLMClient:
         """Stream text from the Claude API using server-sent events."""
         import anthropic
 
-        client = anthropic.AsyncAnthropic(api_key=self._anthropic_key)
-        model = "claude-sonnet-4-20250514"
+        client = anthropic.AsyncAnthropic(api_key=self._anthropic_key, timeout=90.0)
+        model = "claude-sonnet-4-6"
 
         async with client.messages.stream(
             model=model,
@@ -484,8 +484,8 @@ class LLMClient:
         """Generate text using the Claude API."""
         import anthropic
 
-        client = anthropic.AsyncAnthropic(api_key=self._anthropic_key)
-        model = "claude-sonnet-4-20250514"
+        client = anthropic.AsyncAnthropic(api_key=self._anthropic_key, timeout=90.0)
+        model = "claude-sonnet-4-6"
 
         response = await client.messages.create(
             model=model,

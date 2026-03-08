@@ -8,11 +8,7 @@ import type { ReactNode } from "react";
  * Extracted from template.tsx so it can be dynamically imported,
  * keeping framer-motion (~40KB gzipped) out of the initial bundle.
  */
-export default function PageTransition({
-  children,
-}: {
-  children: ReactNode;
-}) {
+export default function PageTransition({ children }: { children: ReactNode }) {
   const prefersReducedMotion = useReducedMotion();
 
   return (

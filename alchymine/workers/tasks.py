@@ -478,8 +478,10 @@ def generate_report(
             _run_async(_db_set_failed(report_id, traceback.format_exc()))
         raise
 
-    except Exception as exc:
-        # Non-transient failure — record and do not retry
+    except BaseException as exc:
+        # Catches both Exception and BaseException subclasses like
+        # Celery's SoftTimeLimitExceeded (which inherits BaseException).
+        # Without this, timed-out reports stay "generating" forever.
         logger.exception("Report %s failed: %s", report_id, exc)
         try:
             _run_async(_db_set_failed(report_id, str(exc)))

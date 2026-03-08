@@ -92,14 +92,20 @@ export interface IdentityLayer {
 export interface ReportResponse {
   id: string;
   status: string;
-  profile_summary: {
-    identity: IdentityLayer;
+  result: {
+    profile_summary?: {
+      identity?: IdentityLayer;
+      [key: string]: unknown;
+    };
+    narratives?: Record<
+      string,
+      { text: string; disclaimers?: string[]; ethics_passed?: boolean }
+    >;
     [key: string]: unknown;
   } | null;
-  modules: Record<string, unknown> | null;
-  quality_gates: Record<string, boolean> | null;
+  error: string | null;
   created_at: string;
-  completed_at: string | null;
+  updated_at: string | null;
 }
 
 // ─── Numerology endpoint types ───────────────────────────────────────

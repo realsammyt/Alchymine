@@ -127,8 +127,11 @@ export default function GeneratingPage() {
     const poll = async () => {
       if (stopped) return;
       try {
+        console.log("[generating] polling report", reportId, "delay:", delay);
         const report = await getReport(reportId);
+        console.log("[generating] report status:", report.status);
         if (report.status === "complete") {
+          console.log("[generating] report complete — redirecting");
           setOverallProgress(100);
           stopped = true;
           if (animationRef.current) clearInterval(animationRef.current);
@@ -137,7 +140,9 @@ export default function GeneratingPage() {
           }, 800);
           return;
         } else if (report.status === "failed") {
-          setError("Report generation failed. Please try again.");
+          const errorMsg = report.error || "Report generation failed. Please try again.";
+          console.error("[generating] report failed:", errorMsg);
+          setError(errorMsg);
           stopped = true;
           if (animationRef.current) clearInterval(animationRef.current);
           return;
@@ -146,12 +151,13 @@ export default function GeneratingPage() {
         delay = 4000;
       } catch (err) {
         if (err instanceof ApiError && err.status === 202) {
-          // Still generating — normal
+          console.log("[generating] still generating (202)");
         } else if (err instanceof ApiError && err.status === 429) {
           // Rate limited — back off
           delay = Math.min(delay * 2, 30000);
+          console.warn("[generating] rate limited (429), backing off to", delay);
         } else {
-          console.error("Polling error:", err);
+          console.error("[generating] polling error:", err);
         }
       }
       if (!stopped) {
