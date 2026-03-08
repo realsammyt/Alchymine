@@ -95,6 +95,18 @@ async def engine():
 def client(engine):
     factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 
+    # Create the test user row so Report FK (user_id) is valid.
+    import asyncio
+
+    from alchymine.db.models import User
+
+    async def _create_test_user():
+        async with factory() as session:
+            session.add(User(id="user-1", email="test@example.com"))
+            await session.commit()
+
+    asyncio.get_event_loop().run_until_complete(_create_test_user())
+
     async def _override_session():
         async with factory() as session:
             try:
