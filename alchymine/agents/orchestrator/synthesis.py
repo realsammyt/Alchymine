@@ -328,6 +328,61 @@ def _get_bridge_connections(
 # ─── Public API ────────────────────────────────────────────────────
 
 
+def _build_strengths_map(
+    coordinator_results: list[CoordinatorResult],
+) -> list[str]:
+    """Build a cross-system strengths map from coordinator results.
+
+    Extracts:
+    - Top Big Five traits (score > 60) from Intelligence
+    - Secure attachment style from Intelligence
+    - Creative strengths from Creative
+    - Perspective-taking ability from Perspective (Kegan stage >= 3)
+    """
+    strengths: list[str] = []
+
+    _big_five_labels = {
+        "openness": "Openness to Experience",
+        "conscientiousness": "Conscientiousness",
+        "extraversion": "Extraversion",
+        "agreeableness": "Agreeableness",
+    }
+
+    for result in coordinator_results:
+        if result.status == CoordinatorStatus.ERROR.value:
+            continue
+
+        data = result.data
+
+        if result.system == "intelligence":
+            personality = data.get("personality", {})
+            if isinstance(personality, dict):
+                big_five = personality.get("big_five", {})
+                if isinstance(big_five, dict):
+                    for trait, label in _big_five_labels.items():
+                        score = big_five.get(trait)
+                        if isinstance(score, (int, float)) and score > 60:
+                            strengths.append(label)
+
+                attachment = personality.get("attachment_style")
+                if attachment == "secure":
+                    strengths.append("Secure Attachment")
+
+        elif result.system == "creative":
+            creative_strengths = data.get("strengths", [])
+            if isinstance(creative_strengths, list):
+                for s in creative_strengths:
+                    if isinstance(s, str):
+                        strengths.append(s.replace("_", " ").title())
+
+        elif result.system == "perspective":
+            kegan = data.get("kegan_stage")
+            if isinstance(kegan, (int, float)) and kegan >= 3:
+                strengths.append("Perspective-Taking")
+
+    return strengths
+
+
 def transform_to_profile_summary(
     coordinator_results: list[CoordinatorResult],
 ) -> dict[str, Any]:
@@ -343,6 +398,7 @@ def transform_to_profile_summary(
     Each coordinator result has .system (str) and .data (dict).
     """
     summary: dict[str, Any] = {}
+    strengths_map = _build_strengths_map(coordinator_results)
 
     for result in coordinator_results:
         if result.status == CoordinatorStatus.ERROR.value:
@@ -358,7 +414,7 @@ def transform_to_profile_summary(
                 "archetype": data.get("archetype", {}),
                 "personality": data.get("personality", {}),
                 "biorhythm": data.get("biorhythm", {}),
-                "strengths_map": [],
+                "strengths_map": strengths_map,
             }
         elif system == "healing":
             summary["healing"] = {k: v for k, v in data.items() if k != "disclaimers"}

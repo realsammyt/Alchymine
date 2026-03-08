@@ -22,11 +22,12 @@ import {
   HealingMatchListResponse,
   OutcomeSummary,
 } from "@/lib/api";
-import { useApi, useIntake } from "@/lib/useApi";
+import { useApi, useIntake, useReportStatus } from "@/lib/useApi";
 import { useAuth } from "@/lib/AuthContext";
 import ProtectedRoute from "@/components/shared/ProtectedRoute";
 import { DEMO_ACCOUNT_EMAIL } from "@/lib/constants";
 import EvidenceBadge from "@/components/shared/EvidenceBadge";
+import GeneratingState from "@/components/shared/GeneratingState";
 
 // ── Constants ─────────────────────────────────────────────────────
 
@@ -454,6 +455,7 @@ export default function HealingPage() {
   const isDemoUser = user?.email === DEMO_ACCOUNT_EMAIL;
   const { data: intake } = useIntake(user?.id);
   const hasIntake = !!(intake?.intentions?.length || intake?.intention);
+  const { status: reportStatus } = useReportStatus();
 
   // Fetch modalities from API
   const modalities = useApi<ModalityListResponse>(
@@ -556,6 +558,13 @@ export default function HealingPage() {
               </p>
             </header>
           </MotionReveal>
+
+          {/* Generation in progress */}
+          {(reportStatus === "pending" || reportStatus === "generating") && (
+            <div className="mb-12">
+              <GeneratingState systemName="Healing" />
+            </div>
+          )}
 
           {/* Practice Streak + Stats Row — demo data only */}
           {isDemoUser && (

@@ -20,12 +20,12 @@ from alchymine.engine.profile import CreativeDNA, GuilfordScores
 # Response keys expected for each Guilford component.
 # Each key maps to a list of question IDs whose scores are averaged.
 _GUILFORD_QUESTION_MAP: dict[str, list[str]] = {
-    "fluency": ["fluency_1", "fluency_2", "fluency_3"],
-    "flexibility": ["flexibility_1", "flexibility_2", "flexibility_3"],
-    "originality": ["originality_1", "originality_2", "originality_3"],
-    "elaboration": ["elaboration_1", "elaboration_2", "elaboration_3"],
-    "sensitivity": ["sensitivity_1", "sensitivity_2", "sensitivity_3"],
-    "redefinition": ["redefinition_1", "redefinition_2", "redefinition_3"],
+    "fluency": ["guil_flu1", "guil_flu2", "guil_flu3"],
+    "flexibility": ["guil_flex1", "guil_flex2", "guil_flex3"],
+    "originality": ["guil_orig1", "guil_orig2", "guil_orig3"],
+    "elaboration": ["guil_elab1", "guil_elab2", "guil_elab3"],
+    "sensitivity": ["guil_sens1", "guil_sens2", "guil_sens3"],
+    "redefinition": ["guil_redef1", "guil_redef2", "guil_redef3"],
 }
 
 

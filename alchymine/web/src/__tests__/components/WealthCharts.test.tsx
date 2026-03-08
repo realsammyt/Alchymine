@@ -46,6 +46,7 @@ jest.mock("@/lib/useApi", () => ({
   }),
   getStoredIntake: () => null,
   useIntake: () => ({ data: null, loading: false }),
+  useReportStatus: () => ({ status: "idle", reportId: null }),
 }));
 
 // Mock the API functions

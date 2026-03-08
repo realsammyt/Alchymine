@@ -283,6 +283,17 @@ def _intelligence_personality(state: CoordinatorState) -> CoordinatorState:
                 except Exception as enn_exc:
                     errors.append(f"Intelligence: enneagram scoring error — {enn_exc!s}")
 
+            # Score risk tolerance if items are present
+            risk_items = {k: v for k, v in bf_responses.items() if k.startswith("risk_")}
+            if len(risk_items) >= 3:
+                try:
+                    from alchymine.engine.personality.enneagram import score_risk_tolerance
+
+                    risk_tol = score_risk_tolerance(risk_items)
+                    personality["risk_tolerance"] = risk_tol.value
+                except Exception as risk_exc:
+                    errors.append(f"Intelligence: risk tolerance scoring error — {risk_exc!s}")
+
             results["personality"] = personality
         else:
             errors.append(f"Intelligence: insufficient Big Five responses ({len(bf_items)}/20)")
@@ -661,18 +672,43 @@ def _creative_orientation(state: CoordinatorState) -> CoordinatorState:
 
 
 def _creative_strengths(state: CoordinatorState) -> CoordinatorState:
-    """Creative strengths node — identifies strengths from Guilford scores."""
+    """Creative strengths node — identifies strengths from Guilford scores.
+
+    If ``guilford_scores`` (a GuilfordScores object) is already present in
+    request_data, it is used directly.  Otherwise, raw ``guil_*`` Likert
+    responses are extracted from ``assessment_responses``, converted from
+    a 1-5 Likert scale to 0-100, and scored via ``assess_guilford``.
+    """
     results = dict(state.get("results", {}))
     errors = list(state.get("errors", []))
     request_data = state.get("request_data", {})
 
     try:
-        from alchymine.engine.creative import identify_strengths
+        from alchymine.engine.creative import assess_guilford, identify_strengths
 
         guilford_scores = request_data.get("guilford_scores")
+
+        if not guilford_scores:
+            # Attempt to compute from raw assessment responses
+            assessment = request_data.get("assessment_responses", {})
+            guil_items = {k: v for k, v in assessment.items() if k.startswith("guil_")}
+            if guil_items:
+                # Convert Likert 1-5 to 0-100 scale
+                scaled = {k: (float(v) - 1) * 25 for k, v in guil_items.items()}
+                guilford_scores = assess_guilford(scaled)
+
         if guilford_scores:
             strengths = identify_strengths(guilford_scores)
             results["strengths"] = strengths
+            # Store raw scores for downstream use
+            results["guilford_scores"] = {
+                "fluency": guilford_scores.fluency,
+                "flexibility": guilford_scores.flexibility,
+                "originality": guilford_scores.originality,
+                "elaboration": guilford_scores.elaboration,
+                "sensitivity": guilford_scores.sensitivity,
+                "redefinition": guilford_scores.redefinition,
+            }
     except ImportError:
         errors.append("Creative: style engine not available")
     except Exception as exc:

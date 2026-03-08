@@ -27,10 +27,12 @@ from alchymine.agents.orchestrator.orchestrator import (
 )
 from alchymine.agents.orchestrator.synthesis import (
     SynthesisResult,
+    _build_strengths_map,
     aggregate_evidence,
     detect_conflicts,
     synthesize_full_profile,
     synthesize_guided_session,
+    transform_to_profile_summary,
 )
 
 
@@ -926,3 +928,184 @@ class TestSynthesisResultDataclass:
         assert sr.overall_coherence == 0.75
         assert sr.quality_passed is True
         assert len(sr.errors) == 1
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# Section 10: Strengths map population
+# ═══════════════════════════════════════════════════════════════════════
+
+
+class TestStrengthsMap:
+    """_build_strengths_map extracts cross-system strengths."""
+
+    def test_big_five_high_traits_included(self) -> None:
+        """Big Five traits scoring above 60 are included as strengths."""
+        result = _intelligence_result(
+            data={
+                "numerology": {"life_path": 7},
+                "personality": {
+                    "big_five": {
+                        "openness": 75.0,
+                        "conscientiousness": 80.0,
+                        "extraversion": 40.0,
+                        "agreeableness": 65.0,
+                        "neuroticism": 20.0,
+                    },
+                    "attachment_style": "anxious",
+                },
+            }
+        )
+        strengths = _build_strengths_map([result])
+        assert "Openness to Experience" in strengths
+        assert "Conscientiousness" in strengths
+        assert "Agreeableness" in strengths
+        # Extraversion is below 60 → excluded
+        assert "Extraversion" not in strengths
+        # Neuroticism is never included (not in label map)
+        assert "Emotional Sensitivity" not in strengths
+
+    def test_secure_attachment_included(self) -> None:
+        """Secure attachment style is listed as a strength."""
+        result = _intelligence_result(
+            data={
+                "personality": {
+                    "big_five": {"openness": 50.0, "conscientiousness": 50.0,
+                                 "extraversion": 50.0, "agreeableness": 50.0,
+                                 "neuroticism": 50.0},
+                    "attachment_style": "secure",
+                },
+            }
+        )
+        strengths = _build_strengths_map([result])
+        assert "Secure Attachment" in strengths
+
+    def test_insecure_attachment_not_included(self) -> None:
+        """Non-secure attachment style is not a strength."""
+        result = _intelligence_result(
+            data={
+                "personality": {
+                    "big_five": {},
+                    "attachment_style": "anxious",
+                },
+            }
+        )
+        strengths = _build_strengths_map([result])
+        assert "Secure Attachment" not in strengths
+
+    def test_creative_strengths_included(self) -> None:
+        """Creative system strengths are included."""
+        result = _creative_result(
+            data={
+                "creative_orientation": {"style": "generative"},
+                "strengths": ["originality", "divergent_thinking"],
+            }
+        )
+        strengths = _build_strengths_map([result])
+        assert "Originality" in strengths
+        assert "Divergent Thinking" in strengths
+
+    def test_kegan_stage_3_plus_adds_perspective(self) -> None:
+        """Kegan stage >= 3 adds Perspective-Taking strength."""
+        result = _perspective_result(data={"kegan_stage": 3})
+        strengths = _build_strengths_map([result])
+        assert "Perspective-Taking" in strengths
+
+    def test_kegan_stage_2_no_perspective(self) -> None:
+        """Kegan stage < 3 does not add Perspective-Taking."""
+        result = _perspective_result(data={"kegan_stage": 2})
+        strengths = _build_strengths_map([result])
+        assert "Perspective-Taking" not in strengths
+
+    def test_error_status_excluded(self) -> None:
+        """Error-status results don't contribute to strengths."""
+        result = _intelligence_result(
+            status=CoordinatorStatus.ERROR.value,
+            data={
+                "personality": {
+                    "big_five": {"openness": 90.0},
+                    "attachment_style": "secure",
+                },
+            },
+        )
+        strengths = _build_strengths_map([result])
+        assert strengths == []
+
+    def test_empty_results(self) -> None:
+        """Empty coordinator results produce empty strengths."""
+        assert _build_strengths_map([]) == []
+
+    def test_cross_system_strengths(self) -> None:
+        """Multiple systems contribute to the combined strengths map."""
+        results = [
+            _intelligence_result(
+                data={
+                    "personality": {
+                        "big_five": {"openness": 80.0, "conscientiousness": 30.0,
+                                     "extraversion": 70.0, "agreeableness": 50.0,
+                                     "neuroticism": 10.0},
+                        "attachment_style": "secure",
+                    },
+                }
+            ),
+            _creative_result(data={"strengths": ["fluency"]}),
+            _perspective_result(data={"kegan_stage": 4}),
+        ]
+        strengths = _build_strengths_map(results)
+        assert "Openness to Experience" in strengths
+        assert "Extraversion" in strengths
+        assert "Secure Attachment" in strengths
+        assert "Fluency" in strengths
+        assert "Perspective-Taking" in strengths
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# Section 11: Profile summary strengths_map integration
+# ═══════════════════════════════════════════════════════════════════════
+
+
+class TestProfileSummaryStrengthsMap:
+    """transform_to_profile_summary populates strengths_map."""
+
+    def test_strengths_map_populated_in_identity(self) -> None:
+        """Identity section has populated strengths_map, not empty list."""
+        results = [
+            _intelligence_result(
+                data={
+                    "numerology": {"life_path": 7},
+                    "astrology": {"sun_sign": "Pisces"},
+                    "personality": {
+                        "big_five": {"openness": 85.0, "conscientiousness": 70.0,
+                                     "extraversion": 40.0, "agreeableness": 50.0,
+                                     "neuroticism": 30.0},
+                        "attachment_style": "secure",
+                    },
+                }
+            ),
+            _creative_result(data={"strengths": ["originality"]}),
+        ]
+        summary = transform_to_profile_summary(results)
+        assert "identity" in summary
+        sm = summary["identity"]["strengths_map"]
+        assert isinstance(sm, list)
+        assert len(sm) > 0
+        assert "Openness to Experience" in sm
+        assert "Conscientiousness" in sm
+        assert "Secure Attachment" in sm
+        assert "Originality" in sm
+
+    def test_strengths_map_empty_when_no_data(self) -> None:
+        """With minimal data, strengths_map is an empty list (not None)."""
+        results = [
+            _intelligence_result(
+                data={
+                    "personality": {
+                        "big_five": {"openness": 30.0, "conscientiousness": 40.0,
+                                     "extraversion": 20.0, "agreeableness": 50.0,
+                                     "neuroticism": 80.0},
+                        "attachment_style": "anxious",
+                    },
+                }
+            ),
+        ]
+        summary = transform_to_profile_summary(results)
+        assert summary["identity"]["strengths_map"] == []

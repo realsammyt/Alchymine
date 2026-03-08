@@ -176,6 +176,9 @@ class MasterOrchestrator:
                     request_data["archetype_secondary"] = archetype_data.get("secondary")
                 if personality_data:
                     request_data["big_five"] = personality_data
+                    risk_tol = personality_data.get("risk_tolerance")
+                    if risk_tol:
+                        request_data["risk_tolerance"] = risk_tol
                 if astrology_data:
                     request_data["astrology"] = astrology_data
                     if astrology_data.get("sun_sign"):
@@ -184,6 +187,25 @@ class MasterOrchestrator:
                         request_data["moon_sign"] = astrology_data["moon_sign"]
                     if astrology_data.get("rising_sign"):
                         request_data["rising_sign"] = astrology_data["rising_sign"]
+
+                # Extract Kegan assessment responses for the Perspective
+                # coordinator. Each kegan_N question maps to a scoring
+                # dimension used by assess_kegan_stage().
+                assessment = request_data.get("assessment_responses", {})
+                _kegan_dimension_map = {
+                    "kegan_1": "self_awareness",
+                    "kegan_2": "perspective_taking",
+                    "kegan_3": "relationship_to_authority",
+                    "kegan_4": "conflict_tolerance",
+                    "kegan_5": "systems_thinking",
+                }
+                kegan_responses = {
+                    dim: assessment[qid]
+                    for qid, dim in _kegan_dimension_map.items()
+                    if qid in assessment
+                }
+                if kegan_responses:
+                    request_data["kegan_responses"] = kegan_responses
 
         # Synthesize if multi-system
         synthesis = None

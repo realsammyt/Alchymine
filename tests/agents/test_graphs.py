@@ -227,6 +227,153 @@ class TestIntelligenceGraphTransitions:
         assert personality["enneagram_type"] is not None
         assert personality["enneagram_wing"] is not None
 
+    def test_risk_tolerance_scored_from_assessment(self) -> None:
+        """Risk tolerance is scored from risk_* assessment items and added to personality."""
+        from datetime import date
+
+        bf_responses = {
+            f"bf_{t}{i}": 3
+            for t in ("e", "a", "c", "n", "o")
+            for i in (1, 2, 3, 4)
+        }
+        # High risk tolerance answers (all 5s → aggressive)
+        risk_responses = {"risk_1": 5, "risk_2": 5, "risk_3": 5}
+        all_responses = {**bf_responses, **risk_responses}
+
+        state = _make_initial_state(
+            request_data={
+                "full_name": "Test User",
+                "birth_date": date(1990, 6, 15),
+                "assessment_responses": all_responses,
+            }
+        )
+
+        mock_profile = MagicMock()
+        mock_profile.life_path = 7
+        mock_profile.expression = 3
+        mock_profile.soul_urge = 9
+        mock_profile.personality = 4
+        mock_profile.personal_year = 1
+        mock_profile.personal_month = 5
+
+        with (
+            patch(
+                "alchymine.engine.numerology.calculate_pythagorean_profile",
+                return_value=mock_profile,
+            ),
+            patch(
+                "alchymine.engine.astrology.approximate_sun_sign",
+                return_value="Gemini",
+            ),
+            patch(
+                "alchymine.engine.astrology.approximate_sun_degree",
+                return_value=84.5,
+            ),
+        ):
+            graph = build_intelligence_graph(include_quality_gate=False)
+            result = graph.invoke(state)
+
+        personality = result["results"]["personality"]
+        assert "risk_tolerance" in personality
+        assert personality["risk_tolerance"] == "aggressive"
+
+    def test_risk_tolerance_conservative(self) -> None:
+        """Low risk answers produce conservative risk_tolerance."""
+        from datetime import date
+
+        bf_responses = {
+            f"bf_{t}{i}": 3
+            for t in ("e", "a", "c", "n", "o")
+            for i in (1, 2, 3, 4)
+        }
+        risk_responses = {"risk_1": 1, "risk_2": 1, "risk_3": 1}
+        all_responses = {**bf_responses, **risk_responses}
+
+        state = _make_initial_state(
+            request_data={
+                "full_name": "Test User",
+                "birth_date": date(1990, 6, 15),
+                "assessment_responses": all_responses,
+            }
+        )
+
+        mock_profile = MagicMock()
+        mock_profile.life_path = 7
+        mock_profile.expression = 3
+        mock_profile.soul_urge = 9
+        mock_profile.personality = 4
+        mock_profile.personal_year = 1
+        mock_profile.personal_month = 5
+
+        with (
+            patch(
+                "alchymine.engine.numerology.calculate_pythagorean_profile",
+                return_value=mock_profile,
+            ),
+            patch(
+                "alchymine.engine.astrology.approximate_sun_sign",
+                return_value="Gemini",
+            ),
+            patch(
+                "alchymine.engine.astrology.approximate_sun_degree",
+                return_value=84.5,
+            ),
+        ):
+            graph = build_intelligence_graph(include_quality_gate=False)
+            result = graph.invoke(state)
+
+        personality = result["results"]["personality"]
+        assert personality["risk_tolerance"] == "conservative"
+
+    def test_risk_tolerance_skipped_when_items_missing(self) -> None:
+        """Risk tolerance not scored when fewer than 3 risk items present."""
+        from datetime import date
+
+        bf_responses = {
+            f"bf_{t}{i}": 3
+            for t in ("e", "a", "c", "n", "o")
+            for i in (1, 2, 3, 4)
+        }
+        # Only 2 risk items — not enough
+        risk_responses = {"risk_1": 3, "risk_2": 3}
+        all_responses = {**bf_responses, **risk_responses}
+
+        state = _make_initial_state(
+            request_data={
+                "full_name": "Test User",
+                "birth_date": date(1990, 6, 15),
+                "assessment_responses": all_responses,
+            }
+        )
+
+        mock_profile = MagicMock()
+        mock_profile.life_path = 7
+        mock_profile.expression = 3
+        mock_profile.soul_urge = 9
+        mock_profile.personality = 4
+        mock_profile.personal_year = 1
+        mock_profile.personal_month = 5
+
+        with (
+            patch(
+                "alchymine.engine.numerology.calculate_pythagorean_profile",
+                return_value=mock_profile,
+            ),
+            patch(
+                "alchymine.engine.astrology.approximate_sun_sign",
+                return_value="Gemini",
+            ),
+            patch(
+                "alchymine.engine.astrology.approximate_sun_degree",
+                return_value=84.5,
+            ),
+        ):
+            graph = build_intelligence_graph(include_quality_gate=False)
+            result = graph.invoke(state)
+
+        personality = result["results"]["personality"]
+        assert "risk_tolerance" not in personality
+
     def test_degraded_when_astrology_fails(self) -> None:
         """Numerology succeeds, astrology fails -> status=degraded."""
         mock_profile = MagicMock()

@@ -13,9 +13,10 @@ import {
   NumerologyResponse,
   AstrologyResponse,
 } from "@/lib/api";
-import { useApi, useIntake } from "@/lib/useApi";
+import { useApi, useIntake, useReportStatus } from "@/lib/useApi";
 import { useAuth } from "@/lib/AuthContext";
 import EvidenceBadge from "@/components/shared/EvidenceBadge";
+import GeneratingState from "@/components/shared/GeneratingState";
 
 const NUMEROLOGY_NUMBERS = [
   {
@@ -118,6 +119,7 @@ export default function IntelligencePage() {
   const { user } = useAuth();
   const { data: intake } = useIntake(user?.id);
   const hasIntake = !!intake?.fullName && !!intake?.birthDate;
+  const { status: reportStatus } = useReportStatus();
 
   const numerology = useApi<NumerologyResponse>(
     hasIntake
@@ -158,6 +160,13 @@ export default function IntelligencePage() {
             </p>
           </header>
         </MotionReveal>
+
+        {/* Generation in progress */}
+        {(reportStatus === "pending" || reportStatus === "generating") && (
+          <div className="mb-12">
+            <GeneratingState systemName="Intelligence" />
+          </div>
+        )}
 
         {/* Personalized Numerology Results */}
         {hasIntake && (

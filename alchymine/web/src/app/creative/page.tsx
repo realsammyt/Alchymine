@@ -18,10 +18,11 @@ import {
   ProjectListResponse,
   ProfileResponse,
 } from "@/lib/api";
-import { useApi, useIntake } from "@/lib/useApi";
+import { useApi, useIntake, useReportStatus } from "@/lib/useApi";
 import { useAuth } from "@/lib/AuthContext";
 import CreativeProjects from "@/components/creative/CreativeProjects";
 import EvidenceBadge from "@/components/shared/EvidenceBadge";
+import GeneratingState from "@/components/shared/GeneratingState";
 
 const CREATIVE_DIMENSIONS = [
   {
@@ -114,6 +115,7 @@ export default function CreativePage() {
   const userId = user?.id ?? null;
   const { data: intake } = useIntake(userId);
   const hasIntake = !!(intake?.intentions?.length || intake?.intention);
+  const { status: reportStatus } = useReportStatus();
 
   useEffect(() => {
     setMounted(true);
@@ -178,6 +180,13 @@ export default function CreativePage() {
               </p>
             </header>
           </MotionReveal>
+
+          {/* Generation in progress */}
+          {(reportStatus === "pending" || reportStatus === "generating") && (
+            <div className="mb-12">
+              <GeneratingState systemName="Creative" />
+            </div>
+          )}
 
           {/* Personalized Style Fingerprint */}
           <MotionReveal delay={0.1}>

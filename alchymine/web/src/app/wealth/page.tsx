@@ -21,7 +21,7 @@ import {
   WealthPlanResponse,
   ProfileResponse,
 } from "@/lib/api";
-import { useApi, useIntake } from "@/lib/useApi";
+import { useApi, useIntake, useReportStatus } from "@/lib/useApi";
 import { useAuth } from "@/lib/AuthContext";
 import ProtectedRoute from "@/components/shared/ProtectedRoute";
 import { DEMO_ACCOUNT_EMAIL } from "@/lib/constants";
@@ -30,6 +30,7 @@ import DebtCalculator, {
 } from "@/components/wealth/DebtCalculator";
 import WealthPlanTracker from "@/components/wealth/WealthPlanTracker";
 import EvidenceBadge from "@/components/shared/EvidenceBadge";
+import GeneratingState from "@/components/shared/GeneratingState";
 
 // ── Constants ─────────────────────────────────────────────────────
 
@@ -669,6 +670,7 @@ export default function WealthPage() {
   const userId = user?.id ?? null;
   const { data: intake } = useIntake(userId);
   const hasIntake = !!(intake?.intentions?.length || intake?.intention);
+  const { status: reportStatus } = useReportStatus();
   const intakeIntentions =
     intake?.intentions ?? (intake?.intention ? [intake.intention] : []);
 
@@ -746,6 +748,13 @@ export default function WealthPage() {
                 </div>
               </MotionReveal>
             </header>
+
+            {/* Generation in progress */}
+            {(reportStatus === "pending" || reportStatus === "generating") && (
+              <div className="mb-12">
+                <GeneratingState systemName="Wealth" />
+              </div>
+            )}
 
             {/* ── Personalized Wealth Profile ──────────────────────────── */}
             <section className="mb-12" aria-labelledby="your-wealth-heading">

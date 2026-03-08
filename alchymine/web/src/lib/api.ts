@@ -407,6 +407,35 @@ export async function getReport(id: string): Promise<ReportResponse> {
   return request<ReportResponse>(`${BASE}/reports/${id}`);
 }
 
+export interface ReportListItem {
+  id: string;
+  status: string;
+  result: Record<string, unknown> | null;
+  error: string | null;
+  created_at: string;
+  updated_at: string | null;
+}
+
+export interface ReportListResponse {
+  reports: ReportListItem[];
+  count: number;
+  skip: number;
+  limit: number;
+}
+
+export async function listUserReports(
+  userId: string,
+  opts?: { skip?: number; limit?: number },
+): Promise<ReportListResponse> {
+  const params = new URLSearchParams();
+  if (opts?.skip) params.set("skip", String(opts.skip));
+  if (opts?.limit) params.set("limit", String(opts.limit));
+  const query = params.toString();
+  return request<ReportListResponse>(
+    `${BASE}/reports/user/${encodeURIComponent(userId)}${query ? `?${query}` : ""}`,
+  );
+}
+
 // ─── Numerology ─────────────────────────────────────────────────────
 
 export async function getNumerology(
