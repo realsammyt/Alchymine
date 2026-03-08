@@ -93,20 +93,37 @@ export function getStoredReportId(): string | null {
 
 export type StoredIntake = ReturnType<typeof getStoredIntake>;
 
+export interface IntakeState {
+  data: StoredIntake;
+  loading: boolean;
+}
+
 /**
  * Hook that returns intake data with cross-device sync.
  *
  * Tries sessionStorage first (fast, same-tab), then falls back to the
  * server profile (persisted across devices). This enables a user to
  * complete intake on one device and see results on another.
+ *
+ * When data is loaded from the server, it is cached to sessionStorage
+ * so subsequent renders in the same tab don't flash empty state.
  */
-export function useIntake(userId: string | null | undefined): StoredIntake {
+export function useIntake(userId: string | null | undefined): IntakeState {
   const sessionIntake = useMemo(() => getStoredIntake(), []);
   const [intake, setIntake] = useState(sessionIntake);
+  const needsServer = !sessionIntake?.fullName || !sessionIntake?.birthDate;
+  const [loading, setLoading] = useState(needsServer && !!userId);
 
   useEffect(() => {
-    if (intake?.fullName && intake?.birthDate) return;
-    if (!userId) return;
+    if (intake?.fullName && intake?.birthDate) {
+      setLoading(false);
+      return;
+    }
+    if (!userId) {
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
     getProfile(userId)
       .then((profile) => {
         if (profile.intake) {
@@ -119,10 +136,20 @@ export function useIntake(userId: string | null | undefined): StoredIntake {
             intention: profile.intake.intention,
           };
           setIntake(fromProfile);
+          // Cache to sessionStorage so subsequent renders don't flash
+          try {
+            sessionStorage.setItem(
+              "alchymine_intake",
+              JSON.stringify(fromProfile),
+            );
+          } catch {
+            /* storage quota or SSR — ignore */
+          }
         }
       })
-      .catch(() => {});
+      .catch(() => {})
+      .finally(() => setLoading(false));
   }, [userId, intake?.fullName, intake?.birthDate]);
 
-  return intake;
+  return { data: intake, loading };
 }

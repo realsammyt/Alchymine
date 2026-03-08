@@ -25,10 +25,8 @@ export interface ReportRequest {
 export interface ReportStatus {
   id: string;
   status: "pending" | "generating" | "complete" | "failed";
-  progress: number;
   created_at: string;
-  completed_at: string | null;
-  quality_gates_passed: boolean | null;
+  updated_at: string | null;
 }
 
 // ─── Identity sub-types ──────────────────────────────────────────────

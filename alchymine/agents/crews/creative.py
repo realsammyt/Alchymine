@@ -244,7 +244,7 @@ class CreativeBlockDetector(DomainAgent):
         # Identify components scoring below 40 as potential blocks
         threshold = 40.0
         for component, score in guilford_scores.items():
-            if isinstance(score, (int, float)) and score < threshold:
+            if isinstance(score, int | float) and score < threshold:
                 exercises = self._BLOCK_EXERCISES.get(component, [])
                 blocks.append(
                     {

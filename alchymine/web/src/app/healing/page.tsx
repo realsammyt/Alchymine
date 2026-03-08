@@ -452,7 +452,7 @@ export default function HealingPage() {
   const [selectedPattern, setSelectedPattern] = useState<string | null>(null);
   const { user } = useAuth();
   const isDemoUser = user?.email === DEMO_ACCOUNT_EMAIL;
-  const intake = useIntake(user?.id);
+  const { data: intake } = useIntake(user?.id);
   const hasIntake = !!(intake?.intentions?.length || intake?.intention);
 
   // Fetch modalities from API

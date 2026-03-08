@@ -84,6 +84,8 @@ select = [
     "ANN",  # flake8-annotations
 ]
 ignore = [
+    "ANN101",  # Missing type annotation for `self` — not standard Python convention
+    "ANN102",  # Missing type annotation for `cls` — not standard Python convention
     "ANN401",  # Dynamically typed expressions (Any) — needed for SQLAlchemy TypeDecorators
     "ANN001",  # Missing type annotation for function argument — covered by mypy
     "ANN003",  # Missing type annotation for **kwargs — covered by mypy

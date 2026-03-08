@@ -112,7 +112,7 @@ export default function CreativePage() {
   const [mounted, setMounted] = useState(false);
   const { user } = useAuth();
   const userId = user?.id ?? null;
-  const intake = useIntake(userId);
+  const { data: intake } = useIntake(userId);
   const hasIntake = !!(intake?.intentions?.length || intake?.intention);
 
   useEffect(() => {

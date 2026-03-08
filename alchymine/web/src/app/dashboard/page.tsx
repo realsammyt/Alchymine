@@ -515,7 +515,7 @@ function CrossInsightCard({ insight }: { insight: BridgeInsightResponse }) {
 export default function DashboardPage() {
   const { user } = useAuth();
   const userId = user?.id ?? null;
-  const intake = useIntake(userId);
+  const { data: intake, loading: intakeLoading } = useIntake(userId);
   const [activeTab, setActiveTab] = useState<"overview" | "journal">(
     "overview",
   );
@@ -545,7 +545,15 @@ export default function DashboardPage() {
       {/* Page wrapper — grain + atmosphere */}
       <main id="main-content" className="grain-overlay flex-1">
         <div className="bg-atmosphere min-h-full">
-          {!intake ? (
+          {intakeLoading ? (
+            // ── Loading state while fetching server profile ─────────
+            <div className="px-4 sm:px-6 lg:px-8 py-12 sm:py-16">
+              <div className="max-w-4xl mx-auto flex flex-col items-center gap-4 py-20">
+                <div className="w-10 h-10 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
+                <p className="text-text/40 font-body text-sm">Loading your profile&hellip;</p>
+              </div>
+            </div>
+          ) : !intake ? (
             // ── Empty state ─────────────────────────────────────────
             <div className="px-4 sm:px-6 lg:px-8 py-12 sm:py-16">
               <div className="max-w-4xl mx-auto space-y-8">
