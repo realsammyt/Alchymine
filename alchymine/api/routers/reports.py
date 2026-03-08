@@ -431,7 +431,7 @@ async def diagnose_reports(
     """
     from sqlalchemy import select, text
 
-    checks: dict[str, dict[str, str]] = {}
+    checks: dict[str, dict[str, object]] = {}
     user_id = current_user["sub"]
 
     # 1. DB connectivity
