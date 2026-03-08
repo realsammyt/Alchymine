@@ -30,6 +30,8 @@ from alchymine.api.auth import get_current_admin
 from alchymine.api.deps import get_db_session
 from alchymine.db.models import AdminAuditLog, InviteCode, JournalEntry, Report, User
 from alchymine.email import send_invitation_email
+from alchymine.safety.audit import AuditEventType
+from alchymine.safety.audit import log_event as safety_log_event
 
 logger = logging.getLogger(__name__)
 
@@ -52,7 +54,13 @@ async def _audit(
     target_id: str | None = None,
     detail: dict | None = None,
 ) -> None:
-    """Write an audit log entry and flush (without committing)."""
+    """Write an audit log entry to the DB and the in-memory safety audit log.
+
+    The DB-backed AdminAuditLog provides persistent, queryable admin audit
+    history.  The safety audit module's in-memory log provides a unified
+    view of all safety-relevant events (admin actions included) for real-time
+    monitoring and stats.
+    """
     db.add(
         AdminAuditLog(
             admin_id=admin_id,
@@ -63,6 +71,20 @@ async def _audit(
         )
     )
     await db.flush()
+
+    # Mirror to safety audit log for unified monitoring
+    safety_log_event(
+        event_type=AuditEventType.FINANCIAL_DATA_ACCESS,
+        system="admin",
+        summary=f"Admin action: {action}",
+        user_id=admin_id,
+        metadata={
+            "action": action,
+            "target_type": target_type,
+            "target_id": target_id,
+            **(detail or {}),
+        },
+    )
 
 
 # ─── Pydantic Schemas ────────────────────────────────────────────────────

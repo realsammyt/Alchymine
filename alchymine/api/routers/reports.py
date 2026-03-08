@@ -21,6 +21,9 @@ from alchymine.api.deps import get_db_session
 from alchymine.db import repository
 from alchymine.engine.profile import IntakeData
 from alchymine.engine.reports.html_renderer import render_report_html
+from alchymine.safety.audit import AuditEventType
+from alchymine.safety.audit import log_event as audit_log_event
+from alchymine.safety.guardrails import GuardrailAction, check_guardrail
 from alchymine.workers.tasks import generate_report as generate_report_task
 
 logger = logging.getLogger(__name__)
@@ -94,6 +97,28 @@ async def create_report(
     ``GET /reports/{id}/status`` to poll for progress or
     ``GET /reports/{id}`` to retrieve the completed result.
     """
+    user_id = current_user["sub"]
+
+    # ── Safety guardrail: rate-limit report generation per user ───────
+    guardrail = check_guardrail(user_id, "report_generation")
+    if guardrail.action == GuardrailAction.DENY:
+        audit_log_event(
+            event_type=AuditEventType.RATE_LIMIT_HIT,
+            system="reports",
+            summary=guardrail.message,
+            user_id=user_id,
+            metadata={"operation": "report_generation"},
+        )
+        raise HTTPException(
+            status_code=429,
+            detail=guardrail.message,
+            headers=(
+                {"Retry-After": str(int(guardrail.retry_after_seconds))}
+                if guardrail.retry_after_seconds
+                else None
+            ),
+        )
+
     report_id = str(uuid.uuid4())
     now = datetime.now(UTC).isoformat()
 

@@ -38,6 +38,9 @@ from alchymine.db.repository import (
     update_report_content,
     update_report_status,
 )
+from alchymine.safety.audit import AuditEventType
+from alchymine.safety.audit import log_event as audit_log_event
+from alchymine.safety.content_filter import FilterAction, filter_content
 from alchymine.workers.celery_app import celery_app
 
 logger = logging.getLogger(__name__)
@@ -226,6 +229,102 @@ async def _db_store_pdf(report_id: str, pdf_bytes: bytes) -> None:
             await session.commit()
 
 
+# ── Safety: content filter helper ─────────────────────────────────────────
+
+
+def _filter_narratives(
+    serialised: dict[str, Any],
+    report_id: str,
+    user_id: str | None,
+) -> None:
+    """Run the content safety filter on all LLM-generated narrative texts.
+
+    Modifies ``serialised["narratives"]`` in place:
+    - Replaces narrative text with the PII-redacted version.
+    - Removes narratives that were blocked by the content filter.
+    - Logs audit events for any safety findings.
+    """
+    narratives = serialised.get("narratives")
+    if not narratives or not isinstance(narratives, dict):
+        return
+
+    blocked_systems: list[str] = []
+
+    for system, narrative_data in list(narratives.items()):
+        text = narrative_data.get("text", "")
+        if not text:
+            continue
+
+        result = filter_content(
+            text,
+            context=system,
+            redact_pii=True,
+            check_crisis=False,  # narratives are LLM output, not user input
+        )
+
+        # Apply PII redaction to narrative text
+        if result.filtered_text != text:
+            narrative_data["text"] = result.filtered_text
+
+        # Log audit events for safety findings
+        if result.pii_matches:
+            audit_log_event(
+                event_type=AuditEventType.PII_REDACTED,
+                system=system,
+                summary=f"PII redacted from {system} narrative in report {report_id}",
+                user_id=user_id,
+                metadata={
+                    "report_id": report_id,
+                    "pii_count": len(result.pii_matches),
+                    "pii_types": list({m.pii_type for m in result.pii_matches}),
+                },
+            )
+
+        if result.action == FilterAction.BLOCK:
+            blocked_systems.append(system)
+            audit_log_event(
+                event_type=AuditEventType.CONTENT_BLOCKED,
+                system=system,
+                summary=(
+                    f"Narrative blocked for {system} in report {report_id}: "
+                    f"{result.blocked_reason}"
+                ),
+                user_id=user_id,
+                metadata={
+                    "report_id": report_id,
+                    "blocked_reason": result.blocked_reason,
+                    "warnings": result.warnings,
+                },
+            )
+        elif result.action == FilterAction.ESCALATE:
+            audit_log_event(
+                event_type=AuditEventType.CONTENT_ESCALATED,
+                system=system,
+                summary=f"Content escalated in {system} narrative for report {report_id}",
+                user_id=user_id,
+                metadata={
+                    "report_id": report_id,
+                    "warnings": result.warnings,
+                },
+            )
+        elif result.action == FilterAction.WARN:
+            logger.info(
+                "Content filter warnings for %s narrative in report %s: %s",
+                system,
+                report_id,
+                result.warnings,
+            )
+
+    # Remove blocked narratives
+    for system in blocked_systems:
+        del narratives[system]
+        logger.warning(
+            "Removed blocked %s narrative from report %s",
+            system,
+            report_id,
+        )
+
+
 # ── Celery task ──────────────────────────────────────────────────────────
 
 
@@ -341,6 +440,17 @@ def generate_report(
                 }
         except Exception as exc:
             logger.warning("Narrative generation failed (non-fatal): %s", exc)
+
+        # ── Safety content filter on LLM-generated narratives ─────────
+        # Resolve user_id early for audit logging
+        _report_row_for_filter = _run_async(_db_get_report(report_id))
+        _filter_user_id = (
+            _report_row_for_filter.user_id if _report_row_for_filter else None
+        )
+        try:
+            _filter_narratives(serialised, report_id, _filter_user_id)
+        except Exception as exc:
+            logger.warning("Content filter failed (non-fatal): %s", exc)
 
         # ── Store success ─────────────────────────────────────────────
         _run_async(_db_set_complete(report_id, serialised))
