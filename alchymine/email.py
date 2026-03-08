@@ -7,6 +7,7 @@ when no API key is configured (useful for local development).
 from __future__ import annotations
 
 import logging
+from datetime import datetime
 
 import resend
 
@@ -59,15 +60,21 @@ async def send_password_reset_email(to: str, reset_token: str) -> bool:
         return False
 
 
-async def send_invitation_email(to: str, invite_code: str, invited_by: str | None = None) -> bool:
+async def send_invitation_email(
+    to: str,
+    invite_code: str,
+    invited_by: str | None = None,
+    expires_at: datetime | None = None,
+) -> bool:
     """Send an invitation email to *to* containing a registration link with *invite_code*.
 
     *invited_by* is an optional display name or email of the admin who sent the invite.
+    *expires_at* is an optional expiry datetime shown in the email body.
     Returns ``True`` on successful delivery, ``False`` otherwise.
     Never raises — failures are logged so the calling endpoint stays fast.
     """
     settings = get_settings()
-    register_url = f"{settings.frontend_url}/register?invite={invite_code}"
+    signup_url = f"{settings.frontend_url}/signup?invite={invite_code}"
 
     if not settings.resend_api_key:
         logger.warning(
@@ -80,6 +87,13 @@ async def send_invitation_email(to: str, invite_code: str, invited_by: str | Non
     if invited_by:
         invited_line = f"<p style='color: #666; font-size: 14px;'>Invited by {invited_by}</p>"
 
+    expiry_line = ""
+    if expires_at is not None:
+        formatted = expires_at.strftime("%B %d, %Y")
+        expiry_line = (
+            f"<p style='color: #666; font-size: 14px;'>This invitation expires on {formatted}.</p>"
+        )
+
     try:
         resend.api_key = settings.resend_api_key
 
@@ -87,17 +101,24 @@ async def send_invitation_email(to: str, invite_code: str, invited_by: str | Non
             {
                 "from": settings.email_from,
                 "to": [to],
-                "subject": "You're Invited to Alchymine",
+                "subject": "You've Been Invited to Alchymine",
                 "html": (
                     "<div style='font-family: sans-serif; max-width: 480px; margin: 0 auto;'>"
-                    "<h2 style='color: #1a1a2e;'>Alchymine</h2>"
+                    "<h2 style='color: #1a1a2e;'>You've been invited to Alchymine</h2>"
                     "<p>You've been invited to join Alchymine — your AI-powered "
                     "Personal Transformation Operating System.</p>"
                     f"{invited_line}"
-                    f"<p><a href='{register_url}' style='display: inline-block; padding: 12px 24px; "
+                    f"<p><a href='{signup_url}' style='display: inline-block; padding: 12px 24px; "
                     "background: #1a1a2e; color: #ffffff; text-decoration: none; border-radius: 6px;'>"
-                    "Accept Invitation</a></p>"
-                    "<p style='color: #666; font-size: 14px;'>This invitation expires in 7 days. "
+                    "Sign Up Now</a></p>"
+                    "<p style='margin-top: 24px;'>Or use this code when signing up:</p>"
+                    "<div style='background: #f4f4f8; border-radius: 6px; padding: 16px; "
+                    "margin: 8px 0; text-align: center;'>"
+                    f"<code style='font-family: monospace; font-size: 18px; letter-spacing: 2px; "
+                    f"color: #1a1a2e; font-weight: bold;'>{invite_code}</code>"
+                    "</div>"
+                    f"{expiry_line}"
+                    "<p style='color: #666; font-size: 14px; margin-top: 16px;'>"
                     "If you weren't expecting this, you can safely ignore this email.</p>"
                     "</div>"
                 ),
