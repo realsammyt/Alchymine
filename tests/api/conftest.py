@@ -43,6 +43,22 @@ def _override_auth(request: pytest.FixtureRequest) -> None:
 
 
 @pytest.fixture(autouse=True)
+def _reset_guardrails() -> None:
+    """Clear safety guardrail session counters before every test.
+
+    The guardrails module tracks per-user operation counts in a global
+    dict keyed by session/user ID.  Without clearing between tests,
+    tests that create reports accumulate against the 3-per-hour limit
+    and later tests get 429 responses.
+    """
+    from alchymine.safety.guardrails import reset_session
+
+    reset_session(TEST_USER_ID)
+    yield
+    reset_session(TEST_USER_ID)
+
+
+@pytest.fixture(autouse=True)
 def _reset_rate_limiter() -> None:
     """Clear the rate limiter's request history before every test.
 
