@@ -184,6 +184,7 @@ export default function IntakePage() {
       .then((profile) => {
         if (profile.intake) {
           setFormData((prev) => ({
+            ...prev,
             fullName: profile.intake!.full_name || prev.fullName,
             birthDate: profile.intake!.birth_date || prev.birthDate,
             birthTime: profile.intake!.birth_time || prev.birthTime,
