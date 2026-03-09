@@ -816,9 +816,7 @@ def _creative_style_fingerprint(state: CoordinatorState) -> CoordinatorState:
                 if isinstance(guilford_data, dict)
                 else guilford_data
             )
-            dna = (
-                CreativeDNA(**dna_data) if isinstance(dna_data, dict) else dna_data
-            )
+            dna = CreativeDNA(**dna_data) if isinstance(dna_data, dict) else dna_data
 
             fingerprint = generate_style_fingerprint(guilford, dna)
             results["style_fingerprint"] = fingerprint

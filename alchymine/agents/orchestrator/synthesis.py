@@ -369,8 +369,11 @@ def _build_strengths_map(
             elif isinstance(kegan, str):
                 # Map enum string values to stage numbers
                 _stage_nums = {
-                    "impulsive": 1, "imperial": 2, "socialized": 3,
-                    "self-authoring": 4, "self-transforming": 5,
+                    "impulsive": 1,
+                    "imperial": 2,
+                    "socialized": 3,
+                    "self-authoring": 4,
+                    "self-transforming": 5,
                 }
                 kegan_stage_num = _stage_nums.get(kegan)
             elif isinstance(kegan, dict):
@@ -427,7 +430,9 @@ def transform_to_profile_summary(
             if isinstance(orientation, str):
                 data["creative_orientation"] = {
                     "style": orientation,
-                    "summary": fingerprint.get("creative_style", "") if isinstance(fingerprint, dict) else "",
+                    "summary": fingerprint.get("creative_style", "")
+                    if isinstance(fingerprint, dict)
+                    else "",
                 }
             summary["creative"] = data
         elif system == "perspective":

@@ -36,14 +36,22 @@ def upgrade() -> None:
     if "kegan_dimension_scores" not in cols:
         op.add_column(
             "perspective_profiles",
-            sa.Column("kegan_dimension_scores", sa.JSON(), nullable=True,
-                      comment="Raw dimension scores for re-assessment"),
+            sa.Column(
+                "kegan_dimension_scores",
+                sa.JSON(),
+                nullable=True,
+                comment="Raw dimension scores for re-assessment",
+            ),
         )
     if "kegan_description" not in cols:
         op.add_column(
             "perspective_profiles",
-            sa.Column("kegan_description", sa.JSON(), nullable=True,
-                      comment="Stage description dict (name, description, strengths, growth_edges)"),
+            sa.Column(
+                "kegan_description",
+                sa.JSON(),
+                nullable=True,
+                comment="Stage description dict (name, description, strengths, growth_edges)",
+            ),
         )
 
 

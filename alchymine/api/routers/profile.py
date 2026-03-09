@@ -412,9 +412,11 @@ async def reassess_layer(
     narrative_text: str | None = None
     if request.regenerate_narrative and status != "error":
         try:
-            from alchymine.llm.narrative import generate_narrative
+            from alchymine.llm.narrative import NarrativeGenerator
 
-            narrative_text = await generate_narrative(system, results)
+            generator = NarrativeGenerator()
+            result = await generator.generate(system, results)
+            narrative_text = result.narrative
         except Exception:
             logger.warning(
                 "Narrative regeneration failed for user %s system %s",
