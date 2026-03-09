@@ -249,7 +249,20 @@ class NarrativeGenerator:
             system_data = engine_data.get(system, engine_data)
             return system, await self.generate(system, system_data)
 
-        pairs = await asyncio.gather(*[_gen(s) for s in systems])
+        try:
+            pairs = await asyncio.wait_for(
+                asyncio.gather(*[_gen(s) for s in systems]),
+                timeout=300,  # 5 min hard cap — well within Celery's 540s soft limit
+            )
+        except TimeoutError:
+            elapsed = _time.monotonic() - t0
+            logger.error(
+                "[narrative] Timed out after %.1fs waiting for %d systems: %s",
+                elapsed,
+                len(systems),
+                systems,
+            )
+            raise
         elapsed = _time.monotonic() - t0
         logger.info("[narrative] All %d narratives complete in %.1fs", len(systems), elapsed)
         return dict(pairs)
