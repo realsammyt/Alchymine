@@ -28,7 +28,9 @@ Public API:
 from .assessment import (
     assess_creative_dna,
     assess_guilford,
+    derive_creative_dna_from_proxy,
     derive_creative_orientation,
+    derive_production_mode,
 )
 from .collaboration import (
     compatibility_score,
@@ -49,7 +51,9 @@ __all__ = [
     # Assessment
     "assess_guilford",
     "assess_creative_dna",
+    "derive_creative_dna_from_proxy",
     "derive_creative_orientation",
+    "derive_production_mode",
     # Style
     "generate_style_fingerprint",
     "identify_strengths",

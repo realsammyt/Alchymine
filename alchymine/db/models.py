@@ -415,6 +415,14 @@ class PerspectiveProfile(Base):
     kegan_stage: Mapped[str | None] = mapped_column(
         String(50), nullable=True, comment="Kegan developmental stage"
     )
+    kegan_dimension_scores: Mapped[dict | None] = mapped_column(
+        JSONColumn, nullable=True, comment="Raw dimension scores for re-assessment"
+    )
+    kegan_description: Mapped[dict | None] = mapped_column(
+        JSONColumn,
+        nullable=True,
+        comment="Stage description dict (name, description, strengths, growth_edges)",
+    )
     mental_models_applied: Mapped[dict | None] = mapped_column(
         JSONColumn, nullable=True, comment="Mental models engaged with"
     )

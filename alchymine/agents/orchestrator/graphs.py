@@ -641,6 +641,10 @@ def _wealth_calculations(state: CoordinatorState) -> CoordinatorState:
         results["intention"] = (
             ", ".join(intention) if isinstance(intention, list) else str(intention)
         )
+    # Pass through wealth_context if provided
+    wealth_context = request_data.get("wealth_context")
+    if wealth_context:
+        results["wealth_context"] = wealth_context
     return {**state, "results": results}
 
 
@@ -743,6 +747,96 @@ def _creative_personality_context(state: CoordinatorState) -> CoordinatorState:
     return {**state, "results": results}
 
 
+def _creative_dna(state: CoordinatorState) -> CoordinatorState:
+    """Derive Creative DNA from direct responses or Big Five proxy."""
+    results = dict(state.get("results", {}))
+    errors = list(state.get("errors", []))
+    request_data = state.get("request_data", {})
+
+    try:
+        from alchymine.engine.creative import assess_creative_dna, derive_creative_dna_from_proxy
+
+        # Check for direct DNA data in request
+        dna_data = request_data.get("creative_dna")
+        if dna_data:
+            if isinstance(dna_data, dict):
+                from alchymine.engine.profile import CreativeDNA
+
+                dna = CreativeDNA(**dna_data)
+            else:
+                dna = dna_data
+            results["creative_dna"] = dna.model_dump()
+        else:
+            # Check for direct DNA assessment responses
+            assessment = request_data.get("assessment_responses", {})
+            dna_items = {k: v for k, v in assessment.items() if k.startswith("dna_")}
+            if dna_items:
+                dna = assess_creative_dna(dna_items)
+                results["creative_dna"] = dna.model_dump()
+            else:
+                # Derive from Big Five proxy
+                big_five = request_data.get("big_five", {})
+                if big_five:
+                    guilford = results.get("guilford_scores")
+                    guilford_obj = None
+                    if guilford and isinstance(guilford, dict):
+                        from alchymine.engine.profile import GuilfordScores
+
+                        guilford_obj = GuilfordScores(**guilford)
+                    dna = derive_creative_dna_from_proxy(big_five, guilford_obj)
+                    results["creative_dna"] = dna.model_dump()
+    except ImportError:
+        errors.append("Creative: DNA engine not available")
+    except Exception as exc:
+        errors.append(f"Creative: DNA derivation error — {exc!s}")
+
+    return {**state, "results": results, "errors": errors}
+
+
+def _creative_style_fingerprint(state: CoordinatorState) -> CoordinatorState:
+    """Generate style fingerprint, medium affinities, and production mode."""
+    results = dict(state.get("results", {}))
+    errors = list(state.get("errors", []))
+    request_data = state.get("request_data", {})
+
+    try:
+        from alchymine.engine.creative import (
+            derive_production_mode,
+            generate_style_fingerprint,
+            suggest_mediums,
+        )
+        from alchymine.engine.profile import CreativeDNA, GuilfordScores
+
+        guilford_data = results.get("guilford_scores")
+        dna_data = results.get("creative_dna")
+
+        if guilford_data and dna_data:
+            guilford = (
+                GuilfordScores(**guilford_data)
+                if isinstance(guilford_data, dict)
+                else guilford_data
+            )
+            dna = CreativeDNA(**dna_data) if isinstance(dna_data, dict) else dna_data
+
+            fingerprint = generate_style_fingerprint(guilford, dna)
+            results["style_fingerprint"] = fingerprint
+
+            mediums = suggest_mediums(dna, guilford)
+            results["medium_affinities"] = mediums
+
+            # Derive production mode
+            big_five = request_data.get("big_five", {})
+            conscientiousness = float(big_five.get("conscientiousness", 50))
+            mode = derive_production_mode(guilford, conscientiousness)
+            results["preferred_production_mode"] = mode.value
+    except ImportError:
+        errors.append("Creative: style engine not available")
+    except Exception as exc:
+        errors.append(f"Creative: style fingerprint error — {exc!s}")
+
+    return {**state, "results": results, "errors": errors}
+
+
 def _creative_status(state: CoordinatorState) -> CoordinatorState:
     """Compute final status for the Creative graph."""
     results = state.get("results", {})
@@ -789,12 +883,32 @@ def _perspective_kegan_assessment(state: CoordinatorState) -> CoordinatorState:
     request_data = state.get("request_data", {})
 
     try:
-        from alchymine.engine.perspective import assess_kegan_stage
+        from alchymine.engine.perspective import assess_kegan_stage, growth_pathway
+        from alchymine.engine.perspective.kegan import stage_description
 
         responses = request_data.get("kegan_responses")
         if responses:
             stage = assess_kegan_stage(responses)
-            results["kegan_stage"] = stage
+            results["kegan_stage"] = stage.value  # string, not enum
+            results["kegan_dimension_scores"] = responses  # raw scores for re-assessment
+
+            desc = stage_description(stage)
+            # Convert KeganStage enum in desc to string for JSON serialization
+            results["kegan_description"] = {
+                "stage_number": desc["stage_number"],
+                "name": desc["name"],
+                "description": desc["description"],
+                "strengths": desc["strengths"],
+                "growth_edges": desc["growth_edges"],
+            }
+
+            pathway = growth_pathway(stage)
+            results["kegan_growth_pathway"] = {
+                "practices": pathway["practices"],
+                "supportive_environments": pathway["supportive_environments"],
+                "timeframe": pathway["timeframe"],
+                "encouragement": pathway["encouragement"],
+            }
     except ImportError:
         errors.append("Perspective: kegan engine not available")
     except Exception as exc:
@@ -1004,7 +1118,7 @@ def build_creative_graph(
 ) -> Any:  # noqa: ANN401
     """Build and compile the Creative system StateGraph.
 
-    Node order: orientation -> strengths -> personality_context -> status [-> quality_gate] -> END
+    Node order: orientation -> strengths -> personality_context -> creative_dna -> style_fingerprint -> status [-> quality_gate] -> END
 
     Parameters
     ----------
@@ -1020,6 +1134,8 @@ def build_creative_graph(
         ("orientation", _creative_orientation),
         ("strengths", _creative_strengths),
         ("personality_context", _creative_personality_context),
+        ("creative_dna", _creative_dna),
+        ("style_fingerprint", _creative_style_fingerprint),
         ("status", _creative_status),
     ]
     if include_quality_gate:
@@ -1033,7 +1149,10 @@ def build_creative_graph(
         graph.add_node(name, func)
     graph.set_entry_point("orientation")
     graph.add_edge("orientation", "strengths")
-    graph.add_edge("strengths", "status")
+    graph.add_edge("strengths", "personality_context")
+    graph.add_edge("personality_context", "creative_dna")
+    graph.add_edge("creative_dna", "style_fingerprint")
+    graph.add_edge("style_fingerprint", "status")
     if include_quality_gate:
         graph.add_edge("status", "quality_gate")
         graph.add_edge("quality_gate", END)

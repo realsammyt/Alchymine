@@ -1,11 +1,20 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
+import { useAuth } from "@/lib/AuthContext";
 import Markdown from "react-markdown";
-import { getReport, ApiError, ReportResponse, IdentityLayer } from "@/lib/api";
+import {
+  getReport,
+  reassessProfile,
+  ApiError,
+  ReportResponse,
+  IdentityLayer,
+} from "@/lib/api";
+import { CREATIVE_DNA_SUPPLEMENT_QUESTIONS } from "@/lib/questions";
 import Card from "@/components/shared/Card";
 import Button from "@/components/shared/Button";
+import SupplementModal from "@/components/shared/SupplementModal";
 import {
   MotionReveal,
   MotionStagger,
@@ -106,6 +115,34 @@ export default function ReportPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // Supplement modal state
+  const { user } = useAuth();
+  const [showCreativeDNA, setShowCreativeDNA] = useState(false);
+  const [supplementLoading, setSupplementLoading] = useState(false);
+
+  const handleReassess = useCallback(
+    async (system: string, responses: Record<string, number | string>) => {
+      if (!user?.id) return;
+      setSupplementLoading(true);
+      try {
+        await reassessProfile(user.id, system, responses, true);
+        // Refresh report data
+        const data = await getReport(reportId);
+        setReport(data);
+        setShowCreativeDNA(false);
+      } catch (err) {
+        alert(
+          err instanceof ApiError
+            ? err.message
+            : "Failed to update profile. Please try again.",
+        );
+      } finally {
+        setSupplementLoading(false);
+      }
+    },
+    [user?.id, reportId],
+  );
+
   useEffect(() => {
     async function fetchReport() {
       try {
@@ -179,9 +216,7 @@ export default function ReportPage() {
     | Record<string, unknown>
     | undefined;
 
-  const identity = profileSummary?.identity as
-    | IdentityLayer
-    | undefined;
+  const identity = profileSummary?.identity as IdentityLayer | undefined;
   const healingSummary = profileSummary?.healing as
     | {
         recommended_modalities?: Array<{
@@ -723,6 +758,12 @@ export default function ReportPage() {
                                 </div>
                               </div>
                             )}
+                          <button
+                            onClick={() => setShowCreativeDNA(true)}
+                            className="mt-3 w-full py-2 px-3 rounded-lg border border-secondary/20 text-secondary-light text-xs font-body hover:bg-secondary/[0.06] transition-colors"
+                          >
+                            Deepen Your Creative DNA
+                          </button>
                         </>
                       ) : (
                         <p className="text-sm font-body text-text/30">
@@ -805,14 +846,27 @@ export default function ReportPage() {
                       const narrative = narratives![key];
                       const systemMeta: Record<
                         string,
-                        { label: string; accent: string; border: string; icon: React.ReactNode }
+                        {
+                          label: string;
+                          accent: string;
+                          border: string;
+                          icon: React.ReactNode;
+                        }
                       > = {
                         intelligence: {
                           label: "Personalized Intelligence",
                           accent: "text-primary",
                           border: "border-primary/20",
                           icon: (
-                            <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                            <svg
+                              className="w-5 h-5"
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth="1.5"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                            >
                               <circle cx="12" cy="12" r="10" />
                               <path d="M12 2a7 7 0 1 0 7 7" />
                               <circle cx="12" cy="12" r="3" />
@@ -824,7 +878,15 @@ export default function ReportPage() {
                           accent: "text-accent",
                           border: "border-accent/20",
                           icon: (
-                            <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                            <svg
+                              className="w-5 h-5"
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth="1.5"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                            >
                               <path d="M12 2a8 8 0 0 0-8 8c0 6 8 12 8 12s8-6 8-12a8 8 0 0 0-8-8z" />
                               <circle cx="12" cy="10" r="3" />
                             </svg>
@@ -835,7 +897,15 @@ export default function ReportPage() {
                           accent: "text-primary-dark",
                           border: "border-primary-dark/20",
                           icon: (
-                            <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                            <svg
+                              className="w-5 h-5"
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth="1.5"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                            >
                               <rect width="18" height="18" x="3" y="3" rx="2" />
                               <path d="M12 8v8" />
                               <path d="M8 12h8" />
@@ -847,7 +917,15 @@ export default function ReportPage() {
                           accent: "text-secondary",
                           border: "border-secondary/20",
                           icon: (
-                            <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                            <svg
+                              className="w-5 h-5"
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth="1.5"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                            >
                               <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z" />
                               <circle cx="12" cy="12" r="3" />
                             </svg>
@@ -858,7 +936,15 @@ export default function ReportPage() {
                           accent: "text-accent-light",
                           border: "border-accent-light/20",
                           icon: (
-                            <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                            <svg
+                              className="w-5 h-5"
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth="1.5"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                            >
                               <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
                               <circle cx="9" cy="7" r="4" />
                               <polyline points="16 11 18 13 22 9" />
@@ -881,7 +967,9 @@ export default function ReportPage() {
                             {/* Card header */}
                             <div className="px-6 pt-5 pb-4 flex items-center gap-3">
                               <span className={meta.accent}>{meta.icon}</span>
-                              <h3 className={`font-display text-lg font-light tracking-tight ${meta.accent}`}>
+                              <h3
+                                className={`font-display text-lg font-light tracking-tight ${meta.accent}`}
+                              >
                                 {meta.label}
                               </h3>
                             </div>
@@ -1003,6 +1091,18 @@ export default function ReportPage() {
           </div>
         </MotionReveal>
       </div>
+
+      {/* ── Supplement Modals ──────────────────────────────────────────── */}
+      {showCreativeDNA && (
+        <SupplementModal
+          title="Deepen Your Creative DNA"
+          description="Answer these questions to refine your Creative DNA profile with direct measurements instead of personality proxies."
+          questions={CREATIVE_DNA_SUPPLEMENT_QUESTIONS}
+          loading={supplementLoading}
+          onSubmit={(responses) => handleReassess("creative", responses)}
+          onClose={() => setShowCreativeDNA(false)}
+        />
+      )}
     </div>
   );
 }

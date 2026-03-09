@@ -12,19 +12,18 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from alchymine.agents.orchestrator.graphs import (
-    CoordinatorState,
     _HAS_LANGGRAPH,
-    _SequentialGraph,
+    CoordinatorState,
     _compute_status,
     _compute_status_with_baseline,
     _run_quality_gate_node,
+    _SequentialGraph,
     build_creative_graph,
     build_healing_graph,
     build_intelligence_graph,
     build_perspective_graph,
     build_wealth_graph,
 )
-
 
 # ─── Helpers ────────────────────────────────────────────────────────
 
@@ -640,19 +639,23 @@ class TestPerspectiveGraphTransitions:
         assert "confirmation_bias" in result["results"]["detected_biases"]
 
     def test_kegan_assessment(self) -> None:
-        """Kegan assessment produces kegan_stage in results."""
+        """Kegan assessment produces kegan_stage as string value in results."""
+        from alchymine.engine.profile import KeganStage
+
         state = _make_initial_state(
             request_data={"kegan_responses": [1, 2, 3, 4, 5]}
         )
 
         with patch(
             "alchymine.engine.perspective.assess_kegan_stage",
-            return_value=3,
+            return_value=KeganStage.SOCIALIZED,
         ):
             graph = build_perspective_graph(include_quality_gate=False)
             result = graph.invoke(state)
 
-        assert result["results"]["kegan_stage"] == 3
+        assert result["results"]["kegan_stage"] == "socialized"
+        assert "kegan_description" in result["results"]
+        assert "kegan_dimension_scores" in result["results"]
 
     def test_decision_framework(self) -> None:
         """Decision framework produces decision_analysis in results."""
@@ -675,6 +678,8 @@ class TestPerspectiveGraphTransitions:
 
     def test_all_three_nodes(self) -> None:
         """All three perspective nodes produce data in a single run."""
+        from alchymine.engine.profile import KeganStage
+
         state = _make_initial_state(
             request_data={
                 "text": "Is this biased?",
@@ -692,7 +697,7 @@ class TestPerspectiveGraphTransitions:
             ),
             patch(
                 "alchymine.engine.perspective.assess_kegan_stage",
-                return_value=4,
+                return_value=KeganStage.SELF_AUTHORING,
             ),
             patch(
                 "alchymine.engine.perspective.pros_cons_analysis",
@@ -705,6 +710,7 @@ class TestPerspectiveGraphTransitions:
         assert result["status"] == "success"
         assert "detected_biases" in result["results"]
         assert "kegan_stage" in result["results"]
+        assert result["results"]["kegan_stage"] == "self-authoring"
         assert "decision_analysis" in result["results"]
         assert result["errors"] == []
 

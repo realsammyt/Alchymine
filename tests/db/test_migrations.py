@@ -101,7 +101,7 @@ class TestMigrationCompleteness:
             rows = result.fetchall()
 
         assert len(rows) == 1, f"Expected 1 head revision, got {len(rows)}: {rows}"
-        assert rows[0][0] == "0009", f"Expected head at 0009, got {rows[0][0]}"
+        assert rows[0][0] == "0010", f"Expected head at 0009, got {rows[0][0]}"
 
     def test_reports_table_has_all_columns(self, fresh_migration_engine):
         """Reports table (added in migration 0006) has all expected columns."""
@@ -211,6 +211,6 @@ class TestStampAndUpgrade:
         with engine.connect() as conn:
             result = conn.execute(text("SELECT version_num FROM alembic_version"))
             version = result.scalar_one()
-        assert version == "0009", f"Expected 0009, got {version}"
+        assert version == "0010", f"Expected 0009, got {version}"
 
         engine.dispose()

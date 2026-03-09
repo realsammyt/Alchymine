@@ -819,6 +819,33 @@ export async function getProfile(userId: string): Promise<ProfileResponse> {
   );
 }
 
+// ─── Profile Reassess ────────────────────────────────────────────────
+
+export interface ReassessResponse {
+  system: string;
+  status: string;
+  updated_data: Record<string, unknown>;
+  narrative: string | null;
+}
+
+export async function reassessProfile(
+  userId: string,
+  system: string,
+  assessmentResponses: Record<string, unknown>,
+  regenerateNarrative = false,
+): Promise<ReassessResponse> {
+  return request<ReassessResponse>(
+    `${BASE}/profile/${encodeURIComponent(userId)}/layers/${system}/reassess`,
+    {
+      method: "PATCH",
+      body: JSON.stringify({
+        assessment_responses: assessmentResponses,
+        regenerate_narrative: regenerateNarrative,
+      }),
+    },
+  );
+}
+
 export async function saveIntake(
   userId: string,
   data: {
