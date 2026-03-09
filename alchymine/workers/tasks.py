@@ -72,7 +72,7 @@ def _run_async(coro: Any) -> Any:
     # An event loop is already running — execute in a background thread
     with ThreadPoolExecutor(max_workers=1) as pool:
         future: Future = pool.submit(asyncio.run, coro)
-        return future.result()
+        return future.result(timeout=560)  # Just above Celery soft_time_limit (540s)
 
 
 def _serialise_orchestrator_result(result: Any) -> dict:

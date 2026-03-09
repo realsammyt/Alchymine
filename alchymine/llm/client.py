@@ -318,6 +318,15 @@ class LLMClient:
         )
         self._last_backend: str = LLMBackend.NONE.value
 
+        # Log backend configuration at init so worker logs confirm what's active
+        key_status = "SET" if self._anthropic_key else "NOT SET"
+        logger.info(
+            "[LLM] Client initialized — ANTHROPIC_API_KEY=%s, forced_backend=%s, ollama=%s",
+            key_status,
+            self._forced_backend or "auto",
+            self._ollama_url,
+        )
+
     @property
     def last_backend(self) -> str:
         """Return the backend used for the most recent call."""
