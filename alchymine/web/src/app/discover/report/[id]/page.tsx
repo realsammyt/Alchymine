@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
+import Markdown from "react-markdown";
 import { getReport, ApiError, ReportResponse, IdentityLayer } from "@/lib/api";
 import Card from "@/components/shared/Card";
 import Button from "@/components/shared/Button";
@@ -789,35 +790,123 @@ export default function ReportPage() {
             {/* ── Personalized Insights ──────────────────────────────── */}
             {activeNarratives.length > 0 && (
               <MotionReveal delay={0.4}>
-                <div className="pt-4">
-                  <h2 className="section-heading-sm text-text/30 mb-6">
-                    Personalized Insights
-                  </h2>
-                  <div className="space-y-4">
-                    {activeNarratives.map((key) => {
+                <div className="pt-8">
+                  {/* Section header with decorative rule */}
+                  <div className="flex items-center gap-4 mb-10">
+                    <hr className="rule-gold flex-1" />
+                    <h2 className="font-display text-display-md font-light tracking-tight text-text/40 whitespace-nowrap">
+                      Personalized Insights
+                    </h2>
+                    <hr className="rule-gold flex-1" />
+                  </div>
+
+                  <div className="space-y-8">
+                    {activeNarratives.map((key, idx) => {
                       const narrative = narratives![key];
+                      const systemMeta: Record<
+                        string,
+                        { label: string; accent: string; border: string; icon: React.ReactNode }
+                      > = {
+                        intelligence: {
+                          label: "Personalized Intelligence",
+                          accent: "text-primary",
+                          border: "border-primary/20",
+                          icon: (
+                            <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                              <circle cx="12" cy="12" r="10" />
+                              <path d="M12 2a7 7 0 1 0 7 7" />
+                              <circle cx="12" cy="12" r="3" />
+                            </svg>
+                          ),
+                        },
+                        healing: {
+                          label: "Ethical Healing",
+                          accent: "text-accent",
+                          border: "border-accent/20",
+                          icon: (
+                            <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                              <path d="M12 2a8 8 0 0 0-8 8c0 6 8 12 8 12s8-6 8-12a8 8 0 0 0-8-8z" />
+                              <circle cx="12" cy="10" r="3" />
+                            </svg>
+                          ),
+                        },
+                        wealth: {
+                          label: "Generational Wealth",
+                          accent: "text-primary-dark",
+                          border: "border-primary-dark/20",
+                          icon: (
+                            <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                              <rect width="18" height="18" x="3" y="3" rx="2" />
+                              <path d="M12 8v8" />
+                              <path d="M8 12h8" />
+                            </svg>
+                          ),
+                        },
+                        creative: {
+                          label: "Creative Development",
+                          accent: "text-secondary",
+                          border: "border-secondary/20",
+                          icon: (
+                            <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                              <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z" />
+                              <circle cx="12" cy="12" r="3" />
+                            </svg>
+                          ),
+                        },
+                        perspective: {
+                          label: "Perspective Enhancement",
+                          accent: "text-accent-light",
+                          border: "border-accent-light/20",
+                          icon: (
+                            <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                              <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+                              <circle cx="9" cy="7" r="4" />
+                              <polyline points="16 11 18 13 22 9" />
+                            </svg>
+                          ),
+                        },
+                      };
+                      const meta = systemMeta[key] ?? {
+                        label: key,
+                        accent: "text-text/60",
+                        border: "border-white/10",
+                        icon: null,
+                      };
+
                       return (
-                        <div key={key} className="card-surface p-6">
-                          <h3 className="font-display text-lg font-light text-text/80 mb-3 capitalize">
-                            {key}
-                          </h3>
-                          <p className="text-sm font-body text-text/60 leading-relaxed">
-                            {narrative.text}
-                          </p>
-                          {narrative.disclaimers &&
-                            narrative.disclaimers.length > 0 && (
-                              <div className="mt-4 pt-3 border-t border-white/[0.04]">
-                                {narrative.disclaimers.map((d, i) => (
-                                  <p
-                                    key={i}
-                                    className="text-[0.65rem] font-body text-text/25 leading-relaxed italic"
-                                  >
-                                    {d}
-                                  </p>
-                                ))}
-                              </div>
-                            )}
-                        </div>
+                        <MotionReveal key={key} delay={0.1 * idx}>
+                          <article
+                            className={`card-surface-elevated overflow-hidden border-l-2 ${meta.border}`}
+                          >
+                            {/* Card header */}
+                            <div className="px-6 pt-5 pb-4 flex items-center gap-3">
+                              <span className={meta.accent}>{meta.icon}</span>
+                              <h3 className={`font-display text-lg font-light tracking-tight ${meta.accent}`}>
+                                {meta.label}
+                              </h3>
+                            </div>
+
+                            {/* Narrative body — rendered markdown */}
+                            <div className="px-6 pb-6 narrative-prose">
+                              <Markdown>{narrative.text}</Markdown>
+                            </div>
+
+                            {/* Disclaimers */}
+                            {narrative.disclaimers &&
+                              narrative.disclaimers.length > 0 && (
+                                <div className="px-6 pb-5 pt-3 border-t border-white/[0.04]">
+                                  {narrative.disclaimers.map((d, i) => (
+                                    <p
+                                      key={i}
+                                      className="text-[0.6rem] font-body text-text/20 leading-relaxed italic"
+                                    >
+                                      {d}
+                                    </p>
+                                  ))}
+                                </div>
+                              )}
+                          </article>
+                        </MotionReveal>
                       );
                     })}
                   </div>
