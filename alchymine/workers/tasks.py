@@ -484,6 +484,10 @@ def generate_report(
             logger.warning("Content filter failed (non-fatal): %s", exc)
 
         # ── Store success ─────────────────────────────────────────────
+        # Re-serialize the full dict: profile_summary and narratives were
+        # added after _serialise_orchestrator_result, so they may contain
+        # date/datetime objects that PostgreSQL JSON columns can't handle.
+        serialised = json.loads(json.dumps(serialised, default=str))
         _run_async(_db_set_complete(report_id, serialised))
 
         # ── Populate profile layer tables from coordinator results ────
