@@ -33,6 +33,12 @@ jest.mock("@/components/shared/Button", () => {
   };
 });
 
+jest.mock("react-markdown", () => {
+  return function MockMarkdown({ children }: { children: string }) {
+    return <>{children}</>;
+  };
+});
+
 jest.mock("@/components/shared/MotionReveal", () => ({
   MotionReveal: ({ children }: { children: React.ReactNode }) => (
     <>{children}</>
