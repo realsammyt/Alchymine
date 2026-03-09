@@ -131,15 +131,16 @@ services:
         required: true
     command: >
       celery -A alchymine.workers.celery_app worker
-      --loglevel=warning
+      --loglevel=${LOG_LEVEL:-info}
       --concurrency=${CELERY_WORKER_CONCURRENCY:-4}
       --max-tasks-per-child=1000
+      --queues=celery,reports
       --without-heartbeat
       --without-gossip
       --without-mingle
     environment:
       - ENVIRONMENT=production
-      - LOG_LEVEL=WARNING
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
     deploy:
       resources:
         limits:
