@@ -961,7 +961,7 @@ export default function DashboardPage() {
                                 key={report.id}
                                 href={
                                   report.status === "complete"
-                                    ? `/report/${report.id}`
+                                    ? `/discover/report/${report.id}`
                                     : `/discover/generating/${report.id}`
                                 }
                                 className="block card-surface p-4 transition-all duration-300 hover:brightness-110 hover:-translate-y-0.5"
