@@ -166,3 +166,4 @@ scripts/setup-resend-key.sh
 .parcel-cache/
 .claude/
 .ignore/
+.worktrees/
