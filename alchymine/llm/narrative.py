@@ -105,13 +105,23 @@ def fill_template(template_text: str, data: dict[str, Any]) -> str:
     return template_text.format_map(DefaultDict(data))
 
 
+_KEGAN_DESCRIPTIONS: dict[str, str] = {
+    "1": "Impulsive — subject to immediate impulses and perceptions",
+    "2": "Imperial — focused on personal needs and concrete interests",
+    "3": "Interpersonal — defined by relationships and others' expectations",
+    "4": "Institutional — self-authoring with an internal value system",
+    "5": "Inter-individual — holding multiple frameworks simultaneously",
+}
+
+
 def flatten_engine_data(data: dict[str, Any]) -> dict[str, Any]:
     """Flatten nested engine data for template substitution.
 
     Converts nested dicts into flat key-value pairs. For example:
     {"numerology": {"life_path": 3}} → {"life_path": 3}
 
-    Also generates summary sections for list-type data.
+    Also generates summary sections for list-type data, and applies
+    system-specific key aliases so template variables resolve correctly.
     """
     flat: dict[str, Any] = {}
 
@@ -132,6 +142,40 @@ def flatten_engine_data(data: dict[str, Any]) -> dict[str, Any]:
             flat[f"{key}_section"] = "\n  ".join(lines) if lines else "(none)"
         else:
             flat[key] = value
+
+    # ── System-specific key aliases ──────────────────────────────────────
+    # Wealth: wealth_archetype dict → {wealth_archetype} + {archetype_description}
+    wa = data.get("wealth_archetype")
+    if isinstance(wa, dict):
+        flat["wealth_archetype"] = wa.get("name", "")
+        flat["archetype_description"] = wa.get("description", "")
+
+    # Creative: creative_orientation dict → {creative_style}
+    co = data.get("creative_orientation")
+    if isinstance(co, dict):
+        flat["creative_style"] = co.get("style", "")
+
+    # Perspective: detected_biases list → {biases_section}
+    if "detected_biases_section" in flat:
+        flat["biases_section"] = flat["detected_biases_section"]
+
+    # Perspective: kegan_stage → {kegan_description}
+    stage = flat.get("kegan_stage")
+    if stage is not None:
+        flat["kegan_description"] = _KEGAN_DESCRIPTIONS.get(str(stage), f"Stage {stage}")
+
+    # Perspective: decision_analysis dict → {decision_section} markdown
+    da = data.get("decision_analysis")
+    if isinstance(da, dict):
+        lines = []
+        for k, v in da.items():
+            label = k.replace("_", " ").title()
+            if isinstance(v, list):
+                lines.append(f"### {label}")
+                lines.extend(f"- {item}" for item in v)
+            else:
+                lines.append(f"- **{label}**: {v}")
+        flat["decision_section"] = "\n".join(lines) if lines else "(no decision provided)"
 
     return flat
 

@@ -625,9 +625,22 @@ def _wealth_lever_prioritisation(state: CoordinatorState) -> CoordinatorState:
 
 
 def _wealth_calculations(state: CoordinatorState) -> CoordinatorState:
-    """Add empty calculations placeholder for the Wealth graph."""
+    """Add empty calculations placeholder for the Wealth graph.
+
+    Also passes through ``risk_tolerance`` and ``intention`` from
+    request_data so that narrative templates can reference them.
+    """
     results = dict(state.get("results", {}))
+    request_data = state.get("request_data", {})
     results["calculations"] = {}
+    # Pass through values the narrative template needs
+    if "risk_tolerance" in request_data:
+        results["risk_tolerance"] = request_data["risk_tolerance"]
+    intention = request_data.get("intention") or request_data.get("intentions")
+    if intention:
+        results["intention"] = (
+            ", ".join(intention) if isinstance(intention, list) else str(intention)
+        )
     return {**state, "results": results}
 
 
@@ -715,6 +728,19 @@ def _creative_strengths(state: CoordinatorState) -> CoordinatorState:
         errors.append(f"Creative: style analysis error — {exc!s}")
 
     return {**state, "results": results, "errors": errors}
+
+
+def _creative_personality_context(state: CoordinatorState) -> CoordinatorState:
+    """Pass through Big Five personality scores for narrative template use."""
+    results = dict(state.get("results", {}))
+    request_data = state.get("request_data", {})
+    big_five = request_data.get("big_five", {})
+    if big_five:
+        if "openness" in big_five:
+            results["openness"] = big_five["openness"]
+        if "conscientiousness" in big_five:
+            results["conscientiousness"] = big_five["conscientiousness"]
+    return {**state, "results": results}
 
 
 def _creative_status(state: CoordinatorState) -> CoordinatorState:
@@ -978,7 +1004,7 @@ def build_creative_graph(
 ) -> Any:  # noqa: ANN401
     """Build and compile the Creative system StateGraph.
 
-    Node order: orientation -> strengths -> status [-> quality_gate] -> END
+    Node order: orientation -> strengths -> personality_context -> status [-> quality_gate] -> END
 
     Parameters
     ----------
@@ -993,6 +1019,7 @@ def build_creative_graph(
     nodes: list[tuple[str, Any]] = [
         ("orientation", _creative_orientation),
         ("strengths", _creative_strengths),
+        ("personality_context", _creative_personality_context),
         ("status", _creative_status),
     ]
     if include_quality_gate:
