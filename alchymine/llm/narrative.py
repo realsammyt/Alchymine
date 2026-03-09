@@ -194,7 +194,10 @@ class NarrativeGenerator:
         )
         logger.info(
             "[narrative] Received narrative for system=%s — backend=%s, model=%s, %d chars",
-            system, llm_response.backend, llm_response.model, len(llm_response.text),
+            system,
+            llm_response.backend,
+            llm_response.model,
+            len(llm_response.text),
         )
 
         # Validate ethics

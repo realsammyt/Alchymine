@@ -404,7 +404,9 @@ def generate_report(
                 intentions=_resolved_intentions,
             )
         )
-        logger.info("[task] Report %s: orchestrator complete in %.1fs", report_id, _time.monotonic() - t0)
+        logger.info(
+            "[task] Report %s: orchestrator complete in %.1fs", report_id, _time.monotonic() - t0
+        )
 
         serialised = _serialise_orchestrator_result(result)
 
@@ -434,13 +436,16 @@ def generate_report(
             if systems:
                 logger.info(
                     "[task] Report %s: starting LLM narrative generation for %d systems: %s",
-                    report_id, len(systems), systems,
+                    report_id,
+                    len(systems),
+                    systems,
                 )
                 t_narr = _time.monotonic()
                 narratives = _run_async(generator.generate_all(systems, engine_data))
                 logger.info(
                     "[task] Report %s: narrative generation complete in %.1fs",
-                    report_id, _time.monotonic() - t_narr,
+                    report_id,
+                    _time.monotonic() - t_narr,
                 )
                 serialised["narratives"] = {
                     system: {
@@ -455,12 +460,19 @@ def generate_report(
                     "[task] Report %s: %d narratives stored (backends: %s)",
                     report_id,
                     len(serialised["narratives"]),
-                    {s: nr.llm_response.model if nr.llm_response else "none" for s, nr in narratives.items()},
+                    {
+                        s: nr.llm_response.model if nr.llm_response else "none"
+                        for s, nr in narratives.items()
+                    },
                 )
             else:
-                logger.warning("[task] Report %s: no systems available for narrative generation", report_id)
+                logger.warning(
+                    "[task] Report %s: no systems available for narrative generation", report_id
+                )
         except Exception as exc:
-            logger.warning("[task] Report %s: narrative generation failed (non-fatal): %s", report_id, exc)
+            logger.warning(
+                "[task] Report %s: narrative generation failed (non-fatal): %s", report_id, exc
+            )
 
         # ── Safety content filter on LLM-generated narratives ─────────
         # Resolve user_id early for audit logging
