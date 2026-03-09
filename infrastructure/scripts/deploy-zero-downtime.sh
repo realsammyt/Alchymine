@@ -66,15 +66,26 @@ rollback() {
     exit "$exit_code"
   fi
 
-  # Restore nginx config if we swapped it (safe: old compose containers still exist)
-  if $NGINX_SWAPPED && [ -f "$NGINX_CONF_BAK" ]; then
-    log "Restoring original nginx config..."
-    cp "$NGINX_CONF_BAK" "$NGINX_CONF"
-    docker exec alchymine-nginx nginx -s reload 2>/dev/null || true
-    log "Nginx restored to original config"
+  # Check if compose services are still functional before deciding rollback strategy
+  if $NGINX_SWAPPED; then
+    API_HEALTH=$(docker inspect --format='{{.State.Health.Status}}' alchymine-api 2>/dev/null || echo "missing")
+    if [ "$API_HEALTH" != "healthy" ] && $TEMPS_RUNNING; then
+      # Compose API is down/unhealthy but temps are still running — keep temps alive
+      err "Compose API is $API_HEALTH — keeping temp containers as fallback"
+      err "Temp containers are serving traffic via nginx. DO NOT remove them."
+      err "To recover: 'export DEPLOY_VERSION=${VERSION} && docker compose ... up -d'"
+      exit "$exit_code"
+    fi
+    # Compose API is healthy or no temps to fall back to — restore nginx
+    if [ -f "$NGINX_CONF_BAK" ]; then
+      log "Restoring original nginx config..."
+      cp "$NGINX_CONF_BAK" "$NGINX_CONF"
+      docker exec alchymine-nginx nginx -s reload 2>/dev/null || true
+      log "Nginx restored to original config"
+    fi
   fi
 
-  # Remove temp containers (old compose containers are still serving)
+  # Remove temp containers only if compose services are healthy
   if $TEMPS_RUNNING; then
     log "Removing temp containers..."
     docker rm -f alchymine-api-tmp alchymine-web-tmp 2>/dev/null || true
@@ -270,8 +281,8 @@ PHASE="compose-recreate"
 log "Step 5/8: Recreating compose services with new images..."
 
 export DEPLOY_VERSION="${VERSION}"
+COMPOSE_RECREATED=true  # Set BEFORE up -d: old containers are gone once --force-recreate starts
 $DC up -d --no-deps --no-build --force-recreate api web worker pdf-service
-COMPOSE_RECREATED=true
 
 # Wait for compose containers to become healthy (max 90s)
 log "Waiting for compose containers to become healthy..."

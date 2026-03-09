@@ -8,6 +8,7 @@ requests and graceful degradation.
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import uuid
 from dataclasses import dataclass, field
@@ -156,7 +157,24 @@ class MasterOrchestrator:
             if coordinator is None:
                 logger.warning("No coordinator for system: %s", system)
                 continue
-            result = await coordinator.process(user_id, request_data)
+            try:
+                result = await asyncio.wait_for(
+                    coordinator.process(user_id, request_data),
+                    timeout=120,
+                )
+            except TimeoutError:
+                logger.warning(
+                    "Coordinator %s timed out after 120s for user %s",
+                    system.value,
+                    user_id,
+                )
+                result = CoordinatorResult(
+                    status=CoordinatorStatus.ERROR.value,
+                    system=system.value,
+                    data={},
+                    errors=[f"{system.value} coordinator timed out after 120s"],
+                    quality_passed=False,
+                )
             coordinator_results.append(result)
 
             # After Intelligence completes, enrich request_data with
