@@ -211,6 +211,25 @@ export default function ReportPage() {
       }
     | undefined;
 
+  const narratives = report?.result?.narratives as
+    | Record<
+        string,
+        { text: string; disclaimers?: string[]; ethics_passed?: boolean }
+      >
+    | undefined;
+
+  const NARRATIVE_SYSTEMS = [
+    "intelligence",
+    "healing",
+    "wealth",
+    "creative",
+    "perspective",
+  ] as const;
+
+  const activeNarratives = NARRATIVE_SYSTEMS.filter(
+    (key) => narratives?.[key]?.text,
+  );
+
   return (
     <div className="flex-1 px-4 sm:px-6 py-12">
       <div className="max-w-4xl mx-auto">
@@ -766,6 +785,45 @@ export default function ReportPage() {
                 </MotionStagger>
               </div>
             </MotionReveal>
+
+            {/* ── Personalized Insights ──────────────────────────────── */}
+            {activeNarratives.length > 0 && (
+              <MotionReveal delay={0.4}>
+                <div className="pt-4">
+                  <h2 className="section-heading-sm text-text/30 mb-6">
+                    Personalized Insights
+                  </h2>
+                  <div className="space-y-4">
+                    {activeNarratives.map((key) => {
+                      const narrative = narratives![key];
+                      return (
+                        <div key={key} className="card-surface p-6">
+                          <h3 className="font-display text-lg font-light text-text/80 mb-3 capitalize">
+                            {key}
+                          </h3>
+                          <p className="text-sm font-body text-text/60 leading-relaxed">
+                            {narrative.text}
+                          </p>
+                          {narrative.disclaimers &&
+                            narrative.disclaimers.length > 0 && (
+                              <div className="mt-4 pt-3 border-t border-white/[0.04]">
+                                {narrative.disclaimers.map((d, i) => (
+                                  <p
+                                    key={i}
+                                    className="text-[0.65rem] font-body text-text/25 leading-relaxed italic"
+                                  >
+                                    {d}
+                                  </p>
+                                ))}
+                              </div>
+                            )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </MotionReveal>
+            )}
           </div>
         ) : (
           <MotionReveal>
@@ -803,7 +861,7 @@ export default function ReportPage() {
         )}
 
         {/* Actions */}
-        <MotionReveal delay={0.4}>
+        <MotionReveal delay={0.5}>
           <div className="mt-12 flex flex-col sm:flex-row items-center justify-center gap-4">
             <Button
               variant="ghost"

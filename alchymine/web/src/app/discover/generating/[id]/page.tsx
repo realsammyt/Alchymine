@@ -78,8 +78,11 @@ export default function GeneratingPage() {
   const [currentStep, setCurrentStep] = useState(0);
   const [overallProgress, setOverallProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
+  const [networkWarning, setNetworkWarning] = useState<string | null>(null);
   const pollRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const animationRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const pollStartRef = useRef<number | null>(null);
+  const networkFailuresRef = useRef(0);
 
   // Animate through the visual steps
   useEffect(() => {
@@ -121,11 +124,27 @@ export default function GeneratingPage() {
   useEffect(() => {
     if (!reportId) return;
 
+    const POLL_TIMEOUT_MS = 10 * 60 * 1000; // 10 minutes
+    const MAX_NETWORK_FAILURES = 10;
+    const NETWORK_WARNING_THRESHOLD = 3;
+
     let delay = 4000; // Start at 4s, back off on 429
     let stopped = false;
+    pollStartRef.current = Date.now();
+    networkFailuresRef.current = 0;
 
     const poll = async () => {
       if (stopped) return;
+
+      // Check poll timeout
+      if (Date.now() - (pollStartRef.current ?? 0) >= POLL_TIMEOUT_MS) {
+        console.error("[generating] poll timeout reached");
+        setError("Report generation timed out. Please try again.");
+        stopped = true;
+        if (animationRef.current) clearInterval(animationRef.current);
+        return;
+      }
+
       try {
         console.log("[generating] polling report", reportId, "delay:", delay);
         const report = await getReport(reportId);
@@ -140,24 +159,52 @@ export default function GeneratingPage() {
           }, 800);
           return;
         } else if (report.status === "failed") {
-          const errorMsg = report.error || "Report generation failed. Please try again.";
+          const errorMsg =
+            report.error || "Report generation failed. Please try again.";
           console.error("[generating] report failed:", errorMsg);
           setError(errorMsg);
           stopped = true;
           if (animationRef.current) clearInterval(animationRef.current);
           return;
         }
-        // Reset delay on success
+        // Reset delay and network failure count on success
         delay = 4000;
+        networkFailuresRef.current = 0;
+        setNetworkWarning(null);
       } catch (err) {
         if (err instanceof ApiError && err.status === 202) {
           console.log("[generating] still generating (202)");
+          networkFailuresRef.current = 0;
+          setNetworkWarning(null);
         } else if (err instanceof ApiError && err.status === 429) {
           // Rate limited — back off
           delay = Math.min(delay * 2, 30000);
-          console.warn("[generating] rate limited (429), backing off to", delay);
+          console.warn(
+            "[generating] rate limited (429), backing off to",
+            delay,
+          );
+          networkFailuresRef.current = 0;
+          setNetworkWarning(null);
         } else {
-          console.error("[generating] polling error:", err);
+          // Network or unknown error
+          networkFailuresRef.current += 1;
+          const failures = networkFailuresRef.current;
+          console.error(
+            "[generating] polling error (failure #" + failures + "):",
+            err,
+          );
+          if (failures >= MAX_NETWORK_FAILURES) {
+            setError(
+              "Unable to reach the server. Please check your connection and try again.",
+            );
+            stopped = true;
+            if (animationRef.current) clearInterval(animationRef.current);
+            return;
+          } else if (failures >= NETWORK_WARNING_THRESHOLD) {
+            setNetworkWarning(
+              "Having trouble reaching the server. Still trying...",
+            );
+          }
         }
       }
       if (!stopped) {
@@ -271,6 +318,15 @@ export default function GeneratingPage() {
             </div>
           ))}
         </div>
+
+        {/* Network warning */}
+        {networkWarning && !error && (
+          <MotionReveal y={8}>
+            <div className="mt-8 p-4 rounded-xl card-surface text-sm font-body text-text/60">
+              <p>{networkWarning}</p>
+            </div>
+          </MotionReveal>
+        )}
 
         {/* Error state */}
         {error && (
