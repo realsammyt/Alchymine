@@ -245,6 +245,96 @@
     content: "·";
     @apply mx-3 text-text/20;
   }
+
+  /* ── Narrative prose — typography for LLM-generated markdown ──────────── */
+  .narrative-prose {
+    @apply text-sm font-body text-text/55 leading-[1.8];
+  }
+
+  .narrative-prose h1 {
+    @apply font-display text-xl font-light text-text/70 mt-0 mb-4 tracking-tight;
+  }
+
+  .narrative-prose h2 {
+    @apply font-display text-base font-light text-text/60 mt-6 mb-3 tracking-tight;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+  }
+
+  .narrative-prose h3 {
+    @apply font-display text-sm font-medium text-text/50 mt-5 mb-2 uppercase tracking-[0.08em];
+  }
+
+  .narrative-prose p {
+    @apply mb-3;
+  }
+
+  .narrative-prose strong {
+    @apply font-medium text-text/70;
+  }
+
+  .narrative-prose em {
+    @apply italic text-text/45;
+  }
+
+  .narrative-prose ul,
+  .narrative-prose ol {
+    @apply mb-3 pl-5 space-y-1.5;
+  }
+
+  .narrative-prose ul {
+    list-style: none;
+  }
+
+  .narrative-prose ul li::before {
+    content: "◆";
+    @apply text-primary/30 text-[0.5rem] mr-2 inline-block;
+    vertical-align: middle;
+  }
+
+  .narrative-prose ol {
+    list-style: decimal;
+    @apply marker:text-primary/30 marker:font-display marker:text-xs;
+  }
+
+  .narrative-prose blockquote {
+    @apply border-l-2 border-primary/20 pl-4 my-4 italic text-text/40;
+  }
+
+  .narrative-prose hr {
+    @apply my-6 border-none;
+    height: 1px;
+    background: linear-gradient(
+      90deg,
+      transparent 0%,
+      rgba(255, 255, 255, 0.06) 30%,
+      rgba(255, 255, 255, 0.06) 70%,
+      transparent 100%
+    );
+  }
+
+  .narrative-prose table {
+    @apply w-full my-4 text-xs;
+    border-collapse: collapse;
+  }
+
+  .narrative-prose th {
+    @apply font-display font-medium text-text/40 text-left pb-2 pr-4;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  }
+
+  .narrative-prose td {
+    @apply py-1.5 pr-4 text-text/50;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+  }
+
+  .narrative-prose a {
+    @apply text-primary/70 underline underline-offset-2 decoration-primary/20 hover:text-primary hover:decoration-primary/40 transition-colors;
+  }
+
+  .narrative-prose code {
+    @apply text-xs bg-white/[0.04] px-1.5 py-0.5 rounded text-text/50;
+  }
 }
 
 @layer utilities {
