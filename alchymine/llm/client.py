@@ -352,31 +352,43 @@ class LLMClient:
             self._last_backend = LLMBackend.NONE.value
             return self._fallback_response()
 
+        import time as _time
+
         # Try Claude first
         if self._forced_backend in (None, LLMBackend.CLAUDE) and self._anthropic_key:
             try:
+                logger.info("[LLM] Sending request to Claude (max_tokens=%d, temp=%.1f)", max_tokens, temperature)
+                t0 = _time.monotonic()
                 result = await self._generate_claude(
                     system_prompt, user_prompt, max_tokens, temperature
                 )
+                elapsed = _time.monotonic() - t0
                 self._last_backend = LLMBackend.CLAUDE.value
-                logger.info("LLM generation completed via Claude backend")
+                logger.info(
+                    "[LLM] Claude response received in %.1fs — model=%s, in=%d tok, out=%d tok",
+                    elapsed, result.model, result.input_tokens, result.output_tokens,
+                )
                 return result
             except Exception as exc:
-                logger.warning("Claude API failed, trying Ollama fallback: %s", exc)
+                logger.warning("[LLM] Claude API failed: %s — trying Ollama fallback", exc)
 
         # Try Ollama
         if self._forced_backend in (None, LLMBackend.OLLAMA):
             try:
+                logger.info("[LLM] Sending request to Ollama at %s", self._ollama_url)
+                t0 = _time.monotonic()
                 result = await self._generate_ollama(
                     system_prompt, user_prompt, max_tokens, temperature
                 )
+                elapsed = _time.monotonic() - t0
                 self._last_backend = LLMBackend.OLLAMA.value
-                logger.info("LLM generation completed via Ollama backend")
+                logger.info("[LLM] Ollama response received in %.1fs", elapsed)
                 return result
             except Exception as exc:
-                logger.warning("Ollama failed: %s", exc)
+                logger.warning("[LLM] Ollama failed: %s", exc)
 
         # Graceful degradation
+        logger.warning("[LLM] All backends exhausted — returning static fallback response")
         self._last_backend = LLMBackend.NONE.value
         return self._fallback_response()
 
@@ -518,6 +530,7 @@ class LLMClient:
 
         for model in self.CLAUDE_MODELS:
             try:
+                logger.info("[LLM] Trying Claude model: %s", model)
                 response = await client.messages.create(
                     model=model,
                     max_tokens=max_tokens,
@@ -531,7 +544,10 @@ class LLMClient:
                     if hasattr(block, "text"):
                         text += block.text
 
-                logger.info("Claude generation succeeded with model %s", model)
+                logger.info(
+                    "[LLM] Claude model %s succeeded — %d input tokens, %d output tokens",
+                    model, response.usage.input_tokens, response.usage.output_tokens,
+                )
                 return LLMResponse(
                     text=text,
                     backend=LLMBackend.CLAUDE.value,

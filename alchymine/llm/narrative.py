@@ -186,10 +186,15 @@ class NarrativeGenerator:
         disclaimers = template.get("disclaimers", [])
 
         # Generate
+        logger.info("[narrative] Requesting LLM narrative for system=%s", system)
         llm_response = await self._client.generate(
             system_prompt=system_prompt,
             user_prompt=user_prompt,
             temperature=temperature,
+        )
+        logger.info(
+            "[narrative] Received narrative for system=%s — backend=%s, model=%s, %d chars",
+            system, llm_response.backend, llm_response.model, len(llm_response.text),
         )
 
         # Validate ethics
@@ -232,10 +237,16 @@ class NarrativeGenerator:
             Map of system name → NarrativeResult.
         """
         import asyncio
+        import time as _time
+
+        logger.info("[narrative] Generating narratives for %d systems: %s", len(systems), systems)
+        t0 = _time.monotonic()
 
         async def _gen(system: str) -> tuple[str, NarrativeResult]:
             system_data = engine_data.get(system, engine_data)
             return system, await self.generate(system, system_data)
 
         pairs = await asyncio.gather(*[_gen(s) for s in systems])
+        elapsed = _time.monotonic() - t0
+        logger.info("[narrative] All %d narratives complete in %.1fs", len(systems), elapsed)
         return dict(pairs)
