@@ -579,3 +579,80 @@ export const LIKERT_LABELS = [
 ] as const;
 
 export const TOTAL_QUESTIONS = ALL_QUESTIONS.length; // 67
+
+// ─── Creative DNA Supplement Questions ──────────────────────────────
+// These are NOT included in ALL_QUESTIONS — they are used in the
+// "Deepen Your Creative DNA" supplement flow after initial report.
+
+export interface SelectOption {
+  value: string;
+  label: string;
+}
+
+export interface SupplementQuestion {
+  id: string;
+  text: string;
+  type: "likert" | "select";
+  options?: SelectOption[];
+}
+
+export const CREATIVE_DNA_SUPPLEMENT_QUESTIONS: SupplementQuestion[] = [
+  // Structure vs. Improvisation
+  {
+    id: "dna_structure_1",
+    text: "I prefer to have a detailed plan before starting a creative project.",
+    type: "likert",
+  },
+  {
+    id: "dna_structure_2",
+    text: "I do my best creative work when I follow a structured process.",
+    type: "likert",
+  },
+  // Collaboration vs. Solitude
+  {
+    id: "dna_collab_1",
+    text: "I create my best work when collaborating with others.",
+    type: "likert",
+  },
+  {
+    id: "dna_collab_2",
+    text: "I need other people's input to refine my creative ideas.",
+    type: "likert",
+  },
+  // Convergent vs. Divergent
+  {
+    id: "dna_convergent_1",
+    text: "I prefer to explore many possibilities before settling on one direction.",
+    type: "likert",
+  },
+  {
+    id: "dna_convergent_2",
+    text: "I am energized by generating as many ideas as possible, even wild ones.",
+    type: "likert",
+  },
+  // Categorical: Primary Sensory Mode
+  {
+    id: "primary_sensory_mode",
+    text: "Which sensory mode feels most natural when you create?",
+    type: "select",
+    options: [
+      { value: "visual", label: "Visual (images, colors, shapes)" },
+      { value: "verbal", label: "Verbal (words, stories, language)" },
+      {
+        value: "kinesthetic",
+        label: "Kinesthetic (movement, touch, building)",
+      },
+      { value: "musical", label: "Musical (rhythm, melody, sound)" },
+    ],
+  },
+  // Categorical: Creative Peak
+  {
+    id: "creative_peak",
+    text: "When do you feel most creatively alive?",
+    type: "select",
+    options: [
+      { value: "morning", label: "Morning" },
+      { value: "evening", label: "Evening" },
+    ],
+  },
+];

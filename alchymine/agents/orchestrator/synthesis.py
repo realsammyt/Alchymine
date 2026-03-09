@@ -362,7 +362,20 @@ def _build_strengths_map(
 
         elif result.system == "perspective":
             kegan = data.get("kegan_stage")
-            if isinstance(kegan, (int, float)) and kegan >= 3:
+            # kegan_stage may be a string (enum value), int, or dict
+            kegan_stage_num = None
+            if isinstance(kegan, (int, float)):
+                kegan_stage_num = kegan
+            elif isinstance(kegan, str):
+                # Map enum string values to stage numbers
+                _stage_nums = {
+                    "impulsive": 1, "imperial": 2, "socialized": 3,
+                    "self-authoring": 4, "self-transforming": 5,
+                }
+                kegan_stage_num = _stage_nums.get(kegan)
+            elif isinstance(kegan, dict):
+                kegan_stage_num = kegan.get("stage")
+            if kegan_stage_num is not None and kegan_stage_num >= 3:
                 strengths.append("Perspective-Taking")
 
     return strengths
@@ -408,8 +421,25 @@ def transform_to_profile_summary(
             summary["wealth"] = {k: v for k, v in data.items() if k != "disclaimers"}
             summary["wealth"]["disclaimers"] = data.get("disclaimers", [])
         elif system == "creative":
+            # Reshape creative_orientation from plain string to {style, summary}
+            orientation = data.get("creative_orientation", "")
+            fingerprint = data.get("style_fingerprint", {})
+            if isinstance(orientation, str):
+                data["creative_orientation"] = {
+                    "style": orientation,
+                    "summary": fingerprint.get("creative_style", "") if isinstance(fingerprint, dict) else "",
+                }
             summary["creative"] = data
         elif system == "perspective":
+            # Reshape kegan_stage from string to {stage, name, description}
+            kegan_value = data.get("kegan_stage")
+            kegan_desc = data.get("kegan_description", {})
+            if isinstance(kegan_value, str) and isinstance(kegan_desc, dict):
+                data["kegan_stage"] = {
+                    "stage": kegan_desc.get("stage_number"),
+                    "name": kegan_desc.get("name", kegan_value),
+                    "description": kegan_desc.get("description", ""),
+                }
             summary["perspective"] = data
 
     return summary

@@ -13,7 +13,7 @@ Frameworks referenced:
 
 from __future__ import annotations
 
-from alchymine.engine.profile import CreativeDNA, GuilfordScores
+from alchymine.engine.profile import CreativeDNA, CreativeProductionMode, GuilfordScores
 
 # ─── Guilford Assessment ─────────────────────────────────────────────────
 
@@ -139,6 +139,88 @@ def assess_creative_dna(responses: dict) -> CreativeDNA:
         primary_sensory_mode=sensory,
         creative_peak=peak,
     )
+
+
+# ─── Proxy Functions (derive from existing assessment data) ──────────────
+
+
+def derive_creative_dna_from_proxy(
+    big_five: dict[str, float],
+    guilford_scores: GuilfordScores | None = None,
+) -> CreativeDNA:
+    """Derive approximate CreativeDNA from Big Five and optional Guilford data.
+
+    When the dedicated DNA questions (``dna_structure_1/2``, etc.) haven't
+    been answered, this function provides a scientifically defensible
+    approximation using personality data already collected in the 67-question
+    assessment.
+
+    Parameters
+    ----------
+    big_five:
+        Dict with keys ``openness``, ``conscientiousness``, ``extraversion``,
+        ``agreeableness``, ``neuroticism`` on a 0-100 scale.
+    guilford_scores:
+        Optional GuilfordScores; when available, ``convergent_vs_divergent``
+        uses the mean of fluency and originality instead of openness alone.
+
+    Returns
+    -------
+    CreativeDNA
+        Approximate creative preference dimensions.
+    """
+    conscientiousness = float(big_five.get("conscientiousness", 50))
+    extraversion = float(big_five.get("extraversion", 50))
+    openness = float(big_five.get("openness", 50))
+
+    # High conscientiousness → structured (low value)
+    structure_vs_improvisation = _clamp((100 - conscientiousness) / 100, 0.0, 1.0)
+
+    # High extraversion → collaborative (low value)
+    collaboration_vs_solitude = _clamp((100 - extraversion) / 100, 0.0, 1.0)
+
+    # High openness → divergent (high value); Guilford overrides if available
+    if guilford_scores is not None:
+        convergent_vs_divergent = _clamp(
+            (guilford_scores.fluency + guilford_scores.originality) / 200, 0.0, 1.0
+        )
+    else:
+        convergent_vs_divergent = _clamp(openness / 100, 0.0, 1.0)
+
+    return CreativeDNA(
+        structure_vs_improvisation=structure_vs_improvisation,
+        collaboration_vs_solitude=collaboration_vs_solitude,
+        convergent_vs_divergent=convergent_vs_divergent,
+        primary_sensory_mode="visual",  # default — no assessment data
+        creative_peak="morning",  # default — no assessment data
+    )
+
+
+def derive_production_mode(
+    guilford: GuilfordScores,
+    conscientiousness: float,
+) -> CreativeProductionMode:
+    """Derive a preferred creative production mode from Guilford + Big Five.
+
+    Parameters
+    ----------
+    guilford:
+        GuilfordScores with component values on a 0-100 scale.
+    conscientiousness:
+        Big Five conscientiousness score on a 0-100 scale.
+
+    Returns
+    -------
+    CreativeProductionMode
+        One of SPRINT, MARATHON, HARVEST, or POLISH.
+    """
+    if guilford.elaboration >= 70 and conscientiousness >= 70:
+        return CreativeProductionMode.POLISH
+    if guilford.fluency >= 70 and conscientiousness < 50:
+        return CreativeProductionMode.SPRINT
+    if conscientiousness >= 60 and guilford.fluency < 60:
+        return CreativeProductionMode.MARATHON
+    return CreativeProductionMode.HARVEST
 
 
 # ─── Creative Orientation from Life Path ──────────────────────────────────

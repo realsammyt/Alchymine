@@ -87,6 +87,22 @@ class LayerUpdateRequest(BaseModel):
     data: dict[str, Any]
 
 
+class ReassessRequest(BaseModel):
+    """Request body for reassessing a specific system layer."""
+
+    assessment_responses: dict[str, Any]
+    regenerate_narrative: bool = False
+
+
+class ReassessResponse(BaseModel):
+    """Response schema for a reassessment."""
+
+    system: str
+    status: str
+    updated_data: dict[str, Any]
+    narrative: str | None = None
+
+
 # ─── Helpers ───────────────────────────────────────────────────────────
 
 
@@ -282,3 +298,133 @@ async def delete_profile(
     if not deleted:
         raise HTTPException(status_code=404, detail="Profile not found")
     return {"detail": "Profile deleted", "user_id": user_id}
+
+
+# ─── Reassess ─────────────────────────────────────────────────────────
+
+_VALID_REASSESS_SYSTEMS = {"creative", "wealth", "perspective", "healing"}
+
+_GRAPH_BUILDERS: dict[str, Any] = {}
+
+
+def _get_graph_builders() -> dict[str, Any]:
+    """Lazy-import graph builders to avoid circular imports."""
+    if not _GRAPH_BUILDERS:
+        from alchymine.agents.orchestrator.graphs import (
+            build_creative_graph,
+            build_healing_graph,
+            build_perspective_graph,
+            build_wealth_graph,
+        )
+
+        _GRAPH_BUILDERS.update(
+            {
+                "creative": build_creative_graph,
+                "healing": build_healing_graph,
+                "wealth": build_wealth_graph,
+                "perspective": build_perspective_graph,
+            }
+        )
+    return _GRAPH_BUILDERS
+
+
+@router.patch("/profile/{user_id}/layers/{system}/reassess")
+async def reassess_layer(
+    user_id: str,
+    system: str,
+    request: ReassessRequest,
+    session: AsyncSession = Depends(get_db_session),
+    current_user: dict = Depends(get_current_user),
+) -> ReassessResponse:
+    """Re-run a system's coordinator graph with new assessment responses.
+
+    Merges the new responses with existing data, re-runs the graph, and
+    updates the profile layer in the database.
+    """
+    if current_user["sub"] != user_id:
+        raise HTTPException(status_code=403, detail="Access denied")
+    if system not in _VALID_REASSESS_SYSTEMS:
+        raise HTTPException(
+            status_code=422,
+            detail=f"Invalid system: {system}. Must be one of {sorted(_VALID_REASSESS_SYSTEMS)}",
+        )
+
+    user = await repository.get_profile(session, user_id)
+    if user is None:
+        raise HTTPException(status_code=404, detail="Profile not found")
+    if user.intake is None:
+        raise HTTPException(status_code=422, detail="No intake data found")
+
+    # Build request_data from existing intake + identity profile
+    existing_responses = user.intake.assessment_responses or {}
+    merged_responses = {**existing_responses, **request.assessment_responses}
+
+    request_data: dict[str, Any] = {
+        "full_name": user.intake.full_name,
+        "birth_date": str(user.intake.birth_date),
+        "intention": user.intake.intention,
+        "intentions": user.intake.resolved_intentions,
+        "assessment_responses": merged_responses,
+    }
+
+    # Enrich with identity data if available
+    if user.identity is not None:
+        for attr in ("life_path", "archetype", "big_five"):
+            val = getattr(user.identity, attr, None)
+            if val is not None:
+                request_data[attr] = val
+
+    # Run the coordinator graph
+    builders = _get_graph_builders()
+    graph = builders[system](include_quality_gate=False)
+    initial_state = {
+        "user_id": user_id,
+        "request_data": request_data,
+        "results": {},
+        "errors": [],
+        "status": "pending",
+    }
+
+    try:
+        final_state = graph.invoke(initial_state)
+    except Exception as exc:
+        logger.exception("Reassessment graph failed for user %s system %s", user_id, system)
+        raise HTTPException(status_code=500, detail="Reassessment processing failed") from exc
+
+    results = final_state.get("results", {})
+    status = final_state.get("status", "error")
+
+    # Update the profile layer in DB
+    try:
+        await repository.update_layer(session, user_id, system, results)
+    except (ValueError, LookupError) as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    # Also update merged assessment responses in intake
+    await repository.update_layer(
+        session,
+        user_id,
+        "intake",
+        {"assessment_responses": merged_responses},
+    )
+
+    # Optionally regenerate narrative
+    narrative_text: str | None = None
+    if request.regenerate_narrative and status != "error":
+        try:
+            from alchymine.llm.narrative import generate_narrative
+
+            narrative_text = await generate_narrative(system, results)
+        except Exception:
+            logger.warning(
+                "Narrative regeneration failed for user %s system %s",
+                user_id,
+                system,
+            )
+
+    return ReassessResponse(
+        system=system,
+        status=status,
+        updated_data=results,
+        narrative=narrative_text,
+    )
