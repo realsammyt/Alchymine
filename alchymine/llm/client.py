@@ -357,7 +357,11 @@ class LLMClient:
         # Try Claude first
         if self._forced_backend in (None, LLMBackend.CLAUDE) and self._anthropic_key:
             try:
-                logger.info("[LLM] Sending request to Claude (max_tokens=%d, temp=%.1f)", max_tokens, temperature)
+                logger.info(
+                    "[LLM] Sending request to Claude (max_tokens=%d, temp=%.1f)",
+                    max_tokens,
+                    temperature,
+                )
                 t0 = _time.monotonic()
                 result = await self._generate_claude(
                     system_prompt, user_prompt, max_tokens, temperature
@@ -366,7 +370,10 @@ class LLMClient:
                 self._last_backend = LLMBackend.CLAUDE.value
                 logger.info(
                     "[LLM] Claude response received in %.1fs — model=%s, in=%d tok, out=%d tok",
-                    elapsed, result.model, result.input_tokens, result.output_tokens,
+                    elapsed,
+                    result.model,
+                    result.input_tokens,
+                    result.output_tokens,
                 )
                 return result
             except Exception as exc:
@@ -546,7 +553,9 @@ class LLMClient:
 
                 logger.info(
                     "[LLM] Claude model %s succeeded — %d input tokens, %d output tokens",
-                    model, response.usage.input_tokens, response.usage.output_tokens,
+                    model,
+                    response.usage.input_tokens,
+                    response.usage.output_tokens,
                 )
                 return LLMResponse(
                     text=text,
