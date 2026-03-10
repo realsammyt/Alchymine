@@ -69,6 +69,12 @@ const NAV_ITEMS: NavItem[] = [
     icon: "user",
     label: "Your unified profile",
   },
+  {
+    name: "About",
+    href: "/about",
+    icon: "info",
+    label: "About Alchymine",
+  },
 ];
 
 export default function Navigation() {

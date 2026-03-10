@@ -50,21 +50,58 @@ cd alchymine/web && npm install && npm run dev
 
 ## Architecture
 
-```
-User Intake → Master Orchestrator → 5 System Coordinators → 28 Domain Agents → Quality Gates → Report
-                    │
-    ┌───────────────┼───────────────┐───────────────┐───────────────┐
-    ▼               ▼               ▼               ▼               ▼
- PI Core        Healing         Wealth          Creative       Perspective
- 6 agents       5 agents        5 agents        7 agents        5 agents
- 6 skills       10 skills       7 skills        7 skills        7 skills
-```
+Alchymine uses a hub-and-spoke agent architecture: 1 Master Orchestrator dispatches to 5 System Coordinators, each running LangGraph state graphs with domain-specific agents.
 
-- **34 agents** (28 domain + 5 coordinators + 1 Master Orchestrator)
-- **46 skills** contributed upstream to healing-swarm-skills
-- **19 quality gates** ensuring ethical, accurate, and culturally sensitive outputs
-- All financial calculations are **deterministic** (never LLM-generated)
-- Hub-and-spoke **Alchemical Spiral** user journey with adaptive entry
+### System Overview
+
+![System Architecture](docs/diagrams/01-system-architecture.png)
+
+<details>
+<summary><strong>Information Flow — Request Lifecycle</strong></summary>
+
+![Information Flow](docs/diagrams/02-information-flow.png)
+
+User intake → FastAPI → Celery worker → Master Orchestrator → 5 coordinators (Intelligence enriches all downstream systems) → Synthesis → Claude API narratives → Quality gates → Report + PDF.
+
+</details>
+
+<details>
+<summary><strong>User Journey</strong></summary>
+
+![User Journey](docs/diagrams/03-user-journey.png)
+
+Landing → Auth → Intake → Assessment → Report Generation → Report View → System Exploration. Future: AI Growth Assistant Agent with per-system coaching, and Gemini-powered generative art throughout.
+
+</details>
+
+<details>
+<summary><strong>Current Functions Matrix</strong></summary>
+
+![Current Functions](docs/diagrams/04-current-functions.png)
+
+**Status:** Engines 5/5 complete, APIs 5/5 complete, Frontend 3/5 complete, MCP 0/5 transport, Skills 0/5 populated.
+
+</details>
+
+### Roadmap — 90-Day Compressed
+
+![90-Day Roadmap](docs/diagrams/05-roadmap-90-day.png)
+
+Three parallel tracks over 12 two-week sprints:
+
+1. **Healing-Swarm-Skills + Cross-System UX** — Activate 46 skills, wire cross-system bridges into frontend, interactive healing tools
+2. **AI Growth Assistant Agent** (Claude Agent SDK) — Chat interface → Proactive coach → Embedded per-system companion
+3. **Gemini Generative Art** — Report visuals → Creative studio → Journey illustrations → Personal brand/identity generation
+
+**Milestones:** Week 4 MVP · Week 8 Beta · Week 12 Launch
+
+**Key numbers:**
+
+- **34 agents** across 5 systems (28 domain + 5 coordinators + 1 orchestrator)
+- **19 quality gates** for ethical, accurate, culturally sensitive outputs
+- **15 healing modalities** with evidence ratings and crisis detection
+- **All financial math is deterministic** — never LLM-generated, always encrypted
+- **Open diagrams:** All `.excalidraw` files in `docs/diagrams/` — open at [excalidraw.com](https://excalidraw.com)
 
 ## Tech Stack
 
