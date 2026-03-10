@@ -17,7 +17,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from alchymine.api.auth import get_current_admin
 from alchymine.api.deps import get_db_session
 from alchymine.db import repository
-from alchymine.db.models import User
+from alchymine.db.models import FeedbackEntry, User
 
 logger = logging.getLogger(__name__)
 
@@ -98,27 +98,27 @@ class FeedbackPatch(BaseModel):
 # ── Helpers ───────────────────────────────────────────────────────────────
 
 
-def _entry_to_response(entry: object) -> FeedbackResponse:
+def _entry_to_response(entry: FeedbackEntry) -> FeedbackResponse:
     """Convert a FeedbackEntry ORM object to FeedbackResponse."""
     created = (
-        entry.created_at.isoformat()  # type: ignore[union-attr]
-        if hasattr(entry.created_at, "isoformat")  # type: ignore[union-attr]
-        else str(entry.created_at)  # type: ignore[union-attr]
+        entry.created_at.isoformat()
+        if hasattr(entry.created_at, "isoformat")
+        else str(entry.created_at)
     )
     updated = (
-        entry.updated_at.isoformat()  # type: ignore[union-attr]
-        if hasattr(entry.updated_at, "isoformat")  # type: ignore[union-attr]
-        else str(entry.updated_at)  # type: ignore[union-attr]
+        entry.updated_at.isoformat()
+        if hasattr(entry.updated_at, "isoformat")
+        else str(entry.updated_at)
     )
     return FeedbackResponse(
-        id=entry.id,  # type: ignore[union-attr]
-        user_id=entry.user_id,  # type: ignore[union-attr]
-        email=entry.email,  # type: ignore[union-attr]
-        category=entry.category,  # type: ignore[union-attr]
-        message=entry.message,  # type: ignore[union-attr]
-        status=entry.status,  # type: ignore[union-attr]
-        admin_note=entry.admin_note,  # type: ignore[union-attr]
-        page_url=entry.page_url,  # type: ignore[union-attr]
+        id=entry.id,
+        user_id=entry.user_id,
+        email=entry.email,
+        category=entry.category,
+        message=entry.message,
+        status=entry.status,
+        admin_note=entry.admin_note,
+        page_url=entry.page_url,
         created_at=created,
         updated_at=updated,
     )
