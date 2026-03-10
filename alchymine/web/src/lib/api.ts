@@ -497,6 +497,38 @@ export async function getBreathwork(
   );
 }
 
+// ─── Biorhythm ──────────────────────────────────────────────────────
+
+export interface BiorhythmResult {
+  date: string;
+  physical: number;
+  emotional: number;
+  intellectual: number;
+  days_alive: number;
+}
+
+export interface BiorhythmRangeResponse {
+  results: BiorhythmResult[];
+  days_requested: number;
+  evidence_rating: string;
+  methodology_note: string;
+}
+
+export async function getBiorhythmRange(
+  birthDate: string,
+  startDate: string,
+  days: number = 30,
+): Promise<BiorhythmRangeResponse> {
+  return request<BiorhythmRangeResponse>(`${BASE}/biorhythm/range`, {
+    method: "POST",
+    body: JSON.stringify({
+      birth_date: birthDate,
+      start_date: startDate,
+      days,
+    }),
+  });
+}
+
 // ─── Wealth ─────────────────────────────────────────────────────────
 
 export async function getWealthProfile(
@@ -569,7 +601,7 @@ export async function getKeganAssessment(
 ): Promise<KeganAssessResponse> {
   return request<KeganAssessResponse>(`${BASE}/perspective/kegan/assess`, {
     method: "POST",
-    body: JSON.stringify(responses),
+    body: JSON.stringify({ responses }),
   });
 }
 
@@ -816,6 +848,33 @@ export async function synthesizeCrossSystems(
 export async function getProfile(userId: string): Promise<ProfileResponse> {
   return request<ProfileResponse>(
     `${BASE}/profile/${encodeURIComponent(userId)}`,
+  );
+}
+
+// ─── Profile Reassess ────────────────────────────────────────────────
+
+export interface ReassessResponse {
+  system: string;
+  status: string;
+  updated_data: Record<string, unknown>;
+  narrative: string | null;
+}
+
+export async function reassessProfile(
+  userId: string,
+  system: string,
+  assessmentResponses: Record<string, unknown>,
+  regenerateNarrative = false,
+): Promise<ReassessResponse> {
+  return request<ReassessResponse>(
+    `${BASE}/profile/${encodeURIComponent(userId)}/layers/${system}/reassess`,
+    {
+      method: "PATCH",
+      body: JSON.stringify({
+        assessment_responses: assessmentResponses,
+        regenerate_narrative: regenerateNarrative,
+      }),
+    },
   );
 }
 

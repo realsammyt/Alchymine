@@ -1,11 +1,20 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
+import { useAuth } from "@/lib/AuthContext";
 import Markdown from "react-markdown";
-import { getReport, ApiError, ReportResponse, IdentityLayer } from "@/lib/api";
+import {
+  getReport,
+  reassessProfile,
+  ApiError,
+  ReportResponse,
+  IdentityLayer,
+} from "@/lib/api";
+import { CREATIVE_DNA_SUPPLEMENT_QUESTIONS } from "@/lib/questions";
 import Card from "@/components/shared/Card";
 import Button from "@/components/shared/Button";
+import SupplementModal from "@/components/shared/SupplementModal";
 import {
   MotionReveal,
   MotionStagger,
@@ -105,6 +114,34 @@ export default function ReportPage() {
   const [report, setReport] = useState<ReportResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // Supplement modal state
+  const { user } = useAuth();
+  const [showCreativeDNA, setShowCreativeDNA] = useState(false);
+  const [supplementLoading, setSupplementLoading] = useState(false);
+
+  const handleReassess = useCallback(
+    async (system: string, responses: Record<string, number | string>) => {
+      if (!user?.id) return;
+      setSupplementLoading(true);
+      try {
+        await reassessProfile(user.id, system, responses, true);
+        // Refresh report data
+        const data = await getReport(reportId);
+        setReport(data);
+        setShowCreativeDNA(false);
+      } catch (err) {
+        alert(
+          err instanceof ApiError
+            ? err.message
+            : "Failed to update profile. Please try again.",
+        );
+      } finally {
+        setSupplementLoading(false);
+      }
+    },
+    [user?.id, reportId],
+  );
 
   useEffect(() => {
     async function fetchReport() {
@@ -721,6 +758,12 @@ export default function ReportPage() {
                                 </div>
                               </div>
                             )}
+                          <button
+                            onClick={() => setShowCreativeDNA(true)}
+                            className="mt-3 w-full py-2 px-3 rounded-lg border border-secondary/20 text-secondary-light text-xs font-body hover:bg-secondary/[0.06] transition-colors"
+                          >
+                            Deepen Your Creative DNA
+                          </button>
                         </>
                       ) : (
                         <p className="text-sm font-body text-text/30">
@@ -1002,9 +1045,14 @@ export default function ReportPage() {
               onClick={async () => {
                 try {
                   const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "";
+                  const token = localStorage.getItem("access_token");
                   const response = await fetch(
                     `${apiUrl}/api/v1/reports/${reportId}/pdf`,
-                    { credentials: "include" },
+                    {
+                      headers: token
+                        ? { Authorization: `Bearer ${token}` }
+                        : {},
+                    },
                   );
                   if (!response.ok) {
                     alert(
@@ -1048,6 +1096,18 @@ export default function ReportPage() {
           </div>
         </MotionReveal>
       </div>
+
+      {/* ── Supplement Modals ──────────────────────────────────────────── */}
+      {showCreativeDNA && (
+        <SupplementModal
+          title="Deepen Your Creative DNA"
+          description="Answer these questions to refine your Creative DNA profile with direct measurements instead of personality proxies."
+          questions={CREATIVE_DNA_SUPPLEMENT_QUESTIONS}
+          loading={supplementLoading}
+          onSubmit={(responses) => handleReassess("creative", responses)}
+          onClose={() => setShowCreativeDNA(false)}
+        />
+      )}
     </div>
   );
 }

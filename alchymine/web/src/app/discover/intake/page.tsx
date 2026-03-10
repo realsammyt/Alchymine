@@ -22,12 +22,52 @@ const INTENTIONS = [
   { value: "legacy", label: "Legacy & Impact", icon: "building" },
 ] as const;
 
+interface WealthContext {
+  income_range: string;
+  has_investments: boolean;
+  has_business: boolean;
+  has_real_estate: boolean;
+  dependents: number | null;
+  debt_level: string;
+  financial_goal: string;
+}
+
+const EMPTY_WEALTH_CONTEXT: WealthContext = {
+  income_range: "",
+  has_investments: false,
+  has_business: false,
+  has_real_estate: false,
+  dependents: null,
+  debt_level: "",
+  financial_goal: "",
+};
+
+const INCOME_RANGES = [
+  { value: "", label: "Prefer not to say" },
+  { value: "under_25k", label: "Under $25k" },
+  { value: "25k_50k", label: "$25k - $50k" },
+  { value: "50k_75k", label: "$50k - $75k" },
+  { value: "75k_100k", label: "$75k - $100k" },
+  { value: "100k_150k", label: "$100k - $150k" },
+  { value: "150k_250k", label: "$150k - $250k" },
+  { value: "over_250k", label: "Over $250k" },
+] as const;
+
+const DEBT_LEVELS = [
+  { value: "", label: "Prefer not to say" },
+  { value: "none", label: "None" },
+  { value: "low", label: "Low" },
+  { value: "moderate", label: "Moderate" },
+  { value: "high", label: "High" },
+] as const;
+
 interface IntakeFormData {
   fullName: string;
   birthDate: string;
   birthTime: string;
   birthCity: string;
   intentions: string[];
+  wealthContext: WealthContext;
 }
 
 const MAX_INTENTIONS = 3;
@@ -130,10 +170,12 @@ export default function IntakePage() {
     birthTime: "",
     birthCity: "",
     intentions: [],
+    wealthContext: { ...EMPTY_WEALTH_CONTEXT },
   });
   const [errors, setErrors] = useState<
     Partial<Record<keyof IntakeFormData | "intentions", string>>
   >({});
+  const [wealthExpanded, setWealthExpanded] = useState(false);
 
   // Pre-fill from saved profile (enables cross-device sync)
   useEffect(() => {
@@ -142,6 +184,7 @@ export default function IntakePage() {
       .then((profile) => {
         if (profile.intake) {
           setFormData((prev) => ({
+            ...prev,
             fullName: profile.intake!.full_name || prev.fullName,
             birthDate: profile.intake!.birth_date || prev.birthDate,
             birthTime: profile.intake!.birth_time || prev.birthTime,
@@ -183,6 +226,28 @@ export default function IntakePage() {
     e.preventDefault();
     if (!validate()) return;
 
+    // Build wealth_context only if any field is filled
+    const wc = formData.wealthContext;
+    const hasWealth =
+      wc.income_range ||
+      wc.debt_level ||
+      wc.financial_goal ||
+      wc.has_investments ||
+      wc.has_business ||
+      wc.has_real_estate ||
+      wc.dependents !== null;
+    const wealth_context = hasWealth
+      ? {
+          income_range: wc.income_range || null,
+          has_investments: wc.has_investments || null,
+          has_business: wc.has_business || null,
+          has_real_estate: wc.has_real_estate || null,
+          dependents: wc.dependents,
+          debt_level: wc.debt_level || null,
+          financial_goal: wc.financial_goal || null,
+        }
+      : null;
+
     // Store in sessionStorage for the assessment page to pick up.
     // Include `intention` (primary) for backward compat with report creation.
     sessionStorage.setItem(
@@ -190,6 +255,7 @@ export default function IntakePage() {
       JSON.stringify({
         ...formData,
         intention: formData.intentions[0],
+        wealth_context,
       }),
     );
 
@@ -203,6 +269,7 @@ export default function IntakePage() {
         birth_city: formData.birthCity || null,
         intention: formData.intentions[0],
         intentions: formData.intentions,
+        ...(wealth_context ? { wealth_context } : {}),
       }).catch((err) => {
         console.warn(
           "Failed to save intake to server (will retry on report submit):",
@@ -439,6 +506,196 @@ export default function IntakePage() {
                 </p>
               )}
             </fieldset>
+
+            {/* Financial Context (Optional, Collapsible) */}
+            <div className="border border-white/[0.06] rounded-xl overflow-hidden">
+              <button
+                type="button"
+                onClick={() => setWealthExpanded((prev) => !prev)}
+                className="w-full flex items-center justify-between px-4 py-3 text-left text-sm font-body font-medium text-text/60 hover:bg-white/[0.02] transition-colors"
+                aria-expanded={wealthExpanded}
+                aria-controls="wealth-context-section"
+              >
+                <span>
+                  Financial Context{" "}
+                  <span className="text-text/25 font-normal">(optional)</span>
+                </span>
+                <svg
+                  className={`w-4 h-4 text-text/30 transition-transform duration-200 ${
+                    wealthExpanded ? "rotate-180" : ""
+                  }`}
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden="true"
+                >
+                  <path d="m6 9 6 6 6-6" />
+                </svg>
+              </button>
+              {wealthExpanded && (
+                <div
+                  id="wealth-context-section"
+                  className="px-4 pb-4 space-y-4 border-t border-white/[0.04]"
+                >
+                  <p className="text-[0.65rem] font-body text-text/25 pt-3">
+                    Your financial data is encrypted and never shared with AI.
+                    All fields are optional.
+                  </p>
+                  {/* Income Range */}
+                  <div>
+                    <label
+                      htmlFor="incomeRange"
+                      className="block text-sm font-body text-text/50 mb-1.5"
+                    >
+                      Income Range
+                    </label>
+                    <select
+                      id="incomeRange"
+                      value={formData.wealthContext.income_range}
+                      onChange={(e) =>
+                        setFormData((prev) => ({
+                          ...prev,
+                          wealthContext: {
+                            ...prev.wealthContext,
+                            income_range: e.target.value,
+                          },
+                        }))
+                      }
+                      className={inputClass}
+                    >
+                      {INCOME_RANGES.map((r) => (
+                        <option key={r.value} value={r.value}>
+                          {r.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  {/* Debt Level */}
+                  <div>
+                    <label
+                      htmlFor="debtLevel"
+                      className="block text-sm font-body text-text/50 mb-1.5"
+                    >
+                      Debt Level
+                    </label>
+                    <select
+                      id="debtLevel"
+                      value={formData.wealthContext.debt_level}
+                      onChange={(e) =>
+                        setFormData((prev) => ({
+                          ...prev,
+                          wealthContext: {
+                            ...prev.wealthContext,
+                            debt_level: e.target.value,
+                          },
+                        }))
+                      }
+                      className={inputClass}
+                    >
+                      {DEBT_LEVELS.map((d) => (
+                        <option key={d.value} value={d.value}>
+                          {d.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  {/* Asset toggles */}
+                  <div className="grid grid-cols-3 gap-3">
+                    {(
+                      [
+                        ["has_investments", "Investments"],
+                        ["has_business", "Business"],
+                        ["has_real_estate", "Real Estate"],
+                      ] as const
+                    ).map(([key, label]) => (
+                      <button
+                        key={key}
+                        type="button"
+                        aria-pressed={formData.wealthContext[key] as boolean}
+                        onClick={() =>
+                          setFormData((prev) => ({
+                            ...prev,
+                            wealthContext: {
+                              ...prev.wealthContext,
+                              [key]: !prev.wealthContext[key],
+                            },
+                          }))
+                        }
+                        className={`px-3 py-2 rounded-xl border text-sm font-body transition-all ${
+                          formData.wealthContext[key]
+                            ? "border-primary/40 bg-primary/[0.08] text-text"
+                            : "border-white/[0.06] bg-white/[0.02] text-text/40"
+                        }`}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                  {/* Dependents */}
+                  <div>
+                    <label
+                      htmlFor="dependents"
+                      className="block text-sm font-body text-text/50 mb-1.5"
+                    >
+                      Dependents
+                    </label>
+                    <input
+                      id="dependents"
+                      type="number"
+                      min={0}
+                      max={10}
+                      placeholder="0"
+                      value={formData.wealthContext.dependents ?? ""}
+                      onChange={(e) =>
+                        setFormData((prev) => ({
+                          ...prev,
+                          wealthContext: {
+                            ...prev.wealthContext,
+                            dependents:
+                              e.target.value === ""
+                                ? null
+                                : Math.min(
+                                    10,
+                                    Math.max(0, Number(e.target.value)),
+                                  ),
+                          },
+                        }))
+                      }
+                      className={inputClass}
+                    />
+                  </div>
+                  {/* Financial Goal */}
+                  <div>
+                    <label
+                      htmlFor="financialGoal"
+                      className="block text-sm font-body text-text/50 mb-1.5"
+                    >
+                      Financial Goal
+                    </label>
+                    <input
+                      id="financialGoal"
+                      type="text"
+                      maxLength={200}
+                      placeholder="e.g. Build a 6-month emergency fund"
+                      value={formData.wealthContext.financial_goal}
+                      onChange={(e) =>
+                        setFormData((prev) => ({
+                          ...prev,
+                          wealthContext: {
+                            ...prev.wealthContext,
+                            financial_goal: e.target.value,
+                          },
+                        }))
+                      }
+                      className={inputClass}
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
 
             {/* Submit */}
             <div className="pt-4">

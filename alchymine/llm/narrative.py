@@ -155,14 +155,47 @@ def flatten_engine_data(data: dict[str, Any]) -> dict[str, Any]:
     if isinstance(co, dict):
         flat["creative_style"] = co.get("style", "")
 
+    # Creative: style_fingerprint dict → {creative_style} (if not already set)
+    sf = data.get("style_fingerprint")
+    if isinstance(sf, dict):
+        if "creative_style" not in flat:
+            flat["creative_style"] = sf.get("creative_style", "")
+        flat["overall_creative_score"] = sf.get("overall_score", "")
+
     # Perspective: detected_biases list → {biases_section}
     if "detected_biases_section" in flat:
         flat["biases_section"] = flat["detected_biases_section"]
 
     # Perspective: kegan_stage → {kegan_description}
+    # Handle both old format (string/int) and new format (dict from synthesis)
     stage = flat.get("kegan_stage")
-    if stage is not None:
+    if isinstance(stage, dict):
+        flat["kegan_description"] = f"{stage.get('name', '')} — {stage.get('description', '')}"
+        flat["kegan_stage_name"] = stage.get("name", "")
+        flat["kegan_stage_number"] = stage.get("stage", "")
+    elif stage is not None:
         flat["kegan_description"] = _KEGAN_DESCRIPTIONS.get(str(stage), f"Stage {stage}")
+
+    # Perspective: kegan_description dict (from enriched graph) → detailed keys
+    kd = data.get("kegan_description")
+    if isinstance(kd, dict):
+        if "kegan_description" not in flat or not flat["kegan_description"]:
+            flat["kegan_description"] = f"{kd.get('name', '')} — {kd.get('description', '')}"
+        flat["kegan_stage_name"] = kd.get("name", "")
+        flat["kegan_strengths_section"] = (
+            "\n".join(f"- {s}" for s in kd.get("strengths", [])) or "(none)"
+        )
+        flat["kegan_growth_edges_section"] = (
+            "\n".join(f"- {e}" for e in kd.get("growth_edges", [])) or "(none)"
+        )
+
+    # Perspective: kegan_growth_pathway dict → {growth_practices}
+    gp = data.get("kegan_growth_pathway")
+    if isinstance(gp, dict):
+        practices = gp.get("practices", [])
+        flat["growth_practices"] = "\n".join(f"- {p}" for p in practices) or "(none)"
+        flat["growth_encouragement"] = gp.get("encouragement", "")
+        flat["growth_timeframe"] = gp.get("timeframe", "")
 
     # Perspective: decision_analysis dict → {decision_section} markdown
     da = data.get("decision_analysis")
@@ -176,6 +209,23 @@ def flatten_engine_data(data: dict[str, Any]) -> dict[str, Any]:
             else:
                 lines.append(f"- **{label}**: {v}")
         flat["decision_section"] = "\n".join(lines) if lines else "(no decision provided)"
+
+    # Healing: recommended_modalities_section → {modalities_section}
+    if "recommended_modalities_section" in flat:
+        flat["modalities_section"] = flat["recommended_modalities_section"]
+
+    # Healing: crisis_response dict → {crisis_section}
+    cr = data.get("crisis_response")
+    if isinstance(cr, dict):
+        severity = cr.get("severity", "unknown")
+        resources = cr.get("resources", [])
+        lines = [f"- Severity: {severity}"]
+        for r in resources:
+            if isinstance(r, dict):
+                lines.append(f"- {r.get('name', '')}: {r.get('contact', '')}")
+        flat["crisis_section"] = "\n  ".join(lines)
+    elif data.get("crisis_flag") is False:
+        flat["crisis_section"] = "No crisis indicators detected."
 
     return flat
 

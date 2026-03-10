@@ -89,6 +89,13 @@ INTENTION_WEIGHTS: dict[str, dict[str, float]] = {
         "creative": 15,
         "healing": 10,
     },
+    "creative": {
+        "creative": 40,
+        "intelligence": 20,
+        "perspective": 20,
+        "healing": 10,
+        "wealth": 10,
+    },
 }
 
 # ── Primary systems per intention (orchestrator routing) ──────────────
@@ -108,6 +115,7 @@ INTENTION_PRIMARY_SYSTEMS: dict[str, list[str]] = {
     "family": ["healing", "perspective"],
     "business": ["wealth", "creative"],
     "legacy": ["wealth", "perspective", "creative"],
+    "creative": ["creative", "intelligence"],
 }
 
 # ── System relevance for synthesis filtering ──────────────────────────

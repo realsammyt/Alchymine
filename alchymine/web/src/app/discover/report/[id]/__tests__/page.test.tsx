@@ -12,6 +12,12 @@ jest.mock("@/lib/api", () => ({
     status: "complete",
     profile_summary: null,
   }),
+  reassessProfile: jest.fn().mockResolvedValue({
+    system: "creative",
+    status: "complete",
+    updated_data: {},
+    narrative: null,
+  }),
   ApiError: class ApiError extends Error {
     status: number;
     constructor(message: string, status: number) {
@@ -50,6 +56,22 @@ jest.mock("@/components/shared/MotionReveal", () => ({
     <>{children}</>
   ),
 }));
+
+jest.mock("@/lib/AuthContext", () => ({
+  useAuth: jest.fn().mockReturnValue({
+    user: { id: "test-user-123", email: "test@example.com" },
+    isLoading: false,
+    login: jest.fn(),
+    logout: jest.fn(),
+    register: jest.fn(),
+  }),
+}));
+
+jest.mock("@/components/shared/SupplementModal", () => {
+  return function MockSupplementModal() {
+    return null;
+  };
+});
 
 describe("ReportPage", () => {
   it("renders loading state initially", () => {

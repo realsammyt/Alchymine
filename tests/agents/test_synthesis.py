@@ -10,8 +10,6 @@ from __future__ import annotations
 
 from unittest.mock import AsyncMock, MagicMock, patch
 
-import pytest
-
 from alchymine.agents.orchestrator.coordinator import (
     CoordinatorResult,
     CoordinatorStatus,
@@ -34,7 +32,6 @@ from alchymine.agents.orchestrator.synthesis import (
     synthesize_guided_session,
     transform_to_profile_summary,
 )
-
 
 # ═══════════════════════════════════════════════════════════════════════
 # Helpers — reusable coordinator result fixtures
@@ -1109,3 +1106,104 @@ class TestProfileSummaryStrengthsMap:
         ]
         summary = transform_to_profile_summary(results)
         assert summary["identity"]["strengths_map"] == []
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# Section: Profile summary shape fixes (Phase 1E)
+# ═══════════════════════════════════════════════════════════════════════
+
+
+class TestProfileSummaryCreativeShape:
+    """Creative orientation is reshaped to {style, summary} by transform_to_profile_summary."""
+
+    def test_creative_orientation_is_dict_with_style_and_summary(self) -> None:
+        """creative_orientation is shaped as {style, summary} in summary output."""
+        results = [
+            _creative_result(
+                data={
+                    "creative_orientation": "generative",
+                    "style_fingerprint": {"creative_style": "Divergent Explorer"},
+                    "strengths": ["originality"],
+                }
+            ),
+        ]
+        summary = transform_to_profile_summary(results)
+        creative = summary.get("creative", {})
+        orientation = creative.get("creative_orientation")
+        assert isinstance(orientation, dict)
+        assert "style" in orientation
+        assert "summary" in orientation
+
+    def test_creative_orientation_already_dict_passes_through(self) -> None:
+        """When creative_orientation is already a dict, it passes through unchanged."""
+        results = [
+            _creative_result(
+                data={
+                    "creative_orientation": {"style": "analytical", "summary": "Details"},
+                    "strengths": [],
+                }
+            ),
+        ]
+        summary = transform_to_profile_summary(results)
+        creative = summary.get("creative", {})
+        orientation = creative.get("creative_orientation")
+        assert isinstance(orientation, dict)
+        assert orientation["style"] == "analytical"
+        assert orientation["summary"] == "Details"
+
+
+class TestProfileSummaryKeganShape:
+    """Kegan stage is reshaped to {stage, name, description} by transform_to_profile_summary."""
+
+    def test_kegan_stage_reshaped_from_string(self) -> None:
+        """String kegan_stage + kegan_description dict → {stage, name, description}."""
+        results = [
+            _perspective_result(
+                data={
+                    "kegan_stage": "self_authoring",
+                    "kegan_description": {
+                        "stage_number": 4,
+                        "name": "Self-Authoring Mind",
+                        "description": "Can evaluate external expectations",
+                    },
+                    "detected_biases": [],
+                }
+            ),
+        ]
+        summary = transform_to_profile_summary(results)
+        perspective = summary.get("perspective", {})
+        kegan = perspective.get("kegan_stage")
+        assert isinstance(kegan, dict)
+        assert kegan["stage"] == 4
+        assert kegan["name"] == "Self-Authoring Mind"
+        assert "evaluate" in kegan["description"]
+
+    def test_kegan_stage_already_dict_passes_through(self) -> None:
+        """When kegan_stage is already a dict, it passes through unchanged."""
+        results = [
+            _perspective_result(
+                data={
+                    "kegan_stage": {"stage": 3, "name": "Socialized Mind", "description": "Shaped by others"},
+                    "detected_biases": [],
+                }
+            ),
+        ]
+        summary = transform_to_profile_summary(results)
+        perspective = summary.get("perspective", {})
+        kegan = perspective.get("kegan_stage")
+        assert isinstance(kegan, dict)
+        assert kegan["stage"] == 3
+
+    def test_kegan_stage_int_handled(self) -> None:
+        """Integer kegan_stage is handled by _build_strengths_map without error."""
+        results = [
+            _perspective_result(
+                data={
+                    "kegan_stage": 4,
+                    "detected_biases": ["anchoring"],
+                }
+            ),
+        ]
+        summary = transform_to_profile_summary(results)
+        perspective = summary.get("perspective", {})
+        assert "kegan_stage" in perspective

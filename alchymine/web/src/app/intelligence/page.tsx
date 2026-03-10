@@ -10,8 +10,10 @@ import {
 import {
   getNumerology,
   getAstrology,
+  getBiorhythmRange,
   NumerologyResponse,
   AstrologyResponse,
+  BiorhythmRangeResponse,
 } from "@/lib/api";
 import { useApi, useIntake, useReportStatus } from "@/lib/useApi";
 import { useAuth } from "@/lib/AuthContext";
@@ -138,6 +140,17 @@ export default function IntelligencePage() {
           )
       : null,
     [intake?.birthDate, intake?.birthTime],
+  );
+
+  // Fetch 30-day biorhythm range starting from today
+  const biorhythm = useApi<BiorhythmRangeResponse>(
+    intake?.birthDate
+      ? () => {
+          const today = new Date().toISOString().split("T")[0];
+          return getBiorhythmRange(intake.birthDate!, today, 30);
+        }
+      : null,
+    [intake?.birthDate],
   );
 
   return (
@@ -429,30 +442,67 @@ export default function IntelligencePage() {
             <hr className="rule-gold mb-6" aria-hidden="true" />
 
             <MotionStagger className="grid sm:grid-cols-3 gap-4 mb-4">
-              {BIORHYTHM_CYCLES.map((cycle) => (
-                <MotionStaggerItem key={cycle.name}>
-                  <div className="card-surface p-5 h-full transition-all duration-300 hover:glow-gold hover:-translate-y-1">
-                    <div className="flex items-center justify-between mb-3">
-                      <h3
-                        className={`font-display text-sm font-medium ${cycle.color}`}
-                      >
-                        {cycle.name}
-                      </h3>
-                      <span className="font-body text-xs text-text/30">
-                        {cycle.period}
-                      </span>
+              {BIORHYTHM_CYCLES.map((cycle) => {
+                const key = cycle.name.toLowerCase() as
+                  | "physical"
+                  | "emotional"
+                  | "intellectual";
+                const todayValue = biorhythm.data?.results?.[0]?.[key];
+                const pct =
+                  todayValue != null ? Math.round(todayValue * 100) : null;
+                return (
+                  <MotionStaggerItem key={cycle.name}>
+                    <div className="card-surface p-5 h-full transition-all duration-300 hover:glow-gold hover:-translate-y-1">
+                      <div className="flex items-center justify-between mb-3">
+                        <h3
+                          className={`font-display text-sm font-medium ${cycle.color}`}
+                        >
+                          {cycle.name}
+                        </h3>
+                        <span className="font-body text-xs text-text/30">
+                          {cycle.period}
+                        </span>
+                      </div>
+                      <p className="font-body text-sm text-text/50 leading-relaxed">
+                        {cycle.description}
+                      </p>
+                      <div className="mt-4 h-8 bg-bg/50 rounded-lg flex items-center justify-center">
+                        {biorhythm.loading ? (
+                          <span className="font-body text-xs text-text/20">
+                            Loading...
+                          </span>
+                        ) : pct != null ? (
+                          <div className="w-full px-3 flex items-center gap-2">
+                            <div className="flex-1 h-2 bg-bg rounded-full overflow-hidden">
+                              <div
+                                className={`h-full rounded-full ${
+                                  pct >= 0
+                                    ? "bg-accent/60"
+                                    : "bg-secondary/60"
+                                }`}
+                                style={{
+                                  width: `${Math.abs(pct)}%`,
+                                  marginLeft:
+                                    pct < 0
+                                      ? `${100 - Math.abs(pct)}%`
+                                      : undefined,
+                                }}
+                              />
+                            </div>
+                            <span className="font-mono text-xs text-text/50 w-10 text-right">
+                              {pct}%
+                            </span>
+                          </div>
+                        ) : (
+                          <span className="font-body text-xs text-text/20">
+                            Complete intake to view
+                          </span>
+                        )}
+                      </div>
                     </div>
-                    <p className="font-body text-sm text-text/50 leading-relaxed">
-                      {cycle.description}
-                    </p>
-                    <div className="mt-4 h-8 bg-bg/50 rounded-lg flex items-center justify-center">
-                      <span className="font-body text-xs text-text/20">
-                        Chart available after assessment
-                      </span>
-                    </div>
-                  </div>
-                </MotionStaggerItem>
-              ))}
+                  </MotionStaggerItem>
+                );
+              })}
             </MotionStagger>
 
             <MethodologyPanel

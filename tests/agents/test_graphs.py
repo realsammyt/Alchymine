@@ -12,19 +12,18 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from alchymine.agents.orchestrator.graphs import (
-    CoordinatorState,
     _HAS_LANGGRAPH,
-    _SequentialGraph,
+    CoordinatorState,
     _compute_status,
     _compute_status_with_baseline,
     _run_quality_gate_node,
+    _SequentialGraph,
     build_creative_graph,
     build_healing_graph,
     build_intelligence_graph,
     build_perspective_graph,
     build_wealth_graph,
 )
-
 
 # ─── Helpers ────────────────────────────────────────────────────────
 
@@ -124,11 +123,7 @@ class TestIntelligenceGraphTransitions:
         from datetime import date
 
         # Provide Big Five assessment responses so personality node succeeds
-        bf_responses = {
-            f"bf_{t}{i}": 3
-            for t in ("e", "a", "c", "n", "o")
-            for i in (1, 2, 3, 4)
-        }
+        bf_responses = {f"bf_{t}{i}": 3 for t in ("e", "a", "c", "n", "o") for i in (1, 2, 3, 4)}
 
         state = _make_initial_state(
             request_data={
@@ -172,11 +167,7 @@ class TestIntelligenceGraphTransitions:
         """Personality output contains big_five, attachment_style, enneagram when all data provided."""
         from datetime import date
 
-        bf_responses = {
-            f"bf_{t}{i}": 3
-            for t in ("e", "a", "c", "n", "o")
-            for i in (1, 2, 3, 4)
-        }
+        bf_responses = {f"bf_{t}{i}": 3 for t in ("e", "a", "c", "n", "o") for i in (1, 2, 3, 4)}
         att_responses = {
             "att_closeness": 4,
             "att_abandonment": 2,
@@ -231,11 +222,7 @@ class TestIntelligenceGraphTransitions:
         """Risk tolerance is scored from risk_* assessment items and added to personality."""
         from datetime import date
 
-        bf_responses = {
-            f"bf_{t}{i}": 3
-            for t in ("e", "a", "c", "n", "o")
-            for i in (1, 2, 3, 4)
-        }
+        bf_responses = {f"bf_{t}{i}": 3 for t in ("e", "a", "c", "n", "o") for i in (1, 2, 3, 4)}
         # High risk tolerance answers (all 5s → aggressive)
         risk_responses = {"risk_1": 5, "risk_2": 5, "risk_3": 5}
         all_responses = {**bf_responses, **risk_responses}
@@ -281,11 +268,7 @@ class TestIntelligenceGraphTransitions:
         """Low risk answers produce conservative risk_tolerance."""
         from datetime import date
 
-        bf_responses = {
-            f"bf_{t}{i}": 3
-            for t in ("e", "a", "c", "n", "o")
-            for i in (1, 2, 3, 4)
-        }
+        bf_responses = {f"bf_{t}{i}": 3 for t in ("e", "a", "c", "n", "o") for i in (1, 2, 3, 4)}
         risk_responses = {"risk_1": 1, "risk_2": 1, "risk_3": 1}
         all_responses = {**bf_responses, **risk_responses}
 
@@ -329,11 +312,7 @@ class TestIntelligenceGraphTransitions:
         """Risk tolerance not scored when fewer than 3 risk items present."""
         from datetime import date
 
-        bf_responses = {
-            f"bf_{t}{i}": 3
-            for t in ("e", "a", "c", "n", "o")
-            for i in (1, 2, 3, 4)
-        }
+        bf_responses = {f"bf_{t}{i}": 3 for t in ("e", "a", "c", "n", "o") for i in (1, 2, 3, 4)}
         # Only 2 risk items — not enough
         risk_responses = {"risk_1": 3, "risk_2": 3}
         all_responses = {**bf_responses, **risk_responses}
@@ -489,6 +468,28 @@ class TestHealingGraphTransitions:
         assert "disclaimers" in result["results"]
         assert any("crisis" in e.lower() for e in result["errors"])
 
+    def test_personality_context_surfaces_big_five(self) -> None:
+        """Healing graph extracts openness, neuroticism, attachment_style from big_five."""
+        state = _make_initial_state(
+            request_data={
+                "big_five": {
+                    "openness": 72,
+                    "neuroticism": 45,
+                    "conscientiousness": 60,
+                    "extraversion": 55,
+                    "agreeableness": 68,
+                },
+                "attachment_style": "secure",
+            },
+        )
+
+        graph = build_healing_graph(include_quality_gate=False)
+        result = graph.invoke(state)
+
+        assert result["results"]["openness"] == 72
+        assert result["results"]["neuroticism"] == 45
+        assert result["results"]["attachment_style"] == "secure"
+
 
 # ═══════════════════════════════════════════════════════════════════════
 # Section 4: Wealth graph state transitions
@@ -625,9 +626,7 @@ class TestPerspectiveGraphTransitions:
 
     def test_bias_detection(self) -> None:
         """Bias detection produces detected_biases in results."""
-        state = _make_initial_state(
-            request_data={"text": "I think this is the only way"}
-        )
+        state = _make_initial_state(request_data={"text": "I think this is the only way"})
 
         with patch(
             "alchymine.engine.perspective.detect_biases",
@@ -640,19 +639,21 @@ class TestPerspectiveGraphTransitions:
         assert "confirmation_bias" in result["results"]["detected_biases"]
 
     def test_kegan_assessment(self) -> None:
-        """Kegan assessment produces kegan_stage in results."""
-        state = _make_initial_state(
-            request_data={"kegan_responses": [1, 2, 3, 4, 5]}
-        )
+        """Kegan assessment produces kegan_stage as string value in results."""
+        from alchymine.engine.profile import KeganStage
+
+        state = _make_initial_state(request_data={"kegan_responses": [1, 2, 3, 4, 5]})
 
         with patch(
             "alchymine.engine.perspective.assess_kegan_stage",
-            return_value=3,
+            return_value=KeganStage.SOCIALIZED,
         ):
             graph = build_perspective_graph(include_quality_gate=False)
             result = graph.invoke(state)
 
-        assert result["results"]["kegan_stage"] == 3
+        assert result["results"]["kegan_stage"] == "socialized"
+        assert "kegan_description" in result["results"]
+        assert "kegan_dimension_scores" in result["results"]
 
     def test_decision_framework(self) -> None:
         """Decision framework produces decision_analysis in results."""
@@ -675,6 +676,8 @@ class TestPerspectiveGraphTransitions:
 
     def test_all_three_nodes(self) -> None:
         """All three perspective nodes produce data in a single run."""
+        from alchymine.engine.profile import KeganStage
+
         state = _make_initial_state(
             request_data={
                 "text": "Is this biased?",
@@ -692,7 +695,7 @@ class TestPerspectiveGraphTransitions:
             ),
             patch(
                 "alchymine.engine.perspective.assess_kegan_stage",
-                return_value=4,
+                return_value=KeganStage.SELF_AUTHORING,
             ),
             patch(
                 "alchymine.engine.perspective.pros_cons_analysis",
@@ -705,6 +708,7 @@ class TestPerspectiveGraphTransitions:
         assert result["status"] == "success"
         assert "detected_biases" in result["results"]
         assert "kegan_stage" in result["results"]
+        assert result["results"]["kegan_stage"] == "self-authoring"
         assert "decision_analysis" in result["results"]
         assert result["errors"] == []
 
@@ -826,7 +830,9 @@ class TestQualityGateIntegration:
         state: CoordinatorState = {
             "user_id": "test",
             "request_data": {},
-            "results": {"disclaimers": ["Not medical advice. Consult a qualified healthcare professional."]},
+            "results": {
+                "disclaimers": ["Not medical advice. Consult a qualified healthcare professional."]
+            },
             "errors": [],
             "status": "success",
             "quality_passed": True,
@@ -866,6 +872,7 @@ class TestNodeOrdering:
             def _node(state):
                 execution_log.append(name)
                 return state
+
             return _node
 
         with (
@@ -898,16 +905,24 @@ class TestNodeOrdering:
             state = _make_initial_state()
             graph.invoke(state)
 
-        assert execution_log == ["numerology", "astrology", "personality", "archetype", "biorhythm", "status"]
+        assert execution_log == [
+            "numerology",
+            "astrology",
+            "personality",
+            "archetype",
+            "biorhythm",
+            "status",
+        ]
 
     def test_healing_node_order(self) -> None:
-        """Healing: init -> crisis_detection -> modality_matching -> status."""
+        """Healing: init -> crisis_detection -> modality_matching -> personality_context -> status."""
         execution_log = []
 
         def log_node(name):
             def _node(state):
                 execution_log.append(name)
                 return state
+
             return _node
 
         with (
@@ -924,6 +939,10 @@ class TestNodeOrdering:
                 side_effect=log_node("modality_matching"),
             ),
             patch(
+                "alchymine.agents.orchestrator.graphs._healing_personality_context",
+                side_effect=log_node("personality_context"),
+            ),
+            patch(
                 "alchymine.agents.orchestrator.graphs._healing_status",
                 side_effect=log_node("status"),
             ),
@@ -932,7 +951,13 @@ class TestNodeOrdering:
             state = _make_initial_state()
             graph.invoke(state)
 
-        assert execution_log == ["init", "crisis_detection", "modality_matching", "status"]
+        assert execution_log == [
+            "init",
+            "crisis_detection",
+            "modality_matching",
+            "personality_context",
+            "status",
+        ]
 
     def test_wealth_node_order(self) -> None:
         """Wealth: init -> archetype -> lever_prioritisation -> calculations -> status."""
@@ -942,6 +967,7 @@ class TestNodeOrdering:
             def _node(state):
                 execution_log.append(name)
                 return state
+
             return _node
 
         with (
@@ -971,7 +997,11 @@ class TestNodeOrdering:
             graph.invoke(state)
 
         assert execution_log == [
-            "init", "archetype", "lever_prioritisation", "calculations", "status"
+            "init",
+            "archetype",
+            "lever_prioritisation",
+            "calculations",
+            "status",
         ]
 
 

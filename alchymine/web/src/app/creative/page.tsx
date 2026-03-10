@@ -93,7 +93,7 @@ const PROJECT_TYPE_DEFAULTS = [
 function ScoreBar({ label, value }: { label: string; value: number }) {
   return (
     <div className="flex items-center gap-3">
-      <span className="font-body text-sm text-text/60 w-28 text-right">
+      <span className="font-body text-sm text-text/80 w-28 text-right capitalize">
         {label}
       </span>
       <div className="flex-1 h-2 bg-surface rounded-full overflow-hidden">
@@ -150,12 +150,28 @@ export default function CreativePage() {
   );
 
   const projects = useApi<ProjectListResponse>(
-    creativePayload
-      ? () =>
-          getCreativeProjects({
-            ...creativePayload,
+    creativePayload && style.data
+      ? () => {
+          // ProjectSuggestRequest requires: orientation (str), strengths (list[str])
+          const guilford = creativePayload.guilford_scores as
+            | Record<string, number>
+            | undefined;
+          const strengths = guilford
+            ? Object.entries(guilford)
+                .sort(([, a], [, b]) => b - a)
+                .slice(0, 3)
+                .map(([name]) => name)
+            : [];
+          return getCreativeProjects({
+            orientation:
+              (creativePayload.creative_orientation as string) ?? "Explorer",
+            strengths,
+            medium_affinities: Array.isArray(creativePayload.medium_affinities)
+              ? (creativePayload.medium_affinities as string[])
+              : [],
             creative_style: style.data?.creative_style,
-          })
+          });
+        }
       : null,
     [JSON.stringify(creativePayload), style.data?.creative_style],
   );
@@ -244,7 +260,7 @@ export default function CreativePage() {
                           </h3>
                           <p className="font-body text-sm text-text/50">
                             Overall Score:{" "}
-                            {Math.round(style.data.overall_score * 100)}%
+                            {Math.round(style.data.overall_score)}%
                           </p>
                         </div>
                       </div>
@@ -257,13 +273,26 @@ export default function CreativePage() {
                               Guilford Scores
                             </h4>
                             {Object.entries(style.data.guilford_summary).map(
-                              ([key, val]) => (
-                                <ScoreBar
-                                  key={key}
-                                  label={key}
-                                  value={Number(val) || 0}
-                                />
-                              ),
+                              ([key, val]) => {
+                                const entry = val as
+                                  | { score?: number; label?: string }
+                                  | number;
+                                const score =
+                                  typeof entry === "number"
+                                    ? entry
+                                    : (entry?.score ?? 0);
+                                return (
+                                  <ScoreBar
+                                    key={key}
+                                    label={
+                                      typeof entry === "object" && entry?.label
+                                        ? entry.label
+                                        : key
+                                    }
+                                    value={score / 100}
+                                  />
+                                );
+                              },
                             )}
                           </div>
                         )}
@@ -521,7 +550,7 @@ export default function CreativePage() {
           <MotionReveal delay={0.1}>
             <div className="text-center">
               <a
-                href="/discover/intake"
+                href="/discover/assessment"
                 className="inline-flex items-center gap-2 px-6 py-3 min-h-[44px] bg-gradient-to-r from-secondary-dark via-secondary to-secondary-light text-white font-body font-medium rounded-xl text-sm transition-all duration-300 hover:shadow-[0_0_20px_rgba(123,45,142,0.3)] hover:scale-[1.02] active:scale-100"
               >
                 {hasIntake
