@@ -93,7 +93,7 @@ const PROJECT_TYPE_DEFAULTS = [
 function ScoreBar({ label, value }: { label: string; value: number }) {
   return (
     <div className="flex items-center gap-3">
-      <span className="font-body text-sm text-text/60 w-28 text-right">
+      <span className="font-body text-sm text-text/80 w-28 text-right capitalize">
         {label}
       </span>
       <div className="flex-1 h-2 bg-surface rounded-full overflow-hidden">
@@ -260,7 +260,7 @@ export default function CreativePage() {
                           </h3>
                           <p className="font-body text-sm text-text/50">
                             Overall Score:{" "}
-                            {Math.round(style.data.overall_score * 100)}%
+                            {Math.round(style.data.overall_score)}%
                           </p>
                         </div>
                       </div>
@@ -273,13 +273,26 @@ export default function CreativePage() {
                               Guilford Scores
                             </h4>
                             {Object.entries(style.data.guilford_summary).map(
-                              ([key, val]) => (
-                                <ScoreBar
-                                  key={key}
-                                  label={key}
-                                  value={Number(val) || 0}
-                                />
-                              ),
+                              ([key, val]) => {
+                                const entry = val as
+                                  | { score?: number; label?: string }
+                                  | number;
+                                const score =
+                                  typeof entry === "number"
+                                    ? entry
+                                    : (entry?.score ?? 0);
+                                return (
+                                  <ScoreBar
+                                    key={key}
+                                    label={
+                                      typeof entry === "object" && entry?.label
+                                        ? entry.label
+                                        : key
+                                    }
+                                    value={score / 100}
+                                  />
+                                );
+                              },
                             )}
                           </div>
                         )}
