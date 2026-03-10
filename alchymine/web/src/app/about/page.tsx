@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import {
   MotionReveal,
@@ -14,6 +15,7 @@ import {
   CheckIcon,
   EyeIcon,
 } from "@/components/shared/Icons";
+import FeedbackForm from "@/components/shared/FeedbackForm";
 
 const FIVE_SYSTEMS_DETAIL = [
   {
@@ -233,6 +235,21 @@ function EthicsIcon({ name, className }: { name: string; className?: string }) {
   if (name === "lock") return <LockIcon className={className} />;
   if (name === "eye") return <EyeIcon className={className} />;
   return null;
+}
+
+function FeedbackFormCTA() {
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <button
+        onClick={() => setOpen(true)}
+        className="inline-flex items-center gap-2 px-8 py-3.5 bg-gradient-to-r from-accent/80 via-accent to-accent/80 text-bg font-body font-medium rounded-xl text-base transition-all duration-300 hover:shadow-[0_0_40px_rgba(32,178,170,0.25)] hover:scale-[1.02] active:scale-[0.98]"
+      >
+        Share Your Feedback
+      </button>
+      <FeedbackForm isOpen={open} onClose={() => setOpen(false)} pageUrl="/about" />
+    </>
+  );
 }
 
 export default function AboutPage() {
@@ -632,6 +649,23 @@ export default function AboutPage() {
               </MotionStaggerItem>
             ))}
           </MotionStagger>
+        </div>
+      </section>
+
+      {/* ── Beta Feedback CTA ──────────────────────────────────────────────── */}
+      <section className="py-20 px-4 sm:px-6 relative">
+        <div className="absolute inset-0 bg-gradient-to-b from-transparent via-accent/[0.02] to-transparent pointer-events-none" />
+        <div className="max-w-xl mx-auto text-center relative">
+          <MotionReveal>
+            <h2 className="font-display text-2xl sm:text-3xl font-light text-gradient-gold mb-3">
+              Help Shape Alchymine
+            </h2>
+            <p className="text-text/40 font-body mb-8 leading-relaxed">
+              Found a bug? Have a feature idea? Just want to share how the
+              journey is going? Your feedback directly shapes what we build next.
+            </p>
+            <FeedbackFormCTA />
+          </MotionReveal>
         </div>
       </section>
 
