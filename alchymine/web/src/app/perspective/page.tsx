@@ -162,7 +162,14 @@ export default function PerspectivePage() {
 
   const keganPayload = useMemo((): Record<string, unknown> | null => {
     if (!perspectiveLayerData) return null;
-    return { ...perspectiveLayerData };
+    // KeganAssessRequest expects dimension scores (1-5).
+    // These are stored in the kegan_dimension_scores column.
+    const scores = perspectiveLayerData.kegan_dimension_scores as
+      | Record<string, number>
+      | null
+      | undefined;
+    if (!scores) return null;
+    return scores;
   }, [perspectiveLayerData]);
 
   const kegan = useApi<KeganAssessResponse>(
@@ -534,7 +541,7 @@ export default function PerspectivePage() {
           <MotionReveal delay={0.1}>
             <div className="text-center">
               <a
-                href="/discover/intake"
+                href="/discover/assessment"
                 className="inline-flex items-center gap-2 px-6 py-3 min-h-[44px] bg-gradient-to-r from-accent-dark via-accent to-accent-light text-bg font-body font-medium rounded-xl text-sm transition-all duration-300 hover:shadow-[0_0_20px_rgba(32,178,170,0.3)] hover:scale-[1.02] active:scale-100"
               >
                 {hasIntake

@@ -697,9 +697,21 @@ export default function WealthPage() {
   // Build the payload the wealth endpoints expect from stored profile data
   const wealthPayload = useMemo((): Record<string, unknown> | null => {
     if (!identityLayerData && !wealthLayerData) return null;
+
+    // Extract top-level fields the wealth endpoints require from nested
+    // identity layer sub-objects (numerology.life_path, archetype.primary).
+    const numerology = identityLayerData?.numerology as
+      | Record<string, unknown>
+      | undefined;
+    const archetype = identityLayerData?.archetype as
+      | Record<string, unknown>
+      | undefined;
+
     return {
-      ...(identityLayerData ?? {}),
-      ...(wealthLayerData ?? {}),
+      life_path: numerology?.life_path,
+      archetype_primary: archetype?.primary,
+      risk_tolerance: wealthLayerData?.risk_tolerance ?? "moderate",
+      wealth_context: wealthLayerData?.wealth_context ?? null,
       intentions: intakeIntentions,
     };
   }, [identityLayerData, wealthLayerData, intakeIntentions]);
@@ -1156,7 +1168,7 @@ export default function WealthPage() {
             {/* ── CTA ─────────────────────────────────────────────────── */}
             <MotionReveal delay={0.05}>
               <div className="text-center">
-                <Link href="/discover/intake">
+                <Link href="/discover/assessment">
                   <Button variant="primary" size="lg">
                     {hasIntake
                       ? "Update Your Wealth Profile"
