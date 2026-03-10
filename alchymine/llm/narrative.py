@@ -210,6 +210,23 @@ def flatten_engine_data(data: dict[str, Any]) -> dict[str, Any]:
                 lines.append(f"- **{label}**: {v}")
         flat["decision_section"] = "\n".join(lines) if lines else "(no decision provided)"
 
+    # Healing: recommended_modalities_section → {modalities_section}
+    if "recommended_modalities_section" in flat:
+        flat["modalities_section"] = flat["recommended_modalities_section"]
+
+    # Healing: crisis_response dict → {crisis_section}
+    cr = data.get("crisis_response")
+    if isinstance(cr, dict):
+        severity = cr.get("severity", "unknown")
+        resources = cr.get("resources", [])
+        lines = [f"- Severity: {severity}"]
+        for r in resources:
+            if isinstance(r, dict):
+                lines.append(f"- {r.get('name', '')}: {r.get('contact', '')}")
+        flat["crisis_section"] = "\n  ".join(lines)
+    elif data.get("crisis_flag") is False:
+        flat["crisis_section"] = "No crisis indicators detected."
+
     return flat
 
 

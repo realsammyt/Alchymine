@@ -36,7 +36,8 @@ ENV PATH="/opt/venv/bin:$PATH"
 RUN pip install --no-cache-dir --upgrade pip setuptools wheel
 
 # Install all project dependencies from pyproject.toml (single source of truth)
-RUN pip install --no-cache-dir . && \
+# Include [pdf] extra for Playwright-based PDF generation
+RUN pip install --no-cache-dir ".[pdf]" && \
     pip install --no-cache-dir watchdog
 
 # ─── Stage 2: Runtime ─────────────────────────────────────────────────────
@@ -48,15 +49,22 @@ LABEL description="Alchymine Worker - Celery background task processor"
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1
 
-# Install runtime-only dependencies
+# Install runtime-only dependencies + Playwright/Chromium system libraries
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     tini \
+    # Chromium dependencies for Playwright PDF rendering
+    libnss3 libatk1.0-0 libatk-bridge2.0-0 libcups2 libdrm2 \
+    libxkbcommon0 libxcomposite1 libxdamage1 libxrandr2 libgbm1 \
+    libpango-1.0-0 libcairo2 libasound2 libxshmfence1 \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy virtual environment from builder
 COPY --from=builder /opt/venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
+
+# Install Chromium browser for PDF generation
+RUN playwright install chromium
 
 # Set up Swiss Ephemeris data directory
 RUN mkdir -p /usr/share/swisseph
