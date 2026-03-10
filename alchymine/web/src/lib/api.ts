@@ -1192,4 +1192,83 @@ export async function adminDeleteWaitlistEntry(entryId: number): Promise<void> {
   });
 }
 
+// ─── Feedback types ───────────────────────────────────────────────
+
+export interface FeedbackPayload {
+  category?: string;
+  message: string;
+  email?: string;
+  page_url?: string;
+}
+
+export interface FeedbackItem {
+  id: number;
+  category: string;
+  message: string;
+  email: string | null;
+  page_url: string | null;
+  status: "new" | "reviewed" | "resolved" | "dismissed";
+  admin_note: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface PaginatedFeedback {
+  items: FeedbackItem[];
+  total: number;
+  page: number;
+  per_page: number;
+}
+
+// ─── Feedback API functions ───────────────────────────────────────
+
+export async function submitFeedback(
+  payload: FeedbackPayload,
+): Promise<{ id: number; message: string }> {
+  const res = await fetch(`${BASE}/feedback`, {
+    method: "POST",
+    credentials: "include",
+    headers: {
+      "Content-Type": "application/json",
+      ...getLegacyAuthHeaders(),
+    },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({ detail: "Unknown error" }));
+    throw new ApiError(res.status, body.detail || `HTTP ${res.status}`);
+  }
+  return res.json();
+}
+
+export async function listAdminFeedback(opts?: {
+  page?: number;
+  perPage?: number;
+  status?: string;
+  category?: string;
+}): Promise<PaginatedFeedback> {
+  const params = new URLSearchParams();
+  if (opts?.page) params.set("page", String(opts.page));
+  if (opts?.perPage) params.set("per_page", String(opts.perPage));
+  if (opts?.status) params.set("status", opts.status);
+  if (opts?.category) params.set("category", opts.category);
+  const query = params.toString();
+  return request<PaginatedFeedback>(
+    `${BASE}/admin/feedback${query ? `?${query}` : ""}`,
+  );
+}
+
+export async function patchFeedback(
+  feedbackId: number,
+  data: {
+    status?: FeedbackItem["status"];
+    admin_note?: string;
+  },
+): Promise<FeedbackItem> {
+  return request<FeedbackItem>(`${BASE}/admin/feedback/${feedbackId}`, {
+    method: "PATCH",
+    body: JSON.stringify(data),
+  });
+}
+
 export { ApiError };
