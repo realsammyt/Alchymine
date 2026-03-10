@@ -249,7 +249,7 @@ export default function AboutPage() {
           <MotionReveal delay={0.1} y={16}>
             <div className="inline-flex items-center gap-2.5 px-4 py-2 rounded-full border border-primary/15 bg-primary/[0.04] text-xs font-body font-medium text-primary/80 tracking-wider uppercase mb-8">
               <span className="w-1.5 h-1.5 bg-primary/60 rounded-full animate-pulse" />
-              Open-Source Personal Transformation OS
+              Beta &middot; Open-Source Personal Transformation OS
             </div>
           </MotionReveal>
 
@@ -274,6 +274,19 @@ export default function AboutPage() {
               transparent methodology, deterministic math, and ethics-first
               design.
             </p>
+          </MotionReveal>
+
+          <MotionReveal delay={0.5} y={10}>
+            <div className="mt-8 max-w-xl mx-auto card-surface-elevated px-6 py-5 text-center">
+              <p className="font-display text-sm font-medium text-primary/80 mb-1.5">
+                Alchymine is in beta — and evolving fast
+              </p>
+              <p className="text-xs text-text/40 font-body leading-relaxed">
+                New features ship every week across all five systems. Your
+                feedback is incredibly valuable and directly shapes what we
+                build next. Found a bug? Have an idea? We want to hear it.
+              </p>
+            </div>
           </MotionReveal>
 
           <MotionReveal delay={0.6} y={10}>
