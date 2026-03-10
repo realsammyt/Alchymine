@@ -20,6 +20,7 @@ import { useApi, useIntake, useReportStatus } from "@/lib/useApi";
 import { useAuth } from "@/lib/AuthContext";
 import EvidenceBadge from "@/components/shared/EvidenceBadge";
 import GeneratingState from "@/components/shared/GeneratingState";
+import JournalCTA from "@/components/shared/JournalCTA";
 
 const KEGAN_STAGES = [
   {
@@ -501,6 +502,16 @@ export default function PerspectivePage() {
                 ))}
               </MotionStagger>
             </section>
+          </MotionReveal>
+
+          <MotionReveal delay={0.05}>
+            <div className="mb-12">
+              <JournalCTA
+                templateId="perspective-scenario-planning"
+                heading="Reflect on your scenario analysis"
+                description="Journal about the scenarios you modeled and what early warning signs to watch for."
+              />
+            </div>
           </MotionReveal>
 
           {/* Connections — healing-perspective bridge */}

@@ -19,6 +19,7 @@ import { useApi, useIntake, useReportStatus } from "@/lib/useApi";
 import { useAuth } from "@/lib/AuthContext";
 import EvidenceBadge from "@/components/shared/EvidenceBadge";
 import GeneratingState from "@/components/shared/GeneratingState";
+import JournalCTA from "@/components/shared/JournalCTA";
 
 const NUMEROLOGY_NUMBERS = [
   {
@@ -318,6 +319,16 @@ export default function IntelligencePage() {
           </MotionReveal>
         )}
 
+        <MotionReveal delay={0.1}>
+          <div className="mb-12">
+            <JournalCTA
+              templateId="intelligence-natal-chart"
+              heading="Reflect on your personal blueprint"
+              description="Journal about which numbers and signs resonate with your lived experience."
+            />
+          </div>
+        </MotionReveal>
+
         {/* Numerology Education Section */}
         <MotionReveal delay={0.2}>
           <section className="mb-12" aria-labelledby="numerology-heading">
@@ -476,9 +487,7 @@ export default function IntelligencePage() {
                             <div className="flex-1 h-2 bg-bg rounded-full overflow-hidden">
                               <div
                                 className={`h-full rounded-full ${
-                                  pct >= 0
-                                    ? "bg-accent/60"
-                                    : "bg-secondary/60"
+                                  pct >= 0 ? "bg-accent/60" : "bg-secondary/60"
                                 }`}
                                 style={{
                                   width: `${Math.abs(pct)}%`,
