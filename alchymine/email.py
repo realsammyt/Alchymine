@@ -60,6 +60,71 @@ async def send_password_reset_email(to: str, reset_token: str) -> bool:
         return False
 
 
+async def send_feedback_notification_email(
+    *,
+    category: str,
+    message: str,
+    email: str | None,
+    entry_id: int,
+) -> bool:
+    """Send a feedback notification email to the admin team.
+
+    Called after a user submits feedback via ``POST /api/v1/feedback``.
+    Returns ``True`` on successful delivery, ``False`` otherwise.
+    Never raises — failures are logged so the calling endpoint stays fast.
+    """
+    settings = get_settings()
+
+    if not settings.resend_api_key:
+        logger.warning(
+            "RESEND_API_KEY not set — skipping feedback notification for entry id=%s",
+            entry_id,
+        )
+        return False
+
+    admin_panel_url = f"{settings.frontend_url}/admin/feedback"
+    sender_line = (
+        f"<p><strong>From:</strong> {email}</p>"
+        if email
+        else "<p><strong>From:</strong> <em>anonymous</em></p>"
+    )
+
+    try:
+        resend.api_key = settings.resend_api_key
+
+        resend.Emails.send(
+            {
+                "from": settings.email_from,
+                "to": [settings.email_from],
+                "subject": f"[Alchymine Feedback] New {category} submission (#{entry_id})",
+                "html": (
+                    "<div style='font-family: sans-serif; max-width: 600px; margin: 0 auto;'>"
+                    "<h2 style='color: #1a1a2e;'>New Feedback Received</h2>"
+                    f"<p><strong>Category:</strong> {category}</p>"
+                    f"{sender_line}"
+                    "<p><strong>Message:</strong></p>"
+                    f"<blockquote style='border-left: 4px solid #1a1a2e; margin: 0; "
+                    f"padding: 12px 16px; background: #f4f4f8; border-radius: 0 6px 6px 0;'>"
+                    f"{message}"
+                    "</blockquote>"
+                    "<p style='margin-top: 24px;'>"
+                    f"<a href='{admin_panel_url}' style='display: inline-block; "
+                    "padding: 10px 20px; background: #1a1a2e; color: #ffffff; "
+                    "text-decoration: none; border-radius: 6px;'>"
+                    "View in Admin Panel</a></p>"
+                    "<p style='color: #999; font-size: 12px; margin-top: 24px;'>"
+                    f"Entry #{entry_id} — Alchymine Feedback System</p>"
+                    "</div>"
+                ),
+            }
+        )
+        logger.info("Feedback notification sent to admin for entry id=%s", entry_id)
+        return True
+    except Exception:
+        logger.exception("Failed to send feedback notification email for entry id=%s", entry_id)
+        return False
+
+
 async def send_invitation_email(
     to: str,
     invite_code: str,
