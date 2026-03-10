@@ -28,6 +28,7 @@ import ProtectedRoute from "@/components/shared/ProtectedRoute";
 import { DEMO_ACCOUNT_EMAIL } from "@/lib/constants";
 import EvidenceBadge from "@/components/shared/EvidenceBadge";
 import GeneratingState from "@/components/shared/GeneratingState";
+import JournalCTA from "@/components/shared/JournalCTA";
 
 // ── Constants ─────────────────────────────────────────────────────
 
@@ -723,6 +724,16 @@ export default function HealingPage() {
               </section>
             </MotionReveal>
           )}
+
+          <MotionReveal>
+            <div className="mb-12">
+              <JournalCTA
+                templateId="healing-modality-experience"
+                heading="Reflect on your healing journey"
+                description="Journal about which modality draws you in and what your first session goal is."
+              />
+            </div>
+          </MotionReveal>
 
           {/* Breathwork Timer */}
           <MotionReveal>

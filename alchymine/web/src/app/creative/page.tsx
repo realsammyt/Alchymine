@@ -23,6 +23,7 @@ import { useAuth } from "@/lib/AuthContext";
 import CreativeProjects from "@/components/creative/CreativeProjects";
 import EvidenceBadge from "@/components/shared/EvidenceBadge";
 import GeneratingState from "@/components/shared/GeneratingState";
+import JournalCTA from "@/components/shared/JournalCTA";
 
 const CREATIVE_DIMENSIONS = [
   {
@@ -510,6 +511,16 @@ export default function CreativePage() {
                 />
               )}
             </section>
+          </MotionReveal>
+
+          <MotionReveal delay={0.05}>
+            <div className="mb-12">
+              <JournalCTA
+                templateId="creative-style-fingerprint"
+                heading="Reflect on your creative identity"
+                description="Journal about your style fingerprint and what creative project you'll start."
+              />
+            </div>
           </MotionReveal>
 
           {/* Connections — shadow-block bridge */}

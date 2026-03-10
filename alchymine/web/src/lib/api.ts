@@ -668,6 +668,22 @@ export async function getJournalStats(
   return request<JournalStatsResponse>(`${BASE}/journal/stats/${userId}`);
 }
 
+export async function updateJournalEntry(
+  entryId: string,
+  data: Record<string, unknown>,
+): Promise<JournalEntry> {
+  return request<JournalEntry>(`${BASE}/journal/${entryId}`, {
+    method: "PUT",
+    body: JSON.stringify(data),
+  });
+}
+
+export async function deleteJournalEntry(entryId: string): Promise<void> {
+  return request<void>(`${BASE}/journal/${entryId}`, {
+    method: "DELETE",
+  });
+}
+
 // ─── Outcomes ─────────────────────────────────────────────────────
 
 export interface SystemProgress {

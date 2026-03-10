@@ -31,6 +31,7 @@ import DebtCalculator, {
 import WealthPlanTracker from "@/components/wealth/WealthPlanTracker";
 import EvidenceBadge from "@/components/shared/EvidenceBadge";
 import GeneratingState from "@/components/shared/GeneratingState";
+import JournalCTA from "@/components/shared/JournalCTA";
 
 // ── Constants ─────────────────────────────────────────────────────
 
@@ -1112,6 +1113,16 @@ export default function WealthPage() {
                 </MotionReveal>
               </section>
             )}
+
+            <MotionReveal delay={0.05}>
+              <div className="mb-12">
+                <JournalCTA
+                  templateId="wealth-archetype-discovery"
+                  heading="Reflect on your wealth profile"
+                  description="Journal about your archetype, wealth levers, and what actions you'll take."
+                />
+              </div>
+            </MotionReveal>
 
             {/* ── Methodology Panel ────────────────────────────────────── */}
             <section className="mb-12">
