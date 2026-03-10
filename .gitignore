@@ -167,3 +167,4 @@ scripts/setup-resend-key.sh
 .claude/
 .ignore/
 .worktrees/
+.superpowers/
