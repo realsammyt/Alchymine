@@ -1045,9 +1045,14 @@ export default function ReportPage() {
               onClick={async () => {
                 try {
                   const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "";
+                  const token = localStorage.getItem("access_token");
                   const response = await fetch(
                     `${apiUrl}/api/v1/reports/${reportId}/pdf`,
-                    { credentials: "include" },
+                    {
+                      headers: token
+                        ? { Authorization: `Bearer ${token}` }
+                        : {},
+                    },
                   );
                   if (!response.ok) {
                     alert(
