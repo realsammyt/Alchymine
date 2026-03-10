@@ -150,12 +150,28 @@ export default function CreativePage() {
   );
 
   const projects = useApi<ProjectListResponse>(
-    creativePayload
-      ? () =>
-          getCreativeProjects({
-            ...creativePayload,
+    creativePayload && style.data
+      ? () => {
+          // ProjectSuggestRequest requires: orientation (str), strengths (list[str])
+          const guilford = creativePayload.guilford_scores as
+            | Record<string, number>
+            | undefined;
+          const strengths = guilford
+            ? Object.entries(guilford)
+                .sort(([, a], [, b]) => b - a)
+                .slice(0, 3)
+                .map(([name]) => name)
+            : [];
+          return getCreativeProjects({
+            orientation:
+              (creativePayload.creative_orientation as string) ?? "Explorer",
+            strengths,
+            medium_affinities: Array.isArray(creativePayload.medium_affinities)
+              ? (creativePayload.medium_affinities as string[])
+              : [],
             creative_style: style.data?.creative_style,
-          })
+          });
+        }
       : null,
     [JSON.stringify(creativePayload), style.data?.creative_style],
   );
@@ -521,7 +537,7 @@ export default function CreativePage() {
           <MotionReveal delay={0.1}>
             <div className="text-center">
               <a
-                href="/discover/intake"
+                href="/discover/assessment"
                 className="inline-flex items-center gap-2 px-6 py-3 min-h-[44px] bg-gradient-to-r from-secondary-dark via-secondary to-secondary-light text-white font-body font-medium rounded-xl text-sm transition-all duration-300 hover:shadow-[0_0_20px_rgba(123,45,142,0.3)] hover:scale-[1.02] active:scale-100"
               >
                 {hasIntake
