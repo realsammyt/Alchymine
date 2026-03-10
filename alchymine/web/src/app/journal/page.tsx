@@ -5,6 +5,8 @@ import {
   createJournalEntry,
   getJournalEntries,
   getJournalStats,
+  updateJournalEntry,
+  deleteJournalEntry,
   JournalEntry,
   JournalStatsResponse,
 } from "@/lib/api";
@@ -146,6 +148,18 @@ export default function JournalPage() {
   // Selected entry detail
   const [selectedEntry, setSelectedEntry] = useState<JournalEntry | null>(null);
 
+  // Edit mode
+  const [editing, setEditing] = useState(false);
+  const [editTitle, setEditTitle] = useState("");
+  const [editContent, setEditContent] = useState("");
+  const [editSystem, setEditSystem] = useState("");
+  const [editType, setEditType] = useState("");
+  const [editMood, setEditMood] = useState<number>(5);
+  const [editTags, setEditTags] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+
   // Modal close button ref for focus management
   const modalCloseRef = useRef<HTMLButtonElement>(null);
 
@@ -185,10 +199,25 @@ export default function JournalPage() {
   useEffect(() => {
     if (!selectedEntry) return;
     const handleKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setSelectedEntry(null);
+      if (e.key === "Escape") {
+        if (showDeleteConfirm) {
+          setShowDeleteConfirm(false);
+        } else if (editing) {
+          setEditing(false);
+        } else {
+          setSelectedEntry(null);
+        }
+      }
     };
     document.addEventListener("keydown", handleKey);
     return () => document.removeEventListener("keydown", handleKey);
+  }, [selectedEntry, editing, showDeleteConfirm]);
+
+  useEffect(() => {
+    if (!selectedEntry) {
+      setEditing(false);
+      setShowDeleteConfirm(false);
+    }
   }, [selectedEntry]);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -219,6 +248,57 @@ export default function JournalPage() {
       setError(err instanceof Error ? err.message : "Failed to create entry");
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const startEdit = (entry: JournalEntry) => {
+    setEditTitle(entry.title);
+    setEditContent(entry.content);
+    setEditSystem(entry.system);
+    setEditType(entry.entry_type);
+    setEditMood(entry.mood_score ?? 5);
+    setEditTags(entry.tags.join(", "));
+    setEditing(true);
+  };
+
+  const handleSaveEdit = async () => {
+    if (!selectedEntry || !editTitle.trim() || !editContent.trim()) return;
+    setSaving(true);
+    try {
+      const updated = await updateJournalEntry(selectedEntry.id, {
+        title: editTitle.trim(),
+        content: editContent.trim(),
+        system: editSystem,
+        entry_type: editType,
+        mood_score: editMood,
+        tags: editTags
+          .split(",")
+          .map((t) => t.trim())
+          .filter(Boolean),
+      });
+      setSelectedEntry(updated);
+      setEditing(false);
+      await fetchEntries();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to update entry");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!selectedEntry) return;
+    setDeleting(true);
+    try {
+      await deleteJournalEntry(selectedEntry.id);
+      setSelectedEntry(null);
+      setShowDeleteConfirm(false);
+      setEditing(false);
+      await fetchEntries();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to delete entry");
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -773,105 +853,349 @@ export default function JournalPage() {
             >
               {/* Modal header */}
               <div className="flex items-start justify-between gap-4 px-6 pt-6 pb-4 border-b border-white/[0.06]">
-                <h2 className="font-display text-xl font-medium text-text leading-snug">
-                  {selectedEntry.title}
-                </h2>
-                <button
-                  ref={modalCloseRef}
-                  onClick={() => setSelectedEntry(null)}
-                  aria-label="Close entry"
-                  className="touch-target flex-shrink-0 flex items-center justify-center w-8 h-8 rounded-lg text-text/40 hover:text-text/70 hover:bg-white/[0.05] transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
-                >
-                  <svg
-                    className="w-5 h-5"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    aria-hidden="true"
+                {editing ? (
+                  <input
+                    type="text"
+                    value={editTitle}
+                    onChange={(e) => setEditTitle(e.target.value)}
+                    className={`${inputClass} font-display text-xl font-medium`}
+                    aria-label="Entry title"
+                  />
+                ) : (
+                  <h2 className="font-display text-xl font-medium text-text leading-snug">
+                    {selectedEntry.title}
+                  </h2>
+                )}
+                <div className="flex items-center gap-1 flex-shrink-0">
+                  {!editing && (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => startEdit(selectedEntry)}
+                        aria-label="Edit entry"
+                        className="touch-target flex items-center justify-center w-8 h-8 rounded-lg text-text/40 hover:text-accent hover:bg-white/[0.05] transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+                      >
+                        <svg
+                          className="w-4 h-4"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          aria-hidden="true"
+                        >
+                          <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                          <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+                        </svg>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setShowDeleteConfirm(true)}
+                        aria-label="Delete entry"
+                        className="touch-target flex items-center justify-center w-8 h-8 rounded-lg text-text/40 hover:text-red-400 hover:bg-white/[0.05] transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+                      >
+                        <svg
+                          className="w-4 h-4"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          aria-hidden="true"
+                        >
+                          <polyline points="3 6 5 6 21 6" />
+                          <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+                          <path d="M10 11v6" />
+                          <path d="M14 11v6" />
+                          <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
+                        </svg>
+                      </button>
+                    </>
+                  )}
+                  <button
+                    ref={modalCloseRef}
+                    onClick={() => setSelectedEntry(null)}
+                    aria-label="Close entry"
+                    className="touch-target flex items-center justify-center w-8 h-8 rounded-lg text-text/40 hover:text-text/70 hover:bg-white/[0.05] transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
                   >
-                    <path d="M18 6 6 18" />
-                    <path d="m6 6 12 12" />
-                  </svg>
-                </button>
+                    <svg
+                      className="w-5 h-5"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      aria-hidden="true"
+                    >
+                      <path d="M18 6 6 18" />
+                      <path d="m6 6 12 12" />
+                    </svg>
+                  </button>
+                </div>
               </div>
 
               {/* Modal body */}
               <div className="px-6 py-5 space-y-5">
-                {/* Metadata badges */}
-                <div className="flex flex-wrap gap-2">
-                  {(() => {
-                    const colors = getSystemColors(selectedEntry.system);
-                    return (
-                      <span
-                        className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-body font-medium ${colors.badge}`}
-                      >
-                        <span
-                          className={`w-1.5 h-1.5 rounded-full ${colors.dot}`}
-                          aria-hidden="true"
+                {editing ? (
+                  <>
+                    {/* Edit form */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div>
+                        <label className={labelClass}>System</label>
+                        <div className="relative">
+                          <select
+                            value={editSystem}
+                            onChange={(e) => setEditSystem(e.target.value)}
+                            className={selectClass}
+                          >
+                            {SYSTEMS.map((s) => (
+                              <option key={s} value={s}>
+                                {formatLabel(s)}
+                              </option>
+                            ))}
+                          </select>
+                          <svg
+                            className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text/30 pointer-events-none"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            aria-hidden="true"
+                          >
+                            <path d="m6 9 6 6 6-6" />
+                          </svg>
+                        </div>
+                      </div>
+                      <div>
+                        <label className={labelClass}>Entry type</label>
+                        <div className="relative">
+                          <select
+                            value={editType}
+                            onChange={(e) => setEditType(e.target.value)}
+                            className={selectClass}
+                          >
+                            {ENTRY_TYPES.map((t) => (
+                              <option key={t} value={t}>
+                                {formatLabel(t)}
+                              </option>
+                            ))}
+                          </select>
+                          <svg
+                            className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text/30 pointer-events-none"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            aria-hidden="true"
+                          >
+                            <path d="m6 9 6 6 6-6" />
+                          </svg>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className={labelClass}>Your thoughts</label>
+                      <textarea
+                        value={editContent}
+                        onChange={(e) => setEditContent(e.target.value)}
+                        rows={8}
+                        className={`${inputClass} resize-y`}
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div>
+                        <label className={labelClass}>
+                          Mood score — {editMood}/10{" "}
+                          <span aria-label={moodLabel(editMood)}>
+                            {moodEmoji(editMood)}
+                          </span>
+                        </label>
+                        <input
+                          type="range"
+                          min={1}
+                          max={10}
+                          value={editMood}
+                          onChange={(e) => setEditMood(Number(e.target.value))}
+                          aria-valuemin={1}
+                          aria-valuemax={10}
+                          aria-valuenow={editMood}
+                          aria-valuetext={`${editMood} — ${moodLabel(editMood)}`}
+                          className="w-full accent-primary mt-2 h-1.5"
                         />
-                        {selectedEntry.system}
-                      </span>
-                    );
-                  })()}
+                      </div>
+                      <div>
+                        <label className={labelClass}>
+                          Tags{" "}
+                          <span className="text-text/25 font-normal">
+                            (comma-separated)
+                          </span>
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="growth, insight, clarity"
+                          value={editTags}
+                          onChange={(e) => setEditTags(e.target.value)}
+                          className={inputClass}
+                        />
+                      </div>
+                    </div>
 
-                  <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-body font-medium bg-white/[0.05] text-text/40">
-                    {selectedEntry.entry_type}
-                  </span>
-
-                  {selectedEntry.mood_score !== null && (
-                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-body font-medium bg-accent/[0.08] text-accent/70">
-                      <span
-                        aria-label={`Mood: ${moodLabel(selectedEntry.mood_score)}`}
+                    <div className="flex items-center gap-3 pt-1">
+                      <button
+                        type="button"
+                        onClick={handleSaveEdit}
+                        disabled={saving}
+                        className="touch-target inline-flex items-center gap-2 px-6 py-2.5 bg-gradient-to-r from-primary-dark via-primary to-primary-light text-bg font-body font-medium text-sm rounded-xl transition-all duration-300 hover:shadow-[0_0_30px_rgba(218,165,32,0.25)] hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none"
                       >
-                        {moodEmoji(selectedEntry.mood_score)}
-                      </span>
-                      <span>
-                        {selectedEntry.mood_score}/10 —{" "}
-                        {moodLabel(selectedEntry.mood_score)}
-                      </span>
-                    </span>
-                  )}
-                </div>
-
-                {/* Entry content */}
-                <p className="text-sm font-body text-text/60 leading-[1.8] whitespace-pre-wrap">
-                  {selectedEntry.content}
-                </p>
-
-                {/* Tags */}
-                {selectedEntry.tags.length > 0 && (
-                  <div className="flex flex-wrap gap-1.5">
-                    {selectedEntry.tags.map((tag) => (
-                      <span
-                        key={tag}
-                        className="inline-flex items-center px-2 py-0.5 rounded-full text-[0.65rem] font-body font-medium bg-white/[0.03] border border-white/[0.06] text-text/30"
+                        {saving ? (
+                          <>
+                            <span
+                              className="w-4 h-4 border-2 border-bg/30 border-t-bg rounded-full animate-spin"
+                              aria-hidden="true"
+                            />
+                            Saving…
+                          </>
+                        ) : (
+                          <>
+                            <svg
+                              className="w-4 h-4"
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth="2"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              aria-hidden="true"
+                            >
+                              <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" />
+                              <polyline points="17 21 17 13 7 13 7 21" />
+                              <polyline points="7 3 7 8 15 8" />
+                            </svg>
+                            Save Changes
+                          </>
+                        )}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setEditing(false)}
+                        className="touch-target px-5 py-2.5 border border-white/[0.08] text-text/40 font-body text-sm rounded-xl hover:bg-white/[0.03] hover:text-text/60 hover:border-white/[0.12] transition-all duration-300"
                       >
-                        #{tag}
+                        Cancel
+                      </button>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    {/* Read-only view */}
+                    {/* Metadata badges */}
+                    <div className="flex flex-wrap gap-2">
+                      {(() => {
+                        const colors = getSystemColors(selectedEntry.system);
+                        return (
+                          <span
+                            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-body font-medium ${colors.badge}`}
+                          >
+                            <span
+                              className={`w-1.5 h-1.5 rounded-full ${colors.dot}`}
+                              aria-hidden="true"
+                            />
+                            {formatLabel(selectedEntry.system)}
+                          </span>
+                        );
+                      })()}
+
+                      <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-body font-medium bg-white/[0.05] text-text/40">
+                        {formatLabel(selectedEntry.entry_type)}
                       </span>
-                    ))}
-                  </div>
+
+                      {selectedEntry.mood_score !== null && (
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-body font-medium bg-accent/[0.08] text-accent/70">
+                          <span
+                            aria-label={`Mood: ${moodLabel(selectedEntry.mood_score)}`}
+                          >
+                            {moodEmoji(selectedEntry.mood_score)}
+                          </span>
+                          <span>
+                            {selectedEntry.mood_score}/10 —{" "}
+                            {moodLabel(selectedEntry.mood_score)}
+                          </span>
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Entry content */}
+                    <p className="text-sm font-body text-text/60 leading-[1.8] whitespace-pre-wrap">
+                      {selectedEntry.content}
+                    </p>
+
+                    {/* Tags */}
+                    {selectedEntry.tags.length > 0 && (
+                      <div className="flex flex-wrap gap-1.5">
+                        {selectedEntry.tags.map((tag) => (
+                          <span
+                            key={tag}
+                            className="inline-flex items-center px-2 py-0.5 rounded-full text-[0.65rem] font-body font-medium bg-white/[0.03] border border-white/[0.06] text-text/30"
+                          >
+                            #{tag}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Timestamp */}
+                    <time
+                      dateTime={selectedEntry.created_at}
+                      className="block text-xs font-body text-text/20"
+                    >
+                      {new Date(selectedEntry.created_at).toLocaleString(
+                        undefined,
+                        {
+                          weekday: "long",
+                          year: "numeric",
+                          month: "long",
+                          day: "numeric",
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        },
+                      )}
+                    </time>
+                  </>
                 )}
 
-                {/* Timestamp */}
-                <time
-                  dateTime={selectedEntry.created_at}
-                  className="block text-xs font-body text-text/20"
-                >
-                  {new Date(selectedEntry.created_at).toLocaleString(
-                    undefined,
-                    {
-                      weekday: "long",
-                      year: "numeric",
-                      month: "long",
-                      day: "numeric",
-                      hour: "2-digit",
-                      minute: "2-digit",
-                    },
-                  )}
-                </time>
+                {/* Delete confirmation */}
+                {showDeleteConfirm && (
+                  <div className="card-surface border border-red-400/20 p-4 space-y-3">
+                    <p className="text-sm font-body text-text/60">
+                      Delete this journal entry? This cannot be undone.
+                    </p>
+                    <div className="flex items-center gap-3">
+                      <button
+                        type="button"
+                        onClick={handleDelete}
+                        disabled={deleting}
+                        className="touch-target inline-flex items-center gap-2 px-5 py-2 bg-red-500/20 border border-red-400/30 text-red-400 font-body text-sm rounded-xl hover:bg-red-500/30 transition-all duration-200 disabled:opacity-50"
+                      >
+                        {deleting ? "Deleting…" : "Delete"}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setShowDeleteConfirm(false)}
+                        className="touch-target px-5 py-2 border border-white/[0.08] text-text/40 font-body text-sm rounded-xl hover:bg-white/[0.03] transition-all duration-200"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           </div>
