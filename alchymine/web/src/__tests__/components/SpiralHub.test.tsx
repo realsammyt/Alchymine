@@ -1,6 +1,13 @@
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import SpiralHub from "@/components/spiral/SpiralHub";
 
+// Mock IntakeCTA — tested separately, avoid needing AuthProvider here
+jest.mock("@/components/shared/IntakeCTA", () => {
+  return function MockIntakeCTA() {
+    return null;
+  };
+});
+
 // Mock next/link
 jest.mock("next/link", () => {
   return function MockLink({
