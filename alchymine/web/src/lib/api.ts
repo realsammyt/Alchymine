@@ -959,6 +959,8 @@ export interface AnalyticsOverview {
   active_invite_codes: number;
   total_reports: number;
   total_journal_entries: number;
+  feedback_new: number;
+  feedback_total: number;
 }
 
 export interface DailyUserCount {
