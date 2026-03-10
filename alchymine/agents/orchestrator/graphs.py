@@ -526,6 +526,24 @@ def _healing_modality_matching(state: CoordinatorState) -> CoordinatorState:
     return {**state, "results": results, "errors": errors}
 
 
+def _healing_personality_context(state: CoordinatorState) -> CoordinatorState:
+    """Extract Big Five and attachment style from request_data for narrative template."""
+    results = dict(state.get("results", {}))
+    request_data = state.get("request_data", {})
+
+    big_five = request_data.get("big_five", {})
+    if big_five:
+        for trait in ("openness", "neuroticism"):
+            if trait in big_five:
+                results[trait] = big_five[trait]
+
+    attachment = request_data.get("attachment_style")
+    if attachment:
+        results["attachment_style"] = attachment
+
+    return {**state, "results": results}
+
+
 def _healing_status(state: CoordinatorState) -> CoordinatorState:
     """Compute final status for the Healing graph."""
     results = state.get("results", {})
@@ -1026,7 +1044,7 @@ def build_healing_graph(
 ) -> Any:  # noqa: ANN401
     """Build and compile the Healing system StateGraph.
 
-    Node order: init -> crisis_detection -> modality_matching -> status [-> quality_gate] -> END
+    Node order: init -> crisis_detection -> modality_matching -> personality_context -> status [-> quality_gate] -> END
 
     Parameters
     ----------
@@ -1042,6 +1060,7 @@ def build_healing_graph(
         ("init", _healing_init),
         ("crisis_detection", _healing_crisis_detection),
         ("modality_matching", _healing_modality_matching),
+        ("personality_context", _healing_personality_context),
         ("status", _healing_status),
     ]
     if include_quality_gate:
@@ -1056,7 +1075,8 @@ def build_healing_graph(
     graph.set_entry_point("init")
     graph.add_edge("init", "crisis_detection")
     graph.add_edge("crisis_detection", "modality_matching")
-    graph.add_edge("modality_matching", "status")
+    graph.add_edge("modality_matching", "personality_context")
+    graph.add_edge("personality_context", "status")
     if include_quality_gate:
         graph.add_edge("status", "quality_gate")
         graph.add_edge("quality_gate", END)
