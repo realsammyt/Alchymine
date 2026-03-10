@@ -44,6 +44,7 @@ from sqlalchemy.orm import selectinload
 
 from alchymine.db.models import (
     CreativeProfile,
+    FeedbackEntry,
     HealingProfile,
     IdentityProfile,
     IntakeData,
@@ -739,3 +740,140 @@ async def get_milestones(
     stmt = stmt.order_by(MilestoneDBRecord.created_at.desc())
     result = await session.execute(stmt)
     return list(result.scalars().all())
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# Feedback CRUD
+# ═══════════════════════════════════════════════════════════════════════
+
+
+async def create_feedback(
+    session: AsyncSession,
+    *,
+    message: str,
+    category: str = "general",
+    email: str | None = None,
+    user_id: str | None = None,
+    page_url: str | None = None,
+) -> FeedbackEntry:
+    """Insert a new feedback entry.
+
+    Parameters
+    ----------
+    session:
+        Active async session.
+    message:
+        The feedback message body.
+    category:
+        One of ``general | bug | feature | praise | other``.
+    email:
+        Optional contact email (for anonymous submissions).
+    user_id:
+        Optional FK to the ``users`` table.
+    page_url:
+        Optional URL of the page the user submitted feedback from.
+
+    Returns
+    -------
+    FeedbackEntry
+        The newly created row.
+    """
+    entry = FeedbackEntry(
+        message=message,
+        category=category,
+        email=email,
+        user_id=user_id,
+        page_url=page_url,
+    )
+    session.add(entry)
+    await session.flush()
+    await session.refresh(entry)
+    return entry
+
+
+async def list_feedback(
+    session: AsyncSession,
+    *,
+    status: str | None = None,
+    category: str | None = None,
+    offset: int = 0,
+    limit: int = 20,
+) -> tuple[list[FeedbackEntry], int]:
+    """Return a paginated list of feedback entries (most recent first).
+
+    Parameters
+    ----------
+    session:
+        Active async session.
+    status:
+        Optional filter by status (``new | reviewed | resolved | dismissed``).
+    category:
+        Optional filter by category.
+    offset:
+        Number of rows to skip.
+    limit:
+        Maximum number of rows to return.
+
+    Returns
+    -------
+    tuple[list[FeedbackEntry], int]
+        ``(entries, total_count)`` where *total_count* is the unfiltered
+        count matching the query (before pagination).
+    """
+    filters = []
+    if status is not None:
+        filters.append(FeedbackEntry.status == status)
+    if category is not None:
+        filters.append(FeedbackEntry.category == category)
+
+    count_stmt = select(func.count()).select_from(FeedbackEntry)
+    if filters:
+        count_stmt = count_stmt.where(*filters)
+    count_result = await session.execute(count_stmt)
+    total = count_result.scalar_one()
+
+    rows_stmt = (
+        select(FeedbackEntry).order_by(FeedbackEntry.created_at.desc()).offset(offset).limit(limit)
+    )
+    if filters:
+        rows_stmt = rows_stmt.where(*filters)
+    rows_result = await session.execute(rows_stmt)
+    entries = list(rows_result.scalars().all())
+    return entries, total
+
+
+async def update_feedback(
+    session: AsyncSession,
+    entry_id: int,
+    *,
+    status: str | None = None,
+    admin_note: str | None = None,
+) -> FeedbackEntry | None:
+    """Update status and/or admin note on a feedback entry.
+
+    Returns the updated ``FeedbackEntry``, or ``None`` if not found.
+    """
+    result = await session.execute(select(FeedbackEntry).where(FeedbackEntry.id == entry_id))
+    entry = result.scalar_one_or_none()
+    if entry is None:
+        return None
+    if status is not None:
+        entry.status = status
+    if admin_note is not None:
+        entry.admin_note = admin_note
+    await session.flush()
+    await session.refresh(entry)
+    return entry
+
+
+async def get_feedback_counts(session: AsyncSession) -> dict[str, int]:
+    """Return feedback counts grouped by status.
+
+    Returns a dict mapping each status value to its count, e.g.
+    ``{"new": 5, "reviewed": 2, "resolved": 10, "dismissed": 1}``.
+    Statuses with zero entries are omitted.
+    """
+    result = await session.execute(
+        select(FeedbackEntry.status, func.count()).group_by(FeedbackEntry.status)
+    )
+    return {row[0]: row[1] for row in result.all()}
