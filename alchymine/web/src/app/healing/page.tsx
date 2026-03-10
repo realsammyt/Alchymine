@@ -28,6 +28,7 @@ import ProtectedRoute from "@/components/shared/ProtectedRoute";
 import { DEMO_ACCOUNT_EMAIL } from "@/lib/constants";
 import EvidenceBadge from "@/components/shared/EvidenceBadge";
 import GeneratingState from "@/components/shared/GeneratingState";
+import IntakeCTA from "@/components/shared/IntakeCTA";
 import JournalCTA from "@/components/shared/JournalCTA";
 
 // ── Constants ─────────────────────────────────────────────────────
@@ -491,6 +492,7 @@ export default function HealingPage() {
         className="min-h-screen grain-overlay bg-atmosphere px-4 sm:px-6 lg:px-8 py-8"
       >
         <div className="max-w-5xl mx-auto">
+          <IntakeCTA />
           {/* Crisis Resources — ALWAYS visible, prominent, at top */}
           <MotionReveal duration={0.5}>
             <section className="mb-10" aria-labelledby="crisis-heading">
