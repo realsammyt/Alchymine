@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, Suspense } from "react";
+import { useSearchParams, useRouter } from "next/navigation";
 import {
   createJournalEntry,
   getJournalEntries,
@@ -17,6 +18,12 @@ import {
   MotionStagger,
   MotionStaggerItem,
 } from "@/components/shared/MotionReveal";
+import {
+  getTemplateById,
+  getTemplatesBySystem,
+  type AlchymineSystem,
+  type JournalTemplate,
+} from "@/lib/journalTemplates";
 
 const SYSTEMS = [
   "intelligence",
@@ -125,6 +132,14 @@ function formatLabel(value: string): string {
 }
 
 export default function JournalPage() {
+  return (
+    <Suspense fallback={null}>
+      <JournalPageInner />
+    </Suspense>
+  );
+}
+
+function JournalPageInner() {
   const { user } = useAuth();
   const [entries, setEntries] = useState<JournalEntry[]>([]);
   const [stats, setStats] = useState<JournalStatsResponse | null>(null);
@@ -159,6 +174,12 @@ export default function JournalPage() {
   const [saving, setSaving] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleting, setDeleting] = useState(false);
+
+  // Tabs: "entries" | "templates"
+  const [activeTab, setActiveTab] = useState<"entries" | "templates">("entries");
+
+  const searchParams = useSearchParams();
+  const router = useRouter();
 
   // Modal close button ref for focus management
   const modalCloseRef = useRef<HTMLButtonElement>(null);
@@ -219,6 +240,35 @@ export default function JournalPage() {
       setShowDeleteConfirm(false);
     }
   }, [selectedEntry]);
+
+  const applyTemplate = (template: JournalTemplate) => {
+    setFormTitle(template.title);
+    setFormContent(template.promptQuestions.map((q) => `## ${q}\n\n`).join("\n"));
+    setFormSystem(template.system);
+    setFormType(template.entryType);
+    setFormTags(template.tags.join(", "));
+    setFormMood(5);
+    setActiveTab("entries");
+    setShowForm(true);
+  };
+
+  // Handle ?template= query param
+  useEffect(() => {
+    const templateId = searchParams.get("template");
+    if (!templateId) return;
+
+    const template = getTemplateById(templateId);
+    // Clear the query param
+    router.replace("/journal", { scroll: false });
+
+    if (template) {
+      applyTemplate(template);
+    } else {
+      // Unknown template ID — just open blank create form
+      setActiveTab("entries");
+      setShowForm(true);
+    }
+  }, [searchParams, router]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -377,6 +427,34 @@ export default function JournalPage() {
 
             <hr className="rule-gold mb-8" />
 
+            {/* ── Tab switcher ──────────────────────────────────────── */}
+            <MotionReveal delay={0.08}>
+              <div className="flex gap-1 mb-8 p-1 bg-white/[0.02] border border-white/[0.06] rounded-xl w-fit">
+                <button
+                  onClick={() => setActiveTab("entries")}
+                  className={`px-4 py-2 text-sm font-body rounded-lg transition-all duration-200 ${
+                    activeTab === "entries"
+                      ? "bg-white/[0.08] text-text font-medium"
+                      : "text-text/40 hover:text-text/60 hover:bg-white/[0.03]"
+                  }`}
+                >
+                  Entries
+                </button>
+                <button
+                  onClick={() => setActiveTab("templates")}
+                  className={`px-4 py-2 text-sm font-body rounded-lg transition-all duration-200 ${
+                    activeTab === "templates"
+                      ? "bg-white/[0.08] text-text font-medium"
+                      : "text-text/40 hover:text-text/60 hover:bg-white/[0.03]"
+                  }`}
+                >
+                  Templates
+                </button>
+              </div>
+            </MotionReveal>
+
+            {activeTab === "entries" && (
+            <>
             {/* ── Stats bar ────────────────────────────────────────────── */}
             {stats && (
               <MotionReveal delay={0.1}>
@@ -810,10 +888,10 @@ export default function JournalPage() {
                               className={`w-1 h-1 rounded-full ${colors.dot}`}
                               aria-hidden="true"
                             />
-                            {entry.system}
+                            {formatLabel(entry.system)}
                           </span>
                           <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[0.65rem] font-body font-medium bg-white/[0.04] text-text/40">
-                            {entry.entry_type}
+                            {formatLabel(entry.entry_type)}
                           </span>
                           <time
                             dateTime={entry.created_at}
@@ -834,6 +912,63 @@ export default function JournalPage() {
                   );
                 })}
               </MotionStagger>
+            )}
+            </>
+            )}
+
+            {/* ── Templates tab ──────────────────────────────────────── */}
+            {activeTab === "templates" && (
+              <MotionReveal delay={0.1}>
+                <div className="space-y-8">
+                  {(
+                    [
+                      "perspective",
+                      "wealth",
+                      "healing",
+                      "intelligence",
+                      "creative",
+                    ] as AlchymineSystem[]
+                  ).map((system) => {
+                    const templates = getTemplatesBySystem(system);
+                    if (templates.length === 0) return null;
+                    const colors = getSystemColors(system);
+                    return (
+                      <section key={system}>
+                        <h3
+                          className={`font-display text-lg font-medium ${colors.text} mb-4 flex items-center gap-2`}
+                        >
+                          <span
+                            className={`w-2 h-2 rounded-full ${colors.dot}`}
+                            aria-hidden="true"
+                          />
+                          {formatLabel(system)}
+                        </h3>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          {templates.map((tmpl) => (
+                            <button
+                              key={tmpl.id}
+                              onClick={() => applyTemplate(tmpl)}
+                              className="group text-left card-surface px-5 py-4 hover:-translate-y-0.5 transition-all duration-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+                            >
+                              <h4 className="font-display text-sm font-medium text-text group-hover:text-text/90 mb-1">
+                                {tmpl.label}
+                              </h4>
+                              <p className="text-xs font-body text-text/35 leading-relaxed">
+                                {tmpl.description}
+                              </p>
+                              <div className="flex items-center gap-2 mt-3">
+                                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[0.6rem] font-body font-medium bg-white/[0.04] text-text/30">
+                                  {formatLabel(tmpl.entryType)}
+                                </span>
+                              </div>
+                            </button>
+                          ))}
+                        </div>
+                      </section>
+                    );
+                  })}
+                </div>
+              </MotionReveal>
             )}
           </div>
         </div>
