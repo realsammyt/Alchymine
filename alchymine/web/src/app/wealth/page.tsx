@@ -31,6 +31,7 @@ import DebtCalculator, {
 import WealthPlanTracker from "@/components/wealth/WealthPlanTracker";
 import EvidenceBadge from "@/components/shared/EvidenceBadge";
 import GeneratingState from "@/components/shared/GeneratingState";
+import IntakeCTA from "@/components/shared/IntakeCTA";
 import JournalCTA from "@/components/shared/JournalCTA";
 
 // ── Constants ─────────────────────────────────────────────────────
@@ -737,6 +738,7 @@ export default function WealthPage() {
       <div className="grain-overlay bg-atmosphere min-h-screen">
         <main id="main-content" className="px-4 sm:px-6 lg:px-8 py-8">
           <div className="max-w-5xl mx-auto">
+            <IntakeCTA />
             {/* ── Page Header ─────────────────────────────────────────── */}
             <header className="mb-10">
               <MotionReveal delay={0.05} y={16}>
