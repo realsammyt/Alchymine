@@ -95,6 +95,16 @@ export default function AdminDashboardPage() {
       value: overview.total_journal_entries,
       color: "text-rose-400",
     },
+    {
+      label: "New Feedback",
+      value: overview.feedback_new,
+      color: "text-cyan-400",
+    },
+    {
+      label: "Total Feedback",
+      value: overview.feedback_total,
+      color: "text-cyan-300",
+    },
   ];
 
   const maxCount =

@@ -28,7 +28,15 @@ from sqlalchemy.orm import selectinload
 
 from alchymine.api.auth import get_current_admin
 from alchymine.api.deps import get_db_session
-from alchymine.db.models import AdminAuditLog, InviteCode, JournalEntry, Report, User, WaitlistEntry
+from alchymine.db.models import (
+    AdminAuditLog,
+    FeedbackEntry,
+    InviteCode,
+    JournalEntry,
+    Report,
+    User,
+    WaitlistEntry,
+)
 from alchymine.email import send_invitation_email
 from alchymine.safety.audit import AuditEventType
 from alchymine.safety.audit import log_event as safety_log_event
@@ -200,6 +208,8 @@ class AnalyticsOverviewResponse(BaseModel):
     active_invite_codes: int
     total_reports: int
     total_journal_entries: int
+    feedback_new: int
+    feedback_total: int
 
 
 class DailyUserCount(BaseModel):
@@ -860,6 +870,11 @@ async def analytics_overview(
         await db.execute(select(func.count()).select_from(JournalEntry))
     ).scalar_one()
 
+    feedback_new_count = (
+        await db.execute(select(func.count(FeedbackEntry.id)).where(FeedbackEntry.status == "new"))
+    ).scalar_one()
+    feedback_total_count = (await db.execute(select(func.count(FeedbackEntry.id)))).scalar_one()
+
     return AnalyticsOverviewResponse(
         total_users=total_users,
         active_users=active_users,
@@ -871,6 +886,8 @@ async def analytics_overview(
         active_invite_codes=active_invite_codes,
         total_reports=total_reports,
         total_journal_entries=total_journal_entries,
+        feedback_new=feedback_new_count,
+        feedback_total=feedback_total_count,
     )
 
 

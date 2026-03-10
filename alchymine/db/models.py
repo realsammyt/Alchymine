@@ -596,3 +596,47 @@ class WaitlistEntry(Base):
 
     def __repr__(self) -> str:
         return f"<WaitlistEntry id={self.id!r} email={self.email!r} status={self.status!r}>"
+
+
+# --- FeedbackEntry ────────────────────────────────────────────────────
+
+
+class FeedbackEntry(Base):
+    """User-submitted feedback entry.
+
+    Status progresses: new -> reviewed -> resolved | dismissed.
+    """
+
+    __tablename__ = "feedback_entries"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[str | None] = mapped_column(
+        String(36), ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    email: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    category: Mapped[str] = mapped_column(
+        String(50),
+        default="general",
+        nullable=False,
+        index=True,
+        comment="general | bug | feature | praise | other",
+    )
+    message: Mapped[str] = mapped_column(Text, nullable=False)
+    status: Mapped[str] = mapped_column(
+        String(20),
+        default="new",
+        nullable=False,
+        index=True,
+        comment="new | reviewed | resolved | dismissed",
+    )
+    admin_note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    page_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), index=True
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+    def __repr__(self) -> str:
+        return f"<FeedbackEntry id={self.id!r} category={self.category!r} status={self.status!r}>"

@@ -3,6 +3,7 @@ import localFont from "next/font/local";
 import "./globals.css";
 import Navigation from "@/components/shared/Navigation";
 import ContentWrapper from "@/components/shared/ContentWrapper";
+import FeedbackButton from "@/components/shared/FeedbackButton";
 import { Providers } from "./providers";
 
 const cormorant = localFont({
@@ -81,6 +82,7 @@ export default function RootLayout({
           </a>
           <Navigation />
           <ContentWrapper>{children}</ContentWrapper>
+          <FeedbackButton />
         </Providers>
       </body>
     </html>
