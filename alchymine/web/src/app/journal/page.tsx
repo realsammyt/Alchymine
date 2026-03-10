@@ -30,6 +30,10 @@ const ENTRY_TYPES = [
   "gratitude",
   "intention",
   "freeform",
+  "practice-log",
+  "decision",
+  "assessment",
+  "progress",
 ];
 
 // Maps each system to a design-system color token set
@@ -109,6 +113,13 @@ function moodLabel(score: number | null): string {
   if (score >= 4) return "Neutral";
   if (score >= 2) return "Low";
   return "Difficult";
+}
+
+function formatLabel(value: string): string {
+  return value
+    .split("-")
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+    .join(" ");
 }
 
 export default function JournalPage() {
@@ -335,7 +346,7 @@ export default function JournalPage() {
                       <option value="">All Systems</option>
                       {SYSTEMS.map((s) => (
                         <option key={s} value={s}>
-                          {s.charAt(0).toUpperCase() + s.slice(1)}
+                          {formatLabel(s)}
                         </option>
                       ))}
                     </select>
@@ -367,7 +378,7 @@ export default function JournalPage() {
                       <option value="">All Types</option>
                       {ENTRY_TYPES.map((t) => (
                         <option key={t} value={t}>
-                          {t.charAt(0).toUpperCase() + t.slice(1)}
+                          {formatLabel(t)}
                         </option>
                       ))}
                     </select>
@@ -445,7 +456,7 @@ export default function JournalPage() {
                         >
                           {SYSTEMS.map((s) => (
                             <option key={s} value={s}>
-                              {s.charAt(0).toUpperCase() + s.slice(1)}
+                              {formatLabel(s)}
                             </option>
                           ))}
                         </select>
@@ -477,7 +488,7 @@ export default function JournalPage() {
                         >
                           {ENTRY_TYPES.map((t) => (
                             <option key={t} value={t}>
-                              {t.charAt(0).toUpperCase() + t.slice(1)}
+                              {formatLabel(t)}
                             </option>
                           ))}
                         </select>
