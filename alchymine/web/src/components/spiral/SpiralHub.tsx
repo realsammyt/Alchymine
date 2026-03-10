@@ -2,6 +2,7 @@
 
 import { useState, useCallback } from "react";
 import Link from "next/link";
+import IntakeCTA from "@/components/shared/IntakeCTA";
 
 // ── Types ─────────────────────────────────────────────────────────
 
@@ -380,6 +381,8 @@ export default function SpiralHub() {
 
   return (
     <div className="max-w-[820px] mx-auto px-4 py-8">
+      <IntakeCTA />
+
       {/* Header */}
       <div className="text-center mb-6">
         <p className="text-xs font-body font-medium text-primary/70 uppercase tracking-[0.15em] mb-3">

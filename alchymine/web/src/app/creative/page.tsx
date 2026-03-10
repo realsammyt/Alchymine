@@ -23,6 +23,7 @@ import { useAuth } from "@/lib/AuthContext";
 import CreativeProjects from "@/components/creative/CreativeProjects";
 import EvidenceBadge from "@/components/shared/EvidenceBadge";
 import GeneratingState from "@/components/shared/GeneratingState";
+import IntakeCTA from "@/components/shared/IntakeCTA";
 import JournalCTA from "@/components/shared/JournalCTA";
 
 const CREATIVE_DIMENSIONS = [
@@ -184,6 +185,7 @@ export default function CreativePage() {
         className="grain-overlay bg-atmosphere min-h-screen px-4 sm:px-6 lg:px-8 py-8"
       >
         <div className="max-w-5xl mx-auto">
+          <IntakeCTA />
           {/* Page Header */}
           <MotionReveal delay={0}>
             <header className="mb-10">

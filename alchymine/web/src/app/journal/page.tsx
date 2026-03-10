@@ -360,7 +360,7 @@ function JournalPageInner() {
     "w-full bg-white/[0.03] border border-white/[0.08] rounded-xl px-4 py-3 text-sm font-body text-text placeholder:text-text/25 focus:outline-none focus:border-accent/40 focus:ring-1 focus:ring-accent/20 focus:bg-white/[0.04] transition-all duration-300";
 
   const selectClass =
-    "w-full bg-white/[0.03] border border-white/[0.08] rounded-xl px-4 py-3 text-sm font-body text-text focus:outline-none focus:border-accent/40 focus:ring-1 focus:ring-accent/20 transition-all duration-300 appearance-none";
+    "w-full bg-white/[0.03] border border-white/[0.08] rounded-xl px-4 py-3 text-sm font-body text-text focus:outline-none focus:border-accent/40 focus:ring-1 focus:ring-accent/20 transition-all duration-300 appearance-none [&>option]:bg-[#141420] [&>option]:text-text";
 
   const labelClass = "block text-xs font-body font-medium text-text/50 mb-1.5";
 

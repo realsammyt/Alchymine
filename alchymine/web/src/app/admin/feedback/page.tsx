@@ -182,7 +182,7 @@ function DetailDrawer({
               onChange={(e) =>
                 setStatus(e.target.value as FeedbackItem["status"])
               }
-              className="w-full bg-bg border border-white/10 rounded-lg px-3 py-2 text-sm font-body text-text focus:outline-none focus:border-primary/40"
+              className="w-full bg-bg border border-white/10 rounded-lg px-3 py-2 text-sm font-body text-text focus:outline-none focus:border-primary/40 [&>option]:bg-[#141420] [&>option]:text-text"
             >
               {STATUS_OPTIONS.map((s) => (
                 <option key={s} value={s}>
@@ -425,7 +425,7 @@ export default function AdminFeedbackPage() {
                           e.target.value as FeedbackItem["status"],
                         );
                       }}
-                      className="bg-bg border border-white/10 rounded px-2 py-1 text-xs font-body text-text/60 focus:outline-none focus:border-primary/40 cursor-pointer"
+                      className="bg-bg border border-white/10 rounded px-2 py-1 text-xs font-body text-text/60 focus:outline-none focus:border-primary/40 cursor-pointer [&>option]:bg-[#141420] [&>option]:text-text"
                       aria-label={`Change status for feedback #${item.id}`}
                     >
                       {STATUS_OPTIONS.map((s) => (
