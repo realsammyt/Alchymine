@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import { createJournalEntry } from "@/lib/api";
 import type { ProjectResponse } from "@/lib/api";
 
@@ -125,16 +126,21 @@ export default function CreativeProjects({
   projects,
   orientation,
 }: CreativeProjectsProps) {
-  const handleStartProject = useCallback(async (project: ProjectResponse) => {
-    await createJournalEntry({
-      system: "creative",
-      entry_type: "project_start",
-      title: `Started: ${project.title}`,
-      content: `Beginning the creative project "${project.title}".\n\nDescription: ${project.description}\n\nMedium: ${project.medium}\nSkill level: ${project.skill_level}\nType: ${project.type}`,
-      tags: ["creative", "project", project.medium, project.type],
-      mood_score: null,
-    });
-  }, []);
+  const router = useRouter();
+  const handleStartProject = useCallback(
+    async (project: ProjectResponse) => {
+      const entry = await createJournalEntry({
+        system: "creative",
+        entry_type: "project_start",
+        title: `Started: ${project.title}`,
+        content: `Beginning the creative project "${project.title}".\n\nDescription: ${project.description}\n\nMedium: ${project.medium}\nSkill level: ${project.skill_level}\nType: ${project.type}`,
+        tags: ["creative", "project", project.medium, project.type],
+        mood_score: null,
+      });
+      router.push(`/journal?highlight=${entry.id}`);
+    },
+    [router],
+  );
 
   if (projects.length === 0) {
     return (
