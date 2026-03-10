@@ -139,7 +139,6 @@ jobs:
             org.opencontainers.image.revision=${{ github.sha }}
           build-args: |
             ${{ matrix.build_args }}
-            CACHE_BUST=${{ github.sha }}
           cache-from: type=gha,scope=${{ matrix.image }}
           cache-to: type=gha,mode=max,scope=${{ matrix.image }}
 

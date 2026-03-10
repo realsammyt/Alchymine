@@ -107,7 +107,7 @@ docker rm -f alchymine-api-tmp alchymine-web-tmp 2>/dev/null || true
 # Free disk space: remove old images not used by running containers.
 # This prevents "no space left on device" during image pulls.
 log "Pre-flight: pruning unused Docker images..."
-docker image prune -af --filter "until=72h" 2>/dev/null || true
+docker image prune -af --filter "until=24h" 2>/dev/null || true
 DISK_AVAIL=$(df -h /var/lib/docker | awk 'NR==2{print $4}')
 log "  Available disk space: ${DISK_AVAIL}"
 
@@ -284,9 +284,9 @@ export DEPLOY_VERSION="${VERSION}"
 COMPOSE_RECREATED=true  # Set BEFORE up -d: old containers are gone once --force-recreate starts
 $DC up -d --no-deps --no-build --force-recreate api web worker pdf-service
 
-# Wait for compose containers to become healthy (max 90s)
+# Wait for compose containers to become healthy (max 180s)
 log "Waiting for compose containers to become healthy..."
-for i in $(seq 1 45); do
+for i in $(seq 1 90); do
   API_HEALTH=$(docker inspect --format='{{.State.Health.Status}}' alchymine-api 2>/dev/null || echo "starting")
   WEB_HEALTH=$(docker inspect --format='{{.State.Health.Status}}' alchymine-web 2>/dev/null || echo "starting")
 
@@ -295,8 +295,8 @@ for i in $(seq 1 45); do
     break
   fi
 
-  if [ "$i" = "45" ]; then
-    err "Compose containers not healthy after 90s (api=$API_HEALTH, web=$WEB_HEALTH)"
+  if [ "$i" = "90" ]; then
+    err "Compose containers not healthy after 180s (api=$API_HEALTH, web=$WEB_HEALTH)"
     err "Temp containers are still serving traffic via nginx."
     err "Run 'deploy-zero-downtime.sh ${VERSION}' again or fix manually."
     false  # triggers ERR trap (temps kept alive since COMPOSE_RECREATED=true)
@@ -304,7 +304,7 @@ for i in $(seq 1 45); do
 
   # Log progress every 10s
   if [ "$((i % 5))" = "0" ]; then
-    log "  Waiting... api=$API_HEALTH web=$WEB_HEALTH ($((i * 2))s / 90s)"
+    log "  Waiting... api=$API_HEALTH web=$WEB_HEALTH ($((i * 2))s / 180s)"
   fi
   sleep 2
 done
@@ -336,6 +336,8 @@ rm -f "$NGINX_CONF_BAK"
 
 # Remove old images: dangling + any alchymine images not matching current version
 docker image prune -f
+docker container prune -f 2>/dev/null || true
+docker volume prune -f 2>/dev/null || true
 for svc in api web worker pdf; do
   docker images "${IMAGE_PREFIX}-${svc}" --format '{{.Tag}}' \
     | grep -v "^${VERSION}$" \
