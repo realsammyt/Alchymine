@@ -241,7 +241,7 @@ function JournalPageInner() {
     }
   }, [selectedEntry]);
 
-  const applyTemplate = (template: JournalTemplate) => {
+  const applyTemplate = useCallback((template: JournalTemplate) => {
     setFormTitle(template.title);
     setFormContent(template.promptQuestions.map((q) => `## ${q}\n\n`).join("\n"));
     setFormSystem(template.system);
@@ -250,7 +250,7 @@ function JournalPageInner() {
     setFormMood(5);
     setActiveTab("entries");
     setShowForm(true);
-  };
+  }, []);
 
   // Handle ?template= query param
   useEffect(() => {
@@ -268,7 +268,7 @@ function JournalPageInner() {
       setActiveTab("entries");
       setShowForm(true);
     }
-  }, [searchParams, router]);
+  }, [searchParams, router, applyTemplate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -429,8 +429,12 @@ function JournalPageInner() {
 
             {/* ── Tab switcher ──────────────────────────────────────── */}
             <MotionReveal delay={0.08}>
-              <div className="flex gap-1 mb-8 p-1 bg-white/[0.02] border border-white/[0.06] rounded-xl w-fit">
+              <div role="tablist" aria-label="Journal view" className="flex gap-1 mb-8 p-1 bg-white/[0.02] border border-white/[0.06] rounded-xl w-fit">
                 <button
+                  role="tab"
+                  id="tab-entries"
+                  aria-selected={activeTab === "entries"}
+                  aria-controls="panel-entries"
                   onClick={() => setActiveTab("entries")}
                   className={`px-4 py-2 text-sm font-body rounded-lg transition-all duration-200 ${
                     activeTab === "entries"
@@ -441,6 +445,10 @@ function JournalPageInner() {
                   Entries
                 </button>
                 <button
+                  role="tab"
+                  id="tab-templates"
+                  aria-selected={activeTab === "templates"}
+                  aria-controls="panel-templates"
                   onClick={() => setActiveTab("templates")}
                   className={`px-4 py-2 text-sm font-body rounded-lg transition-all duration-200 ${
                     activeTab === "templates"
@@ -454,8 +462,8 @@ function JournalPageInner() {
             </MotionReveal>
 
             {activeTab === "entries" && (
-            <>
-            {/* ── Stats bar ────────────────────────────────────────────── */}
+              <div role="tabpanel" id="panel-entries" aria-labelledby="tab-entries">
+              {/* ── Stats bar ────────────────────────────────────────────── */}
             {stats && (
               <MotionReveal delay={0.1}>
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-8">
@@ -913,11 +921,12 @@ function JournalPageInner() {
                 })}
               </MotionStagger>
             )}
-            </>
+            </div>
             )}
 
             {/* ── Templates tab ──────────────────────────────────────── */}
             {activeTab === "templates" && (
+              <div role="tabpanel" id="panel-templates" aria-labelledby="tab-templates">
               <MotionReveal delay={0.1}>
                 <div className="space-y-8">
                   {(
@@ -969,6 +978,7 @@ function JournalPageInner() {
                   })}
                 </div>
               </MotionReveal>
+              </div>
             )}
           </div>
         </div>
