@@ -77,6 +77,7 @@ _ENTRY_ACTIONS: dict[str, dict[str, str]] = {
         "family": "Explore family numerology compatibility",
         "business": "Analyze your Expression number for business strengths",
         "legacy": "Map your Maturity number for legacy planning",
+        "creative": "Explore how your numerology shapes your creative expression",
     },
     "healing": {
         "career": "Build resilience with breathwork for workplace stress",
@@ -87,6 +88,7 @@ _ENTRY_ACTIONS: dict[str, dict[str, str]] = {
         "family": "Explore family healing through somatic practice",
         "business": "Build entrepreneurial resilience through breathwork",
         "legacy": "Process generational patterns with contemplative inquiry",
+        "creative": "Release creative blocks through somatic breathwork",
     },
     "wealth": {
         "career": "Map your income levers and career capital",
@@ -97,6 +99,7 @@ _ENTRY_ACTIONS: dict[str, dict[str, str]] = {
         "family": "Start your family wealth vault and governance plan",
         "business": "Build your business canvas with wealth integration",
         "legacy": "Design your wealth transfer and legacy plan",
+        "creative": "Discover income streams aligned with your creative gifts",
     },
     "creative": {
         "career": "Take the Guilford Creative Assessment for career innovation",
@@ -107,6 +110,7 @@ _ENTRY_ACTIONS: dict[str, dict[str, str]] = {
         "family": "Start a family creative project together",
         "business": "Map your creative business opportunities",
         "legacy": "Build your creative portfolio and legacy works",
+        "creative": "Dive into your Guilford scores and discover your creative DNA",
     },
     "perspective": {
         "career": "Assess your cognitive biases around career decisions",
@@ -117,6 +121,7 @@ _ENTRY_ACTIONS: dict[str, dict[str, str]] = {
         "family": "Assess family dynamics through developmental stages",
         "business": "Run a strategic positioning analysis for your business",
         "legacy": "Expand your perspective through Kegan stage assessment",
+        "creative": "Explore how expanding perspectives fuels creative breakthroughs",
     },
 }
 
@@ -126,6 +131,23 @@ _FOR_YOU_TODAY: dict[str, str] = {
     "wealth": "Small financial actions compound over time. Review your wealth levers today and take one step toward your 90-day goal.",
     "creative": "Your creative energy is calling. Whether it's 5 minutes of ideation or a full session, make space for your creative self today.",
     "perspective": "Fresh perspectives unlock new possibilities. Take a moment to examine one assumption you hold — you might find a breakthrough.",
+}
+
+
+# Map frontend narrative intention keys to canonical intention keys.
+# The SpiralHub UI uses descriptive button keys; the routing engine
+# uses short canonical keys from INTENTION_WEIGHTS.
+_NARRATIVE_TO_CANONICAL: dict[str, str] = {
+    "self-understanding": "purpose",
+    "financial-decision": "money",
+    "creative-block": "creative",
+    "emotional-healing": "health",
+    "career-direction": "career",
+    "build-wealth": "money",
+    "perspective-shift": "purpose",
+    "relationship-growth": "love",
+    "find-purpose": "purpose",
+    "legacy-planning": "legacy",
 }
 
 
@@ -160,6 +182,8 @@ def route_user(
         Ranked recommendations for all 5 systems.
     """
     intention = intention.lower()
+    # Map narrative UI keys to canonical intention keys
+    intention = _NARRATIVE_TO_CANONICAL.get(intention, intention)
     if intention not in INTENTION_WEIGHTS:
         intention = "purpose"  # Default to purpose if unknown
 
