@@ -364,15 +364,9 @@ class TestLLMClientFallbackBehavior:
             {"ANTHROPIC_API_KEY": "test-key", "LLM_BACKEND": ""},
             clear=False,
         ):
-            env_copy = {
-                k: v
-                for k, v in __import__("os").environ.items()
-                if k != "LLM_BACKEND"
-            }
+            env_copy = {k: v for k, v in __import__("os").environ.items() if k != "LLM_BACKEND"}
         with patch.dict("os.environ", env_copy, clear=True):
-            with patch.dict(
-                "os.environ", {"ANTHROPIC_API_KEY": "test-key"}, clear=False
-            ):
+            with patch.dict("os.environ", {"ANTHROPIC_API_KEY": "test-key"}, clear=False):
                 client = LLMClient()
 
         # Make Claude fail
@@ -398,15 +392,9 @@ class TestLLMClientFallbackBehavior:
             {"ANTHROPIC_API_KEY": "test-key"},
             clear=False,
         ):
-            env_copy = {
-                k: v
-                for k, v in __import__("os").environ.items()
-                if k != "LLM_BACKEND"
-            }
+            env_copy = {k: v for k, v in __import__("os").environ.items() if k != "LLM_BACKEND"}
         with patch.dict("os.environ", env_copy, clear=True):
-            with patch.dict(
-                "os.environ", {"ANTHROPIC_API_KEY": "test-key"}, clear=False
-            ):
+            with patch.dict("os.environ", {"ANTHROPIC_API_KEY": "test-key"}, clear=False):
                 client = LLMClient()
 
         client._generate_claude = AsyncMock(side_effect=Exception("Claude down"))  # type: ignore[method-assign]
@@ -477,11 +465,7 @@ class TestLLMClientModelRouting:
 
     async def test_ollama_model_default(self):
         """Without OLLAMA_MODEL, the default should be llama3.2."""
-        env_copy = {
-            k: v
-            for k, v in __import__("os").environ.items()
-            if k != "OLLAMA_MODEL"
-        }
+        env_copy = {k: v for k, v in __import__("os").environ.items() if k != "OLLAMA_MODEL"}
         with patch.dict("os.environ", env_copy, clear=True):
             client = LLMClient()
 
@@ -519,15 +503,9 @@ class TestLLMClientStreamFallback:
             {"ANTHROPIC_API_KEY": "test-key"},
             clear=False,
         ):
-            env_copy = {
-                k: v
-                for k, v in __import__("os").environ.items()
-                if k != "LLM_BACKEND"
-            }
+            env_copy = {k: v for k, v in __import__("os").environ.items() if k != "LLM_BACKEND"}
         with patch.dict("os.environ", env_copy, clear=True):
-            with patch.dict(
-                "os.environ", {"ANTHROPIC_API_KEY": "test-key"}, clear=False
-            ):
+            with patch.dict("os.environ", {"ANTHROPIC_API_KEY": "test-key"}, clear=False):
                 client = LLMClient()
 
         # Make Claude streaming fail
@@ -643,6 +621,44 @@ class TestFlattenEngineData:
     def test_empty_list_produces_none(self):
         result = flatten_engine_data({"items": []})
         assert result["items_section"] == "(none)"
+
+    def test_flatten_healing_modalities_alias(self):
+        """flatten_engine_data creates modalities_section alias from recommended_modalities."""
+        data = {
+            "recommended_modalities": [
+                {
+                    "modality": "Breathwork",
+                    "skill_trigger": "anxiety relief",
+                    "preference_score": 0.85,
+                },
+                {"modality": "Yoga", "skill_trigger": "stress reduction", "preference_score": 0.78},
+            ],
+        }
+        flat = flatten_engine_data(data)
+        assert "modalities_section" in flat
+        assert "Breathwork" in flat["modalities_section"]
+
+    def test_flatten_healing_crisis_section(self):
+        """flatten_engine_data creates crisis_section from crisis_response dict."""
+        data = {
+            "crisis_response": {
+                "severity": "high",
+                "resources": [
+                    {"name": "988 Suicide & Crisis Lifeline", "contact": "988"},
+                ],
+            },
+        }
+        flat = flatten_engine_data(data)
+        assert "crisis_section" in flat
+        assert "high" in flat["crisis_section"]
+        assert "988" in flat["crisis_section"]
+
+    def test_flatten_healing_no_crisis(self):
+        """No crisis -> crisis_section says no crisis detected."""
+        data = {"crisis_flag": False}
+        flat = flatten_engine_data(data)
+        assert "crisis_section" in flat
+        assert "no crisis" in flat["crisis_section"].lower()
 
 
 class TestNarrativeGenerator:
