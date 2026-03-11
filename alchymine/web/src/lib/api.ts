@@ -1271,9 +1271,15 @@ export async function listAdminFeedback(opts?: {
   if (opts?.status) params.set("status", opts.status);
   if (opts?.category) params.set("category", opts.category);
   const query = params.toString();
-  return request<PaginatedFeedback>(
-    `${BASE}/admin/feedback${query ? `?${query}` : ""}`,
-  );
+  // The API returns { entries: [...], total, page, per_page }.
+  // Normalize to { items: [...], ... } to match PaginatedFeedback.
+  const raw = await request<
+    Omit<PaginatedFeedback, "items"> & { entries?: FeedbackItem[]; items?: FeedbackItem[] }
+  >(`${BASE}/admin/feedback${query ? `?${query}` : ""}`);
+  return {
+    ...raw,
+    items: raw.items ?? raw.entries ?? [],
+  };
 }
 
 export async function patchFeedback(
