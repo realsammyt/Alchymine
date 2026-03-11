@@ -28,6 +28,12 @@ const NAV_ITEMS: NavItem[] = [
     label: "Intake and assessment flow",
   },
   {
+    name: "Profile",
+    href: "/profile",
+    icon: "user",
+    label: "Your unified profile",
+  },
+  {
     name: "Intelligence",
     href: "/intelligence",
     icon: "brain",
@@ -62,12 +68,6 @@ const NAV_ITEMS: NavItem[] = [
     href: "/journal",
     icon: "book",
     label: "Reflection journal",
-  },
-  {
-    name: "Profile",
-    href: "/profile",
-    icon: "user",
-    label: "Your unified profile",
   },
   {
     name: "About",
@@ -379,6 +379,7 @@ export default function Navigation() {
                       {
                         Dashboard: "Home",
                         Discover: "Discover",
+                        Profile: "Profile",
                         Intelligence: "Mind",
                         Healing: "Heal",
                         Wealth: "Wealth",

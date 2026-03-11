@@ -12,6 +12,7 @@ import {
   MotionStagger,
   MotionStaggerItem,
 } from "@/components/shared/MotionReveal";
+import ProfileSummaryCard from "@/components/shared/ProfileSummaryCard";
 import {
   getOutcomeSummary,
   getJournalStats,
@@ -812,6 +813,8 @@ export default function DashboardPage() {
                     aria-labelledby="tab-overview"
                     className="space-y-6"
                   >
+                    <ProfileSummaryCard />
+
                     {/* Overall Score Card */}
                     <MotionReveal delay={0.25} y={16}>
                       <Card title="Overall Progress">
