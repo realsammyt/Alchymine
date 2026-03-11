@@ -389,7 +389,7 @@ export default function AdminFeedbackPage() {
                   />
                 </td>
               </tr>
-            ) : data?.items.length === 0 ? (
+            ) : (data?.items?.length ?? 0) === 0 ? (
               <tr>
                 <td colSpan={5} className="px-4 py-8 text-center text-text/40">
                   No feedback entries found
