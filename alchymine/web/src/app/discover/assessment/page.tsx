@@ -90,6 +90,7 @@ export default function AssessmentPage() {
             intakeData.intentions ??
             (intakeData.intention ? [intakeData.intention] : []),
           assessment_responses: finalResponses,
+          wealth_context: intakeData.wealth_context ?? null,
         };
 
         const result = await createReport(intake);

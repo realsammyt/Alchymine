@@ -14,6 +14,15 @@ export interface IntakePayload {
   intention: string; // Primary intention (first selected) — backward compat for report creation
   intentions?: string[]; // All selected intentions (1-3)
   assessment_responses: Record<string, number>;
+  wealth_context?: {
+    income_range?: string | null;
+    has_investments?: boolean | null;
+    has_business?: boolean | null;
+    has_real_estate?: boolean | null;
+    dependents?: number | null;
+    debt_level?: string | null;
+    financial_goal?: string | null;
+  } | null;
 }
 
 export interface ReportRequest {
@@ -903,6 +912,7 @@ export async function saveIntake(
     birth_city?: string | null;
     intention: string;
     intentions: string[];
+    wealth_context?: IntakePayload["wealth_context"];
   },
 ): Promise<ProfileResponse> {
   return request<ProfileResponse>(
