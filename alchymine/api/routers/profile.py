@@ -300,9 +300,85 @@ async def delete_profile(
     return {"detail": "Profile deleted", "user_id": user_id}
 
 
+# ─── Completeness ─────────────────────────────────────────────────────
+
+
+@router.get("/profile/{user_id}/completeness")
+async def get_profile_completeness(
+    user_id: str,
+    session: AsyncSession = Depends(get_db_session),
+    current_user: dict = Depends(get_current_user),
+) -> dict:
+    """Return completeness metrics for all assessment sections of a profile."""
+    if current_user["sub"] != user_id:
+        raise HTTPException(status_code=403, detail="Access denied")
+
+    from alchymine.api.schemas.completeness import compute_completeness
+
+    user = await repository.get_profile(session, user_id)
+    if user is None:
+        raise HTTPException(status_code=404, detail="Profile not found")
+
+    assessment_responses = user.intake.assessment_responses if user.intake is not None else None
+    identity_layer: dict | None = None
+    if user.identity is not None:
+        identity_layer = {
+            col.name: getattr(user.identity, col.name, None)
+            for col in user.identity.__table__.columns
+            if col.name not in ("id", "user_id")
+        }
+
+    return compute_completeness(assessment_responses, identity_layer)
+
+
 # ─── Reassess ─────────────────────────────────────────────────────────
 
-_VALID_REASSESS_SYSTEMS = {"creative", "wealth", "perspective", "healing"}
+
+def _extract_identity_enrichment(identity: Any) -> dict[str, Any]:
+    """Extract enrichment fields from an IdentityProfile ORM instance.
+
+    IdentityProfile stores sub-models in JSON columns (``numerology``,
+    ``astrology``, ``archetype``, ``personality``).  This helper reads
+    those nested structures so the reassess endpoint can include them
+    in ``request_data`` without silently failing.
+
+    Returns a flat dict with any keys that could be resolved; missing or
+    ``None`` columns are omitted.
+    """
+    result: dict[str, Any] = {}
+
+    numerology: dict[str, Any] | None = getattr(identity, "numerology", None) or {}
+    if numerology:
+        life_path = numerology.get("life_path")
+        if life_path is not None:
+            result["life_path"] = life_path
+
+    archetype: dict[str, Any] | None = getattr(identity, "archetype", None) or {}
+    if archetype:
+        result["archetype"] = archetype
+        primary = archetype.get("primary")
+        if primary is not None:
+            result["archetype_primary"] = primary
+        secondary = archetype.get("secondary")
+        if secondary is not None:
+            result["archetype_secondary"] = secondary
+
+    personality: dict[str, Any] | None = getattr(identity, "personality", None)
+    if personality is not None:
+        result["big_five"] = personality
+
+    astrology: dict[str, Any] | None = getattr(identity, "astrology", None) or {}
+    if astrology:
+        result["astrology"] = astrology
+        for key in ("sun_sign", "moon_sign", "rising_sign"):
+            val = astrology.get(key)
+            if val is not None:
+                result[key] = val
+
+    return result
+
+
+_VALID_REASSESS_SYSTEMS = {"creative", "wealth", "perspective", "healing", "intelligence"}
 
 _GRAPH_BUILDERS: dict[str, Any] = {}
 
@@ -313,6 +389,7 @@ def _get_graph_builders() -> dict[str, Any]:
         from alchymine.agents.orchestrator.graphs import (
             build_creative_graph,
             build_healing_graph,
+            build_intelligence_graph,
             build_perspective_graph,
             build_wealth_graph,
         )
@@ -321,6 +398,7 @@ def _get_graph_builders() -> dict[str, Any]:
             {
                 "creative": build_creative_graph,
                 "healing": build_healing_graph,
+                "intelligence": build_intelligence_graph,
                 "wealth": build_wealth_graph,
                 "perspective": build_perspective_graph,
             }
@@ -369,10 +447,10 @@ async def reassess_layer(
 
     # Enrich with identity data if available
     if user.identity is not None:
-        for attr in ("life_path", "archetype", "big_five"):
-            val = getattr(user.identity, attr, None)
-            if val is not None:
-                request_data[attr] = val
+        enrichment = _extract_identity_enrichment(user.identity)
+        for key, val in enrichment.items():
+            if key not in request_data:
+                request_data[key] = val
 
     # Run the coordinator graph
     builders = _get_graph_builders()
@@ -394,9 +472,13 @@ async def reassess_layer(
     results = final_state.get("results", {})
     status = final_state.get("status", "error")
 
+    # Map system name to profile layer name where they differ
+    _layer_map = {"intelligence": "identity"}
+    layer_name = _layer_map.get(system, system)
+
     # Update the profile layer in DB
     try:
-        await repository.update_layer(session, user_id, system, results)
+        await repository.update_layer(session, user_id, layer_name, results)
     except (ValueError, LookupError) as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
 
