@@ -5,12 +5,7 @@ import Link from "next/link";
 import ProtectedRoute from "@/components/shared/ProtectedRoute";
 import { useAuth } from "@/lib/AuthContext";
 import { useApi } from "@/lib/useApi";
-import {
-  getProfile,
-  saveIntake,
-  ProfileResponse,
-  IntakePayload,
-} from "@/lib/api";
+import { getProfile, saveIntake, ProfileResponse, IntakePayload } from "@/lib/api";
 import {
   MotionReveal,
   MotionStagger,
@@ -288,7 +283,9 @@ function ComputedField({
         {label}
       </span>
       <div className="text-right">
-        <span className="font-body text-sm text-text/80">{String(value)}</span>
+        <span className="font-body text-sm text-text/80">
+          {String(value)}
+        </span>
         <span className="font-body text-[10px] text-text/25 ml-2">
           (computed)
         </span>
@@ -658,7 +655,9 @@ function WealthSection({
           <EditField
             label="Dependents"
             value={
-              editForm.dependents !== null ? String(editForm.dependents) : ""
+              editForm.dependents !== null
+                ? String(editForm.dependents)
+                : ""
             }
             onChange={(v) =>
               setEditForm({
@@ -898,7 +897,9 @@ function downloadProfileJson(profile: ProfileResponse, email: string) {
 
 // ── Main Page ─────────────────────────────────────────────────────
 
-function makeIdentityForm(profile: ProfileResponse): IdentityEditForm {
+function makeIdentityForm(
+  profile: ProfileResponse,
+): IdentityEditForm {
   const intake = profile.intake;
   return {
     full_name: intake?.full_name ?? "",
@@ -908,10 +909,13 @@ function makeIdentityForm(profile: ProfileResponse): IdentityEditForm {
   };
 }
 
-function makeWealthForm(profile: ProfileResponse): WealthEditForm {
+function makeWealthForm(
+  profile: ProfileResponse,
+): WealthEditForm {
   // wealth_context may exist on the intake data from the API (not typed on IntakeProfileData)
-  const wc = (profile.intake as Record<string, unknown> | null)
-    ?.wealth_context as IntakePayload["wealth_context"] | undefined;
+  const wc = (profile.intake as Record<string, unknown> | null)?.wealth_context as
+    | IntakePayload["wealth_context"]
+    | undefined;
   return {
     income_range: wc?.income_range ?? "",
     has_investments: wc?.has_investments ?? null,
@@ -1033,47 +1037,16 @@ export default function ProfilePage() {
           <div className="max-w-4xl mx-auto space-y-8">
             {/* ── Header ─────────────────────────────────────────── */}
             <MotionReveal delay={0.05} y={16}>
-              <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
-                <div>
-                  <p className="text-xs font-body font-medium text-primary/70 uppercase tracking-[0.2em] mb-2">
-                    Personal Command Center
-                  </p>
-                  <h1 className="font-display text-display-md font-light">
-                    Your <span className="text-gradient-gold">Profile</span>
-                  </h1>
-                  <p className="font-body text-text/40 text-sm mt-2">
-                    All five systems in one place
-                  </p>
-                </div>
-
-                {profileState.data && (
-                  <button
-                    onClick={() =>
-                      downloadProfileJson(
-                        profileState.data!,
-                        user?.email ?? "user",
-                      )
-                    }
-                    className="inline-flex items-center gap-2 px-4 py-2.5 min-h-[44px] bg-primary/10 border border-primary/20 text-primary font-body text-sm rounded-xl hover:bg-primary/20 transition-colors self-start sm:self-auto"
-                    aria-label="Download your profile data as JSON"
-                  >
-                    <svg
-                      className="w-4 h-4"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      aria-hidden="true"
-                    >
-                      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                      <polyline points="7 10 12 15 17 10" />
-                      <line x1="12" y1="15" x2="12" y2="3" />
-                    </svg>
-                    Download Your Data
-                  </button>
-                )}
+              <div>
+                <p className="text-xs font-body font-medium text-primary/70 uppercase tracking-[0.2em] mb-2">
+                  Personal Command Center
+                </p>
+                <h1 className="font-display text-display-md font-light">
+                  Your <span className="text-gradient-gold">Profile</span>
+                </h1>
+                <p className="font-body text-text/40 text-sm mt-2">
+                  All five systems in one place
+                </p>
               </div>
               <hr className="rule-gold mt-6 max-w-[80px]" />
             </MotionReveal>
@@ -1139,6 +1112,45 @@ export default function ProfilePage() {
                 </MotionStaggerItem>
                 <MotionStaggerItem>
                   <PerspectiveSection profile={profileState.data} />
+                </MotionStaggerItem>
+
+                {/* ── Your Data ───────────────────────────────────── */}
+                <MotionStaggerItem>
+                  <div className="card-surface px-5 py-5 sm:px-6">
+                    <h2 className="font-display text-lg font-light text-text mb-2">
+                      Your Data
+                    </h2>
+                    <p className="font-body text-xs text-text/40 mb-4">
+                      Your data belongs to you. Download a complete copy of
+                      everything Alchymine knows about you.
+                    </p>
+                    <button
+                      onClick={() =>
+                        downloadProfileJson(
+                          profileState.data!,
+                          user?.email ?? "user",
+                        )
+                      }
+                      className="inline-flex items-center gap-2 px-4 py-2 bg-white/[0.04] border border-white/10 text-text/60 font-body text-sm rounded-lg hover:bg-white/[0.08] hover:text-text transition-colors"
+                      aria-label="Download your profile data as JSON"
+                    >
+                      <svg
+                        className="w-4 h-4"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        aria-hidden="true"
+                      >
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                        <polyline points="7 10 12 15 17 10" />
+                        <line x1="12" y1="15" x2="12" y2="3" />
+                      </svg>
+                      Download JSON
+                    </button>
+                  </div>
                 </MotionStaggerItem>
               </MotionStagger>
             ) : null}
