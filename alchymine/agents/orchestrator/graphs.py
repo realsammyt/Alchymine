@@ -611,16 +611,19 @@ def _healing_personality_context(state: CoordinatorState) -> CoordinatorState:
                 "name": "Breathwork",
                 "description": "Conscious breathing techniques that regulate the nervous system",
                 "evidence_level": "strong",
+                "difficulty_level": "beginner",
             },
             {
                 "name": "Mindfulness Meditation",
                 "description": "Present-moment awareness practices for stress reduction",
                 "evidence_level": "strong",
+                "difficulty_level": "beginner",
             },
             {
                 "name": "Somatic Practice",
                 "description": "Body-based awareness exercises for releasing tension",
                 "evidence_level": "strong",
+                "difficulty_level": "beginner",
             },
         ]
 
