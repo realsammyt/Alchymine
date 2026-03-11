@@ -488,12 +488,22 @@ def _healing_modality_matching(state: CoordinatorState) -> CoordinatorState:
 
     try:
         from alchymine.engine.healing import match_modalities
+        from alchymine.engine.profile import BigFiveScores
 
         archetype = request_data.get("archetype")
         intentions = request_data.get("intentions")
         intention = request_data.get("intention")
         archetype_secondary = request_data.get("archetype_secondary")
-        big_five = request_data.get("big_five")
+        big_five_raw = request_data.get("big_five")
+
+        # Unwrap nested personality dict → BigFiveScores object
+        big_five = None
+        if isinstance(big_five_raw, dict):
+            scores = big_five_raw.get("big_five", big_five_raw)
+            if isinstance(scores, dict) and "openness" in scores:
+                big_five = BigFiveScores(**scores)
+        elif isinstance(big_five_raw, BigFiveScores):
+            big_five = big_five_raw
 
         # Prefer multi-intention list, fall back to single intention
         _intentions = (
@@ -531,15 +541,20 @@ def _healing_personality_context(state: CoordinatorState) -> CoordinatorState:
     results = dict(state.get("results", {}))
     request_data = state.get("request_data", {})
 
-    big_five = request_data.get("big_five", {})
-    if big_five:
-        for trait in ("openness", "neuroticism"):
-            if trait in big_five:
-                results[trait] = big_five[trait]
+    big_five_raw = request_data.get("big_five", {})
+    if big_five_raw and isinstance(big_five_raw, dict):
+        # Unwrap nested personality dict: big_five_raw may be
+        # {"big_five": {"openness": 72, ...}, "attachment_style": "secure"}
+        scores = big_five_raw.get("big_five", big_five_raw)
+        if isinstance(scores, dict):
+            for trait in ("openness", "neuroticism"):
+                if trait in scores:
+                    results[trait] = scores[trait]
 
-    attachment = request_data.get("attachment_style")
-    if attachment:
-        results["attachment_style"] = attachment
+        # attachment_style lives at the outer personality dict level
+        attachment = big_five_raw.get("attachment_style") or request_data.get("attachment_style")
+        if attachment:
+            results["attachment_style"] = attachment
 
     return {**state, "results": results}
 
@@ -611,13 +626,21 @@ def _wealth_lever_prioritisation(state: CoordinatorState) -> CoordinatorState:
     request_data = state.get("request_data", {})
 
     try:
+        from alchymine.engine.profile import WealthContext
         from alchymine.engine.wealth import prioritize_levers
 
         life_path = request_data.get("life_path")
         risk_tolerance = request_data.get("risk_tolerance", "moderate")
         intentions = request_data.get("intentions")
         intention = request_data.get("intention")
-        wealth_context = request_data.get("wealth_context")
+        wealth_context_raw = request_data.get("wealth_context")
+
+        # Deserialize dict → WealthContext object for attribute access
+        wealth_context = None
+        if isinstance(wealth_context_raw, dict):
+            wealth_context = WealthContext(**wealth_context_raw)
+        elif isinstance(wealth_context_raw, WealthContext):
+            wealth_context = wealth_context_raw
 
         # Prefer multi-intention list, fall back to single intention
         _intentions = (
