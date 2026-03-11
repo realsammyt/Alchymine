@@ -24,6 +24,8 @@ from alchymine.engine.healing.modalities import (
     VALID_CATEGORIES,
     VALID_EVIDENCE_LEVELS,
 )
+from alchymine.engine.healing.skills.loader import registry as _skill_registry
+from alchymine.engine.healing.skills.schema import HealingSkill as _HealingSkill
 from alchymine.engine.profile import (
     ArchetypeType,
     BigFiveScores,
@@ -318,3 +320,54 @@ async def detect_crisis_endpoint(
     """
     result = detect_crisis(request.text)
     return _crisis_to_response(result)
+
+
+# --- Skills endpoints -------------------------------------------------------
+
+
+class SkillResponse(BaseModel):
+    """A single healing skill from the YAML registry."""
+
+    id: str
+    modality: str
+    title: str
+    duration_minutes: int
+    difficulty: str
+    instructions: list[str]
+    contraindications: list[str]
+    traditions: list[str]
+    evidence_level: str
+    tags: list[str]
+
+
+def _skill_to_response(skill: _HealingSkill) -> SkillResponse:
+    return SkillResponse(**skill.model_dump())
+
+
+@router.get("/healing/skills")
+async def list_skills(
+    modality: str | None = Query(None, description="Filter by modality name"),
+    current_user: dict = Depends(get_current_user),
+) -> list[SkillResponse]:
+    """List healing skills, optionally filtered by modality.
+
+    Returns all skills in the registry, or only those matching *modality*
+    when the query parameter is supplied.
+    """
+    skills = _skill_registry.by_modality(modality) if modality else _skill_registry.all()
+    return [_skill_to_response(s) for s in skills]
+
+
+@router.get("/healing/skills/{skill_id}")
+async def get_skill(
+    skill_id: str,
+    current_user: dict = Depends(get_current_user),
+) -> SkillResponse:
+    """Retrieve a single healing skill by ID.
+
+    Returns the full skill definition or 404 if the ID is not found.
+    """
+    skill = _skill_registry.get(skill_id)
+    if skill is None:
+        raise HTTPException(status_code=404, detail=f"Skill '{skill_id}' not found")
+    return _skill_to_response(skill)

@@ -46,3 +46,4 @@ class SkillRegistry:
 
 
 registry = SkillRegistry()
+registry.load_from_dir()
