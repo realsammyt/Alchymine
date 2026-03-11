@@ -19,7 +19,7 @@ export default function ProfileSummaryCard() {
   const { data: intake, loading: intakeLoading } = useIntake(userId);
 
   const profile = useApi<ProfileResponse>(
-    () => (userId ? getProfile(userId) : Promise.reject(new Error("No user"))),
+    userId ? () => getProfile(userId) : null,
     [userId],
   );
 
