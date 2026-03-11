@@ -61,6 +61,10 @@ class Settings(BaseSettings):
     anthropic_api_key: str = ""
     ollama_base_url: str = "http://localhost:11434"
 
+    # ── Gemini ───────────────────────────────────────────────────────────
+    gemini_api_key: str = ""
+    art_cache_dir: str = "/tmp/alchymine_art"
+
     # ── Celery ───────────────────────────────────────────────────────────
     celery_broker_url: str = "redis://localhost:6379/1"
     celery_result_backend: str = "redis://localhost:6379/2"

@@ -34,6 +34,7 @@ dependencies = [
     # LLM
     "anthropic>=0.40.0",
     "httpx>=0.28.0",
+    "google-genai>=1.0",
     # Email
     "resend>=2.0.0",
     # Utilities
@@ -97,7 +98,7 @@ ignore = [
 [tool.ruff.lint.per-file-ignores]
 "tests/**/*.py" = ["S101", "ANN"]
 "alchymine/db/migrations/**/*.py" = ["ANN", "E501"]
-"alchymine/config.py" = ["S105"]  # dev-default secrets are intentional
+"alchymine/config.py" = ["S105", "S108"]  # dev-default secrets and temp paths are intentional
 "alchymine/api/auth.py" = ["B008"]  # FastAPI Depends() in defaults is standard
 "alchymine/api/routers/**/*.py" = ["B008"]  # FastAPI Depends() in defaults is standard
 
@@ -129,6 +130,8 @@ module = [
     "cryptography.*",
     "anthropic.*",
     "httpx.*",
+    "google.genai.*",
+    "google.*",
     "yaml.*",
     "jinja2.*",
     "playwright.*",
