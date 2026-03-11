@@ -1,10 +1,16 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import ProtectedRoute from "@/components/shared/ProtectedRoute";
 import { useAuth } from "@/lib/AuthContext";
 import { useApi } from "@/lib/useApi";
-import { getProfile, ProfileResponse } from "@/lib/api";
+import {
+  getProfile,
+  saveIntake,
+  ProfileResponse,
+  IntakePayload,
+} from "@/lib/api";
 import {
   MotionReveal,
   MotionStagger,
@@ -33,6 +39,7 @@ function ProfileSection({
   accentBg,
   accentColor,
   icon,
+  editButton,
   footerHref,
   footerLabel,
   children,
@@ -42,6 +49,7 @@ function ProfileSection({
   accentBg: string;
   accentColor: string;
   icon: React.ReactNode;
+  editButton?: React.ReactNode;
   footerHref: string;
   footerLabel: string;
   children: React.ReactNode;
@@ -51,16 +59,19 @@ function ProfileSection({
       className="card-surface border-l-4 p-6"
       style={{ borderColor: accentColor }}
     >
-      <div className="flex items-center gap-3 mb-5">
-        <div
-          className={`w-10 h-10 rounded-xl ${accentBg} flex items-center justify-center flex-shrink-0`}
-          aria-hidden="true"
-        >
-          {icon}
+      <div className="flex items-center justify-between mb-5">
+        <div className="flex items-center gap-3">
+          <div
+            className={`w-10 h-10 rounded-xl ${accentBg} flex items-center justify-center flex-shrink-0`}
+            aria-hidden="true"
+          >
+            {icon}
+          </div>
+          <h2 className={`font-display text-xl font-light ${accentText}`}>
+            {title}
+          </h2>
         </div>
-        <h2 className={`font-display text-xl font-light ${accentText}`}>
-          {title}
-        </h2>
+        {editButton}
       </div>
       {children}
       <div className="mt-5 pt-4 border-t border-white/[0.05]">
@@ -147,9 +158,195 @@ function EmptyLayer({
   );
 }
 
+// ── Edit form types ──────────────────────────────────────────────
+
+interface IdentityEditForm {
+  full_name: string;
+  birth_date: string;
+  birth_time: string;
+  birth_city: string;
+}
+
+interface WealthEditForm {
+  income_range: string;
+  has_investments: boolean | null;
+  has_business: boolean | null;
+  has_real_estate: boolean | null;
+  dependents: number | null;
+  debt_level: string;
+  financial_goal: string;
+}
+
+type EditingSection = "identity" | "wealth" | null;
+
+// ── Edit helper components ──────────────────────────────────────
+
+const editInputClass =
+  "bg-bg border border-white/10 rounded-lg px-3 py-2 text-sm font-body text-text focus:outline-none focus:border-primary/40 w-full";
+
+function EditField({
+  label,
+  value,
+  onChange,
+  type = "text",
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  type?: string;
+}) {
+  return (
+    <div className="flex items-start justify-between gap-4 py-2 border-b border-white/[0.05] last:border-0">
+      <span className="font-body text-xs text-text/40 uppercase tracking-wide flex-shrink-0 pt-2">
+        {label}
+      </span>
+      <input
+        type={type}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className={`${editInputClass} max-w-[220px]`}
+      />
+    </div>
+  );
+}
+
+function EditSelect({
+  label,
+  value,
+  options,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  options: { value: string; label: string }[];
+  onChange: (v: string) => void;
+}) {
+  return (
+    <div className="flex items-start justify-between gap-4 py-2 border-b border-white/[0.05] last:border-0">
+      <span className="font-body text-xs text-text/40 uppercase tracking-wide flex-shrink-0 pt-2">
+        {label}
+      </span>
+      <select
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className={`${editInputClass} max-w-[220px] [&>option]:bg-[#141420] [&>option]:text-text`}
+      >
+        {options.map((opt) => (
+          <option key={opt.value} value={opt.value}>
+            {opt.label}
+          </option>
+        ))}
+      </select>
+    </div>
+  );
+}
+
+function EditToggle({
+  label,
+  value,
+  onChange,
+}: {
+  label: string;
+  value: boolean | null;
+  onChange: (v: boolean) => void;
+}) {
+  return (
+    <div className="flex items-center justify-between gap-4 py-2 border-b border-white/[0.05] last:border-0">
+      <span className="font-body text-xs text-text/40 uppercase tracking-wide flex-shrink-0">
+        {label}
+      </span>
+      <button
+        type="button"
+        role="switch"
+        aria-checked={!!value}
+        onClick={() => onChange(!value)}
+        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+          value ? "bg-primary/60" : "bg-white/10"
+        }`}
+      >
+        <span
+          className={`inline-block h-4 w-4 rounded-full bg-white transition-transform ${
+            value ? "translate-x-6" : "translate-x-1"
+          }`}
+        />
+      </button>
+    </div>
+  );
+}
+
+function ComputedField({
+  label,
+  value,
+}: {
+  label: string;
+  value: string | number | null | undefined;
+}) {
+  if (value === null || value === undefined || value === "") return null;
+  return (
+    <div className="flex items-start justify-between gap-4 py-2 border-b border-white/[0.05] last:border-0">
+      <span className="font-body text-xs text-text/40 uppercase tracking-wide flex-shrink-0">
+        {label}
+      </span>
+      <div className="text-right">
+        <span className="font-body text-sm text-text/80">{String(value)}</span>
+        <span className="font-body text-[10px] text-text/25 ml-2">
+          (computed)
+        </span>
+      </div>
+    </div>
+  );
+}
+
+function EditActions({
+  onSave,
+  onCancel,
+  saving,
+}: {
+  onSave: () => void;
+  onCancel: () => void;
+  saving: boolean;
+}) {
+  return (
+    <div className="flex items-center gap-3 pt-3">
+      <button
+        onClick={onSave}
+        disabled={saving}
+        className="px-4 py-2 bg-primary/20 border border-primary/30 text-primary font-body text-sm rounded-lg hover:bg-primary/30 transition-colors disabled:opacity-50"
+      >
+        {saving ? "Saving..." : "Save"}
+      </button>
+      <button
+        onClick={onCancel}
+        disabled={saving}
+        className="px-4 py-2 bg-white/[0.04] border border-white/10 text-text/60 font-body text-sm rounded-lg hover:bg-white/[0.08] transition-colors disabled:opacity-50"
+      >
+        Cancel
+      </button>
+    </div>
+  );
+}
+
 // ── Identity Section ──────────────────────────────────────────────
 
-function IdentitySection({ profile }: { profile: ProfileResponse }) {
+function IdentitySection({
+  profile,
+  editing,
+  onEdit,
+  onCancel,
+  onSave,
+  editForm,
+  setEditForm,
+  saving,
+}: {
+  profile: ProfileResponse;
+  editing: boolean;
+  onEdit: () => void;
+  onCancel: () => void;
+  onSave: () => void;
+  editForm: IdentityEditForm;
+  setEditForm: (form: IdentityEditForm) => void;
+  saving: boolean;
+}) {
   const identity = profile.identity;
   const intake = profile.intake;
 
@@ -179,6 +376,16 @@ function IdentitySection({ profile }: { profile: ProfileResponse }) {
           <path d="M12 8h.01" />
         </svg>
       }
+      editButton={
+        hasData && !editing ? (
+          <button
+            onClick={onEdit}
+            className="font-body text-xs text-text/40 hover:text-text/60 transition-colors"
+          >
+            Edit
+          </button>
+        ) : undefined
+      }
     >
       {!hasData ? (
         <EmptyLayer
@@ -186,6 +393,60 @@ function IdentitySection({ profile }: { profile: ProfileResponse }) {
           accentText="text-primary"
           linkText="Explore Personal Intelligence"
         />
+      ) : editing ? (
+        <div className="space-y-3">
+          <EditField
+            label="Name"
+            value={editForm.full_name}
+            onChange={(v) => setEditForm({ ...editForm, full_name: v })}
+          />
+          <EditField
+            label="Birth Date"
+            value={editForm.birth_date}
+            onChange={(v) => setEditForm({ ...editForm, birth_date: v })}
+            type="date"
+          />
+          <EditField
+            label="Birth Time"
+            value={editForm.birth_time}
+            onChange={(v) => setEditForm({ ...editForm, birth_time: v })}
+            type="time"
+          />
+          <EditField
+            label="Birth City"
+            value={editForm.birth_city}
+            onChange={(v) => setEditForm({ ...editForm, birth_city: v })}
+          />
+          {identity && (
+            <>
+              <ComputedField
+                label="Life Path"
+                value={identity.life_path as number}
+              />
+              <ComputedField
+                label="Expression"
+                value={identity.expression as number}
+              />
+              <ComputedField
+                label="Soul Urge"
+                value={identity.soul_urge as number}
+              />
+              <ComputedField
+                label="Sun Sign"
+                value={identity.sun_sign as string}
+              />
+              <ComputedField
+                label="Moon Sign"
+                value={identity.moon_sign as string}
+              />
+              <ComputedField
+                label="Archetype"
+                value={identity.primary_archetype as string}
+              />
+            </>
+          )}
+          <EditActions onSave={onSave} onCancel={onCancel} saving={saving} />
+        </div>
       ) : (
         <div className="space-y-1">
           {intake && (
@@ -295,7 +556,45 @@ function HealingSection({ profile }: { profile: ProfileResponse }) {
 
 // ── Wealth Section ────────────────────────────────────────────────
 
-function WealthSection({ profile }: { profile: ProfileResponse }) {
+const INCOME_RANGES = [
+  { value: "", label: "Select..." },
+  { value: "under_30k", label: "Under $30k" },
+  { value: "30k_50k", label: "$30k - $50k" },
+  { value: "50k_75k", label: "$50k - $75k" },
+  { value: "75k_100k", label: "$75k - $100k" },
+  { value: "100k_150k", label: "$100k - $150k" },
+  { value: "150k_250k", label: "$150k - $250k" },
+  { value: "over_250k", label: "Over $250k" },
+];
+
+const DEBT_LEVELS = [
+  { value: "", label: "Select..." },
+  { value: "none", label: "None" },
+  { value: "low", label: "Low" },
+  { value: "moderate", label: "Moderate" },
+  { value: "high", label: "High" },
+  { value: "severe", label: "Severe" },
+];
+
+function WealthSection({
+  profile,
+  editing,
+  onEdit,
+  onCancel,
+  onSave,
+  editForm,
+  setEditForm,
+  saving,
+}: {
+  profile: ProfileResponse;
+  editing: boolean;
+  onEdit: () => void;
+  onCancel: () => void;
+  onSave: () => void;
+  editForm: WealthEditForm;
+  setEditForm: (form: WealthEditForm) => void;
+  saving: boolean;
+}) {
   const wealth = profile.wealth;
 
   return (
@@ -322,8 +621,79 @@ function WealthSection({ profile }: { profile: ProfileResponse }) {
           <line x1="6" y1="20" x2="6" y2="16" />
         </svg>
       }
+      editButton={
+        !editing ? (
+          <button
+            onClick={onEdit}
+            className="font-body text-xs text-text/40 hover:text-text/60 transition-colors"
+          >
+            Edit
+          </button>
+        ) : undefined
+      }
     >
-      {!wealth ? (
+      {editing ? (
+        <div className="space-y-3">
+          <EditSelect
+            label="Income Range"
+            value={editForm.income_range}
+            options={INCOME_RANGES}
+            onChange={(v) => setEditForm({ ...editForm, income_range: v })}
+          />
+          <EditToggle
+            label="Has Investments"
+            value={editForm.has_investments}
+            onChange={(v) => setEditForm({ ...editForm, has_investments: v })}
+          />
+          <EditToggle
+            label="Has Business"
+            value={editForm.has_business}
+            onChange={(v) => setEditForm({ ...editForm, has_business: v })}
+          />
+          <EditToggle
+            label="Has Real Estate"
+            value={editForm.has_real_estate}
+            onChange={(v) => setEditForm({ ...editForm, has_real_estate: v })}
+          />
+          <EditField
+            label="Dependents"
+            value={
+              editForm.dependents !== null ? String(editForm.dependents) : ""
+            }
+            onChange={(v) =>
+              setEditForm({
+                ...editForm,
+                dependents: v === "" ? null : parseInt(v, 10) || 0,
+              })
+            }
+            type="number"
+          />
+          <EditSelect
+            label="Debt Level"
+            value={editForm.debt_level}
+            options={DEBT_LEVELS}
+            onChange={(v) => setEditForm({ ...editForm, debt_level: v })}
+          />
+          <EditField
+            label="Financial Goal"
+            value={editForm.financial_goal}
+            onChange={(v) => setEditForm({ ...editForm, financial_goal: v })}
+          />
+          {wealth && (
+            <>
+              <ComputedField
+                label="Wealth Archetype"
+                value={wealth.wealth_archetype as string}
+              />
+              <ComputedField
+                label="Plan Phase"
+                value={wealth.plan_phase as string}
+              />
+            </>
+          )}
+          <EditActions onSave={onSave} onCancel={onCancel} saving={saving} />
+        </div>
+      ) : !wealth ? (
         <EmptyLayer
           href="/wealth"
           accentText="text-primary"
@@ -528,6 +898,31 @@ function downloadProfileJson(profile: ProfileResponse, email: string) {
 
 // ── Main Page ─────────────────────────────────────────────────────
 
+function makeIdentityForm(profile: ProfileResponse): IdentityEditForm {
+  const intake = profile.intake;
+  return {
+    full_name: intake?.full_name ?? "",
+    birth_date: intake?.birth_date ?? "",
+    birth_time: intake?.birth_time ?? "",
+    birth_city: intake?.birth_city ?? "",
+  };
+}
+
+function makeWealthForm(profile: ProfileResponse): WealthEditForm {
+  // wealth_context may exist on the intake data from the API (not typed on IntakeProfileData)
+  const wc = (profile.intake as Record<string, unknown> | null)
+    ?.wealth_context as IntakePayload["wealth_context"] | undefined;
+  return {
+    income_range: wc?.income_range ?? "",
+    has_investments: wc?.has_investments ?? null,
+    has_business: wc?.has_business ?? null,
+    has_real_estate: wc?.has_real_estate ?? null,
+    dependents: wc?.dependents ?? null,
+    debt_level: wc?.debt_level ?? "",
+    financial_goal: wc?.financial_goal ?? "",
+  };
+}
+
 export default function ProfilePage() {
   const { user } = useAuth();
   const userId = user?.id ?? null;
@@ -536,6 +931,100 @@ export default function ProfilePage() {
     () => (userId ? getProfile(userId) : Promise.reject(new Error("No user"))),
     [userId],
   );
+
+  // ── Edit state ──────────────────────────────────────────────────
+  const [editingSection, setEditingSection] = useState<EditingSection>(null);
+  const [identityForm, setIdentityForm] = useState<IdentityEditForm>({
+    full_name: "",
+    birth_date: "",
+    birth_time: "",
+    birth_city: "",
+  });
+  const [wealthForm, setWealthForm] = useState<WealthEditForm>({
+    income_range: "",
+    has_investments: null,
+    has_business: null,
+    has_real_estate: null,
+    dependents: null,
+    debt_level: "",
+    financial_goal: "",
+  });
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+
+  function startEditIdentity() {
+    if (!profileState.data) return;
+    setIdentityForm(makeIdentityForm(profileState.data));
+    setSaveError(null);
+    setEditingSection("identity");
+  }
+
+  function startEditWealth() {
+    if (!profileState.data) return;
+    setWealthForm(makeWealthForm(profileState.data));
+    setSaveError(null);
+    setEditingSection("wealth");
+  }
+
+  function cancelEdit() {
+    setEditingSection(null);
+    setSaveError(null);
+  }
+
+  async function handleSaveIdentity() {
+    if (!userId || !profileState.data) return;
+    setSaving(true);
+    setSaveError(null);
+    try {
+      const intake = profileState.data.intake;
+      await saveIntake(userId, {
+        full_name: identityForm.full_name,
+        birth_date: identityForm.birth_date,
+        birth_time: identityForm.birth_time || null,
+        birth_city: identityForm.birth_city || null,
+        intention: intake?.intention ?? "",
+        intentions: intake?.intentions ?? [],
+      });
+      profileState.refetch();
+      setEditingSection(null);
+    } catch (err) {
+      setSaveError(err instanceof Error ? err.message : "Save failed");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleSaveWealth() {
+    if (!userId || !profileState.data) return;
+    setSaving(true);
+    setSaveError(null);
+    try {
+      const intake = profileState.data.intake;
+      await saveIntake(userId, {
+        full_name: intake?.full_name ?? "",
+        birth_date: intake?.birth_date ?? "",
+        birth_time: intake?.birth_time ?? null,
+        birth_city: intake?.birth_city ?? null,
+        intention: intake?.intention ?? "",
+        intentions: intake?.intentions ?? [],
+        wealth_context: {
+          income_range: wealthForm.income_range || null,
+          has_investments: wealthForm.has_investments,
+          has_business: wealthForm.has_business,
+          has_real_estate: wealthForm.has_real_estate,
+          dependents: wealthForm.dependents,
+          debt_level: wealthForm.debt_level || null,
+          financial_goal: wealthForm.financial_goal || null,
+        },
+      });
+      profileState.refetch();
+      setEditingSection(null);
+    } catch (err) {
+      setSaveError(err instanceof Error ? err.message : "Save failed");
+    } finally {
+      setSaving(false);
+    }
+  }
 
   return (
     <ProtectedRoute>
@@ -589,6 +1078,13 @@ export default function ProfilePage() {
               <hr className="rule-gold mt-6 max-w-[80px]" />
             </MotionReveal>
 
+            {/* ── Save error banner ────────────────────────────────── */}
+            {saveError && (
+              <div className="rounded-lg border border-red-500/20 bg-red-500/10 px-4 py-3">
+                <p className="font-body text-sm text-red-400">{saveError}</p>
+              </div>
+            )}
+
             {/* ── Content ────────────────────────────────────────── */}
             {profileState.loading ? (
               <Spinner />
@@ -612,13 +1108,31 @@ export default function ProfilePage() {
             ) : profileState.data ? (
               <MotionStagger staggerDelay={0.1} className="space-y-6">
                 <MotionStaggerItem>
-                  <IdentitySection profile={profileState.data} />
+                  <IdentitySection
+                    profile={profileState.data}
+                    editing={editingSection === "identity"}
+                    onEdit={startEditIdentity}
+                    onCancel={cancelEdit}
+                    onSave={handleSaveIdentity}
+                    editForm={identityForm}
+                    setEditForm={setIdentityForm}
+                    saving={saving}
+                  />
                 </MotionStaggerItem>
                 <MotionStaggerItem>
                   <HealingSection profile={profileState.data} />
                 </MotionStaggerItem>
                 <MotionStaggerItem>
-                  <WealthSection profile={profileState.data} />
+                  <WealthSection
+                    profile={profileState.data}
+                    editing={editingSection === "wealth"}
+                    onEdit={startEditWealth}
+                    onCancel={cancelEdit}
+                    onSave={handleSaveWealth}
+                    editForm={wealthForm}
+                    setEditForm={setWealthForm}
+                    saving={saving}
+                  />
                 </MotionStaggerItem>
                 <MotionStaggerItem>
                   <CreativeSection profile={profileState.data} />
