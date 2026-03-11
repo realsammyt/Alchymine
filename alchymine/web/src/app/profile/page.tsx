@@ -1,10 +1,16 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import ProtectedRoute from "@/components/shared/ProtectedRoute";
 import { useAuth } from "@/lib/AuthContext";
 import { useApi } from "@/lib/useApi";
-import { getProfile, ProfileResponse } from "@/lib/api";
+import {
+  getProfile,
+  getCompleteness,
+  ProfileResponse,
+  type CompletenessResponse,
+} from "@/lib/api";
 import {
   MotionReveal,
   MotionStagger,
@@ -512,6 +518,17 @@ export default function ProfilePage() {
     [userId],
   );
 
+  const [completeness, setCompleteness] = useState<CompletenessResponse | null>(
+    null,
+  );
+
+  useEffect(() => {
+    if (!userId) return;
+    getCompleteness(userId)
+      .then(setCompleteness)
+      .catch(() => {});
+  }, [userId]);
+
   return (
     <ProtectedRoute>
       <div className="grain-overlay bg-atmosphere min-h-screen">
@@ -601,6 +618,96 @@ export default function ProfilePage() {
                 <MotionStaggerItem>
                   <PerspectiveSection profile={profileState.data} />
                 </MotionStaggerItem>
+                {completeness && (
+                  <MotionStaggerItem>
+                    <div className="card-surface p-6">
+                      <h3 className="font-display text-lg font-medium mb-4">
+                        Assessment Status
+                      </h3>
+                      <div className="space-y-3">
+                        {(
+                          [
+                            {
+                              key: "big_five" as const,
+                              label: "Personality (Big Five)",
+                              sections: "big_five",
+                            },
+                            {
+                              key: "attachment" as const,
+                              label: "Attachment Style",
+                              sections: "attachment",
+                            },
+                            {
+                              key: "risk_tolerance" as const,
+                              label: "Risk Tolerance",
+                              sections: "risk_tolerance",
+                            },
+                            {
+                              key: "enneagram" as const,
+                              label: "Enneagram",
+                              sections: "enneagram",
+                            },
+                            {
+                              key: "perspective" as const,
+                              label: "Perspective (Kegan)",
+                              sections: "perspective",
+                            },
+                            {
+                              key: "creativity" as const,
+                              label: "Creativity",
+                              sections: "creativity",
+                            },
+                          ] as const
+                        ).map(({ key, label, sections }) => {
+                          const section = completeness[key];
+                          return (
+                            <div
+                              key={key}
+                              className="flex items-center justify-between py-2 border-b border-white/[0.06] last:border-0"
+                            >
+                              <div>
+                                <span className="text-sm font-body text-text">
+                                  {label}
+                                </span>
+                                <span className="text-xs text-text/40 ml-2">
+                                  {section.answered}/{section.total}
+                                </span>
+                              </div>
+                              {section.complete ? (
+                                <div className="flex items-center gap-2">
+                                  <span className="text-xs text-primary/70">
+                                    Complete
+                                  </span>
+                                  <a
+                                    href={`/discover/assessment?sections=${sections}`}
+                                    className="text-xs text-text/30 hover:text-text/60 transition-colors"
+                                  >
+                                    Retake
+                                  </a>
+                                </div>
+                              ) : (
+                                <a
+                                  href={`/discover/assessment?sections=${sections}`}
+                                  className="text-xs font-medium text-primary hover:text-primary-light transition-colors"
+                                >
+                                  Complete
+                                </a>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                      <div className="mt-4 pt-3 border-t border-white/[0.06]">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs text-text/40">Overall</span>
+                          <span className="text-xs text-text/50">
+                            {completeness.overall_pct}%
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </MotionStaggerItem>
+                )}
               </MotionStagger>
             ) : null}
           </div>

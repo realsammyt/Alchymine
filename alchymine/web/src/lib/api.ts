@@ -876,6 +876,35 @@ export async function getProfile(userId: string): Promise<ProfileResponse> {
   );
 }
 
+// ─── Profile Completeness ────────────────────────────────────────────
+
+export interface SectionCompleteness {
+  complete: boolean;
+  answered: number;
+  total: number;
+}
+
+export interface CompletenessResponse {
+  big_five: SectionCompleteness;
+  attachment: SectionCompleteness;
+  risk_tolerance: SectionCompleteness;
+  enneagram: SectionCompleteness;
+  perspective: SectionCompleteness;
+  creativity: SectionCompleteness;
+  identity_computed: boolean;
+  overall_pct: number;
+  total_answered: number;
+  total_questions: number;
+}
+
+export async function getCompleteness(
+  userId: string,
+): Promise<CompletenessResponse> {
+  return request<CompletenessResponse>(
+    `${BASE}/profile/${encodeURIComponent(userId)}/completeness`,
+  );
+}
+
 // ─── Profile Reassess ────────────────────────────────────────────────
 
 export interface ReassessResponse {
@@ -1284,7 +1313,10 @@ export async function listAdminFeedback(opts?: {
   // The API returns { entries: [...], total, page, per_page }.
   // Normalize to { items: [...], ... } to match PaginatedFeedback.
   const raw = await request<
-    Omit<PaginatedFeedback, "items"> & { entries?: FeedbackItem[]; items?: FeedbackItem[] }
+    Omit<PaginatedFeedback, "items"> & {
+      entries?: FeedbackItem[];
+      items?: FeedbackItem[];
+    }
   >(`${BASE}/admin/feedback${query ? `?${query}` : ""}`);
   return {
     ...raw,
