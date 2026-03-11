@@ -1,0 +1,26 @@
+id: bw_001
+modality: breathwork
+title: Box Breathing Baseline
+duration_minutes: 5
+difficulty: foundation
+instructions:
+  - Find a comfortable seated position and close your eyes
+  - Inhale slowly through your nose for 4 counts
+  - Hold your breath for 4 counts
+  - Exhale slowly through your mouth for 4 counts
+  - Hold empty for 4 counts
+  - Repeat for 6 cycles
+  - Gently open your eyes when complete
+contraindications:
+  - severe asthma
+  - panic disorder
+  - uncontrolled epilepsy
+traditions:
+  - Pranayama (Yogic)
+  - Military stress inoculation (Western)
+evidence_level: strong
+tags:
+  - calm
+  - focus
+  - foundation
+  - stress-reduction
