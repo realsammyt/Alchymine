@@ -29,6 +29,11 @@ Functions — Journal Entries
 - ``update_journal_entry``   — update fields on an existing entry
 - ``delete_journal_entry``   — hard-delete an entry
 - ``get_journal_stats``      — summary statistics for a user's journal
+
+Functions — Chat History
+~~~~~~~~~~~~~~~~~~~~~~~~~
+- ``save_chat_message``      — persist a single chat message (user or assistant)
+- ``get_chat_history``       — fetch last N messages for a user (oldest-first)
 """
 
 from __future__ import annotations
@@ -43,6 +48,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from alchymine.db.models import (
+    ChatMessage,
     CreativeProfile,
     FeedbackEntry,
     HealingProfile,
@@ -877,3 +883,76 @@ async def get_feedback_counts(session: AsyncSession) -> dict[str, int]:
         select(FeedbackEntry.status, func.count()).group_by(FeedbackEntry.status)
     )
     return {row[0]: row[1] for row in result.all()}
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# Chat History CRUD
+# ═══════════════════════════════════════════════════════════════════════
+
+
+async def save_chat_message(
+    session: AsyncSession,
+    user_id: str,
+    role: str,
+    content: str,
+    system_context: str | None = None,
+) -> ChatMessage:
+    """Persist a single chat message to the database.
+
+    Parameters
+    ----------
+    session:
+        Active async session.
+    user_id:
+        The owner of the message.
+    role:
+        Either ``"user"`` or ``"assistant"``.
+    content:
+        The message body text.
+    system_context:
+        Optional system specialist key (e.g. ``"healing"``, ``"wealth"``).
+
+    Returns
+    -------
+    ChatMessage
+        The newly created row.
+    """
+    msg = ChatMessage(
+        user_id=user_id,
+        role=role,
+        content=content,
+        system_context=system_context,
+    )
+    session.add(msg)
+    await session.flush()
+    return msg
+
+
+async def get_chat_history(
+    session: AsyncSession,
+    user_id: str,
+    limit: int = 50,
+) -> list[ChatMessage]:
+    """Fetch the most recent chat messages for a user, ordered oldest-first.
+
+    Parameters
+    ----------
+    session:
+        Active async session.
+    user_id:
+        The user whose history to retrieve.
+    limit:
+        Maximum number of messages to return (default 50).
+
+    Returns
+    -------
+    list[ChatMessage]
+        Messages ordered by ``created_at`` ascending (oldest first).
+    """
+    result = await session.execute(
+        select(ChatMessage)
+        .where(ChatMessage.user_id == user_id)
+        .order_by(ChatMessage.created_at.asc())
+        .limit(limit)
+    )
+    return list(result.scalars().all())
