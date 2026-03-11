@@ -6,11 +6,11 @@ import { getReport, ApiError } from "@/lib/api";
 import { MotionReveal } from "@/components/shared/MotionReveal";
 
 const GENERATION_STEPS = [
-  { label: "Calculating numerology...", icon: "numerology", duration: 8000 },
-  { label: "Mapping astrology...", icon: "astrology", duration: 12000 },
-  { label: "Analyzing personality...", icon: "personality", duration: 10000 },
-  { label: "Mapping archetypes...", icon: "archetype", duration: 10000 },
-  { label: "Building your profile...", icon: "profile", duration: 20000 },
+  { label: "Calculating numerology...", icon: "numerology", duration: 4000 },
+  { label: "Mapping astrology...", icon: "astrology", duration: 6000 },
+  { label: "Analyzing personality...", icon: "personality", duration: 5000 },
+  { label: "Mapping archetypes...", icon: "archetype", duration: 5000 },
+  { label: "Building your profile...", icon: "profile", duration: 10000 },
 ];
 
 function StepIcon({ icon, className }: { icon: string; className?: string }) {
