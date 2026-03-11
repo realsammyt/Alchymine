@@ -555,9 +555,7 @@ def _healing_modality_matching(state: CoordinatorState) -> CoordinatorState:
             if not _intentions:
                 missing.append("intentions")
             if missing:
-                errors.append(
-                    f"Healing: modality matching skipped — missing {', '.join(missing)}"
-                )
+                errors.append(f"Healing: modality matching skipped — missing {', '.join(missing)}")
     except ImportError:
         errors.append("Healing: modality engine not available")
     except Exception as exc:
