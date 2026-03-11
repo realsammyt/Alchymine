@@ -1181,7 +1181,7 @@ export default function WealthPage() {
             {/* ── CTA ─────────────────────────────────────────────────── */}
             <MotionReveal delay={0.05}>
               <div className="text-center">
-                <Link href="/discover/assessment">
+                <Link href="/discover/intake">
                   <Button variant="primary" size="lg">
                     {hasIntake
                       ? "Update Your Wealth Profile"

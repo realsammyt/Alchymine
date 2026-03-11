@@ -176,7 +176,9 @@ function JournalPageInner() {
   const [deleting, setDeleting] = useState(false);
 
   // Tabs: "entries" | "templates"
-  const [activeTab, setActiveTab] = useState<"entries" | "templates">("entries");
+  const [activeTab, setActiveTab] = useState<"entries" | "templates">(
+    "entries",
+  );
 
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -243,7 +245,9 @@ function JournalPageInner() {
 
   const applyTemplate = useCallback((template: JournalTemplate) => {
     setFormTitle(template.title);
-    setFormContent(template.promptQuestions.map((q) => `## ${q}\n\n`).join("\n"));
+    setFormContent(
+      template.promptQuestions.map((q) => `## ${q}\n\n`).join("\n"),
+    );
     setFormSystem(template.system);
     setFormType(template.entryType);
     setFormTags(template.tags.join(", "));
@@ -429,7 +433,11 @@ function JournalPageInner() {
 
             {/* ── Tab switcher ──────────────────────────────────────── */}
             <MotionReveal delay={0.08}>
-              <div role="tablist" aria-label="Journal view" className="flex gap-1 mb-8 p-1 bg-white/[0.02] border border-white/[0.06] rounded-xl w-fit">
+              <div
+                role="tablist"
+                aria-label="Journal view"
+                className="flex gap-1 mb-8 p-1 bg-white/[0.02] border border-white/[0.06] rounded-xl w-fit"
+              >
                 <button
                   role="tab"
                   id="tab-entries"
@@ -462,164 +470,58 @@ function JournalPageInner() {
             </MotionReveal>
 
             {activeTab === "entries" && (
-              <div role="tabpanel" id="panel-entries" aria-labelledby="tab-entries">
-              {/* ── Stats bar ────────────────────────────────────────────── */}
-            {stats && (
-              <MotionReveal delay={0.1}>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-8">
-                  <StatCard
-                    label="Total Entries"
-                    value={stats.total_entries}
-                    accent="primary"
-                  />
-                  <StatCard
-                    label="Streak"
-                    value={`${stats.streak_days}d`}
-                    accent="accent"
-                  />
-                  <StatCard
-                    label="Avg Mood"
-                    value={
-                      stats.average_mood !== null
-                        ? `${stats.average_mood.toFixed(1)} ${moodEmoji(stats.average_mood)}`
-                        : "—"
-                    }
-                    accent="secondary"
-                  />
-                  <StatCard
-                    label="Tags Used"
-                    value={stats.tags_used.length}
-                    accent="primary"
-                  />
-                </div>
-              </MotionReveal>
-            )}
+              <div
+                role="tabpanel"
+                id="panel-entries"
+                aria-labelledby="tab-entries"
+              >
+                {/* ── Stats bar ────────────────────────────────────────────── */}
+                {stats && (
+                  <MotionReveal delay={0.1}>
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-8">
+                      <StatCard
+                        label="Total Entries"
+                        value={stats.total_entries}
+                        accent="primary"
+                      />
+                      <StatCard
+                        label="Streak"
+                        value={`${stats.streak_days}d`}
+                        accent="accent"
+                      />
+                      <StatCard
+                        label="Avg Mood"
+                        value={
+                          stats.average_mood !== null
+                            ? `${stats.average_mood.toFixed(1)} ${moodEmoji(stats.average_mood)}`
+                            : "—"
+                        }
+                        accent="secondary"
+                      />
+                      <StatCard
+                        label="Tags Used"
+                        value={stats.tags_used.length}
+                        accent="primary"
+                      />
+                    </div>
+                  </MotionReveal>
+                )}
 
-            {/* ── Filters ──────────────────────────────────────────────── */}
-            <MotionReveal delay={0.15}>
-              <div className="flex flex-col sm:flex-row gap-3 mb-8">
-                <div className="flex-1">
-                  <label htmlFor="filter-system" className={labelClass}>
-                    Filter by system
-                  </label>
-                  <div className="relative">
-                    <select
-                      id="filter-system"
-                      value={filterSystem}
-                      onChange={(e) => setFilterSystem(e.target.value)}
-                      className={selectClass}
-                    >
-                      <option value="">All Systems</option>
-                      {SYSTEMS.map((s) => (
-                        <option key={s} value={s}>
-                          {formatLabel(s)}
-                        </option>
-                      ))}
-                    </select>
-                    <svg
-                      className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text/30 pointer-events-none"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      aria-hidden="true"
-                    >
-                      <path d="m6 9 6 6 6-6" />
-                    </svg>
-                  </div>
-                </div>
-                <div className="flex-1">
-                  <label htmlFor="filter-type" className={labelClass}>
-                    Filter by type
-                  </label>
-                  <div className="relative">
-                    <select
-                      id="filter-type"
-                      value={filterType}
-                      onChange={(e) => setFilterType(e.target.value)}
-                      className={selectClass}
-                    >
-                      <option value="">All Types</option>
-                      {ENTRY_TYPES.map((t) => (
-                        <option key={t} value={t}>
-                          {formatLabel(t)}
-                        </option>
-                      ))}
-                    </select>
-                    <svg
-                      className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text/30 pointer-events-none"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      aria-hidden="true"
-                    >
-                      <path d="m6 9 6 6 6-6" />
-                    </svg>
-                  </div>
-                </div>
-              </div>
-            </MotionReveal>
-
-            {/* ── New entry form ────────────────────────────────────────── */}
-            {showForm && (
-              <MotionReveal delay={0}>
-                <form
-                  id="new-entry-form"
-                  onSubmit={handleSubmit}
-                  aria-label="New journal entry"
-                  className="card-surface-elevated p-6 mb-8 space-y-4"
-                >
-                  <h2 className="font-display text-lg font-medium text-text mb-2">
-                    New Entry
-                  </h2>
-
-                  <div>
-                    <label htmlFor="form-title" className={labelClass}>
-                      Title
-                    </label>
-                    <input
-                      id="form-title"
-                      type="text"
-                      placeholder="Give this entry a title…"
-                      value={formTitle}
-                      onChange={(e) => setFormTitle(e.target.value)}
-                      className={inputClass}
-                      required
-                    />
-                  </div>
-
-                  <div>
-                    <label htmlFor="form-content" className={labelClass}>
-                      Your thoughts
-                    </label>
-                    <textarea
-                      id="form-content"
-                      placeholder="Write freely — this is your space…"
-                      value={formContent}
-                      onChange={(e) => setFormContent(e.target.value)}
-                      rows={5}
-                      className={`${inputClass} resize-y`}
-                      required
-                    />
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div>
-                      <label htmlFor="form-system" className={labelClass}>
-                        System
+                {/* ── Filters ──────────────────────────────────────────────── */}
+                <MotionReveal delay={0.15}>
+                  <div className="flex flex-col sm:flex-row gap-3 mb-8">
+                    <div className="flex-1">
+                      <label htmlFor="filter-system" className={labelClass}>
+                        Filter by system
                       </label>
                       <div className="relative">
                         <select
-                          id="form-system"
-                          value={formSystem}
-                          onChange={(e) => setFormSystem(e.target.value)}
+                          id="filter-system"
+                          value={filterSystem}
+                          onChange={(e) => setFilterSystem(e.target.value)}
                           className={selectClass}
                         >
+                          <option value="">All Systems</option>
                           {SYSTEMS.map((s) => (
                             <option key={s} value={s}>
                               {formatLabel(s)}
@@ -640,18 +542,18 @@ function JournalPageInner() {
                         </svg>
                       </div>
                     </div>
-
-                    <div>
-                      <label htmlFor="form-type" className={labelClass}>
-                        Entry type
+                    <div className="flex-1">
+                      <label htmlFor="filter-type" className={labelClass}>
+                        Filter by type
                       </label>
                       <div className="relative">
                         <select
-                          id="form-type"
-                          value={formType}
-                          onChange={(e) => setFormType(e.target.value)}
+                          id="filter-type"
+                          value={filterType}
+                          onChange={(e) => setFilterType(e.target.value)}
                           className={selectClass}
                         >
+                          <option value="">All Types</option>
                           {ENTRY_TYPES.map((t) => (
                             <option key={t} value={t}>
                               {formatLabel(t)}
@@ -672,312 +574,428 @@ function JournalPageInner() {
                         </svg>
                       </div>
                     </div>
-
-                    <div>
-                      <label htmlFor="form-mood" className={labelClass}>
-                        Mood score — {formMood}/10{" "}
-                        <span aria-label={moodLabel(formMood)}>
-                          {moodEmoji(formMood)}
-                        </span>
-                      </label>
-                      <input
-                        id="form-mood"
-                        type="range"
-                        min={1}
-                        max={10}
-                        value={formMood}
-                        onChange={(e) => setFormMood(Number(e.target.value))}
-                        aria-valuemin={1}
-                        aria-valuemax={10}
-                        aria-valuenow={formMood}
-                        aria-valuetext={`${formMood} — ${moodLabel(formMood)}`}
-                        className="w-full accent-primary mt-2 h-1.5"
-                      />
-                    </div>
-
-                    <div>
-                      <label htmlFor="form-tags" className={labelClass}>
-                        Tags{" "}
-                        <span className="text-text/25 font-normal">
-                          (comma-separated)
-                        </span>
-                      </label>
-                      <input
-                        id="form-tags"
-                        type="text"
-                        placeholder="growth, insight, clarity"
-                        value={formTags}
-                        onChange={(e) => setFormTags(e.target.value)}
-                        className={inputClass}
-                      />
-                    </div>
                   </div>
+                </MotionReveal>
 
-                  <div className="flex items-center gap-3 pt-1">
-                    <button
-                      type="submit"
-                      disabled={submitting}
-                      className="touch-target inline-flex items-center gap-2 px-6 py-2.5 bg-gradient-to-r from-primary-dark via-primary to-primary-light text-bg font-body font-medium text-sm rounded-xl transition-all duration-300 hover:shadow-[0_0_30px_rgba(218,165,32,0.25)] hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none"
+                {/* ── New entry form ────────────────────────────────────────── */}
+                {showForm && (
+                  <MotionReveal delay={0}>
+                    <form
+                      id="new-entry-form"
+                      onSubmit={handleSubmit}
+                      aria-label="New journal entry"
+                      className="card-surface-elevated p-6 mb-8 space-y-4"
                     >
-                      {submitting ? (
-                        <>
-                          <span
-                            className="w-4 h-4 border-2 border-bg/30 border-t-bg rounded-full animate-spin"
-                            aria-hidden="true"
+                      <h2 className="font-display text-lg font-medium text-text mb-2">
+                        New Entry
+                      </h2>
+
+                      <div>
+                        <label htmlFor="form-title" className={labelClass}>
+                          Title
+                        </label>
+                        <input
+                          id="form-title"
+                          type="text"
+                          placeholder="Give this entry a title…"
+                          value={formTitle}
+                          onChange={(e) => setFormTitle(e.target.value)}
+                          className={inputClass}
+                          required
+                        />
+                      </div>
+
+                      <div>
+                        <label htmlFor="form-content" className={labelClass}>
+                          Your thoughts
+                        </label>
+                        <textarea
+                          id="form-content"
+                          placeholder="Write freely — this is your space…"
+                          value={formContent}
+                          onChange={(e) => setFormContent(e.target.value)}
+                          rows={5}
+                          className={`${inputClass} resize-y`}
+                          required
+                        />
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                          <label htmlFor="form-system" className={labelClass}>
+                            System
+                          </label>
+                          <div className="relative">
+                            <select
+                              id="form-system"
+                              value={formSystem}
+                              onChange={(e) => setFormSystem(e.target.value)}
+                              className={selectClass}
+                            >
+                              {SYSTEMS.map((s) => (
+                                <option key={s} value={s}>
+                                  {formatLabel(s)}
+                                </option>
+                              ))}
+                            </select>
+                            <svg
+                              className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text/30 pointer-events-none"
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth="2"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              aria-hidden="true"
+                            >
+                              <path d="m6 9 6 6 6-6" />
+                            </svg>
+                          </div>
+                        </div>
+
+                        <div>
+                          <label htmlFor="form-type" className={labelClass}>
+                            Entry type
+                          </label>
+                          <div className="relative">
+                            <select
+                              id="form-type"
+                              value={formType}
+                              onChange={(e) => setFormType(e.target.value)}
+                              className={selectClass}
+                            >
+                              {ENTRY_TYPES.map((t) => (
+                                <option key={t} value={t}>
+                                  {formatLabel(t)}
+                                </option>
+                              ))}
+                            </select>
+                            <svg
+                              className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text/30 pointer-events-none"
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth="2"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              aria-hidden="true"
+                            >
+                              <path d="m6 9 6 6 6-6" />
+                            </svg>
+                          </div>
+                        </div>
+
+                        <div>
+                          <label htmlFor="form-mood" className={labelClass}>
+                            Mood score — {formMood}/10{" "}
+                            <span aria-label={moodLabel(formMood)}>
+                              {moodEmoji(formMood)}
+                            </span>
+                          </label>
+                          <input
+                            id="form-mood"
+                            type="range"
+                            min={1}
+                            max={10}
+                            value={formMood}
+                            onChange={(e) =>
+                              setFormMood(Number(e.target.value))
+                            }
+                            aria-valuemin={1}
+                            aria-valuemax={10}
+                            aria-valuenow={formMood}
+                            aria-valuetext={`${formMood} — ${moodLabel(formMood)}`}
+                            className="w-full accent-primary mt-2 h-1.5"
                           />
-                          Saving…
-                        </>
-                      ) : (
-                        <>
-                          <svg
-                            className="w-4 h-4"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="currentColor"
-                            strokeWidth="2"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            aria-hidden="true"
-                          >
-                            <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" />
-                            <polyline points="17 21 17 13 7 13 7 21" />
-                            <polyline points="7 3 7 8 15 8" />
-                          </svg>
-                          Save Entry
-                        </>
-                      )}
-                    </button>
+                        </div>
 
-                    <button
-                      type="button"
-                      onClick={() => setShowForm(false)}
-                      className="touch-target px-5 py-2.5 border border-white/[0.08] text-text/40 font-body text-sm rounded-xl hover:bg-white/[0.03] hover:text-text/60 hover:border-white/[0.12] transition-all duration-300"
+                        <div>
+                          <label htmlFor="form-tags" className={labelClass}>
+                            Tags{" "}
+                            <span className="text-text/25 font-normal">
+                              (comma-separated)
+                            </span>
+                          </label>
+                          <input
+                            id="form-tags"
+                            type="text"
+                            placeholder="growth, insight, clarity"
+                            value={formTags}
+                            onChange={(e) => setFormTags(e.target.value)}
+                            className={inputClass}
+                          />
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-3 pt-1">
+                        <button
+                          type="submit"
+                          disabled={submitting}
+                          className="touch-target inline-flex items-center gap-2 px-6 py-2.5 bg-gradient-to-r from-primary-dark via-primary to-primary-light text-bg font-body font-medium text-sm rounded-xl transition-all duration-300 hover:shadow-[0_0_30px_rgba(218,165,32,0.25)] hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none"
+                        >
+                          {submitting ? (
+                            <>
+                              <span
+                                className="w-4 h-4 border-2 border-bg/30 border-t-bg rounded-full animate-spin"
+                                aria-hidden="true"
+                              />
+                              Saving…
+                            </>
+                          ) : (
+                            <>
+                              <svg
+                                className="w-4 h-4"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="2"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                aria-hidden="true"
+                              >
+                                <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" />
+                                <polyline points="17 21 17 13 7 13 7 21" />
+                                <polyline points="7 3 7 8 15 8" />
+                              </svg>
+                              Save Entry
+                            </>
+                          )}
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => setShowForm(false)}
+                          className="touch-target px-5 py-2.5 border border-white/[0.08] text-text/40 font-body text-sm rounded-xl hover:bg-white/[0.03] hover:text-text/60 hover:border-white/[0.12] transition-all duration-300"
+                        >
+                          Discard
+                        </button>
+                      </div>
+                    </form>
+                  </MotionReveal>
+                )}
+
+                {/* ── Error banner ─────────────────────────────────────────── */}
+                {error && (
+                  <MotionReveal delay={0}>
+                    <div
+                      role="alert"
+                      className="flex items-start gap-3 bg-primary-dark/[0.08] border border-primary-dark/[0.18] text-primary-dark text-sm font-body rounded-xl px-4 py-3 mb-6"
                     >
-                      Discard
-                    </button>
-                  </div>
-                </form>
-              </MotionReveal>
-            )}
+                      <svg
+                        className="w-4 h-4 flex-shrink-0 mt-0.5"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        aria-hidden="true"
+                      >
+                        <circle cx="12" cy="12" r="10" />
+                        <line x1="12" y1="8" x2="12" y2="12" />
+                        <line x1="12" y1="16" x2="12.01" y2="16" />
+                      </svg>
+                      {error}
+                    </div>
+                  </MotionReveal>
+                )}
 
-            {/* ── Error banner ─────────────────────────────────────────── */}
-            {error && (
-              <MotionReveal delay={0}>
-                <div
-                  role="alert"
-                  className="flex items-start gap-3 bg-primary-dark/[0.08] border border-primary-dark/[0.18] text-primary-dark text-sm font-body rounded-xl px-4 py-3 mb-6"
-                >
-                  <svg
-                    className="w-4 h-4 flex-shrink-0 mt-0.5"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    aria-hidden="true"
+                {/* ── Loading state ─────────────────────────────────────────── */}
+                {loading && (
+                  <div
+                    className="flex flex-col items-center gap-4 py-20"
+                    role="status"
+                    aria-label="Loading journal entries"
                   >
-                    <circle cx="12" cy="12" r="10" />
-                    <line x1="12" y1="8" x2="12" y2="12" />
-                    <line x1="12" y1="16" x2="12.01" y2="16" />
-                  </svg>
-                  {error}
-                </div>
-              </MotionReveal>
-            )}
-
-            {/* ── Loading state ─────────────────────────────────────────── */}
-            {loading && (
-              <div
-                className="flex flex-col items-center gap-4 py-20"
-                role="status"
-                aria-label="Loading journal entries"
-              >
-                <span
-                  className="w-8 h-8 border-2 border-primary/30 border-t-primary rounded-full animate-spin"
-                  aria-hidden="true"
-                />
-                <p className="text-sm font-body text-text/35">
-                  Loading journal entries…
-                </p>
-              </div>
-            )}
-
-            {/* ── Empty state ───────────────────────────────────────────── */}
-            {!loading && entries.length === 0 && (
-              <MotionReveal delay={0.1}>
-                <div className="card-surface flex flex-col items-center gap-5 py-16 px-6 text-center">
-                  <div className="w-16 h-16 rounded-2xl bg-primary/[0.06] border border-primary/[0.12] flex items-center justify-center">
-                    <svg
-                      className="w-7 h-7 text-primary/50"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="1.5"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
+                    <span
+                      className="w-8 h-8 border-2 border-primary/30 border-t-primary rounded-full animate-spin"
                       aria-hidden="true"
-                    >
-                      <path d="M12 20h9" />
-                      <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" />
-                    </svg>
-                  </div>
-                  <div>
-                    <h2 className="font-display text-xl font-light text-text mb-2">
-                      Your journal awaits
-                    </h2>
-                    <p className="text-sm font-body text-text/35 max-w-xs">
-                      Begin your reflection practice — write your first entry
-                      and start tracking patterns across your transformation
-                      journey.
+                    />
+                    <p className="text-sm font-body text-text/35">
+                      Loading journal entries…
                     </p>
                   </div>
-                  <button
-                    onClick={() => setShowForm(true)}
-                    className="touch-target inline-flex items-center gap-2 px-6 py-2.5 bg-gradient-to-r from-primary-dark via-primary to-primary-light text-bg font-body font-medium text-sm rounded-xl transition-all duration-300 hover:shadow-[0_0_30px_rgba(218,165,32,0.25)] hover:scale-[1.02] active:scale-[0.98]"
-                  >
-                    <svg
-                      className="w-4 h-4"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      aria-hidden="true"
-                    >
-                      <path d="M12 5v14" />
-                      <path d="M5 12h14" />
-                    </svg>
-                    Write First Entry
-                  </button>
-                </div>
-              </MotionReveal>
-            )}
+                )}
 
-            {/* ── Entries list ──────────────────────────────────────────── */}
-            {!loading && entries.length > 0 && (
-              <MotionStagger
-                staggerDelay={0.06}
-                className="flex flex-col gap-3"
-              >
-                {entries.map((entry) => {
-                  const colors = getSystemColors(entry.system);
-                  return (
-                    <MotionStaggerItem key={entry.id}>
-                      <button
-                        onClick={() => setSelectedEntry(entry)}
-                        className={`group w-full text-left card-surface border-l-4 ${colors.border} px-5 py-4 hover:-translate-y-0.5 hover:border-opacity-100 transition-all duration-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40`}
-                        aria-label={`Open journal entry: ${entry.title}`}
-                      >
-                        <div className="flex items-start justify-between gap-3 mb-2">
-                          <h3 className="font-display text-base font-medium text-text group-hover:text-text/90 transition-colors">
-                            {entry.title}
-                          </h3>
-                          {entry.mood_score !== null && (
-                            <span
-                              className="text-xl flex-shrink-0"
-                              aria-label={`Mood: ${moodLabel(entry.mood_score)}`}
-                            >
-                              {moodEmoji(entry.mood_score)}
-                            </span>
-                          )}
-                        </div>
-                        <p className="text-sm font-body text-text/35 mb-3 leading-relaxed">
-                          {entry.content.length > 120
-                            ? entry.content.slice(0, 120) + "…"
-                            : entry.content}
+                {/* ── Empty state ───────────────────────────────────────────── */}
+                {!loading && entries.length === 0 && (
+                  <MotionReveal delay={0.1}>
+                    <div className="card-surface flex flex-col items-center gap-5 py-16 px-6 text-center">
+                      <div className="w-16 h-16 rounded-2xl bg-primary/[0.06] border border-primary/[0.12] flex items-center justify-center">
+                        <svg
+                          className="w-7 h-7 text-primary/50"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="1.5"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          aria-hidden="true"
+                        >
+                          <path d="M12 20h9" />
+                          <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" />
+                        </svg>
+                      </div>
+                      <div>
+                        <h2 className="font-display text-xl font-light text-text mb-2">
+                          Your journal awaits
+                        </h2>
+                        <p className="text-sm font-body text-text/35 max-w-xs">
+                          Begin your reflection practice — write your first
+                          entry and start tracking patterns across your
+                          transformation journey.
                         </p>
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span
-                            className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[0.65rem] font-body font-medium ${colors.badge}`}
-                          >
-                            <span
-                              className={`w-1 h-1 rounded-full ${colors.dot}`}
-                              aria-hidden="true"
-                            />
-                            {formatLabel(entry.system)}
-                          </span>
-                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[0.65rem] font-body font-medium bg-white/[0.04] text-text/40">
-                            {formatLabel(entry.entry_type)}
-                          </span>
-                          <time
-                            dateTime={entry.created_at}
-                            className="ml-auto text-[0.65rem] font-body text-text/25"
-                          >
-                            {new Date(entry.created_at).toLocaleDateString(
-                              undefined,
-                              {
-                                month: "short",
-                                day: "numeric",
-                                year: "numeric",
-                              },
-                            )}
-                          </time>
-                        </div>
+                      </div>
+                      <button
+                        onClick={() => setShowForm(true)}
+                        className="touch-target inline-flex items-center gap-2 px-6 py-2.5 bg-gradient-to-r from-primary-dark via-primary to-primary-light text-bg font-body font-medium text-sm rounded-xl transition-all duration-300 hover:shadow-[0_0_30px_rgba(218,165,32,0.25)] hover:scale-[1.02] active:scale-[0.98]"
+                      >
+                        <svg
+                          className="w-4 h-4"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          aria-hidden="true"
+                        >
+                          <path d="M12 5v14" />
+                          <path d="M5 12h14" />
+                        </svg>
+                        Write First Entry
                       </button>
-                    </MotionStaggerItem>
-                  );
-                })}
-              </MotionStagger>
-            )}
-            </div>
+                    </div>
+                  </MotionReveal>
+                )}
+
+                {/* ── Entries list ──────────────────────────────────────────── */}
+                {!loading && entries.length > 0 && (
+                  <MotionStagger
+                    staggerDelay={0.06}
+                    className="flex flex-col gap-3"
+                  >
+                    {entries.map((entry) => {
+                      const colors = getSystemColors(entry.system);
+                      return (
+                        <MotionStaggerItem key={entry.id}>
+                          <button
+                            onClick={() => setSelectedEntry(entry)}
+                            className={`group w-full text-left card-surface border-l-4 ${colors.border} px-5 py-4 hover:-translate-y-0.5 hover:border-opacity-100 transition-all duration-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40`}
+                            aria-label={`Open journal entry: ${entry.title}`}
+                          >
+                            <div className="flex items-start justify-between gap-3 mb-2">
+                              <h3 className="font-display text-base font-medium text-text group-hover:text-text/90 transition-colors">
+                                {entry.title}
+                              </h3>
+                              {entry.mood_score !== null && (
+                                <span
+                                  className="text-xl flex-shrink-0"
+                                  aria-label={`Mood: ${moodLabel(entry.mood_score)}`}
+                                >
+                                  {moodEmoji(entry.mood_score)}
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-sm font-body text-text/35 mb-3 leading-relaxed">
+                              {entry.content.length > 120
+                                ? entry.content.slice(0, 120) + "…"
+                                : entry.content}
+                            </p>
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span
+                                className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[0.65rem] font-body font-medium ${colors.badge}`}
+                              >
+                                <span
+                                  className={`w-1 h-1 rounded-full ${colors.dot}`}
+                                  aria-hidden="true"
+                                />
+                                {formatLabel(entry.system)}
+                              </span>
+                              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[0.65rem] font-body font-medium bg-white/[0.04] text-text/40">
+                                {formatLabel(entry.entry_type)}
+                              </span>
+                              <time
+                                dateTime={entry.created_at}
+                                className="ml-auto text-[0.65rem] font-body text-text/25"
+                              >
+                                {new Date(entry.created_at).toLocaleDateString(
+                                  undefined,
+                                  {
+                                    month: "short",
+                                    day: "numeric",
+                                    year: "numeric",
+                                  },
+                                )}
+                              </time>
+                            </div>
+                          </button>
+                        </MotionStaggerItem>
+                      );
+                    })}
+                  </MotionStagger>
+                )}
+              </div>
             )}
 
             {/* ── Templates tab ──────────────────────────────────────── */}
             {activeTab === "templates" && (
-              <div role="tabpanel" id="panel-templates" aria-labelledby="tab-templates">
-              <MotionReveal delay={0.1}>
-                <div className="space-y-8">
-                  {(
-                    [
-                      "perspective",
-                      "wealth",
-                      "healing",
-                      "intelligence",
-                      "creative",
-                    ] as AlchymineSystem[]
-                  ).map((system) => {
-                    const templates = getTemplatesBySystem(system);
-                    if (templates.length === 0) return null;
-                    const colors = getSystemColors(system);
-                    return (
-                      <section key={system}>
-                        <h3
-                          className={`font-display text-lg font-medium ${colors.text} mb-4 flex items-center gap-2`}
-                        >
-                          <span
-                            className={`w-2 h-2 rounded-full ${colors.dot}`}
-                            aria-hidden="true"
-                          />
-                          {formatLabel(system)}
-                        </h3>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                          {templates.map((tmpl) => (
-                            <button
-                              key={tmpl.id}
-                              onClick={() => applyTemplate(tmpl)}
-                              className="group text-left card-surface px-5 py-4 hover:-translate-y-0.5 transition-all duration-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
-                            >
-                              <h4 className="font-display text-sm font-medium text-text group-hover:text-text/90 mb-1">
-                                {tmpl.label}
-                              </h4>
-                              <p className="text-xs font-body text-text/35 leading-relaxed">
-                                {tmpl.description}
-                              </p>
-                              <div className="flex items-center gap-2 mt-3">
-                                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[0.6rem] font-body font-medium bg-white/[0.04] text-text/30">
-                                  {formatLabel(tmpl.entryType)}
-                                </span>
-                              </div>
-                            </button>
-                          ))}
-                        </div>
-                      </section>
-                    );
-                  })}
-                </div>
-              </MotionReveal>
+              <div
+                role="tabpanel"
+                id="panel-templates"
+                aria-labelledby="tab-templates"
+              >
+                <MotionReveal delay={0.1}>
+                  <div className="space-y-8">
+                    {(
+                      [
+                        "perspective",
+                        "wealth",
+                        "healing",
+                        "intelligence",
+                        "creative",
+                      ] as AlchymineSystem[]
+                    ).map((system) => {
+                      const templates = getTemplatesBySystem(system);
+                      if (templates.length === 0) return null;
+                      const colors = getSystemColors(system);
+                      return (
+                        <section key={system}>
+                          <h3
+                            className={`font-display text-lg font-medium ${colors.text} mb-4 flex items-center gap-2`}
+                          >
+                            <span
+                              className={`w-2 h-2 rounded-full ${colors.dot}`}
+                              aria-hidden="true"
+                            />
+                            {formatLabel(system)}
+                          </h3>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            {templates.map((tmpl) => (
+                              <button
+                                key={tmpl.id}
+                                onClick={() => applyTemplate(tmpl)}
+                                className="group text-left card-surface px-5 py-4 hover:-translate-y-0.5 transition-all duration-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+                              >
+                                <h4 className="font-display text-sm font-medium text-text group-hover:text-text/90 mb-1">
+                                  {tmpl.label}
+                                </h4>
+                                <p className="text-xs font-body text-text/35 leading-relaxed">
+                                  {tmpl.description}
+                                </p>
+                                <div className="flex items-center gap-2 mt-3">
+                                  <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[0.6rem] font-body font-medium bg-white/[0.04] text-text/30">
+                                    {formatLabel(tmpl.entryType)}
+                                  </span>
+                                </div>
+                              </button>
+                            ))}
+                          </div>
+                        </section>
+                      );
+                    })}
+                  </div>
+                </MotionReveal>
               </div>
             )}
           </div>

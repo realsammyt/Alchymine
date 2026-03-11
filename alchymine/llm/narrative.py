@@ -134,7 +134,7 @@ def flatten_engine_data(data: dict[str, Any]) -> dict[str, Any]:
             lines = []
             for item in value:
                 if isinstance(item, dict):
-                    name = item.get("name", item.get("type", str(item)))
+                    name = item.get("name", item.get("modality", item.get("type", str(item))))
                     desc = item.get("description", "")
                     lines.append(f"- **{name}**: {desc}" if desc else f"- {name}")
                 else:
