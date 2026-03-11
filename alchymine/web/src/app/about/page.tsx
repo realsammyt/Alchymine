@@ -247,7 +247,11 @@ function FeedbackFormCTA() {
       >
         Share Your Feedback
       </button>
-      <FeedbackForm isOpen={open} onClose={() => setOpen(false)} pageUrl="/about" />
+      <FeedbackForm
+        isOpen={open}
+        onClose={() => setOpen(false)}
+        pageUrl="/about"
+      />
     </>
   );
 }
@@ -675,7 +679,8 @@ export default function AboutPage() {
             </h2>
             <p className="text-text/40 font-body mb-8 leading-relaxed">
               Found a bug? Have a feature idea? Just want to share how the
-              journey is going? Your feedback directly shapes what we build next.
+              journey is going? Your feedback directly shapes what we build
+              next.
             </p>
             <FeedbackFormCTA />
           </MotionReveal>

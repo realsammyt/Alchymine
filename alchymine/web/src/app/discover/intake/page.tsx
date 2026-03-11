@@ -175,7 +175,6 @@ export default function IntakePage() {
   const [errors, setErrors] = useState<
     Partial<Record<keyof IntakeFormData | "intentions", string>>
   >({});
-  const [wealthExpanded, setWealthExpanded] = useState(false);
 
   // Pre-fill from saved profile (enables cross-device sync)
   useEffect(() => {
@@ -507,43 +506,17 @@ export default function IntakePage() {
               )}
             </fieldset>
 
-            {/* Financial Context (Optional, Collapsible) */}
-            <div className="border border-white/[0.06] rounded-xl overflow-hidden">
-              <button
-                type="button"
-                onClick={() => setWealthExpanded((prev) => !prev)}
-                className="w-full flex items-center justify-between px-4 py-3 text-left text-sm font-body font-medium text-text/60 hover:bg-white/[0.02] transition-colors"
-                aria-expanded={wealthExpanded}
-                aria-controls="wealth-context-section"
-              >
-                <span>
-                  Financial Context{" "}
-                  <span className="text-text/25 font-normal">(optional)</span>
-                </span>
-                <svg
-                  className={`w-4 h-4 text-text/30 transition-transform duration-200 ${
-                    wealthExpanded ? "rotate-180" : ""
-                  }`}
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  aria-hidden="true"
-                >
-                  <path d="m6 9 6 6 6-6" />
-                </svg>
-              </button>
-              {wealthExpanded && (
-                <div
-                  id="wealth-context-section"
-                  className="px-4 pb-4 space-y-4 border-t border-white/[0.04]"
-                >
-                  <p className="text-[0.65rem] font-body text-text/25 pt-3">
-                    Your financial data is encrypted and never shared with AI.
-                    All fields are optional.
-                  </p>
+            {/* Financial Context */}
+            <fieldset>
+              <legend className="block text-sm font-body font-medium text-text/60 mb-1">
+                Financial Context{" "}
+                <span className="text-text/25 font-normal">(optional)</span>
+              </legend>
+              <p className="text-[0.65rem] font-body text-text/25 mb-3">
+                Your financial data is encrypted and never shared with AI.
+                All fields are optional.
+              </p>
+              <div className="space-y-4">
                   {/* Income Range */}
                   <div>
                     <label
@@ -564,7 +537,7 @@ export default function IntakePage() {
                           },
                         }))
                       }
-                      className={inputClass}
+                      className={`${inputClass} [&>option]:bg-[#141420] [&>option]:text-text`}
                     >
                       {INCOME_RANGES.map((r) => (
                         <option key={r.value} value={r.value}>
@@ -593,7 +566,7 @@ export default function IntakePage() {
                           },
                         }))
                       }
-                      className={inputClass}
+                      className={`${inputClass} [&>option]:bg-[#141420] [&>option]:text-text`}
                     >
                       {DEBT_LEVELS.map((d) => (
                         <option key={d.value} value={d.value}>
@@ -693,9 +666,8 @@ export default function IntakePage() {
                       className={inputClass}
                     />
                   </div>
-                </div>
-              )}
-            </div>
+              </div>
+            </fieldset>
 
             {/* Submit */}
             <div className="pt-4">
