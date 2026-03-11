@@ -20,6 +20,7 @@ import {
   MotionStagger,
   MotionStaggerItem,
 } from "@/components/shared/MotionReveal";
+import ReportHero from "@/components/report/ReportHero";
 
 // ─── Helper components ───────────────────────────────────────────────
 
@@ -266,9 +267,42 @@ export default function ReportPage() {
     (key) => narratives?.[key]?.text,
   );
 
+  // Build profile context for hero image generation
+  const heroProfile = {
+    archetype: (identity?.archetype as string | undefined) ?? undefined,
+    zodiac_sign: (identity?.astrology as { sun_sign?: string } | undefined)
+      ?.sun_sign,
+    big_five: identity?.personality?.big_five
+      ? {
+          openness: (identity.personality.big_five as { openness?: number })
+            ?.openness,
+          conscientiousness: (
+            identity.personality.big_five as { conscientiousness?: number }
+          )?.conscientiousness,
+          extraversion: (
+            identity.personality.big_five as { extraversion?: number }
+          )?.extraversion,
+        }
+      : undefined,
+  };
+
   return (
     <div className="flex-1 px-4 sm:px-6 py-12">
       <div className="max-w-4xl mx-auto">
+        {/* Personalized hero image — degrades to gradient when Gemini unavailable */}
+        <MotionReveal>
+          <div className="mb-10">
+            <ReportHero
+              profile={heroProfile}
+              token={
+                typeof window !== "undefined"
+                  ? (localStorage.getItem("access_token") ?? undefined)
+                  : undefined
+              }
+            />
+          </div>
+        </MotionReveal>
+
         {/* Report Header */}
         <MotionReveal>
           <div className="text-center mb-14">
