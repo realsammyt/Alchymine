@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import Button from "@/components/shared/Button";
 import { useAuth } from "@/lib/AuthContext";
-import { friendlyAuthError } from "@/lib/api";
+import { friendlyAuthError, joinWaitlist } from "@/lib/api";
 import { MotionReveal } from "@/components/shared/MotionReveal";
 
 export default function SignupPage() {
@@ -18,6 +18,26 @@ export default function SignupPage() {
   const [promoCode, setPromoCode] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+
+  // Waitlist
+  const [waitlistEmail, setWaitlistEmail] = useState("");
+  const [waitlistLoading, setWaitlistLoading] = useState(false);
+  const [waitlistSuccess, setWaitlistSuccess] = useState(false);
+  const [waitlistError, setWaitlistError] = useState("");
+
+  async function handleWaitlist(e: FormEvent) {
+    e.preventDefault();
+    setWaitlistError("");
+    setWaitlistLoading(true);
+    try {
+      await joinWaitlist(waitlistEmail);
+      setWaitlistSuccess(true);
+    } catch {
+      setWaitlistError("Something went wrong. Please try again.");
+    } finally {
+      setWaitlistLoading(false);
+    }
+  }
 
   useEffect(() => {
     const invite = searchParams.get("invite");
@@ -190,6 +210,62 @@ export default function SignupPage() {
               </Link>
             </p>
           </form>
+        </MotionReveal>
+
+        {/* ── Waitlist module ──────────────────────────────────────── */}
+        <MotionReveal delay={0.2}>
+          <div className="mt-6 card-surface p-6">
+            <div className="flex items-center gap-3 mb-4">
+              <hr className="flex-1 border-white/[0.06]" />
+              <span className="text-xs font-body text-text/30 whitespace-nowrap">
+                Don&apos;t have an invitation code?
+              </span>
+              <hr className="flex-1 border-white/[0.06]" />
+            </div>
+
+            {waitlistSuccess ? (
+              <div className="text-center py-2">
+                <p className="text-sm font-body text-primary">
+                  You&apos;re on the list — we&apos;ll be in touch!
+                </p>
+              </div>
+            ) : (
+              <form onSubmit={handleWaitlist} className="space-y-3">
+                {waitlistError && (
+                  <div
+                    role="alert"
+                    className="bg-primary-dark/10 border border-primary-dark/20 text-primary-dark text-sm font-body rounded-xl p-3"
+                  >
+                    {waitlistError}
+                  </div>
+                )}
+                <div>
+                  <label
+                    htmlFor="waitlist-email"
+                    className="block font-body text-sm font-medium text-text/70 mb-1.5"
+                  >
+                    Join the Waitlist
+                  </label>
+                  <input
+                    id="waitlist-email"
+                    type="email"
+                    required
+                    value={waitlistEmail}
+                    onChange={(e) => setWaitlistEmail(e.target.value)}
+                    className="w-full bg-white/[0.03] border border-white/[0.08] rounded-xl px-4 py-3 text-sm font-body placeholder:text-text/25 focus:border-primary/40 focus:ring-1 focus:ring-primary/20 focus:bg-white/[0.05] transition-all duration-300 focus:outline-none text-text"
+                    placeholder="you@example.com"
+                  />
+                </div>
+                <Button
+                  type="submit"
+                  loading={waitlistLoading}
+                  className="w-full"
+                >
+                  Join Waitlist
+                </Button>
+              </form>
+            )}
+          </div>
         </MotionReveal>
       </div>
     </main>
