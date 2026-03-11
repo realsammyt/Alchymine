@@ -488,6 +488,7 @@ def _healing_modality_matching(state: CoordinatorState) -> CoordinatorState:
 
     try:
         from alchymine.engine.healing import match_modalities
+        from alchymine.engine.healing.modalities import MODALITY_REGISTRY
         from alchymine.engine.profile import BigFiveScores
 
         archetype = request_data.get("archetype")
@@ -520,6 +521,22 @@ def _healing_modality_matching(state: CoordinatorState) -> CoordinatorState:
             results["recommended_modalities"] = [
                 {
                     "modality": m.modality,
+                    "name": m.modality.replace("_", " ").title(),
+                    "description": (
+                        MODALITY_REGISTRY[m.modality].description
+                        if m.modality in MODALITY_REGISTRY
+                        else ""
+                    ),
+                    "evidence_level": (
+                        MODALITY_REGISTRY[m.modality].evidence_level
+                        if m.modality in MODALITY_REGISTRY
+                        else ""
+                    ),
+                    "category": (
+                        MODALITY_REGISTRY[m.modality].category
+                        if m.modality in MODALITY_REGISTRY
+                        else ""
+                    ),
                     "skill_trigger": m.skill_trigger,
                     "preference_score": m.preference_score,
                     "difficulty_level": m.difficulty_level.value
@@ -528,6 +545,19 @@ def _healing_modality_matching(state: CoordinatorState) -> CoordinatorState:
                 }
                 for m in modalities
             ]
+        else:
+            # Log which prerequisites are missing to aid debugging
+            missing = []
+            if not archetype:
+                missing.append("archetype")
+            if not big_five:
+                missing.append("big_five")
+            if not _intentions:
+                missing.append("intentions")
+            if missing:
+                errors.append(
+                    f"Healing: modality matching skipped — missing {', '.join(missing)}"
+                )
     except ImportError:
         errors.append("Healing: modality engine not available")
     except Exception as exc:
@@ -537,7 +567,13 @@ def _healing_modality_matching(state: CoordinatorState) -> CoordinatorState:
 
 
 def _healing_personality_context(state: CoordinatorState) -> CoordinatorState:
-    """Extract Big Five and attachment style from request_data for narrative template."""
+    """Extract Big Five and attachment style from request_data for narrative template.
+
+    Always sets ``openness``, ``neuroticism``, and ``attachment_style`` in
+    results — using neutral defaults (50) when Intelligence data is
+    unavailable — so the healing narrative template never has unfilled
+    placeholders.
+    """
     results = dict(state.get("results", {}))
     request_data = state.get("request_data", {})
 
@@ -555,6 +591,38 @@ def _healing_personality_context(state: CoordinatorState) -> CoordinatorState:
         attachment = big_five_raw.get("attachment_style") or request_data.get("attachment_style")
         if attachment:
             results["attachment_style"] = attachment
+
+    # Ensure fallback defaults so template placeholders are always filled.
+    # Neutral midpoint (50) avoids biasing the LLM narrative in either
+    # direction when real personality data is unavailable.
+    results.setdefault("openness", 50)
+    results.setdefault("neuroticism", 50)
+    results.setdefault("attachment_style", "not assessed")
+
+    # Ensure crisis_flag always has a value for the template
+    results.setdefault("crisis_flag", False)
+
+    # If modality matching couldn't run (missing Intelligence data),
+    # provide general-purpose modalities so the template placeholder
+    # {modalities_section} is never left unfilled.
+    if "recommended_modalities" not in results:
+        results["recommended_modalities"] = [
+            {
+                "name": "Breathwork",
+                "description": "Conscious breathing techniques that regulate the nervous system",
+                "evidence_level": "strong",
+            },
+            {
+                "name": "Mindfulness Meditation",
+                "description": "Present-moment awareness practices for stress reduction",
+                "evidence_level": "strong",
+            },
+            {
+                "name": "Somatic Practice",
+                "description": "Body-based awareness exercises for releasing tension",
+                "evidence_level": "strong",
+            },
+        ]
 
     return {**state, "results": results}
 
