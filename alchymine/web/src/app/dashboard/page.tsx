@@ -131,10 +131,12 @@ function ProgressRing({
   value,
   label,
   size = 80,
+  glow = false,
 }: {
   value: number;
   label: string;
   size?: number;
+  glow?: boolean;
 }) {
   const gradientId = useId();
   const radius = (size - 8) / 2;
@@ -144,7 +146,10 @@ function ProgressRing({
 
   return (
     <div className="flex flex-col items-center gap-3">
-      <div className="relative" style={{ width: size, height: size }}>
+      <div
+        className={`relative${glow ? " glow-gold rounded-full" : ""}`}
+        style={{ width: size, height: size }}
+      >
         <svg
           width={size}
           height={size}
@@ -565,8 +570,9 @@ export default function DashboardPage() {
     [userId],
   );
 
-  // Derive a greeting name from email or use generic fallback
-  const displayName = user?.email?.split("@")[0] ?? "Alchemist";
+  // Derive a greeting name: prefer full name from intake, fall back to email prefix
+  const displayName =
+    intake?.fullName || user?.email?.split("@")[0] || "Alchemist";
 
   return (
     <ProtectedRoute>
@@ -825,13 +831,12 @@ export default function DashboardPage() {
                           <div>
                             {/* Progress ring — featured hero metric */}
                             <div className="flex justify-center mb-8">
-                              <div className="glow-gold rounded-full p-1">
-                                <ProgressRing
-                                  value={outcomes.data.overall_score}
-                                  label="Overall Score"
-                                  size={110}
-                                />
-                              </div>
+                              <ProgressRing
+                                value={outcomes.data.overall_score}
+                                label="Overall Score"
+                                size={110}
+                                glow
+                              />
                             </div>
 
                             <hr className="rule-gold mb-6" />
