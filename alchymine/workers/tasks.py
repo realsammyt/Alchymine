@@ -229,6 +229,23 @@ async def _db_store_pdf(report_id: str, pdf_bytes: bytes) -> None:
             await session.commit()
 
 
+# ── Missing sections helper ───────────────────────────────────────────────
+
+
+def _extract_missing_sections(coordinator_results: list[dict]) -> dict[str, list[str]]:
+    """Extract missing_prerequisites from coordinator results.
+
+    Returns a map of system → list of missing prerequisite names.
+    """
+    missing: dict[str, list[str]] = {}
+    for cr in coordinator_results:
+        data = cr.get("data", {})
+        prereqs = data.get("missing_prerequisites", [])
+        if prereqs:
+            missing[cr.get("system", "unknown")] = prereqs
+    return missing
+
+
 # ── Safety: content filter helper ─────────────────────────────────────────
 
 
@@ -419,6 +436,11 @@ def generate_report(
             serialised["profile_summary"] = transform_to_profile_summary(result.coordinator_results)
         except Exception as exc:
             logger.warning("Failed to build profile_summary: %s", exc)
+
+        # Expose which systems are missing prerequisite data for the frontend
+        serialised["missing_sections"] = _extract_missing_sections(
+            serialised.get("coordinator_results", [])
+        )
 
         # Generate LLM narratives (optional — reports work without them)
         try:

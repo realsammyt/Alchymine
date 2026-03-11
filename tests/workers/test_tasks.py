@@ -37,6 +37,7 @@ from alchymine.db.base import Base  # noqa: E402
 from alchymine.db.repository import get_report  # noqa: E402
 from alchymine.workers.celery_app import celery_app  # noqa: E402
 from alchymine.workers.tasks import (  # noqa: E402
+    _extract_missing_sections,
     _now_iso,
     _run_async,
     _serialise_orchestrator_result,
@@ -224,6 +225,26 @@ class TestHelpers:
         assert "coordinator_results" in result
         assert len(result["coordinator_results"]) == 1
         assert result["coordinator_results"][0]["system"] == "intelligence"
+
+    def test_extract_missing_sections(self):
+        """_extract_missing_sections returns map of system to missing prereqs."""
+        results = [
+            {
+                "system": "healing",
+                "data": {"missing_prerequisites": ["big_five", "archetype"]},
+                "status": "degraded",
+            },
+            {"system": "intelligence", "data": {"personality": {}}, "status": "success"},
+        ]
+        result = _extract_missing_sections(results)
+        assert result == {"healing": ["big_five", "archetype"]}
+
+    def test_extract_missing_sections_empty(self):
+        """_extract_missing_sections returns empty dict when no prereqs are missing."""
+        results = [
+            {"system": "intelligence", "data": {}, "status": "success"},
+        ]
+        assert _extract_missing_sections(results) == {}
 
 
 # ── Report generation task tests (eager mode) ───────────────────────────
