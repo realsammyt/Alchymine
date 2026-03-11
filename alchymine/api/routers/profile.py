@@ -355,9 +355,10 @@ def _extract_identity_enrichment(identity: Any) -> dict[str, Any]:
 
     archetype: dict[str, Any] | None = getattr(identity, "archetype", None) or {}
     if archetype:
-        result["archetype"] = archetype
         primary = archetype.get("primary")
         if primary is not None:
+            # Store as string — match_modalities() expects a string, not a dict
+            result["archetype"] = primary
             result["archetype_primary"] = primary
         secondary = archetype.get("secondary")
         if secondary is not None:

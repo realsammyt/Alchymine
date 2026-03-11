@@ -61,7 +61,7 @@ def test_extract_archetype_primary_and_secondary() -> None:
     )
     result = _extract_identity_enrichment(identity)
 
-    assert result["archetype"] == {"primary": "Sage", "secondary": "Explorer", "tertiary": "Ruler"}
+    assert result["archetype"] == "Sage"
     assert result["archetype_primary"] == "Sage"
     assert result["archetype_secondary"] == "Explorer"
 
