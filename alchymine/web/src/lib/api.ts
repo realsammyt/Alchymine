@@ -842,6 +842,7 @@ export interface IntakeProfileData {
   intentions: string[];
   assessment_responses?: Record<string, unknown> | null;
   family_structure?: string | null;
+  wealth_context?: IntakePayload["wealth_context"];
 }
 
 export interface ProfileResponse {
@@ -1284,7 +1285,10 @@ export async function listAdminFeedback(opts?: {
   // The API returns { entries: [...], total, page, per_page }.
   // Normalize to { items: [...], ... } to match PaginatedFeedback.
   const raw = await request<
-    Omit<PaginatedFeedback, "items"> & { entries?: FeedbackItem[]; items?: FeedbackItem[] }
+    Omit<PaginatedFeedback, "items"> & {
+      entries?: FeedbackItem[];
+      items?: FeedbackItem[];
+    }
   >(`${BASE}/admin/feedback${query ? `?${query}` : ""}`);
   return {
     ...raw,

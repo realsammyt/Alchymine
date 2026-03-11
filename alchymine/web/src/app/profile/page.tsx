@@ -593,6 +593,7 @@ function WealthSection({
   saving: boolean;
 }) {
   const wealth = profile.wealth;
+  const hasData = !!(wealth || profile.intake);
 
   return (
     <ProfileSection
@@ -619,7 +620,7 @@ function WealthSection({
         </svg>
       }
       editButton={
-        !editing ? (
+        hasData && !editing ? (
           <button
             onClick={onEdit}
             className="font-body text-xs text-text/40 hover:text-text/60 transition-colors"
@@ -913,9 +914,7 @@ function makeWealthForm(
   profile: ProfileResponse,
 ): WealthEditForm {
   // wealth_context may exist on the intake data from the API (not typed on IntakeProfileData)
-  const wc = (profile.intake as Record<string, unknown> | null)?.wealth_context as
-    | IntakePayload["wealth_context"]
-    | undefined;
+  const wc = profile.intake?.wealth_context;
   return {
     income_range: wc?.income_range ?? "",
     has_investments: wc?.has_investments ?? null,
@@ -977,6 +976,10 @@ export default function ProfilePage() {
 
   async function handleSaveIdentity() {
     if (!userId || !profileState.data) return;
+    if (!identityForm.full_name.trim() || !identityForm.birth_date) {
+      setSaveError("Name and birth date are required.");
+      return;
+    }
     setSaving(true);
     setSaveError(null);
     try {
