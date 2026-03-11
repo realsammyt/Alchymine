@@ -580,6 +580,28 @@ export const LIKERT_LABELS = [
 
 export const TOTAL_QUESTIONS = ALL_QUESTIONS.length; // 67
 
+export type QuestionCategory = Question["category"];
+
+export const QUESTION_CATEGORIES: QuestionCategory[] = [
+  "big_five",
+  "attachment",
+  "risk_tolerance",
+  "enneagram",
+  "perspective",
+  "creativity",
+];
+
+/**
+ * Filter ALL_QUESTIONS to only include the specified categories.
+ * Returns all questions if sections is empty or undefined.
+ */
+export function filterQuestionsBySection(
+  sections?: QuestionCategory[],
+): Question[] {
+  if (!sections || sections.length === 0) return ALL_QUESTIONS;
+  return ALL_QUESTIONS.filter((q) => sections.includes(q.category));
+}
+
 // ─── Creative DNA Supplement Questions ──────────────────────────────
 // These are NOT included in ALL_QUESTIONS — they are used in the
 // "Deepen Your Creative DNA" supplement flow after initial report.

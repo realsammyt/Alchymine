@@ -2,16 +2,45 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { ALL_QUESTIONS, LIKERT_LABELS, TOTAL_QUESTIONS } from "@/lib/questions";
-import { createReport, getProfile, IntakePayload } from "@/lib/api";
+import { useSearchParams } from "next/navigation";
+import {
+  LIKERT_LABELS,
+  filterQuestionsBySection,
+  type QuestionCategory,
+} from "@/lib/questions";
+import {
+  createReport,
+  getProfile,
+  reassessProfile,
+  IntakePayload,
+} from "@/lib/api";
 import { useAuth } from "@/lib/AuthContext";
 import Button from "@/components/shared/Button";
 import ProgressBar from "@/components/shared/ProgressBar";
 import { MotionReveal } from "@/components/shared/MotionReveal";
 
+// Section-to-system mapping
+const SECTION_TO_SYSTEM: Record<string, string> = {
+  big_five: "intelligence",
+  attachment: "intelligence",
+  risk_tolerance: "intelligence",
+  enneagram: "intelligence",
+  perspective: "perspective",
+  creativity: "creative",
+};
+
 export default function AssessmentPage() {
   const router = useRouter();
   const { user } = useAuth();
+  const searchParams = useSearchParams();
+  const sectionsParam = searchParams.get("sections");
+  const selectedSections = sectionsParam
+    ? (sectionsParam.split(",") as QuestionCategory[])
+    : undefined;
+
+  const questions = filterQuestionsBySection(selectedSections);
+  const totalQuestions = questions.length;
+
   const [currentIndex, setCurrentIndex] = useState(0);
   const [responses, setResponses] = useState<Record<string, number>>({});
   const [submitting, setSubmitting] = useState(false);
@@ -61,10 +90,27 @@ export default function AssessmentPage() {
       });
   }, [router, user?.id]);
 
-  const question = ALL_QUESTIONS[currentIndex];
-  const progress = (Object.keys(responses).length / TOTAL_QUESTIONS) * 100;
-  const isLastQuestion = currentIndex === TOTAL_QUESTIONS - 1;
-  const allAnswered = Object.keys(responses).length === TOTAL_QUESTIONS;
+  useEffect(() => {
+    if (!selectedSections || !user?.id) return;
+
+    // In section mode, load existing responses from profile
+    getProfile(user.id)
+      .then((profile) => {
+        const existing = profile.intake?.assessment_responses;
+        if (existing) {
+          sessionStorage.setItem(
+            "alchymine_existing_responses",
+            JSON.stringify(existing),
+          );
+        }
+      })
+      .catch(() => {});
+  }, [selectedSections, user?.id]);
+
+  const question = questions[currentIndex];
+  const progress = (Object.keys(responses).length / totalQuestions) * 100;
+  const isLastQuestion = currentIndex === totalQuestions - 1;
+  const allAnswered = Object.keys(responses).length === totalQuestions;
 
   const handleSubmit = useCallback(
     async (finalResponses: Record<string, number>) => {
@@ -72,6 +118,23 @@ export default function AssessmentPage() {
       setError(null);
 
       try {
+        const existingRaw = sessionStorage.getItem(
+          "alchymine_existing_responses",
+        );
+        const existingResponses = existingRaw ? JSON.parse(existingRaw) : {};
+        const mergedResponses = { ...existingResponses, ...finalResponses };
+
+        if (selectedSections && user?.id) {
+          const systems = [
+            ...new Set(selectedSections.map((s) => SECTION_TO_SYSTEM[s])),
+          ];
+          for (const system of systems) {
+            await reassessProfile(user.id, system, mergedResponses);
+          }
+          router.push("/profile");
+          return;
+        }
+
         const intakeRaw = sessionStorage.getItem("alchymine_intake");
         if (!intakeRaw) {
           router.replace("/discover/intake");
@@ -89,7 +152,7 @@ export default function AssessmentPage() {
           intentions:
             intakeData.intentions ??
             (intakeData.intention ? [intakeData.intention] : []),
-          assessment_responses: finalResponses,
+          assessment_responses: mergedResponses,
           wealth_context: intakeData.wealth_context ?? null,
         };
 
@@ -105,7 +168,7 @@ export default function AssessmentPage() {
         setSubmitting(false);
       }
     },
-    [router],
+    [router, selectedSections, user?.id],
   );
 
   const handleAnswer = useCallback(
@@ -115,7 +178,7 @@ export default function AssessmentPage() {
 
       if (
         isLastQuestion &&
-        Object.keys(newResponses).length === TOTAL_QUESTIONS
+        Object.keys(newResponses).length === totalQuestions
       ) {
         // Show completion screen instead of auto-submitting
         setShowCompletion(true);
@@ -234,7 +297,7 @@ export default function AssessmentPage() {
               </h1>
               <hr className="rule-gold my-5 max-w-[80px] mx-auto" />
               <p className="text-text/40 font-body leading-relaxed max-w-sm mx-auto">
-                You&apos;ve answered all {TOTAL_QUESTIONS} questions. Ready to
+                You&apos;ve answered all {totalQuestions} questions. Ready to
                 generate your personalized Alchymine report?
               </p>
             </div>
@@ -293,7 +356,7 @@ export default function AssessmentPage() {
           <div className="mb-8">
             <ProgressBar
               value={progress}
-              label={`Question ${currentIndex + 1} of ${TOTAL_QUESTIONS}`}
+              label={`Question ${currentIndex + 1} of ${totalQuestions}`}
               showPercentage
             />
           </div>
