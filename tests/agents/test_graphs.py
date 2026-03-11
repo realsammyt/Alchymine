@@ -490,6 +490,17 @@ class TestHealingGraphTransitions:
         assert result["results"]["neuroticism"] == 45
         assert result["results"]["attachment_style"] == "secure"
 
+    def test_missing_prerequisites_reported_when_no_intelligence_data(self) -> None:
+        """Healing graph reports missing_prerequisites when identity data absent."""
+        state = _make_initial_state(request_data={"intentions": ["health"]})
+
+        graph = build_healing_graph(include_quality_gate=False)
+        result = graph.invoke(state)
+
+        prereqs = result["results"].get("missing_prerequisites", [])
+        assert "big_five" in prereqs or "archetype" in prereqs
+        assert result["status"] == "degraded"
+
 
 # ═══════════════════════════════════════════════════════════════════════
 # Section 4: Wealth graph state transitions
@@ -799,13 +810,39 @@ class TestQualityGateIntegration:
     """Quality gate nodes validate output within the graph."""
 
     def test_healing_quality_gate_passes_with_disclaimers(self) -> None:
-        """Healing graph with quality gate passes when disclaimers present."""
-        state = _make_initial_state(request_data={})
+        """Healing graph with quality gate passes when intelligence data present."""
+        state = _make_initial_state(
+            request_data={
+                "archetype": "Alchemist",
+                "big_five": {
+                    "big_five": {
+                        "openness": 72,
+                        "conscientiousness": 65,
+                        "extraversion": 45,
+                        "agreeableness": 78,
+                        "neuroticism": 38,
+                    },
+                    "attachment_style": "secure",
+                },
+                "intentions": ["health"],
+            }
+        )
 
         graph = build_healing_graph(include_quality_gate=True)
         result = graph.invoke(state)
 
         assert result["quality_passed"] is True
+
+    def test_healing_quality_gate_degraded_without_intelligence(self) -> None:
+        """Healing graph degrades gracefully without intelligence data."""
+        state = _make_initial_state(request_data={})
+
+        graph = build_healing_graph(include_quality_gate=True)
+        result = graph.invoke(state)
+
+        assert result["status"] == "degraded"
+        prereqs = result["results"].get("missing_prerequisites", [])
+        assert len(prereqs) > 0
 
     def test_wealth_quality_gate_passes_with_disclaimers(self) -> None:
         """Wealth graph with quality gate passes when disclaimers present."""

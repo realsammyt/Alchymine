@@ -567,63 +567,40 @@ def _healing_modality_matching(state: CoordinatorState) -> CoordinatorState:
 def _healing_personality_context(state: CoordinatorState) -> CoordinatorState:
     """Extract Big Five and attachment style from request_data for narrative template.
 
-    Always sets ``openness``, ``neuroticism``, and ``attachment_style`` in
-    results — using neutral defaults (50) when Intelligence data is
-    unavailable — so the healing narrative template never has unfilled
-    placeholders.
+    Reports missing_prerequisites when Intelligence data is unavailable
+    so the frontend can guide the user to complete their assessment.
     """
     results = dict(state.get("results", {}))
     request_data = state.get("request_data", {})
+    missing: list[str] = []
 
     big_five_raw = request_data.get("big_five", {})
+    has_personality = False
+
     if big_five_raw and isinstance(big_five_raw, dict):
-        # Unwrap nested personality dict: big_five_raw may be
-        # {"big_five": {"openness": 72, ...}, "attachment_style": "secure"}
         scores = big_five_raw.get("big_five", big_five_raw)
-        if isinstance(scores, dict):
+        if isinstance(scores, dict) and "openness" in scores:
+            has_personality = True
             for trait in ("openness", "neuroticism"):
-                if trait in scores:
-                    results[trait] = scores[trait]
+                results[trait] = scores[trait]
 
-        # attachment_style lives at the outer personality dict level
-        attachment = big_five_raw.get("attachment_style") or request_data.get("attachment_style")
-        if attachment:
-            results["attachment_style"] = attachment
+            attachment = big_five_raw.get("attachment_style") or request_data.get(
+                "attachment_style"
+            )
+            if attachment:
+                results["attachment_style"] = attachment
 
-    # Ensure fallback defaults so template placeholders are always filled.
-    # Neutral midpoint (50) avoids biasing the LLM narrative in either
-    # direction when real personality data is unavailable.
-    results.setdefault("openness", 50)
-    results.setdefault("neuroticism", 50)
-    results.setdefault("attachment_style", "not assessed")
+    if not has_personality:
+        missing.append("big_five")
 
-    # Ensure crisis_flag always has a value for the template
+    if not request_data.get("archetype"):
+        missing.append("archetype")
+
+    # Ensure crisis_flag always has a value (safety default — not a fallback)
     results.setdefault("crisis_flag", False)
 
-    # If modality matching couldn't run (missing Intelligence data),
-    # provide general-purpose modalities so the template placeholder
-    # {modalities_section} is never left unfilled.
-    if "recommended_modalities" not in results:
-        results["recommended_modalities"] = [
-            {
-                "name": "Breathwork",
-                "description": "Conscious breathing techniques that regulate the nervous system",
-                "evidence_level": "strong",
-                "difficulty_level": "beginner",
-            },
-            {
-                "name": "Mindfulness Meditation",
-                "description": "Present-moment awareness practices for stress reduction",
-                "evidence_level": "strong",
-                "difficulty_level": "beginner",
-            },
-            {
-                "name": "Somatic Practice",
-                "description": "Body-based awareness exercises for releasing tension",
-                "evidence_level": "strong",
-                "difficulty_level": "beginner",
-            },
-        ]
+    if missing:
+        results["missing_prerequisites"] = missing
 
     return {**state, "results": results}
 
