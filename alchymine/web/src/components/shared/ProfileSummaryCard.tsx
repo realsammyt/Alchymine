@@ -32,7 +32,7 @@ export default function ProfileSummaryCard() {
 
   return (
     <div className="card-surface border border-white/[0.06] rounded-2xl px-5 py-4 sm:px-6">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+      <div className="flex flex-col items-center sm:flex-row sm:items-center sm:justify-between gap-4">
         <div className="flex items-center gap-4 sm:items-start">
           <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0 text-2xl">
             {archetype ? "🔮" : "✨"}
