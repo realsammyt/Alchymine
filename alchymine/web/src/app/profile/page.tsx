@@ -31,19 +31,26 @@ function ProfileSection({
   title,
   accentText,
   accentBg,
-  accentBorder,
+  accentColor,
   icon,
+  footerHref,
+  footerLabel,
   children,
 }: {
   title: string;
   accentText: string;
   accentBg: string;
-  accentBorder: string;
+  accentColor: string;
   icon: React.ReactNode;
+  footerHref: string;
+  footerLabel: string;
   children: React.ReactNode;
 }) {
   return (
-    <div className={`card-surface border ${accentBorder} p-6`}>
+    <div
+      className="card-surface border-l-4 p-6"
+      style={{ borderColor: accentColor }}
+    >
       <div className="flex items-center gap-3 mb-5">
         <div
           className={`w-10 h-10 rounded-xl ${accentBg} flex items-center justify-center flex-shrink-0`}
@@ -56,6 +63,14 @@ function ProfileSection({
         </h2>
       </div>
       {children}
+      <div className="mt-5 pt-4 border-t border-white/[0.05]">
+        <Link
+          href={footerHref}
+          className={`font-body text-sm ${accentText} hover:underline underline-offset-2 transition-colors`}
+        >
+          {footerLabel} &rarr;
+        </Link>
+      </div>
     </div>
   );
 }
@@ -145,7 +160,9 @@ function IdentitySection({ profile }: { profile: ProfileResponse }) {
       title="Personal Intelligence"
       accentText="text-primary"
       accentBg="bg-primary/10"
-      accentBorder="border-primary/20"
+      accentColor="#DAA520"
+      footerHref="/intelligence"
+      footerLabel="Explore Intelligence"
       icon={
         <svg
           className="w-5 h-5 text-primary"
@@ -220,7 +237,9 @@ function HealingSection({ profile }: { profile: ProfileResponse }) {
       title="Ethical Healing"
       accentText="text-accent"
       accentBg="bg-accent/10"
-      accentBorder="border-accent/20"
+      accentColor="#20B2AA"
+      footerHref="/healing"
+      footerLabel="Explore Healing"
       icon={
         <svg
           className="w-5 h-5 text-accent"
@@ -284,7 +303,9 @@ function WealthSection({ profile }: { profile: ProfileResponse }) {
       title="Generational Wealth"
       accentText="text-primary"
       accentBg="bg-primary/10"
-      accentBorder="border-primary/20"
+      accentColor="#DAA520"
+      footerHref="/wealth"
+      footerLabel="Explore Wealth"
       icon={
         <svg
           className="w-5 h-5 text-primary"
@@ -355,7 +376,9 @@ function CreativeSection({ profile }: { profile: ProfileResponse }) {
       title="Creative Forge"
       accentText="text-secondary-light"
       accentBg="bg-secondary/10"
-      accentBorder="border-secondary/20"
+      accentColor="#9B4DCA"
+      footerHref="/creative"
+      footerLabel="Explore Creative"
       icon={
         <svg
           className="w-5 h-5 text-secondary-light"
@@ -428,7 +451,9 @@ function PerspectiveSection({ profile }: { profile: ProfileResponse }) {
       title="Perspective Prism"
       accentText="text-accent"
       accentBg="bg-accent/10"
-      accentBorder="border-accent/20"
+      accentColor="#7B2D8E"
+      footerHref="/perspective"
+      footerLabel="Explore Perspective"
       icon={
         <svg
           className="w-5 h-5 text-accent"
