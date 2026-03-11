@@ -28,6 +28,7 @@ from alchymine.api.routers import (
     compatibility,
     creative,
     feedback,
+    generative_art,
     healing,
     health,
     integration,
@@ -130,3 +131,4 @@ app.include_router(spiral.router, prefix="/api/v1", tags=["spiral"])
 app.include_router(integration.router, prefix="/api/v1", tags=["integration"])
 app.include_router(admin.router, prefix="/api/v1", tags=["admin"])
 app.include_router(feedback.router, prefix="/api/v1", tags=["feedback"])
+app.include_router(generative_art.router, prefix="/api/v1", tags=["generative-art"])
