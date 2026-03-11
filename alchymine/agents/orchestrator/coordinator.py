@@ -251,6 +251,12 @@ class HealingCoordinator(_GraphCoordinatorMixin, BaseCoordinator):
 
     Handles modality matching, breathwork patterns, and crisis
     detection. Delegates processing to a Healing StateGraph.
+
+    Before invoking the graph, the coordinator pre-loads the user's
+    IdentityProfile from the database and merges any available
+    enrichment fields (archetype, big_five, life_path, etc.) into
+    ``request_data``.  Existing keys are never overwritten, so callers
+    that already supply enrichment data take precedence.
     """
 
     system_name = "healing"
@@ -258,11 +264,38 @@ class HealingCoordinator(_GraphCoordinatorMixin, BaseCoordinator):
     def __init__(self) -> None:
         self._graph = build_healing_graph(include_quality_gate=False)
 
+    async def _load_identity_profile(self, user_id: str) -> Any:
+        """Load the user's IdentityProfile from the database."""
+        try:
+            from alchymine.db import repository
+            from alchymine.db.base import get_async_engine, get_async_session_factory
+
+            engine = get_async_engine()
+            factory = get_async_session_factory(engine)
+            async with factory() as session:
+                user = await repository.get_profile(session, user_id)
+                return user.identity if user else None
+        except Exception as exc:
+            logger.warning(
+                "Healing: failed to load identity profile for %s: %s",
+                user_id,
+                exc,
+            )
+            return None
+
     async def _execute(
         self,
         user_id: str,
         request_data: dict,
     ) -> CoordinatorResult:
+        identity = await self._load_identity_profile(user_id)
+        if identity is not None:
+            from alchymine.api.routers.profile import _extract_identity_enrichment
+
+            enrichment = _extract_identity_enrichment(identity)
+            for key, val in enrichment.items():
+                if key not in request_data:
+                    request_data[key] = val
         return self._invoke_graph(user_id, request_data)
 
 
