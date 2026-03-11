@@ -254,6 +254,9 @@ export default function ReportPage() {
       >
     | undefined;
 
+  const missingSections: Record<string, string[]> =
+    (report?.result?.missing_sections as Record<string, string[]>) ?? {};
+
   const NARRATIVE_SYSTEMS = [
     "intelligence",
     "healing",
@@ -827,6 +830,80 @@ export default function ReportPage() {
                 </MotionStagger>
               </div>
             </MotionReveal>
+
+            {/* ── Missing Section Guidance ───────────────────────────── */}
+            {Object.keys(missingSections).length > 0 && (
+              <MotionReveal delay={0.38}>
+                <div className="space-y-4">
+                  {Object.entries(missingSections).map(
+                    ([system, prerequisites]) => {
+                      const systemLabels: Record<string, string> = {
+                        healing: "Ethical Healing",
+                        wealth: "Generational Wealth",
+                        creative: "Creative Development",
+                        perspective: "Perspective Enhancement",
+                      };
+                      const prerequisiteLabels: Record<
+                        string,
+                        { label: string; sections: string }
+                      > = {
+                        big_five: {
+                          label: "Personality Assessment",
+                          sections: "big_five",
+                        },
+                        archetype: {
+                          label: "Complete Identity Assessment",
+                          sections: "big_five,attachment",
+                        },
+                        risk_tolerance: {
+                          label: "Risk Tolerance Assessment",
+                          sections: "risk_tolerance",
+                        },
+                      };
+
+                      return (
+                        <div
+                          key={system}
+                          className="card-surface p-6 border-l-4 border-primary/30"
+                        >
+                          <h3 className="font-display text-lg font-medium mb-2">
+                            {systemLabels[system] ?? system}
+                          </h3>
+                          <p className="text-sm text-text/40 mb-4">
+                            Complete the following to unlock this section:
+                          </p>
+                          <div className="space-y-2">
+                            {(prerequisites as string[]).map((prereq) => {
+                              const info = prerequisiteLabels[prereq];
+                              return (
+                                <a
+                                  key={prereq}
+                                  href={`/discover/assessment?sections=${info?.sections ?? prereq}`}
+                                  className="flex items-center gap-2 text-sm text-primary hover:text-primary-light transition-colors"
+                                >
+                                  <svg
+                                    className="w-4 h-4"
+                                    viewBox="0 0 24 24"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    strokeWidth="2"
+                                    aria-hidden="true"
+                                  >
+                                    <path d="M5 12h14" />
+                                    <path d="m12 5 7 7-7 7" />
+                                  </svg>
+                                  {info?.label ?? prereq}
+                                </a>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      );
+                    },
+                  )}
+                </div>
+              </MotionReveal>
+            )}
 
             {/* ── Personalized Insights ──────────────────────────────── */}
             {activeNarratives.length > 0 && (
