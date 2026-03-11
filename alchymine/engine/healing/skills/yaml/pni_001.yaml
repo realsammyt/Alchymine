@@ -1,0 +1,28 @@
+id: pni_001
+modality: pni_mapping
+title: Mind-Body Symptom Tracking Protocol
+duration_minutes: 15
+difficulty: advanced
+instructions:
+  - Keep a 7-day symptom and state log using the provided template
+  - Each evening, record physical symptoms (energy, pain, digestion, sleep quality)
+    on a 1–10 scale alongside emotional states and key stressors of that day
+  - At the end of 7 days, review for patterns — which mental states correlate
+    with physical symptoms on the following day?
+  - Identify your top 3 stress-symptom pairs (e.g., conflict → next-day fatigue)
+  - Choose one pair and design a 5-minute micro-intervention (breath, movement,
+    or gratitude practice) to insert after the stressor event
+  - Track the effect for 2 more weeks and note any changes in the symptom
+contraindications:
+  - active autoimmune flare without medical supervision
+  - immunosuppressive therapy without physician clearance
+traditions:
+  - Psychoneuroimmunology (Western clinical)
+  - Ayurveda mind-body typology (Indian)
+  - Traditional Chinese Medicine (Chinese)
+evidence_level: emerging
+tags:
+  - pni
+  - tracking
+  - mind-body
+  - advanced
