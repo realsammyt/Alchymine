@@ -181,6 +181,34 @@ async def _db_get_report(report_id: str) -> Any:
         return report
 
 
+def _normalize_coordinator_data(system: str, data: dict[str, Any]) -> dict[str, Any]:
+    """Normalize coordinator result data to match DB column schemas.
+
+    Coordinator graphs produce data keyed for the report/frontend shape,
+    but profile layer tables sometimes use different column names or types.
+    This function bridges that gap.
+    """
+    normalized = dict(data)
+
+    if system == "wealth":
+        # wealth_archetype: coordinator returns {name, description} dict
+        # but DB column is String(100) — extract just the name.
+        wa = normalized.get("wealth_archetype")
+        if isinstance(wa, dict):
+            normalized["wealth_archetype"] = wa.get("name", "")
+
+    elif system == "healing":
+        # Coordinator keys → DB column mapping:
+        #   recommended_modalities → selected_modalities
+        #   crisis_flag → crisis_protocol_active
+        if "recommended_modalities" in normalized:
+            normalized["selected_modalities"] = normalized.pop("recommended_modalities")
+        if "crisis_flag" in normalized:
+            normalized["crisis_protocol_active"] = normalized.pop("crisis_flag")
+
+    return normalized
+
+
 async def _db_populate_profiles(
     user_id: str | None,
     coordinator_results: list,
@@ -211,7 +239,8 @@ async def _db_populate_profiles(
                 continue
 
             try:
-                await repository.update_layer(session, user_id, layer, data)
+                normalized = _normalize_coordinator_data(system, data)
+                await repository.update_layer(session, user_id, layer, normalized)
             except Exception as exc:
                 logger.warning("Failed to populate %s profile for %s: %s", layer, user_id, exc)
 

@@ -869,11 +869,66 @@ export async function synthesizeCrossSystems(
   });
 }
 
+// ─── Spiral routing ──────────────────────────────────────────────
+
+export interface SpiralRouteResult {
+  primary_system: string;
+  recommendations: {
+    system: string;
+    score: number;
+    reason: string;
+    entry_action: string;
+    priority: number;
+  }[];
+  for_you_today: string;
+  evidence_level: string;
+  calculation_type: string;
+  methodology: string;
+}
+
+export async function getSpiralRoute(
+  intention: string,
+): Promise<SpiralRouteResult> {
+  return request<SpiralRouteResult>(`${BASE}/spiral/route`, {
+    method: "POST",
+    body: JSON.stringify({ intention }),
+  });
+}
+
 // ─── Profile API functions ────────────────────────────────────────
 
 export async function getProfile(userId: string): Promise<ProfileResponse> {
   return request<ProfileResponse>(
     `${BASE}/profile/${encodeURIComponent(userId)}`,
+  );
+}
+
+// ─── Profile Completeness ────────────────────────────────────────────
+
+export interface SectionCompleteness {
+  complete: boolean;
+  answered: number;
+  total: number;
+}
+
+export interface CompletenessResponse {
+  big_five: SectionCompleteness;
+  attachment: SectionCompleteness;
+  risk_tolerance: SectionCompleteness;
+  enneagram: SectionCompleteness;
+  perspective: SectionCompleteness;
+  creativity: SectionCompleteness;
+  identity_computed: boolean;
+  overall_pct: number;
+  total_answered: number;
+  total_questions: number;
+}
+
+export async function getCompleteness(
+  userId: string,
+): Promise<CompletenessResponse> {
+  return request<CompletenessResponse>(
+    `${BASE}/profile/${encodeURIComponent(userId)}/completeness`,
   );
 }
 

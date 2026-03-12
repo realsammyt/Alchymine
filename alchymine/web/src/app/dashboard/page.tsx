@@ -17,11 +17,9 @@ import {
   getOutcomeSummary,
   getJournalStats,
   synthesizeCrossSystems,
-  listUserReports,
   OutcomeSummary,
   JournalStatsResponse,
   BridgeInsightResponse,
-  ReportListResponse,
 } from "@/lib/api";
 import QualityGateDisplay from "@/components/shared/QualityGateDisplay";
 
@@ -520,22 +518,6 @@ function CrossInsightCard({ insight }: { insight: BridgeInsightResponse }) {
 
 // ─── Report status badge ─────────────────────────────────────────────
 
-function ReportStatusBadge({ status }: { status: string }) {
-  const styles: Record<string, string> = {
-    complete: "bg-green-500/15 text-green-400 border-green-500/20",
-    generating: "bg-yellow-500/15 text-yellow-400 border-yellow-500/20",
-    pending: "bg-blue-500/15 text-blue-400 border-blue-500/20",
-    failed: "bg-red-500/15 text-red-400 border-red-500/20",
-  };
-  return (
-    <span
-      className={`inline-block px-2 py-0.5 rounded-full text-[0.65rem] font-body font-medium tracking-wider uppercase border ${styles[status] ?? styles["pending"]}`}
-    >
-      {status}
-    </span>
-  );
-}
-
 // ─── Main Dashboard ──────────────────────────────────────────────────
 
 export default function DashboardPage() {
@@ -561,14 +543,6 @@ export default function DashboardPage() {
   const crossInsights = useApi<BridgeInsightResponse[]>(
     intake ? () => synthesizeCrossSystems({}) : null,
     [!!intake],
-  );
-
-  const recentReports = useApi<ReportListResponse>(
-    () =>
-      userId
-        ? listUserReports(userId, { limit: 3 })
-        : Promise.reject(new Error("No user")),
-    [userId],
   );
 
   // Derive a greeting name: prefer full name from intake, fall back to email prefix
@@ -942,66 +916,6 @@ export default function DashboardPage() {
                         </Card>
                       </MotionReveal>
                     )}
-
-                    {/* Recent Reports */}
-                    <MotionReveal delay={0.35} y={16}>
-                      <Card
-                        title="Recent Reports"
-                        subtitle="Your latest transformation reports"
-                      >
-                        {recentReports.loading ? (
-                          <Spinner />
-                        ) : recentReports.error ||
-                          !recentReports.data ||
-                          recentReports.data.reports.length === 0 ? (
-                          <div className="text-center py-6">
-                            <p className="font-body text-text/50 mb-3">
-                              No reports yet
-                            </p>
-                            <Link href="/discover/intake">
-                              <Button size="sm">Start Assessment</Button>
-                            </Link>
-                          </div>
-                        ) : (
-                          <div className="space-y-2">
-                            {recentReports.data.reports.map((report) => (
-                              <Link
-                                key={report.id}
-                                href={
-                                  report.status === "complete"
-                                    ? `/discover/report/${report.id}`
-                                    : `/discover/generating/${report.id}`
-                                }
-                                className="block card-surface p-4 transition-all duration-300 hover:brightness-110 hover:-translate-y-0.5"
-                              >
-                                <div className="flex items-center justify-between gap-3">
-                                  <div className="min-w-0 flex-1">
-                                    <p className="font-body text-sm text-text/70 truncate">
-                                      Report{" "}
-                                      <span className="text-text/30">
-                                        {report.id.slice(0, 8)}
-                                      </span>
-                                    </p>
-                                    <p className="font-body text-xs text-text/30 mt-0.5">
-                                      {new Date(
-                                        report.created_at,
-                                      ).toLocaleDateString(undefined, {
-                                        month: "short",
-                                        day: "numeric",
-                                        year: "numeric",
-                                        hour: "numeric",
-                                        minute: "2-digit",
-                                      })}
-                                    </p>
-                                  </div>
-                                  <ReportStatusBadge status={report.status} />
-                                </div>
-                              </Link>
-                            ))}
-                          </div>
-                        )}
-                      </Card>
-                    </MotionReveal>
 
                     {/* Quick Actions */}
                     <MotionReveal delay={0.38} y={16}>
