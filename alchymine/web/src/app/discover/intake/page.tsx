@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/AuthContext";
 import { getProfile, saveIntake } from "@/lib/api";
 import Button from "@/components/shared/Button";
+import ProtectedRoute from "@/components/shared/ProtectedRoute";
 import {
   MotionReveal,
   MotionStagger,
@@ -295,6 +296,7 @@ export default function IntakePage() {
     "w-full bg-white/[0.03] border border-white/[0.08] rounded-xl px-4 py-3 text-sm font-body text-text placeholder:text-text/25 focus:outline-none focus:border-primary/40 focus:ring-1 focus:ring-primary/20 transition-all duration-300 [color-scheme:dark]";
 
   return (
+    <ProtectedRoute>
     <div className="flex-1 flex items-center justify-center px-4 sm:px-6 py-12">
       <div className="w-full max-w-lg">
         {/* Header */}
@@ -703,5 +705,6 @@ export default function IntakePage() {
         </MotionReveal>
       </div>
     </div>
+    </ProtectedRoute>
   );
 }

@@ -294,7 +294,7 @@ export default function LandingPage() {
             <MotionReveal delay={0.6} y={10}>
               <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
                 <Link
-                  href="/discover/intake"
+                  href="/signup"
                   className="inline-flex items-center gap-2 px-8 py-3.5 bg-gradient-to-r from-primary-dark via-primary to-primary-light text-bg font-body font-medium rounded-xl text-base transition-all duration-300 hover:shadow-[0_0_40px_rgba(218,165,32,0.25)] hover:scale-[1.02] active:scale-[0.98]"
                 >
                   Begin Your Journey
