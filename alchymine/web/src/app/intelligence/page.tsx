@@ -21,6 +21,7 @@ import EvidenceBadge from "@/components/shared/EvidenceBadge";
 import GeneratingState from "@/components/shared/GeneratingState";
 import IntakeCTA from "@/components/shared/IntakeCTA";
 import JournalCTA from "@/components/shared/JournalCTA";
+import ProtectedRoute from "@/components/shared/ProtectedRoute";
 
 const NUMEROLOGY_NUMBERS = [
   {
@@ -156,6 +157,7 @@ export default function IntelligencePage() {
   );
 
   return (
+    <ProtectedRoute>
     <main
       id="main-content"
       className="grain-overlay bg-atmosphere min-h-screen px-4 sm:px-6 lg:px-8 py-8"
@@ -558,5 +560,6 @@ export default function IntelligencePage() {
         </MotionReveal>
       </div>
     </main>
+    </ProtectedRoute>
   );
 }
