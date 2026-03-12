@@ -858,9 +858,11 @@ class TestIntentionsToSystems:
         systems = intentions_to_systems(["health"])
         assert systems[0] == SystemIntent.INTELLIGENCE
 
-    def test_unknown_intention_still_has_intelligence(self) -> None:
+    def test_unknown_intention_still_has_all_systems(self) -> None:
+        """All 5 systems are always included regardless of intention."""
         systems = intentions_to_systems(["unknown_xyz"])
-        assert systems == [SystemIntent.INTELLIGENCE]
+        assert systems[0] == SystemIntent.INTELLIGENCE
+        assert len(systems) == 5
 
     def test_case_insensitive(self) -> None:
         systems = intentions_to_systems(["HEALTH"])

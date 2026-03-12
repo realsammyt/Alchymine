@@ -258,12 +258,12 @@ export default function CreativePage() {
                           )?.icon ?? "\u{1F3A8}"}
                         </div>
                         <div>
-                          <h3 className="font-display text-xl font-light text-gradient-purple">
-                            {style.data.creative_style}
+                          <h3 className="font-display text-xl font-light text-text">
+                            {(creativePayload?.creative_orientation as string) ||
+                              "Your Creative Style"}
                           </h3>
-                          <p className="font-body text-sm text-text/50">
-                            Overall Score:{" "}
-                            {Math.round(style.data.overall_score)}%
+                          <p className="font-body text-sm text-text/50 leading-relaxed">
+                            {style.data.creative_style}
                           </p>
                         </div>
                       </div>
@@ -274,6 +274,9 @@ export default function CreativePage() {
                           <div className="space-y-2">
                             <h4 className="font-body text-xs uppercase tracking-wider text-text/40 mb-2">
                               Guilford Scores
+                              <span className="ml-2 normal-case tracking-normal font-mono text-secondary">
+                                {Math.round(style.data!.overall_score)}%
+                              </span>
                             </h4>
                             {Object.entries(style.data.guilford_summary).map(
                               ([key, val]) => {

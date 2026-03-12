@@ -379,7 +379,7 @@ class CreativeProfile(Base):
     medium_affinities: Mapped[dict | None] = mapped_column(
         JSONColumn, nullable=True, comment="Top creative modality tracks"
     )
-    active_projects: Mapped[int] = mapped_column(Integer, default=0)
+    active_projects: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
     preferred_production_mode: Mapped[str | None] = mapped_column(
         String(50), nullable=True, comment="sprint | marathon | harvest | polish"
     )

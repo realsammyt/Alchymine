@@ -55,6 +55,7 @@ class IntakeResponse(BaseModel):
     intentions: list[str] = Field(default_factory=list)
     assessment_responses: dict[str, Any] | None = None
     family_structure: str | None = None
+    wealth_context: dict[str, Any] | None = None
 
 
 class ProfileResponse(BaseModel):
@@ -110,6 +111,12 @@ def _user_to_response(user: User) -> ProfileResponse:
     """Convert a User ORM model to a ProfileResponse."""
     intake_resp = None
     if user.intake is not None:
+        # Pull wealth_context from the wealth layer (it's stored there, not on intake)
+        wc = None
+        if user.wealth is not None and user.wealth.wealth_context is not None:
+            wc = (
+                user.wealth.wealth_context if isinstance(user.wealth.wealth_context, dict) else None
+            )
         intake_resp = IntakeResponse(
             full_name=user.intake.full_name,
             birth_date=user.intake.birth_date,
@@ -119,6 +126,7 @@ def _user_to_response(user: User) -> ProfileResponse:
             intentions=user.intake.resolved_intentions,
             assessment_responses=user.intake.assessment_responses,
             family_structure=user.intake.family_structure,
+            wealth_context=wc,
         )
 
     def _layer_to_dict(layer: Any) -> dict | None:
@@ -272,12 +280,24 @@ async def update_layer(
                     detail=f"Invalid birth_time format: {coerced['birth_time']!r}",
                 ) from exc
 
+    # When saving intake, route wealth_context to the wealth layer
+    wealth_context = coerced.pop("wealth_context", None)
+
     try:
         user = await repository.update_layer(session, user_id, layer, coerced)
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     except LookupError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+    if layer == "intake" and wealth_context is not None:
+        try:
+            user = await repository.update_layer(
+                session, user_id, "wealth", {"wealth_context": wealth_context}
+            )
+        except (ValueError, LookupError):
+            logger.warning("Failed to save wealth_context for user %s", user_id)
+
     try:
         return _user_to_response(user)
     except Exception:

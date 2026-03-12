@@ -3,25 +3,7 @@
 import { useState, useCallback } from "react";
 import Link from "next/link";
 import IntakeCTA from "@/components/shared/IntakeCTA";
-
-// ── Types ─────────────────────────────────────────────────────────
-
-interface SystemRecommendation {
-  system: string;
-  score: number;
-  reason: string;
-  entry_action: string;
-  priority: number;
-}
-
-interface SpiralRouteResult {
-  primary_system: string;
-  recommendations: SystemRecommendation[];
-  for_you_today: string;
-  evidence_level: string;
-  calculation_type: string;
-  methodology: string;
-}
+import { getSpiralRoute, type SpiralRouteResult } from "@/lib/api";
 
 // ── Constants ─────────────────────────────────────────────────────
 
@@ -154,8 +136,6 @@ const SYSTEM_META: Record<
   },
 };
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "";
-
 // ── Spiral Visual ─────────────────────────────────────────────────
 // The spiral animation requires dynamic colors, so inline styles are necessary here.
 
@@ -248,7 +228,7 @@ function RecommendationCard({
   rec,
   isPrimary,
 }: {
-  rec: SystemRecommendation;
+  rec: SpiralRouteResult["recommendations"][number];
   isPrimary: boolean;
 }) {
   const meta = SYSTEM_META[rec.system];
@@ -362,13 +342,7 @@ export default function SpiralHub() {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(`${API_URL}/api/v1/spiral/route`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ intention: intentionKey }),
-      });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const data: SpiralRouteResult = await res.json();
+      const data = await getSpiralRoute(intentionKey);
       setRouteResult(data);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to get routing");

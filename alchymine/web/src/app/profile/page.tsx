@@ -1,11 +1,20 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import ProtectedRoute from "@/components/shared/ProtectedRoute";
 import { useAuth } from "@/lib/AuthContext";
 import { useApi } from "@/lib/useApi";
-import { getProfile, saveIntake, ProfileResponse, IntakePayload } from "@/lib/api";
+import {
+  getProfile,
+  getCompleteness,
+  saveIntake,
+  listUserReports,
+  ProfileResponse,
+  IntakePayload,
+  type CompletenessResponse,
+  type ReportListResponse,
+} from "@/lib/api";
 import {
   MotionReveal,
   MotionStagger,
@@ -418,69 +427,62 @@ function IdentitySection({
             <>
               <ComputedField
                 label="Life Path"
-                value={identity.life_path as number}
+                value={(identity.numerology as Record<string, unknown>)?.life_path as number}
               />
               <ComputedField
                 label="Expression"
-                value={identity.expression as number}
+                value={(identity.numerology as Record<string, unknown>)?.expression as number}
               />
               <ComputedField
                 label="Soul Urge"
-                value={identity.soul_urge as number}
+                value={(identity.numerology as Record<string, unknown>)?.soul_urge as number}
               />
               <ComputedField
                 label="Sun Sign"
-                value={identity.sun_sign as string}
+                value={(identity.astrology as Record<string, unknown>)?.sun_sign as string}
               />
               <ComputedField
                 label="Moon Sign"
-                value={identity.moon_sign as string}
+                value={(identity.astrology as Record<string, unknown>)?.moon_sign as string}
+              />
+              <ComputedField
+                label="Rising Sign"
+                value={(identity.astrology as Record<string, unknown>)?.rising_sign as string}
               />
               <ComputedField
                 label="Archetype"
-                value={identity.primary_archetype as string}
+                value={(identity.archetype as Record<string, unknown>)?.primary as string}
               />
             </>
           )}
           <EditActions onSave={onSave} onCancel={onCancel} saving={saving} />
         </div>
-      ) : (
-        <div className="space-y-1">
-          {intake && (
-            <>
-              <FieldRow label="Name" value={intake.full_name} />
-              <FieldRow label="Birth Date" value={intake.birth_date} />
-              <FieldRow label="Birth Time" value={intake.birth_time} />
-              <FieldRow label="Birth City" value={intake.birth_city} />
-            </>
-          )}
-          {identity && (
-            <>
-              <FieldRow
-                label="Life Path"
-                value={identity.life_path as number}
-              />
-              <FieldRow
-                label="Expression"
-                value={identity.expression as number}
-              />
-              <FieldRow
-                label="Soul Urge"
-                value={identity.soul_urge as number}
-              />
-              <FieldRow label="Sun Sign" value={identity.sun_sign as string} />
-              <FieldRow
-                label="Moon Sign"
-                value={identity.moon_sign as string}
-              />
-              <FieldRow
-                label="Archetype"
-                value={identity.primary_archetype as string}
-              />
-            </>
-          )}
-        </div>
-      )}
+      ) : (() => {
+        const num = identity?.numerology as Record<string, unknown> | undefined;
+        const ast = identity?.astrology as Record<string, unknown> | undefined;
+        const arch = identity?.archetype as Record<string, unknown> | undefined;
+        const pers = identity?.personality as Record<string, unknown> | undefined;
+        return (
+          <div className="space-y-1">
+            {intake && (
+              <>
+                <FieldRow label="Name" value={intake.full_name} />
+                <FieldRow label="Birth Date" value={intake.birth_date} />
+                <FieldRow label="Birth Time" value={intake.birth_time} />
+                <FieldRow label="Birth City" value={intake.birth_city} />
+              </>
+            )}
+            <FieldRow label="Life Path" value={num?.life_path as number} />
+            <FieldRow label="Expression" value={num?.expression as number} />
+            <FieldRow label="Soul Urge" value={num?.soul_urge as number} />
+            <FieldRow label="Sun Sign" value={ast?.sun_sign as string} />
+            <FieldRow label="Moon Sign" value={ast?.moon_sign as string} />
+            <FieldRow label="Rising Sign" value={ast?.rising_sign as string} />
+            <FieldRow label="Archetype" value={arch?.primary as string} />
+            <FieldRow label="Attachment Style" value={pers?.attachment_style as string} />
+          </div>
+        );
+      })()}
     </ProfileSection>
   );
 }
@@ -520,33 +522,40 @@ function HealingSection({ profile }: { profile: ProfileResponse }) {
           accentText="text-accent"
           linkText="Start Healing Journey"
         />
-      ) : (
-        <div className="space-y-4">
-          <div className="space-y-1">
-            <FieldRow
-              label="Breathwork Preference"
-              value={healing.breathwork_preference as string}
-            />
-            <FieldRow
-              label="Attachment Style"
-              value={healing.attachment_style as string}
-            />
-          </div>
-          {Array.isArray(healing.active_modalities) &&
-            healing.active_modalities.length > 0 && (
+      ) : (() => {
+        const mods = (healing.selected_modalities ?? healing.recommended_modalities) as Array<Record<string, unknown>> | undefined;
+        const topMods = mods?.slice(0, 3).map((m) => (m.name ?? m.modality) as string).filter(Boolean);
+        return (
+          <div className="space-y-4">
+            <div className="space-y-1">
+              <FieldRow
+                label="Crisis Protocol"
+                value={healing.crisis_flag === true ? "Active" : healing.crisis_flag === false ? "Inactive" : undefined}
+              />
+              <FieldRow
+                label="Openness"
+                value={typeof healing.openness === "number" ? `${Math.round(healing.openness as number)}%` : undefined}
+              />
+              <FieldRow
+                label="Attachment Style"
+                value={healing.attachment_style as string}
+              />
+            </div>
+            {topMods && topMods.length > 0 && (
               <div>
                 <p className="font-body text-xs text-text/40 uppercase tracking-wide mb-2">
-                  Active Modalities
+                  Recommended Modalities
                 </p>
                 <TagList
-                  items={healing.active_modalities as string[]}
+                  items={topMods}
                   accentBg="bg-accent/10"
                   accentText="text-accent"
                 />
               </div>
             )}
-        </div>
-      )}
+          </div>
+        );
+      })()}
     </ProfileSection>
   );
 }
@@ -699,30 +708,37 @@ function WealthSection({
           accentText="text-primary"
           linkText="Discover Your Wealth Archetype"
         />
-      ) : (
-        <div className="space-y-4">
-          <div className="space-y-1">
-            <FieldRow
-              label="Wealth Archetype"
-              value={wealth.wealth_archetype as string}
-            />
-            <FieldRow label="Plan Phase" value={wealth.plan_phase as string} />
-          </div>
-          {Array.isArray(wealth.primary_levers) &&
-            wealth.primary_levers.length > 0 && (
+      ) : (() => {
+        const wa = wealth.wealth_archetype as Record<string, unknown> | string | null;
+        const waName = typeof wa === "object" && wa !== null ? (wa.name as string) : (wa as string);
+        const waDesc = typeof wa === "object" && wa !== null ? (wa.description as string) : undefined;
+        const levers = wealth.lever_priorities as string[] | null;
+        return (
+          <div className="space-y-4">
+            <div className="space-y-1">
+              <FieldRow label="Wealth Archetype" value={waName} />
+              {waDesc && (
+                <p className="font-body text-xs text-text/40 leading-relaxed py-1">
+                  {waDesc}
+                </p>
+              )}
+              <FieldRow label="Risk Tolerance" value={wealth.risk_tolerance as string} />
+            </div>
+            {Array.isArray(levers) && levers.length > 0 && (
               <div>
                 <p className="font-body text-xs text-text/40 uppercase tracking-wide mb-2">
-                  Lever Focus
+                  Lever Priority
                 </p>
                 <TagList
-                  items={wealth.primary_levers as string[]}
+                  items={levers}
                   accentBg="bg-primary/10"
                   accentText="text-primary"
                 />
               </div>
             )}
-        </div>
-      )}
+          </div>
+        );
+      })()}
     </ProfileSection>
   );
 }
@@ -731,15 +747,6 @@ function WealthSection({
 
 function CreativeSection({ profile }: { profile: ProfileResponse }) {
   const creative = profile.creative;
-
-  const guilfordFields: Array<{ label: string; key: string }> = [
-    { label: "Fluency", key: "guilford_fluency" },
-    { label: "Flexibility", key: "guilford_flexibility" },
-    { label: "Originality", key: "guilford_originality" },
-    { label: "Elaboration", key: "guilford_elaboration" },
-    { label: "Sensitivity", key: "guilford_sensitivity" },
-    { label: "Redefinition", key: "guilford_redefinition" },
-  ];
 
   return (
     <ProfileSection
@@ -774,39 +781,47 @@ function CreativeSection({ profile }: { profile: ProfileResponse }) {
           accentText="text-secondary-light"
           linkText="Explore Creative Forge"
         />
-      ) : (
-        <div className="space-y-4">
-          <div className="space-y-1">
-            <FieldRow
-              label="Creative Style"
-              value={creative.creative_style as string}
-            />
-            <FieldRow
-              label="Overall Score"
-              value={
-                typeof creative.overall_score === "number"
-                  ? (creative.overall_score as number).toFixed(1)
-                  : undefined
-              }
-            />
-          </div>
-          <div className="space-y-1">
-            {guilfordFields.map(({ label, key }) =>
-              creative[key] !== undefined && creative[key] !== null ? (
-                <FieldRow
-                  key={key}
-                  label={`Guilford: ${label}`}
-                  value={
-                    typeof creative[key] === "number"
-                      ? (creative[key] as number).toFixed(1)
-                      : (creative[key] as string)
-                  }
+      ) : (() => {
+        const guilford = creative.guilford_scores as Record<string, number> | undefined;
+        const mediums = creative.medium_affinities as string[] | undefined;
+        return (
+          <div className="space-y-4">
+            <div className="space-y-1">
+              <FieldRow
+                label="Creative Orientation"
+                value={creative.creative_orientation as string}
+              />
+              <FieldRow
+                label="Production Mode"
+                value={creative.preferred_production_mode as string}
+              />
+            </div>
+            {guilford && Object.keys(guilford).length > 0 && (
+              <div className="space-y-1">
+                {Object.entries(guilford).map(([key, val]) => (
+                  <FieldRow
+                    key={key}
+                    label={key.charAt(0).toUpperCase() + key.slice(1)}
+                    value={Math.round(val)}
+                  />
+                ))}
+              </div>
+            )}
+            {Array.isArray(mediums) && mediums.length > 0 && (
+              <div>
+                <p className="font-body text-xs text-text/40 uppercase tracking-wide mb-2">
+                  Recommended Mediums
+                </p>
+                <TagList
+                  items={mediums}
+                  accentBg="bg-secondary/10"
+                  accentText="text-secondary-light"
                 />
-              ) : null,
+              </div>
             )}
           </div>
-        </div>
-      )}
+        );
+      })()}
     </ProfileSection>
   );
 }
@@ -846,33 +861,50 @@ function PerspectiveSection({ profile }: { profile: ProfileResponse }) {
           accentText="text-accent"
           linkText="Map Your Perspective"
         />
-      ) : (
-        <div className="space-y-4">
-          <div className="space-y-1">
-            <FieldRow
-              label="Kegan Stage"
-              value={perspective.kegan_stage as string | number}
-            />
-            <FieldRow
-              label="Stage Name"
-              value={perspective.kegan_stage_name as string}
-            />
-          </div>
-          {Array.isArray(perspective.detected_biases) &&
-            perspective.detected_biases.length > 0 && (
+      ) : (() => {
+        const kd = perspective.kegan_description as Record<string, unknown> | undefined;
+        const strengths = kd?.strengths as string[] | undefined;
+        const growthEdges = kd?.growth_edges as string[] | undefined;
+        return (
+          <div className="space-y-4">
+            <div className="space-y-1">
+              <FieldRow
+                label="Kegan Stage"
+                value={kd?.name as string || perspective.kegan_stage as string}
+              />
+              {kd?.description != null && (
+                <p className="font-body text-xs text-text/40 leading-relaxed py-1">
+                  {String(kd.description)}
+                </p>
+              )}
+            </div>
+            {Array.isArray(strengths) && strengths.length > 0 && (
               <div>
                 <p className="font-body text-xs text-text/40 uppercase tracking-wide mb-2">
-                  Detected Biases
+                  Strengths
                 </p>
                 <TagList
-                  items={perspective.detected_biases as string[]}
+                  items={strengths}
                   accentBg="bg-accent/10"
                   accentText="text-accent"
                 />
               </div>
             )}
-        </div>
-      )}
+            {Array.isArray(growthEdges) && growthEdges.length > 0 && (
+              <div>
+                <p className="font-body text-xs text-text/40 uppercase tracking-wide mb-2">
+                  Growth Edges
+                </p>
+                <TagList
+                  items={growthEdges}
+                  accentBg="bg-white/5"
+                  accentText="text-text/50"
+                />
+              </div>
+            )}
+          </div>
+        );
+      })()}
     </ProfileSection>
   );
 }
@@ -894,6 +926,24 @@ function downloadProfileJson(profile: ProfileResponse, email: string) {
   anchor.download = `alchymine-profile-${profile.id.slice(0, 8)}.json`;
   anchor.click();
   URL.revokeObjectURL(url);
+}
+
+// ── Report status badge ───────────────────────────────────────────
+
+function ReportStatusBadge({ status }: { status: string }) {
+  const styles: Record<string, string> = {
+    complete: "bg-green-500/15 text-green-400 border-green-500/20",
+    generating: "bg-yellow-500/15 text-yellow-400 border-yellow-500/20",
+    pending: "bg-blue-500/15 text-blue-400 border-blue-500/20",
+    failed: "bg-red-500/15 text-red-400 border-red-500/20",
+  };
+  return (
+    <span
+      className={`inline-block px-2 py-0.5 rounded-full text-[0.65rem] font-body font-medium tracking-wider uppercase border ${styles[status] ?? styles["pending"]}`}
+    >
+      {status}
+    </span>
+  );
 }
 
 // ── Main Page ─────────────────────────────────────────────────────
@@ -932,6 +982,14 @@ export default function ProfilePage() {
 
   const profileState = useApi<ProfileResponse>(
     () => (userId ? getProfile(userId) : Promise.reject(new Error("No user"))),
+    [userId],
+  );
+
+  const recentReports = useApi<ReportListResponse>(
+    () =>
+      userId
+        ? listUserReports(userId, { limit: 5 })
+        : Promise.reject(new Error("No user")),
     [userId],
   );
 
@@ -1033,6 +1091,17 @@ export default function ProfilePage() {
     }
   }
 
+  const [completeness, setCompleteness] = useState<CompletenessResponse | null>(
+    null,
+  );
+
+  useEffect(() => {
+    if (!userId) return;
+    getCompleteness(userId)
+      .then(setCompleteness)
+      .catch(() => {});
+  }, [userId]);
+
   return (
     <ProtectedRoute>
       <div className="grain-overlay bg-atmosphere min-h-screen">
@@ -1044,9 +1113,30 @@ export default function ProfilePage() {
                 <p className="text-xs font-body font-medium text-primary/70 uppercase tracking-[0.2em] mb-2">
                   Personal Command Center
                 </p>
-                <h1 className="font-display text-display-md font-light">
-                  Your <span className="text-gradient-gold">Profile</span>
-                </h1>
+                <div className="flex items-center justify-between">
+                  <h1 className="font-display text-display-md font-light">
+                    Your <span className="text-gradient-gold">Profile</span>
+                  </h1>
+                  <Link
+                    href="/discover/intake"
+                    className="inline-flex items-center gap-2 px-4 py-2 rounded-xl border border-white/[0.08] bg-white/[0.03] text-sm font-body text-text/50 hover:border-primary/30 hover:text-text/70 transition-all duration-300"
+                  >
+                    <svg
+                      className="w-4 h-4"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="1.5"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      aria-hidden="true"
+                    >
+                      <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                      <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+                    </svg>
+                    Update Profile
+                  </Link>
+                </div>
                 <p className="font-body text-text/40 text-sm mt-2">
                   All five systems in one place
                 </p>
@@ -1117,6 +1207,72 @@ export default function ProfilePage() {
                   <PerspectiveSection profile={profileState.data} />
                 </MotionStaggerItem>
 
+                {/* ── Recent Reports ─────────────────────────────── */}
+                <MotionStaggerItem>
+                  <div className="card-surface px-5 py-5 sm:px-6">
+                    <h2 className="font-display text-lg font-light text-text mb-1">
+                      Recent Reports
+                    </h2>
+                    <p className="font-body text-xs text-text/40 mb-4">
+                      Your latest transformation reports
+                    </p>
+                    {recentReports.loading ? (
+                      <Spinner />
+                    ) : recentReports.error ||
+                      !recentReports.data ||
+                      recentReports.data.reports.length === 0 ? (
+                      <div className="text-center py-4">
+                        <p className="font-body text-text/50 text-sm mb-3">
+                          No reports yet
+                        </p>
+                        <Link
+                          href="/discover/intake"
+                          className="inline-flex items-center gap-2 px-4 py-2 bg-primary/10 border border-primary/20 text-primary font-body text-sm rounded-xl hover:bg-primary/20 transition-colors"
+                        >
+                          Start Assessment
+                        </Link>
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        {recentReports.data.reports.map((report) => (
+                          <Link
+                            key={report.id}
+                            href={
+                              report.status === "complete"
+                                ? `/discover/report/${report.id}`
+                                : `/discover/generating/${report.id}`
+                            }
+                            className="block card-surface p-4 transition-all duration-300 hover:brightness-110 hover:-translate-y-0.5"
+                          >
+                            <div className="flex items-center justify-between gap-3">
+                              <div className="min-w-0 flex-1">
+                                <p className="font-body text-sm text-text/70 truncate">
+                                  Report{" "}
+                                  <span className="text-text/30">
+                                    {report.id.slice(0, 8)}
+                                  </span>
+                                </p>
+                                <p className="font-body text-xs text-text/30 mt-0.5">
+                                  {new Date(
+                                    report.created_at,
+                                  ).toLocaleDateString(undefined, {
+                                    month: "short",
+                                    day: "numeric",
+                                    year: "numeric",
+                                    hour: "numeric",
+                                    minute: "2-digit",
+                                  })}
+                                </p>
+                              </div>
+                              <ReportStatusBadge status={report.status} />
+                            </div>
+                          </Link>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </MotionStaggerItem>
+
                 {/* ── Your Data ───────────────────────────────────── */}
                 <MotionStaggerItem>
                   <div className="card-surface px-5 py-5 sm:px-6">
@@ -1155,6 +1311,99 @@ export default function ProfilePage() {
                     </button>
                   </div>
                 </MotionStaggerItem>
+                {completeness && (
+                  <MotionStaggerItem>
+                    <div className="card-surface p-6">
+                      <h3 className="font-display text-lg font-medium mb-4">
+                        Assessment Status
+                      </h3>
+                      <div className="space-y-3">
+                        {(
+                          [
+                            {
+                              key: "big_five" as const,
+                              label: "Personality (Big Five)",
+                              sections: "big_five",
+                            },
+                            {
+                              key: "attachment" as const,
+                              label: "Attachment Style",
+                              sections: "attachment",
+                            },
+                            {
+                              key: "risk_tolerance" as const,
+                              label: "Risk Tolerance",
+                              sections: "risk_tolerance",
+                            },
+                            {
+                              key: "enneagram" as const,
+                              label: "Enneagram",
+                              sections: "enneagram",
+                            },
+                            {
+                              key: "perspective" as const,
+                              label: "Perspective (Kegan)",
+                              sections: "perspective",
+                            },
+                            {
+                              key: "creativity" as const,
+                              label: "Creativity",
+                              sections: "creativity",
+                            },
+                          ] as const
+                        ).map(({ key, label, sections }) => {
+                          const section = completeness[key] as
+                            | { answered: number; total: number; complete: boolean }
+                            | undefined;
+                          if (!section) return null;
+                          return (
+                            <div
+                              key={key}
+                              className="flex items-center justify-between py-2 border-b border-white/[0.06] last:border-0"
+                            >
+                              <div>
+                                <span className="text-sm font-body text-text">
+                                  {label}
+                                </span>
+                                <span className="text-xs text-text/40 ml-2">
+                                  {section.answered}/{section.total}
+                                </span>
+                              </div>
+                              {section.complete ? (
+                                <div className="flex items-center gap-2">
+                                  <span className="text-xs text-primary/70">
+                                    Complete
+                                  </span>
+                                  <a
+                                    href={`/discover/assessment?sections=${sections}`}
+                                    className="text-xs text-text/30 hover:text-text/60 transition-colors"
+                                  >
+                                    Retake
+                                  </a>
+                                </div>
+                              ) : (
+                                <a
+                                  href={`/discover/assessment?sections=${sections}`}
+                                  className="text-xs font-medium text-primary hover:text-primary-light transition-colors"
+                                >
+                                  Complete
+                                </a>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                      <div className="mt-4 pt-3 border-t border-white/[0.06]">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs text-text/40">Overall</span>
+                          <span className="text-xs text-text/50">
+                            {completeness.overall_pct}%
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </MotionStaggerItem>
+                )}
               </MotionStagger>
             ) : null}
           </div>

@@ -209,8 +209,10 @@ _INTENTION_TO_SYSTEMS: dict[str, list[SystemIntent]] = {
 def intentions_to_systems(intentions: list[str]) -> list[SystemIntent]:
     """Map a list of user intention strings to unique SystemIntents.
 
-    Always includes INTELLIGENCE as the base system (numerology/astrology
-    are computed for every report).
+    Always includes all five systems so every report section is populated.
+    Intention-based routing determines *priority* during synthesis, not
+    which systems run.  Intelligence is always first (numerology/astrology
+    are core), followed by intention-relevant systems, then the rest.
 
     Parameters
     ----------
@@ -220,19 +222,27 @@ def intentions_to_systems(intentions: list[str]) -> list[SystemIntent]:
     Returns
     -------
     list[SystemIntent]
-        Deduplicated list of systems to invoke, with INTELLIGENCE first.
+        All five systems, ordered with INTELLIGENCE first, then
+        intention-relevant systems, then remaining systems.
     """
     systems: list[SystemIntent] = []
     seen: set[SystemIntent] = set()
-    # Always include intelligence (numerology/astrology are core)
+    # Always include intelligence first (numerology/astrology are core)
     systems.append(SystemIntent.INTELLIGENCE)
     seen.add(SystemIntent.INTELLIGENCE)
 
+    # Add intention-relevant systems first (higher priority in synthesis)
     for intention in intentions:
         for system in _INTENTION_TO_SYSTEMS.get(intention.lower(), []):
             if system not in seen:
                 systems.append(system)
                 seen.add(system)
+
+    # Ensure all five systems are included so every report section is populated
+    for system in SystemIntent:
+        if system not in seen and system not in (SystemIntent.UNKNOWN, SystemIntent.MULTI_SYSTEM):
+            systems.append(system)
+            seen.add(system)
 
     return systems
 

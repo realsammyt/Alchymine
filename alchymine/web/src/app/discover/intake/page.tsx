@@ -191,6 +191,17 @@ export default function IntakePage() {
             intentions: profile.intake!.intentions?.length
               ? profile.intake!.intentions
               : prev.intentions,
+            wealthContext: profile.intake!.wealth_context
+              ? {
+                  income_range: profile.intake!.wealth_context.income_range ?? "",
+                  has_investments: profile.intake!.wealth_context.has_investments ?? false,
+                  has_business: profile.intake!.wealth_context.has_business ?? false,
+                  has_real_estate: profile.intake!.wealth_context.has_real_estate ?? false,
+                  dependents: profile.intake!.wealth_context.dependents ?? null,
+                  debt_level: profile.intake!.wealth_context.debt_level ?? "",
+                  financial_goal: profile.intake!.wealth_context.financial_goal ?? "",
+                }
+              : prev.wealthContext,
           }));
         }
       })
