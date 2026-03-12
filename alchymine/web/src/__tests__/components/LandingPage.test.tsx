@@ -113,10 +113,10 @@ describe("LandingPage", () => {
     ).toBeInTheDocument();
   });
 
-  it("has Begin Your Journey CTA linking to discover intake", () => {
+  it("has Begin Your Journey CTA linking to signup", () => {
     render(<LandingPage />);
     expect(screen.getByText("Begin Your Journey")).toBeInTheDocument();
     const link = screen.getByText("Begin Your Journey").closest("a");
-    expect(link).toHaveAttribute("href", "/discover/intake");
+    expect(link).toHaveAttribute("href", "/signup");
   });
 });
