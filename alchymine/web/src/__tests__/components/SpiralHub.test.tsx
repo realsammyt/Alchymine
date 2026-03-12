@@ -27,13 +27,15 @@ jest.mock("next/link", () => {
   };
 });
 
-// Mock fetch
-const mockFetch = jest.fn();
-global.fetch = mockFetch;
+// Mock the API module (SpiralHub now uses getSpiralRoute instead of raw fetch)
+const mockGetSpiralRoute = jest.fn();
+jest.mock("@/lib/api", () => ({
+  getSpiralRoute: (...args: unknown[]) => mockGetSpiralRoute(...args),
+}));
 
 describe("SpiralHub", () => {
   beforeEach(() => {
-    mockFetch.mockReset();
+    mockGetSpiralRoute.mockReset();
   });
 
   it("renders without crashing", () => {
@@ -76,22 +78,18 @@ describe("SpiralHub", () => {
   });
 
   it("shows loading state when an intention is clicked", async () => {
-    mockFetch.mockImplementation(
+    mockGetSpiralRoute.mockImplementation(
       () =>
         new Promise((resolve) =>
           setTimeout(
             () =>
               resolve({
-                ok: true,
-                json: () =>
-                  Promise.resolve({
-                    primary_system: "intelligence",
-                    recommendations: [],
-                    for_you_today: "Test message",
-                    evidence_level: "strong",
-                    calculation_type: "deterministic",
-                    methodology: "Test methodology",
-                  }),
+                primary_system: "intelligence",
+                recommendations: [],
+                for_you_today: "Test message",
+                evidence_level: "strong",
+                calculation_type: "deterministic",
+                methodology: "Test methodology",
               }),
             500,
           ),
@@ -108,32 +106,28 @@ describe("SpiralHub", () => {
   });
 
   it("displays recommendations after successful API call", async () => {
-    mockFetch.mockResolvedValueOnce({
-      ok: true,
-      json: () =>
-        Promise.resolve({
-          primary_system: "intelligence",
-          recommendations: [
-            {
-              system: "intelligence",
-              score: 92,
-              reason: "Your profile aligns with deep self-exploration.",
-              entry_action: "Start your numerology reading",
-              priority: 1,
-            },
-            {
-              system: "healing",
-              score: 75,
-              reason: "Emotional healing supports self-understanding.",
-              entry_action: "Begin a breathwork session",
-              priority: 2,
-            },
-          ],
-          for_you_today: "Today is about understanding your inner world.",
-          evidence_level: "strong",
-          calculation_type: "deterministic",
-          methodology: "Spiral routing methodology",
-        }),
+    mockGetSpiralRoute.mockResolvedValueOnce({
+      primary_system: "intelligence",
+      recommendations: [
+        {
+          system: "intelligence",
+          score: 92,
+          reason: "Your profile aligns with deep self-exploration.",
+          entry_action: "Start your numerology reading",
+          priority: 1,
+        },
+        {
+          system: "healing",
+          score: 75,
+          reason: "Emotional healing supports self-understanding.",
+          entry_action: "Begin a breathwork session",
+          priority: 2,
+        },
+      ],
+      for_you_today: "Today is about understanding your inner world.",
+      evidence_level: "strong",
+      calculation_type: "deterministic",
+      methodology: "Spiral routing methodology",
     });
 
     render(<SpiralHub />);
@@ -153,21 +147,18 @@ describe("SpiralHub", () => {
   });
 
   it("displays error state on API failure", async () => {
-    mockFetch.mockResolvedValueOnce({
-      ok: false,
-      status: 500,
-    });
+    mockGetSpiralRoute.mockRejectedValueOnce(new Error("Failed to get routing"));
 
     render(<SpiralHub />);
     fireEvent.click(screen.getByText("I want to understand myself better"));
 
     await waitFor(() => {
-      expect(screen.getByText("HTTP 500")).toBeInTheDocument();
+      expect(screen.getByText("Failed to get routing")).toBeInTheDocument();
     });
   });
 
   it("sets aria-pressed on selected intention", () => {
-    mockFetch.mockImplementation(
+    mockGetSpiralRoute.mockImplementation(
       () => new Promise(() => {}), // never resolves
     );
 
@@ -187,25 +178,21 @@ describe("SpiralHub", () => {
   });
 
   it("renders recommendation cards with links to system pages", async () => {
-    mockFetch.mockResolvedValueOnce({
-      ok: true,
-      json: () =>
-        Promise.resolve({
-          primary_system: "wealth",
-          recommendations: [
-            {
-              system: "wealth",
-              score: 88,
-              reason: "Financial focus detected.",
-              entry_action: "Review your plan",
-              priority: 1,
-            },
-          ],
-          for_you_today: "Focus on your finances today.",
-          evidence_level: "strong",
-          calculation_type: "deterministic",
-          methodology: "Test",
-        }),
+    mockGetSpiralRoute.mockResolvedValueOnce({
+      primary_system: "wealth",
+      recommendations: [
+        {
+          system: "wealth",
+          score: 88,
+          reason: "Financial focus detected.",
+          entry_action: "Review your plan",
+          priority: 1,
+        },
+      ],
+      for_you_today: "Focus on your finances today.",
+      evidence_level: "strong",
+      calculation_type: "deterministic",
+      methodology: "Test",
     });
 
     render(<SpiralHub />);

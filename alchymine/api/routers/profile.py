@@ -114,7 +114,9 @@ def _user_to_response(user: User) -> ProfileResponse:
         # Pull wealth_context from the wealth layer (it's stored there, not on intake)
         wc = None
         if user.wealth is not None and user.wealth.wealth_context is not None:
-            wc = user.wealth.wealth_context if isinstance(user.wealth.wealth_context, dict) else None
+            wc = (
+                user.wealth.wealth_context if isinstance(user.wealth.wealth_context, dict) else None
+            )
         intake_resp = IntakeResponse(
             full_name=user.intake.full_name,
             birth_date=user.intake.birth_date,
