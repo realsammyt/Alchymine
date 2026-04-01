@@ -84,6 +84,11 @@ export default function RootLayout({
           <ContentWrapper>{children}</ContentWrapper>
           <FeedbackButton />
         </Providers>
+        <script
+          data-goatcounter="https://alchymine.goatcounter.com/count"
+          async
+          src="//gc.zgo.at/count.js"
+        />
       </body>
     </html>
   );
