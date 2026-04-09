@@ -43,6 +43,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from alchymine.db.models import (
+    ChatMessage,
     CreativeProfile,
     FeedbackEntry,
     HealingProfile,
@@ -864,6 +865,97 @@ async def update_feedback(
     await session.flush()
     await session.refresh(entry)
     return entry
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# Chat Message CRUD (Growth Assistant)
+# ═══════════════════════════════════════════════════════════════════════
+
+
+async def save_chat_message(
+    session: AsyncSession,
+    *,
+    user_id: str,
+    role: str,
+    content: str,
+    system_key: str | None = None,
+) -> ChatMessage:
+    """Persist a single chat message and return the ORM row.
+
+    Parameters
+    ----------
+    session:
+        Active async session.
+    user_id:
+        FK to ``users.id``.
+    role:
+        ``"user"``, ``"assistant"``, or ``"system"``.
+    content:
+        Message body — encrypted at rest by the ORM column type.
+    system_key:
+        Optional system scope (``"intelligence" | "healing" | "wealth" |
+        "creative" | "perspective"``) or ``None`` for the general coach.
+
+    Returns
+    -------
+    ChatMessage
+        The newly created row, refreshed so ``id`` and ``created_at`` are
+        populated.
+    """
+    msg = ChatMessage(
+        user_id=user_id,
+        role=role,
+        content=content,
+        system_key=system_key,
+    )
+    session.add(msg)
+    await session.flush()
+    await session.refresh(msg)
+    return msg
+
+
+async def get_chat_history(
+    session: AsyncSession,
+    *,
+    user_id: str,
+    system_key: str | None = None,
+    limit: int = 50,
+) -> list[ChatMessage]:
+    """Return the most recent chat history for a user, in chronological order.
+
+    The query fetches the *latest* ``limit`` rows ordered by ``created_at``
+    descending (so we always get the newest messages even when the history
+    is long), then reverses the slice before returning so callers receive
+    them oldest-first — the natural order for replay into an LLM context.
+
+    When ``system_key`` is provided, only messages scoped to that system are
+    returned.  When ``system_key`` is ``None``, **all** messages for the
+    user are returned regardless of their scope (general history).
+
+    Parameters
+    ----------
+    session:
+        Active async session.
+    user_id:
+        FK to ``users.id``.
+    system_key:
+        Optional system filter; ``None`` means "all messages".
+    limit:
+        Maximum number of messages to return (default 50).
+
+    Returns
+    -------
+    list[ChatMessage]
+        Messages in chronological (oldest-first) order.
+    """
+    stmt = select(ChatMessage).where(ChatMessage.user_id == user_id)
+    if system_key is not None:
+        stmt = stmt.where(ChatMessage.system_key == system_key)
+    stmt = stmt.order_by(ChatMessage.created_at.desc()).limit(limit)
+    result = await session.execute(stmt)
+    rows = list(result.scalars().all())
+    rows.reverse()  # chronological order for callers
+    return rows
 
 
 async def get_feedback_counts(session: AsyncSession) -> dict[str, int]:
