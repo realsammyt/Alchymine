@@ -61,6 +61,15 @@ class Settings(BaseSettings):
     anthropic_api_key: str = ""
     ollama_base_url: str = "http://localhost:11434"
 
+    # ── Gemini (Generative Art) ──────────────────────────────────────────
+    # Optional — when unset, the generative art endpoints degrade gracefully
+    # and return 204 No Content so the frontend can render placeholder art.
+    gemini_api_key: str = ""
+    gemini_model: str = "gemini-2.0-flash-preview-image-generation"
+    # Filesystem cache location for generated image bytes (relative paths
+    # are resolved against the project root at runtime).
+    art_cache_dir: str = "data/generated_images"
+
     # ── Celery ───────────────────────────────────────────────────────────
     celery_broker_url: str = "redis://localhost:6379/1"
     celery_result_backend: str = "redis://localhost:6379/2"
