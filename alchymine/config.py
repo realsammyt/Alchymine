@@ -30,6 +30,12 @@ class Settings(BaseSettings):
         env_file=".env",
         env_file_encoding="utf-8",
         case_sensitive=False,
+        # Tolerate extra vars in .env files (e.g. production envs that include
+        # docker-compose service names, deployment secrets, or other tooling
+        # vars that Settings doesn't declare). Without this, a local dev
+        # running tests with a production-style .env hits extra_forbidden
+        # errors on every Settings() instantiation.
+        extra="ignore",
     )
 
     # ── App ──────────────────────────────────────────────────────────────
