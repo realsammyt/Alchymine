@@ -275,3 +275,132 @@ class TestGetImage:
     def test_returns_404_for_unknown_id(self, client: TestClient) -> None:
         response = client.get("/api/v1/art/no-such-image")
         assert response.status_code == 404
+
+
+# ── GET /api/v1/art/presets ─────────────────────────────────────────────
+
+
+class TestListStylePresets:
+    """Tests for GET /api/v1/art/presets."""
+
+    def test_returns_all_presets(self, client: TestClient) -> None:
+        from alchymine.llm.art_prompts import STYLE_PRESETS
+
+        response = client.get("/api/v1/art/presets")
+        assert response.status_code == 200
+        body = response.json()
+        assert isinstance(body, list)
+        ids = {entry["id"] for entry in body}
+        assert ids == set(STYLE_PRESETS.keys())
+        for entry in body:
+            assert entry["name"]
+            assert entry["description"]
+
+
+# ── GET /api/v1/art/list ────────────────────────────────────────────────
+
+
+class TestListUserImages:
+    """Tests for GET /api/v1/art/list."""
+
+    def _seed_image(self, client: TestClient) -> str:
+        fake = _FakeGemini(available=True, succeed=True)
+        app.dependency_overrides[_gemini_dependency] = lambda: fake
+        response = client.post("/api/v1/art/generate", json={"style_preset": "mystical"})
+        assert response.status_code == 201
+        return response.json()["image_id"]
+
+    def test_returns_empty_list_for_user_with_no_images(self, client: TestClient) -> None:
+        response = client.get("/api/v1/art/list")
+        assert response.status_code == 200
+        body = response.json()
+        assert body["images"] == []
+        assert body["limit"] == 20
+        assert body["offset"] == 0
+
+    def test_returns_user_images_metadata(self, client: TestClient) -> None:
+        image_id = self._seed_image(client)
+        response = client.get("/api/v1/art/list")
+        assert response.status_code == 200
+        body = response.json()
+        assert len(body["images"]) == 1
+        entry = body["images"][0]
+        assert entry["id"] == image_id
+        assert entry["style_preset"] == "mystical"
+        assert entry["url"] == f"/api/v1/art/{image_id}"
+        assert entry["prompt"]
+        assert entry["created_at"]
+
+    def test_respects_limit_and_offset(self, client: TestClient) -> None:
+        self._seed_image(client)
+        self._seed_image(client)
+
+        response = client.get("/api/v1/art/list?limit=1&offset=0")
+        assert response.status_code == 200
+        body = response.json()
+        assert len(body["images"]) == 1
+        assert body["limit"] == 1
+
+        response2 = client.get("/api/v1/art/list?limit=1&offset=1")
+        assert response2.status_code == 200
+        body2 = response2.json()
+        assert len(body2["images"]) == 1
+        # Different offsets should return different images.
+        assert body["images"][0]["id"] != body2["images"][0]["id"]
+
+    def test_does_not_leak_other_users_images(self, client: TestClient) -> None:
+        self._seed_image(client)
+
+        async def _override_other() -> dict:
+            return {"sub": OTHER_USER_ID, "email": "other-art-test@example.com"}
+
+        app.dependency_overrides[get_current_user] = _override_other
+        response = client.get("/api/v1/art/list")
+        assert response.status_code == 200
+        assert response.json()["images"] == []
+
+
+# ── DELETE /api/v1/art/{image_id} ───────────────────────────────────────
+
+
+class TestDeleteUserImage:
+    """Tests for DELETE /api/v1/art/{image_id}."""
+
+    def _seed_image(self, client: TestClient) -> str:
+        fake = _FakeGemini(available=True, succeed=True)
+        app.dependency_overrides[_gemini_dependency] = lambda: fake
+        response = client.post("/api/v1/art/generate", json={})
+        assert response.status_code == 201
+        return response.json()["image_id"]
+
+    def test_owner_can_delete_own_image(self, client: TestClient) -> None:
+        image_id = self._seed_image(client)
+
+        response = client.delete(f"/api/v1/art/{image_id}")
+        assert response.status_code == 204
+
+        # Follow-up GET should now 404.
+        follow_up = client.get(f"/api/v1/art/{image_id}")
+        assert follow_up.status_code == 404
+
+    def test_cross_user_delete_returns_404(self, client: TestClient) -> None:
+        image_id = self._seed_image(client)
+
+        async def _override_other() -> dict:
+            return {"sub": OTHER_USER_ID, "email": "other-art-test@example.com"}
+
+        app.dependency_overrides[get_current_user] = _override_other
+        response = client.delete(f"/api/v1/art/{image_id}")
+        assert response.status_code == 404
+
+        # Restore the primary user — the image should still be fetchable.
+        async def _override_primary() -> dict:
+            return {"sub": TEST_USER_ID, "email": "art-test@example.com"}
+
+        app.dependency_overrides[get_current_user] = _override_primary
+        follow_up = client.get(f"/api/v1/art/{image_id}")
+        assert follow_up.status_code == 200
+
+    def test_delete_unknown_id_returns_404(self, client: TestClient) -> None:
+        response = client.delete("/api/v1/art/no-such-image")
+        assert response.status_code == 404
