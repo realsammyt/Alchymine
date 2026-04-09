@@ -640,3 +640,69 @@ class FeedbackEntry(Base):
 
     def __repr__(self) -> str:
         return f"<FeedbackEntry id={self.id!r} category={self.category!r} status={self.status!r}>"
+
+
+# ─── ChatMessage ───────────────────────────────────────────────────────
+
+
+class ChatMessage(Base):
+    """Persisted chat message for the Growth Assistant.
+
+    Stores the running conversation between a user and the AI Growth
+    Assistant across all five Alchymine systems.  Each row is a single
+    message turn (user, assistant, or system).
+
+    The ``content`` column is encrypted at rest because chat history may
+    contain sensitive personal disclosures (PII classification — same
+    treatment as ``JournalEntry.content``).
+
+    Columns
+    -------
+    id:
+        UUID primary key.
+    user_id:
+        FK to ``users.id`` with ``ON DELETE CASCADE``.
+    role:
+        One of ``"user"``, ``"assistant"``, ``"system"``.
+    content:
+        Message body — encrypted via Fernet at rest.
+    system_key:
+        Optional system scope (``"intelligence" | "healing" | "wealth" |
+        "creative" | "perspective"``) or ``NULL`` for general chat.
+    created_at:
+        UTC timestamp of message creation.
+    """
+
+    __tablename__ = "chat_messages"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    user_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    role: Mapped[str] = mapped_column(
+        String(16), nullable=False, comment="user | assistant | system"
+    )
+    content: Mapped[str] = mapped_column(EncryptedString(), nullable=False)
+    system_key: Mapped[str | None] = mapped_column(
+        String(32),
+        nullable=True,
+        index=True,
+        comment="intelligence | healing | wealth | creative | perspective | NULL",
+    )
+    # Use a Python-side default in addition to the server default so that
+    # rows inserted in rapid succession (especially in SQLite tests, where
+    # ``func.now()`` resolves to whole-second precision) get unique
+    # microsecond-resolution timestamps for stable ordering.
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(UTC),
+        server_default=func.now(),
+        nullable=False,
+        index=True,
+    )
+
+    def __repr__(self) -> str:
+        return (
+            f"<ChatMessage id={self.id!r} user_id={self.user_id!r} "
+            f"role={self.role!r} system_key={self.system_key!r}>"
+        )
