@@ -54,7 +54,12 @@ export default function ChatMessageList({
   // Auto-scroll on new messages / streaming content.
   useEffect(() => {
     if (!pinnedToBottom) return;
-    bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+    // jsdom doesn't implement scrollIntoView — guard for tests and any
+    // ancient runtime without the API.
+    const el = bottomRef.current;
+    if (el && typeof el.scrollIntoView === "function") {
+      el.scrollIntoView({ behavior: "smooth", block: "end" });
+    }
   }, [messages, pinnedToBottom]);
 
   // Identify the last assistant message for typing-indicator logic.
