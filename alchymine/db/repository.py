@@ -45,6 +45,7 @@ from sqlalchemy.orm import selectinload
 from alchymine.db.models import (
     CreativeProfile,
     FeedbackEntry,
+    GeneratedImage,
     HealingProfile,
     IdentityProfile,
     IntakeData,
@@ -877,3 +878,55 @@ async def get_feedback_counts(session: AsyncSession) -> dict[str, int]:
         select(FeedbackEntry.status, func.count()).group_by(FeedbackEntry.status)
     )
     return {row[0]: row[1] for row in result.all()}
+
+
+# ─── Generated Image CRUD ──────────────────────────────────────────────
+
+
+async def create_generated_image(
+    session: AsyncSession,
+    *,
+    user_id: str,
+    prompt: str,
+    file_path: str,
+    mime_type: str = "image/png",
+    style_preset: str | None = None,
+    model: str | None = None,
+) -> GeneratedImage:
+    """Insert a new generated_images row.
+
+    Parameters
+    ----------
+    session:
+        Active async session.
+    user_id:
+        Owning user (FK).
+    prompt:
+        The exact prompt used to generate the image.
+    file_path:
+        Path on disk (relative to ``ART_CACHE_DIR``) where the bytes live.
+    mime_type:
+        IANA mime type, default ``image/png``.
+    style_preset:
+        Optional style preset id from ``STYLE_PRESETS``.
+    model:
+        Optional Gemini model id used.
+    """
+    image = GeneratedImage(
+        user_id=user_id,
+        prompt=prompt,
+        file_path=file_path,
+        mime_type=mime_type,
+        style_preset=style_preset,
+        model=model,
+    )
+    session.add(image)
+    await session.flush()
+    await session.refresh(image)
+    return image
+
+
+async def get_generated_image(session: AsyncSession, image_id: str) -> GeneratedImage | None:
+    """Fetch a single generated_images row by id, or ``None``."""
+    result = await session.execute(select(GeneratedImage).where(GeneratedImage.id == image_id))
+    return result.scalar_one_or_none()
