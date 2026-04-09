@@ -1,0 +1,20 @@
+name: somatic-grounding-5-4-3-2-1
+modality: somatic_practice
+title: 5-4-3-2-1 Sensory Grounding
+description: >-
+  A trauma-informed grounding technique that interrupts dissociation, anxious
+  spirals, and panic by anchoring attention to the immediate sensory environment.
+  Widely used in clinical settings for its simplicity and quick effect.
+steps:
+  - Plant both feet on the floor and feel the contact between feet and ground.
+  - Name 5 things you can see in the room — describe each in one short phrase.
+  - Name 4 things you can physically feel (clothing, chair, air on skin, weight of hands).
+  - Name 3 things you can hear right now, near or far.
+  - Name 2 things you can smell, or two smells you can recall vividly.
+  - Name 1 thing you can taste, or take a sip of water and name what you taste.
+  - Take one slow breath and notice the difference from when you started.
+evidence_rating: B
+contraindications:
+  - recent major surgery preventing seated posture
+  - acute physical injury at the practice site
+duration_minutes: 5

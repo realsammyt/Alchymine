@@ -1,0 +1,20 @@
+name: sleep-cbt-i-wind-down
+modality: sleep_healing
+title: CBT-I Wind-Down Routine
+description: >-
+  A 30-minute pre-sleep routine drawn from cognitive behavioural therapy for
+  insomnia (CBT-I), the first-line non-pharmacological treatment for chronic
+  insomnia. The protocol cues the nervous system that sleep is imminent through
+  light, temperature, and stimulus control.
+steps:
+  - 30 minutes before intended sleep, dim all bright lights and put screens away (or use a strict night filter).
+  - Lower the room temperature toward 18-19 C and ventilate if possible.
+  - Spend 10 minutes on a quiet, non-stimulating activity (reading paper, light stretching, journaling).
+  - Write a 3-line "tomorrow list" so the mind has nowhere new to wander.
+  - Get into bed only when sleepy. If awake after 20 minutes, get up, sit somewhere dim, and return when sleepy again.
+  - Keep a consistent wake time the next morning regardless of how the night went.
+evidence_rating: A
+contraindications:
+  - untreated sleep apnoea requiring CPAP titration
+  - severe restless leg syndrome (consult clinician)
+duration_minutes: 30

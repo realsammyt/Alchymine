@@ -1,0 +1,23 @@
+name: resilience-cold-exposure-protocol
+modality: resilience_training
+title: Graded Cold Exposure for Stress Inoculation
+description: >-
+  A graded shower protocol that uses brief, voluntary cold exposure to train
+  parasympathetic recovery and tolerance for discomfort. Multiple controlled
+  trials suggest modest but real benefits for mood, sick-day frequency, and
+  perceived resilience when practiced consistently.
+steps:
+  - Take your normal warm shower first, washing as usual.
+  - At the end, lower the temperature gradually until the water is cold but tolerable.
+  - Stand under the cold stream for 30 seconds, breathing slowly and deeply through the nose.
+  - Notice the urge to brace or gasp — instead, soften the jaw and shoulders.
+  - Step out and dry off vigorously to rewarm.
+  - Each subsequent day, add 15 seconds until you reach 2-3 minutes total.
+evidence_rating: B
+contraindications:
+  - cardiovascular disease (uncleared)
+  - Raynaud's phenomenon
+  - pregnancy without obstetric clearance
+  - cold urticaria
+  - acute PTSD without clinical supervision
+duration_minutes: 5

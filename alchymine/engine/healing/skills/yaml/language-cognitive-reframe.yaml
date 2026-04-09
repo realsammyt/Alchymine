@@ -1,0 +1,20 @@
+name: language-cognitive-reframe
+modality: language_awareness
+title: Cognitive Reframe of an Automatic Thought
+description: >-
+  A short journaling practice from cognitive behavioural therapy that surfaces
+  habitual self-talk and rewrites it in language that is more accurate and less
+  catastrophising. The technique is well-supported by RCTs for mild-to-moderate
+  anxiety and low mood.
+steps:
+  - Notice a recent moment when you felt strong unpleasant emotion.
+  - Write down the automatic thought that ran through your mind in that moment, word-for-word.
+  - Underline any absolutist words ("always", "never", "must", "everyone", "nothing").
+  - Ask three questions in writing — What is the evidence for this? What is the evidence against? What would I tell a friend with this thought?
+  - Rewrite the thought in language that is true, fair, and uses concrete specifics instead of absolutes.
+  - Read the new sentence aloud once and notice how the body responds.
+evidence_rating: A
+contraindications:
+  - active speech therapy for trauma-related mutism
+  - acute trauma flashbacks (use grounding first)
+duration_minutes: 12
