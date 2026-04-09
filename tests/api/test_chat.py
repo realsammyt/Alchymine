@@ -270,6 +270,123 @@ class TestChatSafety:
         assert response.status_code == 422
 
 
+# ─── Scope enforcement (off-topic / token burn protection) ────────────
+
+
+class TestChatScopeEnforcement:
+    """The Growth Assistant is a personal transformation coach — not a
+    general-purpose LLM. Off-topic requests (code generation, translation,
+    homework, lookups) must be rejected BEFORE calling the LLM so we do not
+    burn API tokens on out-of-scope work.
+    """
+
+    @pytest.mark.parametrize(
+        "message",
+        [
+            # Code generation
+            "write me a Python script that sorts a list of dictionaries",
+            "Generate a JavaScript function to fetch user data",
+            "write me some TypeScript code for a REST client",
+            "Create a SQL query for this schema",
+            # Debug / fix / explain code
+            "debug this code: def foo(x): return x + 1",
+            "fix my function that's throwing a TypeError",
+            "explain this code snippet to me",
+            "explain the following regex for me",
+            # Translation
+            "Translate this to Spanish: good morning, how are you?",
+            "translate the following into French please",
+            "translate it into German for me",
+            # Math / homework
+            "solve this equation: 2x + 5 = 13",
+            "solve for x in the integral below",
+            "write me an essay on the French Revolution",
+            "do my homework for me",
+            # General-knowledge lookups
+            "What is the capital of Australia?",
+            "what is the population of Tokyo",
+            "what is the GDP of France",
+            # Arbitrary-content summarization
+            "summarize this article for me",
+            "summarize the following document please",
+        ],
+    )
+    def test_chat_rejects_off_topic_message(
+        self, client: TestClient, message: str
+    ) -> None:
+        """Off-topic messages return 400 before any LLM call."""
+        response = client.post("/api/v1/chat", json={"message": message})
+        assert response.status_code == 400, f"expected 400 for: {message!r}"
+        detail = response.json()["detail"].lower()
+        assert "transformation" in detail or "scope" in detail or "coaching" in detail, (
+            f"error message should explain scope limitation: {detail!r}"
+        )
+
+    @pytest.mark.parametrize(
+        "message",
+        [
+            # Healing / breathwork
+            "What breathwork practice would help me with anxiety?",
+            "Explain shadow work to me",
+            "How do I start a meditation practice?",
+            # Coaching
+            "Help me understand my archetype",
+            "What does my Life Path number suggest about my career?",
+            "I'm feeling stuck in my creative practice, can you help?",
+            # Personal writing (legit expressive healing)
+            "Help me write a letter to my younger self",
+            "I want to journal about my grief — can you suggest prompts?",
+            # Personal summary (legit reflection)
+            "Summarize my healing journey so far",
+            "Can you explain my numerology reading?",
+            # Translation-like but legitimate (metaphorical)
+            "Translate what I'm feeling into words I can use",
+            # Wealth / perspective coaching
+            "What money scripts might I be running from my family?",
+            "How do I notice when I'm in a cognitive distortion?",
+        ],
+    )
+    def test_chat_allows_on_topic_coaching(
+        self,
+        client: TestClient,
+        message: str,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """Legitimate coaching questions must NOT be blocked (regression)."""
+        monkeypatch.setenv("LLM_BACKEND", "none")
+        response = client.post("/api/v1/chat", json={"message": message})
+        assert response.status_code == 200, (
+            f"legit coaching question was blocked: {message!r} -> {response.text}"
+        )
+
+    def test_chat_off_topic_check_runs_before_llm(
+        self,
+        client: TestClient,
+        session_factory: async_sessionmaker[AsyncSession],
+    ) -> None:
+        """Rejected off-topic messages must NOT be persisted to the DB.
+
+        This is the critical token-burn protection: the request never reaches
+        the LLM and never writes to chat_messages.
+        """
+        response = client.post(
+            "/api/v1/chat",
+            json={"message": "write me a Python script to parse JSON"},
+        )
+        assert response.status_code == 400
+
+        loop = asyncio.new_event_loop()
+        try:
+            messages = loop.run_until_complete(
+                _fetch_chat_messages(session_factory, "user-1")
+            )
+        finally:
+            loop.close()
+        assert messages == [], (
+            f"off-topic messages should not be persisted; found {len(messages)}"
+        )
+
+
 # ─── Auth ──────────────────────────────────────────────────────────────
 
 

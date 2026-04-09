@@ -47,12 +47,97 @@ _BLOCKED_PATTERNS = [
 ]
 
 
+# ─── Scope enforcement (off-topic / token-burn protection) ─────────────
+#
+# The Growth Assistant is a personal transformation coach, not a
+# general-purpose LLM.  Off-topic requests (code generation, translation,
+# homework lookups, arbitrary summarization) are rejected BEFORE calling
+# the LLM so we do not burn API tokens on out-of-scope work.
+#
+# These patterns are deliberately conservative — they target clear
+# abuse cases and must not catch legitimate coaching questions.  The
+# test suite (tests/api/test_chat.py::TestChatScopeEnforcement) pins
+# both rejection AND allowance cases so regressions in either
+# direction are caught.
+
+_OFF_TOPIC_PATTERNS = [
+    # Programming-language code generation
+    (
+        r"\b(write|generate|create|give\s+me|show\s+me|build)\b[^.]{0,60}"
+        r"\b(python|javascript|typescript|java|c\+\+|ruby|rust|bash|shell|sql|html|css|php)\s+"
+        r"(code|script|function|program|class|method|query|snippet)"
+    ),
+    # Generic code/program/script request
+    (
+        r"\b(write|generate|create)\s+(me\s+)?(a\s+|an\s+|some\s+)?"
+        r"(script|program|code\s+snippet|regex|regular\s+expression)\b"
+    ),
+    # Debug / fix / explain external code
+    (
+        r"\b(debug|fix)\s+(?:\w+\s+){0,3}"
+        r"(code|function|script|error|bug|program|stack\s*trace)\b"
+    ),
+    r"\bexplain\s+(?:\w+\s+){0,3}(code|function|snippet|regex|sql|algorithm)\b",
+    # Translation of arbitrary content to another spoken language
+    (
+        r"\btranslate\b[^.]{0,40}\b(to|into|in)\s+"
+        r"(spanish|french|german|chinese|japanese|korean|russian|italian|portuguese|"
+        r"arabic|hindi|mandarin|dutch|swedish|polish|turkish|latin|greek)\b"
+    ),
+    # Math / equation solving
+    (
+        r"\bsolve\b[^.]{0,40}\b"
+        r"(equation|math\s+problem|integral|derivative|calculus|algebra|for\s+x\b)"
+    ),
+    # Essay / paper / homework writing for external topics
+    (
+        r"\bwrite\s+(me\s+)?(a|an)\s+"
+        r"(essay|research\s+paper|report|thesis|book\s+report)\s+(on|about|for)\s+"
+    ),
+    # Do my X (school / taxes / admin tasks)
+    r"\bdo\s+my\s+(homework|assignment|taxes|essay|report)\b",
+    # Pure general-knowledge lookups
+    (
+        r"\bwhat\s+is\s+the\s+"
+        r"(capital|population|gdp|currency|official\s+language|national\s+anthem)\s+of\b"
+    ),
+    # Summarization of arbitrary external content
+    # (note: "summarize my journey" stays legit — this requires an explicit
+    # third-party noun like article/document/paper)
+    (
+        r"\bsummar(ize|ise)\s+(this|the\s+following)\s+"
+        r"(article|text|document|passage|paper|book|pdf|email|transcript)"
+    ),
+]
+
+
+_OFF_TOPIC_MESSAGE = (
+    "The Growth Assistant is focused on personal transformation coaching "
+    "(healing, wealth mindset, creative development, perspective work, "
+    "intelligence insights). For coding, translation, homework, or general "
+    "research, please use a general-purpose assistant. This keeps the "
+    "conversation in scope and reduces unnecessary token usage."
+)
+
+
 def _check_content_safety(text: str) -> str | None:
     """Return an error message if *text* matches a blocked pattern, else ``None``."""
     lower = text.lower()
     for pattern in _BLOCKED_PATTERNS:
         if re.search(pattern, lower):
             return "Content flagged by safety filter"
+    return None
+
+
+def _check_on_topic(text: str) -> str | None:
+    """Return an error message if *text* is clearly off-topic, else ``None``.
+
+    Runs BEFORE any LLM call so out-of-scope requests never reach Claude.
+    """
+    lower = text.lower()
+    for pattern in _OFF_TOPIC_PATTERNS:
+        if re.search(pattern, lower):
+            return _OFF_TOPIC_MESSAGE
     return None
 
 
@@ -175,6 +260,10 @@ async def chat(
     safety_message = _check_content_safety(request.message)
     if safety_message:
         raise HTTPException(status_code=400, detail=safety_message)
+
+    off_topic_message = _check_on_topic(request.message)
+    if off_topic_message:
+        raise HTTPException(status_code=400, detail=off_topic_message)
 
     if request.system_key is not None and request.system_key not in _VALID_SYSTEM_KEYS:
         raise HTTPException(
