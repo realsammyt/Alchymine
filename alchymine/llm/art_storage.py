@@ -67,3 +67,26 @@ def read_image(file_path: str) -> bytes | None:
     except (FileNotFoundError, OSError) as exc:
         logger.warning("Generated image not found at %s: %s", abs_path, exc)
         return None
+
+
+def delete_image(file_path: str) -> bool:
+    """Delete the file at ``file_path`` (relative to the art cache root).
+
+    Returns ``True`` if the file was unlinked, ``False`` if it was
+    already missing. A missing file is **not** an error here — the
+    caller still wants the DB row gone, and a partial write could
+    leave the row without a matching file.
+    """
+    if not file_path:
+        return False
+    root = get_art_cache_root()
+    abs_path = root / file_path
+    try:
+        abs_path.unlink()
+        return True
+    except FileNotFoundError:
+        logger.info("Generated image already gone at %s", abs_path)
+        return False
+    except OSError as exc:
+        logger.warning("Failed to unlink generated image at %s: %s", abs_path, exc)
+        return False
