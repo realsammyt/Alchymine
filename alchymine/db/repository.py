@@ -1022,3 +1022,41 @@ async def get_generated_image(session: AsyncSession, image_id: str) -> Generated
     """Fetch a single generated_images row by id, or ``None``."""
     result = await session.execute(select(GeneratedImage).where(GeneratedImage.id == image_id))
     return result.scalar_one_or_none()
+
+
+async def list_generated_images_for_user(
+    session: AsyncSession,
+    user_id: str,
+    *,
+    limit: int = 20,
+    offset: int = 0,
+) -> list[GeneratedImage]:
+    """Return a page of a user's generated images, newest first.
+
+    The caller is expected to strip bytes/paths before returning to
+    clients — this repository helper only loads metadata from the DB.
+    """
+    stmt = (
+        select(GeneratedImage)
+        .where(GeneratedImage.user_id == user_id)
+        .order_by(GeneratedImage.created_at.desc())
+        .limit(limit)
+        .offset(offset)
+    )
+    result = await session.execute(stmt)
+    return list(result.scalars().all())
+
+
+async def delete_generated_image(session: AsyncSession, image_id: str) -> bool:
+    """Delete a generated_images row by id.
+
+    Returns ``True`` if a row was deleted, ``False`` otherwise. The
+    caller is responsible for verifying ownership before calling and
+    for unlinking the corresponding file from disk.
+    """
+    image = await get_generated_image(session, image_id)
+    if image is None:
+        return False
+    await session.delete(image)
+    await session.flush()
+    return True
