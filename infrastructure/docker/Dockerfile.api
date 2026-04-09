@@ -51,9 +51,15 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1
 
 # Install runtime-only dependencies
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    curl \
-    tini \
+# Note: apt-get upgrade pulls the latest Debian security patches (e.g.
+# openssl CVE-2026-28390 fixed in 3.5.5-1~deb13u2), which the upstream
+# python:3.11-slim image may lag behind on. Running upgrade here ensures
+# Trivy scans see the latest patched packages.
+RUN apt-get update && \
+    apt-get upgrade -y --no-install-recommends && \
+    apt-get install -y --no-install-recommends \
+        curl \
+        tini \
     && rm -rf /var/lib/apt/lists/*
 
 # Upgrade system-level setuptools/wheel to fix vendored vulnerabilities
