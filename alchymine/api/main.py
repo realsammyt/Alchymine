@@ -25,6 +25,7 @@ from alchymine.api.routers import (
     astrology,
     auth,
     biorhythm,
+    bridges,
     compatibility,
     creative,
     feedback,
@@ -122,6 +123,7 @@ app.include_router(compatibility.router, prefix="/api/v1", tags=["compatibility"
 app.include_router(biorhythm.router, prefix="/api/v1", tags=["biorhythm"])
 app.include_router(healing.router, prefix="/api/v1", tags=["healing"])
 app.include_router(healing_skills.router, prefix="/api/v1", tags=["healing-skills"])
+app.include_router(bridges.router, prefix="/api/v1", tags=["bridges"])
 app.include_router(creative.router, prefix="/api/v1", tags=["creative"])
 app.include_router(perspective.router, prefix="/api/v1", tags=["perspective"])
 app.include_router(personality.router, prefix="/api/v1", tags=["personality"])
