@@ -198,6 +198,15 @@ export default function CreativePage() {
                 Guilford-based creative assessment to discover your Creative
                 DNA, style profile, and tools for sustained creative output.
               </p>
+              <div className="mt-4">
+                <Link
+                  href="/creative-studio"
+                  className="inline-flex items-center gap-2 px-5 py-2.5 min-h-[44px] bg-gradient-to-r from-primary to-secondary text-white font-body font-medium rounded-xl text-sm transition-all duration-300 hover:shadow-[0_0_20px_rgba(123,45,142,0.3)] hover:scale-[1.02] active:scale-100"
+                >
+                  Open Creative Studio
+                  <span aria-hidden="true">&rarr;</span>
+                </Link>
+              </div>
             </header>
           </MotionReveal>
 

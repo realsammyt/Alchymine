@@ -131,6 +131,22 @@ export function InfoIcon({ className, ...props }: IconProps) {
   );
 }
 
+export function SparkleIcon({ className, ...props }: IconProps) {
+  return (
+    <Icon className={className} {...props}>
+      <path d="M12 3v1" />
+      <path d="M12 20v1" />
+      <path d="m4.22 4.22.7.7" />
+      <path d="m19.07 19.07.7.7" />
+      <path d="M3 12h1" />
+      <path d="M20 12h1" />
+      <path d="m4.22 19.78.7-.7" />
+      <path d="m19.07 4.93.7-.7" />
+      <path d="M12 8a4 4 0 0 1 0 8 4 4 0 0 1 0-8" />
+    </Icon>
+  );
+}
+
 // ── Trust / utility icons ─────────────────────────────────────────────
 
 export function CodeIcon({ className, ...props }: IconProps) {
@@ -204,6 +220,7 @@ const NAV_ICONS: Record<string, React.ComponentType<IconProps>> = {
   book: BookIcon,
   user: UserIcon,
   info: InfoIcon,
+  sparkle: SparkleIcon,
 };
 
 /**
