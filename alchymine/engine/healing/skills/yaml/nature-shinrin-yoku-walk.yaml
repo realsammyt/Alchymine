@@ -1,0 +1,21 @@
+name: nature-shinrin-yoku-walk
+modality: nature_healing
+title: Shinrin-yoku Forest Bathing Walk
+description: >-
+  A slow, sensory-led walk in a forested or wooded area, drawn from the
+  Japanese practice of shinrin-yoku ("forest bathing"). RCTs show measurable
+  reductions in cortisol, blood pressure, and self-reported stress after a
+  single session of 1-2 hours in a wooded environment.
+steps:
+  - Find a wooded park, forest, or tree-lined trail and put your phone on silent.
+  - Walk much more slowly than usual — about half your normal pace.
+  - For the first 5 minutes, simply notice 3 sights, 3 sounds, and 3 smells.
+  - Pause beside a tree and place a hand on the bark. Stay for 1 minute.
+  - Continue walking, letting attention rest on textures, light through leaves, and the sensation of air on the skin.
+  - Sit somewhere quiet for the final 5 minutes and breathe normally before returning.
+evidence_rating: A
+contraindications:
+  - severe agoraphobia
+  - anaphylactic environmental allergies (insect stings, pollen) without medication on hand
+  - mobility impairment incompatible with uneven terrain
+duration_minutes: 60

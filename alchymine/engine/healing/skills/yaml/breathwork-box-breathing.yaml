@@ -1,0 +1,23 @@
+name: breathwork-box-breathing
+modality: breathwork
+title: Box Breathing (4-4-4-4)
+description: >-
+  A simple, evidence-based breathing pattern used by Navy SEALs and clinicians
+  to down-regulate the sympathetic nervous system. Each phase is held for an
+  equal count of four, producing a steady "box" rhythm that improves heart-rate
+  variability and focus.
+steps:
+  - Sit upright with both feet on the floor and hands resting on your thighs.
+  - Exhale fully through pursed lips to empty the lungs.
+  - Inhale slowly through the nose for a count of 4.
+  - Hold the breath gently for a count of 4 (do not strain).
+  - Exhale through the mouth for a count of 4.
+  - Hold empty for a count of 4 before the next inhale.
+  - Repeat for 8 cycles, then breathe normally and notice any shift.
+evidence_rating: B
+contraindications:
+  - severe asthma during an active flare
+  - panic disorder triggered by breath retention
+  - uncontrolled epilepsy
+  - late-stage pregnancy (consult clinician before breath holds)
+duration_minutes: 6

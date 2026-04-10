@@ -1,0 +1,23 @@
+name: water-warm-bath-immersion
+modality: water_healing
+title: Mindful Warm Bath Immersion
+description: >-
+  A simple hydrotherapy practice — a 20-minute warm bath taken with full
+  sensory attention. Studies suggest evening warm immersion can shorten sleep
+  onset and lower core temperature on exit, supporting deeper sleep.
+steps:
+  - Run a warm (not hot) bath, around 38-40 C, with the bathroom dimly lit.
+  - Optional — add a handful of unscented epsom salts and stir to dissolve.
+  - Step in slowly and let the body acclimate before fully reclining.
+  - For the first 5 minutes, simply notice the sensation of warmth, weight, and buoyancy.
+  - For the next 10 minutes, breathe long and slow, letting attention rest on the sound of water.
+  - Stay no longer than 20 minutes total to avoid overheating.
+  - On exit, dry off in a warm towel and notice the contrast as the body cools.
+evidence_rating: B
+contraindications:
+  - severe aquaphobia
+  - open wounds or active skin infections
+  - cardiovascular conditions where heat is contraindicated
+  - first-trimester pregnancy without obstetric clearance for warm immersion
+  - uncontrolled epilepsy
+duration_minutes: 25

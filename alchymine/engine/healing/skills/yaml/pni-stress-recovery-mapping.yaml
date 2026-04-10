@@ -1,0 +1,20 @@
+name: pni-stress-recovery-mapping
+modality: pni_mapping
+title: Stress and Recovery Mapping (PNI Journal)
+description: >-
+  A weekly journaling exercise informed by psychoneuroimmunology research.
+  By tracking stress, sleep, immune symptoms, and mood together, the practitioner
+  surfaces patterns linking mental states to physical wellbeing — useful as
+  data for self-understanding, not as a diagnostic tool.
+steps:
+  - At the end of each day, rate today's stress (1-10), sleep quality last night (1-10), and mood (1-10) in a notebook or app.
+  - Write one sentence describing the most stressful event and one describing the most restorative moment.
+  - Note any physical symptoms (headache, digestive change, muscle tension, illness).
+  - At the end of the week, look back at all 7 entries and circle patterns that repeat.
+  - Choose ONE small experiment for the coming week (earlier sleep, mid-day walk, evening stretch) and commit in writing.
+  - Notice without judgement; this is observation, not self-improvement pressure.
+evidence_rating: C
+contraindications:
+  - active autoimmune flare without medical supervision
+  - history of using journaling to ruminate or self-monitor obsessively
+duration_minutes: 10
