@@ -12,16 +12,16 @@ set -euo pipefail
 cd "$(git rev-parse --show-toplevel)"
 
 echo "==> Stopping db + dropping volume"
-docker compose -f infrastructure/docker-compose.yml -f infrastructure/docker-compose.dev.yml --env-file .env stop db
-docker compose -f infrastructure/docker-compose.yml -f infrastructure/docker-compose.dev.yml --env-file .env rm -f db
+docker compose -f infrastructure/docker-compose.yml -f infrastructure/docker-compose.dev.yml --env-file .secrets/.env stop db
+docker compose -f infrastructure/docker-compose.yml -f infrastructure/docker-compose.dev.yml --env-file .secrets/.env rm -f db
 docker volume rm alchymine-db-data 2>/dev/null || true
 
 echo "==> Starting fresh db"
-docker compose -f infrastructure/docker-compose.yml -f infrastructure/docker-compose.dev.yml --env-file .env up -d db
+docker compose -f infrastructure/docker-compose.yml -f infrastructure/docker-compose.dev.yml --env-file .secrets/.env up -d db
 sleep 3
 
 echo "==> Restarting api so alembic can run against fresh db"
-docker compose -f infrastructure/docker-compose.yml -f infrastructure/docker-compose.dev.yml --env-file .env restart api
+docker compose -f infrastructure/docker-compose.yml -f infrastructure/docker-compose.dev.yml --env-file .secrets/.env restart api
 
 echo "==> Waiting for api to be healthy"
 for i in 1 2 3 4 5 6 7 8 9 10; do
