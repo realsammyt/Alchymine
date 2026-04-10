@@ -4,14 +4,19 @@ import pytest
 
 from alchymine.mcp.healing_server import server
 
-
 # ─── Test: tool listing ──────────────────────────────────────────────────
 
 
 def test_lists_all_tools():
     tools = server.list_tools()
     names = {t["name"] for t in tools}
-    assert names == {"detect_crisis", "match_modalities", "get_breathwork"}
+    assert names == {
+        "detect_crisis",
+        "match_modalities",
+        "get_breathwork",
+        "list_skills",
+        "run_skill",
+    }
 
 
 def test_tool_schemas_valid():
@@ -236,3 +241,63 @@ async def test_get_breathwork_invalid_difficulty():
             "get_breathwork",
             {"difficulty": "impossible"},
         )
+
+
+# ─── Test: list_skills ──────────────────────────────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_list_skills_all():
+    result = await server.call_tool("list_skills", {})
+    assert isinstance(result, list)
+    assert len(result) >= 15
+    for item in result:
+        assert "name" in item
+        assert "title" in item
+        assert "modality" in item
+        assert "evidence_rating" in item
+        assert "duration_minutes" in item
+
+
+@pytest.mark.asyncio
+async def test_list_skills_by_modality():
+    result = await server.call_tool("list_skills", {"modality": "breathwork"})
+    assert isinstance(result, list)
+    assert len(result) >= 1
+    for item in result:
+        assert item["modality"] == "breathwork"
+
+
+@pytest.mark.asyncio
+async def test_list_skills_unknown_modality():
+    result = await server.call_tool("list_skills", {"modality": "nonexistent"})
+    assert result == []
+
+
+# ─── Test: run_skill ───────────────────────────────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_run_skill_valid():
+    result = await server.call_tool("run_skill", {"name": "breathwork-box-breathing"})
+    assert result["name"] == "breathwork-box-breathing"
+    assert result["title"] == "Box Breathing (4-4-4-4)"
+    assert result["modality"] == "breathwork"
+    assert isinstance(result["steps"], list)
+    assert len(result["steps"]) > 0
+    assert result["evidence_rating"] == "B"
+    assert isinstance(result["contraindications"], list)
+    assert result["duration_minutes"] == 6
+    assert "description" in result
+
+
+@pytest.mark.asyncio
+async def test_run_skill_not_found():
+    with pytest.raises(ValueError, match="Skill not found"):
+        await server.call_tool("run_skill", {"name": "nonexistent-skill"})
+
+
+@pytest.mark.asyncio
+async def test_run_skill_missing_name():
+    with pytest.raises(ValueError, match="Missing required argument"):
+        await server.call_tool("run_skill", {})
