@@ -959,6 +959,40 @@ async def get_chat_history(
     return rows
 
 
+async def count_user_chat_messages(
+    session: AsyncSession,
+    *,
+    user_id: str,
+    system_key: str | None = None,
+) -> int:
+    """Return the total number of **user** messages for a user/system pair.
+
+    Only counts ``role='user'`` rows.  Used by the history-cap guardrail
+    to enforce a per-system message ceiling before accepting new input.
+
+    Parameters
+    ----------
+    session:
+        Active async session.
+    user_id:
+        FK to ``users.id``.
+    system_key:
+        Optional system filter; ``None`` counts messages with ``NULL``
+        system_key (general coach mode).
+    """
+    stmt = (
+        select(func.count())
+        .select_from(ChatMessage)
+        .where(ChatMessage.user_id == user_id, ChatMessage.role == "user")
+    )
+    if system_key is not None:
+        stmt = stmt.where(ChatMessage.system_key == system_key)
+    else:
+        stmt = stmt.where(ChatMessage.system_key.is_(None))
+    result = await session.execute(stmt)
+    return result.scalar_one()
+
+
 async def get_feedback_counts(session: AsyncSession) -> dict[str, int]:
     """Return feedback counts grouped by status.
 

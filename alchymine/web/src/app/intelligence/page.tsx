@@ -22,6 +22,7 @@ import GeneratingState from "@/components/shared/GeneratingState";
 import IntakeCTA from "@/components/shared/IntakeCTA";
 import JournalCTA from "@/components/shared/JournalCTA";
 import ProtectedRoute from "@/components/shared/ProtectedRoute";
+import SystemCoachBanner from "@/components/chat/SystemCoachBanner";
 
 const NUMEROLOGY_NUMBERS = [
   {
@@ -177,6 +178,13 @@ export default function IntelligencePage() {
               reproducible and transparent.
             </p>
           </header>
+        </MotionReveal>
+
+        {/* Coach banner */}
+        <MotionReveal delay={0.05}>
+          <div className="mb-8">
+            <SystemCoachBanner systemKey="intelligence" />
+          </div>
         </MotionReveal>
 
         {/* Generation in progress */}

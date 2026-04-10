@@ -25,6 +25,7 @@ import EvidenceBadge from "@/components/shared/EvidenceBadge";
 import GeneratingState from "@/components/shared/GeneratingState";
 import IntakeCTA from "@/components/shared/IntakeCTA";
 import JournalCTA from "@/components/shared/JournalCTA";
+import SystemCoachBanner from "@/components/chat/SystemCoachBanner";
 
 const CREATIVE_DIMENSIONS = [
   {
@@ -198,6 +199,13 @@ export default function CreativePage() {
                 DNA, style profile, and tools for sustained creative output.
               </p>
             </header>
+          </MotionReveal>
+
+          {/* Coach banner */}
+          <MotionReveal delay={0.05}>
+            <div className="mb-8">
+              <SystemCoachBanner systemKey="creative" />
+            </div>
           </MotionReveal>
 
           {/* Generation in progress */}
