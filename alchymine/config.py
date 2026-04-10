@@ -71,7 +71,7 @@ class Settings(BaseSettings):
     # Optional — when unset, the generative art endpoints degrade gracefully
     # and return 204 No Content so the frontend can render placeholder art.
     gemini_api_key: str = ""
-    gemini_model: str = "gemini-2.0-flash-preview-image-generation"
+    gemini_model: str = "gemini-3.1-flash-image-preview"
     # Filesystem cache location for generated image bytes (relative paths
     # are resolved against the project root at runtime).
     art_cache_dir: str = "data/generated_images"
