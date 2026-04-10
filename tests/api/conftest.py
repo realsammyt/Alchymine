@@ -64,7 +64,13 @@ def _reset_rate_limiter() -> None:
 
     The RateLimitMiddleware stores timestamps in ``_requests`` (a defaultdict).
     Clearing it ensures each test starts with a fresh budget.
+
+    Also resets the per-user chat rate limiter introduced in #165.
     """
+    from alchymine.api.routers.chat import reset_chat_rate_limit
+
+    reset_chat_rate_limit()  # clear chat endpoint rate limiter
+
     for middleware in app.user_middleware:
         # middleware.cls is the class, middleware.kwargs holds init args
         pass  # user_middleware is the config, not the instances

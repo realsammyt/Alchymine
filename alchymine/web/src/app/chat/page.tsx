@@ -1,19 +1,44 @@
 "use client";
 
 /**
- * /chat — dedicated full-viewport Growth Assistant page.
+ * /chat -- dedicated full-viewport Growth Assistant page.
  *
- * Sprint 2 deliverable: a simple protected layout containing a single
- * ``ChatPanel`` in its general (``systemKey=null``) mode.  Pillar-
- * scoped chat and history loading land in Sprint 3 (#164).
+ * Reads optional query parameters so other pages (system coach banners,
+ * starter-prompt chips) can deep-link into a scoped conversation:
+ *
+ *   /chat?system=healing               -- open in healing-specialist mode
+ *   /chat?system=healing&prompt=...    -- open + auto-send the prompt
+ *
+ * Sprint 5 (#165): wired `system` and `prompt` query params for the
+ * SystemCoachBanner deep-link flow.
  */
 
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
+import { Suspense } from "react";
 
 import ChatPanel from "@/components/chat/ChatPanel";
 import ProtectedRoute from "@/components/shared/ProtectedRoute";
+import type { SystemKey } from "@/hooks/usePageContext";
 
-export default function ChatPage() {
+const VALID_SYSTEMS = new Set<string>([
+  "intelligence",
+  "healing",
+  "wealth",
+  "creative",
+  "perspective",
+]);
+
+function ChatPageInner() {
+  const searchParams = useSearchParams();
+  const systemParam = searchParams.get("system");
+  const promptParam = searchParams.get("prompt");
+
+  const systemKey: SystemKey | null =
+    systemParam && VALID_SYSTEMS.has(systemParam)
+      ? (systemParam as SystemKey)
+      : null;
+
   return (
     <ProtectedRoute>
       <main className="flex min-h-screen flex-col bg-bg">
@@ -46,10 +71,21 @@ export default function ChatPage() {
 
         <div className="mx-auto flex w-full max-w-4xl flex-1 flex-col px-4 py-4 sm:py-6">
           <div className="flex h-[calc(100vh-9rem)] flex-col sm:h-[calc(100vh-10rem)]">
-            <ChatPanel systemKey={null} />
+            <ChatPanel
+              systemKey={systemKey}
+              initialPrompt={promptParam ?? undefined}
+            />
           </div>
         </div>
       </main>
     </ProtectedRoute>
+  );
+}
+
+export default function ChatPage() {
+  return (
+    <Suspense>
+      <ChatPageInner />
+    </Suspense>
   );
 }

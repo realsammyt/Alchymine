@@ -8,9 +8,12 @@
  * pass an optional ``systemKey``.  When the conversation is empty (no
  * history loaded and no messages sent yet), contextual starter-prompt
  * chips are rendered so users have a low-friction entry point.
+ *
+ * Sprint 5 (#165): accepts ``initialPrompt`` so the SystemCoachBanner
+ * can deep-link a specific coaching question into the chat.
  */
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { useChat } from "@/hooks/useChat";
 import { getStarterPrompts } from "@/lib/starterPrompts";
@@ -21,6 +24,8 @@ import ChatMessageList from "./ChatMessageList";
 interface Props {
   /** Optional pillar scope: intelligence | healing | wealth | creative | perspective */
   systemKey?: string | null;
+  /** If set, auto-send this message on first mount (from deep-link). */
+  initialPrompt?: string;
 }
 
 const SYSTEM_LABELS: Record<string, string> = {
@@ -31,7 +36,10 @@ const SYSTEM_LABELS: Record<string, string> = {
   perspective: "Perspective Enhancement",
 };
 
-export default function ChatPanel({ systemKey = null }: Props) {
+export default function ChatPanel({
+  systemKey = null,
+  initialPrompt,
+}: Props) {
   const {
     messages,
     isStreaming,
@@ -41,6 +49,16 @@ export default function ChatPanel({ systemKey = null }: Props) {
     resetConversation,
   } = useChat({ systemKey });
   const [errorDismissed, setErrorDismissed] = useState(false);
+
+  // Auto-send the initial prompt once (from deep-link query param).
+  const initialSentRef = useRef(false);
+  useEffect(() => {
+    if (initialPrompt && !initialSentRef.current && !isLoadingHistory) {
+      initialSentRef.current = true;
+      void sendMessage(initialPrompt, systemKey);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialPrompt, isLoadingHistory]);
 
   const visibleError = errorDismissed ? null : error;
 

@@ -9,12 +9,21 @@ Safety: the user input is run through the same prompt-injection /
 harmful-content patterns used by ``alchymine/api/routers/streaming.py``
 before any LLM call is made.  Blocked content returns HTTP 400 with no
 LLM round-trip.
+
+Guardrails added in Sprint 5 (#165):
+- **History cap**: 200 user messages per user per system_key.  Beyond
+  that, new messages are rejected with HTTP 429 and a friendly message
+  asking the user to start a fresh conversation.
+- **Per-user rate limit**: 10 messages per minute per user, enforced
+  with a simple in-memory sliding-window counter (no Redis needed).
 """
 
 from __future__ import annotations
 
 import logging
 import re
+import time
+from collections import defaultdict
 from collections.abc import AsyncGenerator
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -144,6 +153,65 @@ def _check_on_topic(text: str) -> str | None:
 # Valid system keys — keep aligned with SYSTEM_PROMPTS in
 # alchymine/agents/growth/system_prompts.py.
 _VALID_SYSTEM_KEYS = {"intelligence", "healing", "wealth", "creative", "perspective"}
+
+
+# ─── History cap ──────────────────────────────────────────────────────
+#
+# Limits the total number of *user* messages a single user can send
+# per system_key.  This prevents runaway conversations from exhausting
+# the LLM token budget.  The cap is per-system, so a user can send
+# 200 messages in healing *and* 200 in wealth independently.
+
+HISTORY_CAP = 200
+
+_HISTORY_CAP_MESSAGE = (
+    "You've reached the 200-message limit for this coaching topic. "
+    "Please start a fresh conversation to continue. This limit exists "
+    "to keep your coaching sessions focused and effective."
+)
+
+
+# ─── Per-user chat rate limiter (in-memory sliding window) ───────────
+#
+# Simple approach: keep a deque of timestamps per user; reject when
+# more than ``_RATE_LIMIT_MAX`` entries fall within the last
+# ``_RATE_LIMIT_WINDOW`` seconds.  No Redis, no persistence.
+
+_RATE_LIMIT_MAX = 10  # messages per window
+_RATE_LIMIT_WINDOW = 60.0  # seconds
+
+# {user_id: [timestamp, ...]} — timestamps older than the window are
+# lazily pruned on each request.
+_rate_limit_store: dict[str, list[float]] = defaultdict(list)
+
+_RATE_LIMIT_MESSAGE = (
+    "You're sending messages too quickly. Please wait a moment before "
+    "trying again (limit: 10 messages per minute)."
+)
+
+
+def _check_rate_limit(user_id: str) -> str | None:
+    """Return an error message if the user has exceeded the chat rate limit."""
+    now = time.monotonic()
+    cutoff = now - _RATE_LIMIT_WINDOW
+    timestamps = _rate_limit_store[user_id]
+    # Prune expired entries.
+    _rate_limit_store[user_id] = [t for t in timestamps if t > cutoff]
+    if len(_rate_limit_store[user_id]) >= _RATE_LIMIT_MAX:
+        return _RATE_LIMIT_MESSAGE
+    _rate_limit_store[user_id].append(now)
+    return None
+
+
+def reset_chat_rate_limit(user_id: str | None = None) -> None:
+    """Clear rate-limit state — used by test fixtures.
+
+    When ``user_id`` is ``None``, all entries are cleared.
+    """
+    if user_id is None:
+        _rate_limit_store.clear()
+    else:
+        _rate_limit_store.pop(user_id, None)
 
 
 # ─── Request model ─────────────────────────────────────────────────────
@@ -285,11 +353,25 @@ async def chat(
 
     user_id = current_user["sub"]
 
+    # ── Per-user rate limit (in-memory, 10 msg/min) ──────────────────
+    rate_limit_msg = _check_rate_limit(user_id)
+    if rate_limit_msg:
+        raise HTTPException(status_code=429, detail=rate_limit_msg)
+
     # Ensure the user row exists so the FK constraint on chat_messages
     # is satisfied.  In production the user always exists (auth requires
     # a real account); in tests with the auth dependency overridden we
     # may need to create the test user on demand.
     await _ensure_user_exists(session, user_id)
+
+    # ── History cap (200 user messages per system_key) ───────────────
+    msg_count = await repository.count_user_chat_messages(
+        session,
+        user_id=user_id,
+        system_key=request.system_key,
+    )
+    if msg_count >= HISTORY_CAP:
+        raise HTTPException(status_code=429, detail=_HISTORY_CAP_MESSAGE)
 
     return StreamingResponse(
         _chat_event_stream(
