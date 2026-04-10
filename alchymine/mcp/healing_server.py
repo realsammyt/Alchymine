@@ -10,6 +10,11 @@ tool is the highest-priority tool in this server.
 from __future__ import annotations
 
 from alchymine.engine.healing import detect_crisis, get_breathwork_pattern, match_modalities
+from alchymine.engine.healing.skills import (
+    SkillNotFoundError,
+    SkillRegistry,
+    get_default_yaml_dir,
+)
 from alchymine.engine.profile import (
     ArchetypeType,
     BigFiveScores,
@@ -20,6 +25,19 @@ from alchymine.engine.profile import (
 from .base import MCPServer
 
 server = MCPServer(name="alchymine-healing", version="1.0.0")
+
+# Module-level skill registry, loaded lazily on first tool call.
+_skill_registry: SkillRegistry | None = None
+
+
+def _get_skill_registry() -> SkillRegistry:
+    """Return the lazily-initialised skill registry."""
+    global _skill_registry
+    if _skill_registry is None:
+        reg = SkillRegistry()
+        reg.load_directory(get_default_yaml_dir())
+        _skill_registry = reg
+    return _skill_registry
 
 
 # ─── Tool: detect_crisis ────────────────────────────────────────────────
@@ -166,6 +184,98 @@ def get_breathwork_tool(difficulty: str, intention: str | None = None) -> dict:
         "cycles": pattern.cycles,
         "difficulty": pattern.difficulty.value,
         "description": pattern.description,
+    }
+
+
+# ─── Tool: list_skills ──────────────────────────────────────────────────
+
+
+@server.tool(
+    name="list_skills",
+    description=(
+        "List all available healing skills, optionally filtered by modality. "
+        "Returns a list of skill summaries (name, title, modality, evidence "
+        "rating, duration). Use run_skill to get full details and guided steps."
+    ),
+    input_schema={
+        "type": "object",
+        "properties": {
+            "modality": {
+                "type": "string",
+                "description": (
+                    "Optional: filter by modality (e.g., 'breathwork', 'somatic', "
+                    "'language', 'nature'). Omit to list all skills."
+                ),
+            },
+        },
+        "required": [],
+    },
+)
+def list_skills_tool(modality: str | None = None) -> list[dict]:
+    """List healing skills from the SkillRegistry."""
+    registry = _get_skill_registry()
+    if modality is not None:
+        skills = registry.list_by_modality(modality)
+    else:
+        skills = registry.list_all()
+    return [
+        {
+            "name": s.name,
+            "title": s.title,
+            "modality": s.modality,
+            "evidence_rating": s.evidence_rating,
+            "duration_minutes": s.duration_minutes,
+        }
+        for s in skills
+    ]
+
+
+# ─── Tool: run_skill ───────────────────────────────────────────────────
+
+
+@server.tool(
+    name="run_skill",
+    description=(
+        "Retrieve a healing skill by name and return its full practice card "
+        "including guided steps, contraindications, and evidence rating. "
+        "The caller should present the steps to the user sequentially."
+    ),
+    input_schema={
+        "type": "object",
+        "properties": {
+            "name": {
+                "type": "string",
+                "description": (
+                    "The skill slug, e.g. 'breathwork-box-breathing' or "
+                    "'somatic-grounding-5-4-3-2-1'."
+                ),
+            },
+        },
+        "required": ["name"],
+    },
+)
+def run_skill_tool(name: str) -> dict:
+    """Return the full practice card for a single healing skill.
+
+    Raises
+    ------
+    ValueError
+        If the skill name is not found in the registry.
+    """
+    registry = _get_skill_registry()
+    try:
+        skill = registry.get(name)
+    except SkillNotFoundError as exc:
+        raise ValueError(f"Skill not found: {name}") from exc
+    return {
+        "name": skill.name,
+        "title": skill.title,
+        "modality": skill.modality,
+        "description": skill.description,
+        "steps": list(skill.steps),
+        "evidence_rating": skill.evidence_rating,
+        "contraindications": list(skill.contraindications),
+        "duration_minutes": skill.duration_minutes,
     }
 
 

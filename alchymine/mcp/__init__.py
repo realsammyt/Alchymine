@@ -11,9 +11,12 @@ Each system has its own server module:
 """
 
 from .base import MCPServer, ResourceDefinition, ToolDefinition
+from .transport import make_mcp_router, mount_all_mcp_routers
 
 __all__ = [
     "MCPServer",
     "ResourceDefinition",
     "ToolDefinition",
+    "make_mcp_router",
+    "mount_all_mcp_routers",
 ]

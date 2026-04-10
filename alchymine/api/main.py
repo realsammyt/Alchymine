@@ -9,7 +9,7 @@ from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime
 
-from fastapi import FastAPI
+from fastapi import APIRouter, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from alchymine import __version__
@@ -47,6 +47,7 @@ from alchymine.api.routers import (
     wealth,
 )
 from alchymine.config import get_settings
+from alchymine.mcp.transport import mount_all_mcp_routers
 
 
 class _JSONFormatter(logging.Formatter):
@@ -138,3 +139,8 @@ app.include_router(integration.router, prefix="/api/v1", tags=["integration"])
 app.include_router(admin.router, prefix="/api/v1", tags=["admin"])
 app.include_router(feedback.router, prefix="/api/v1", tags=["feedback"])
 app.include_router(generative_art.router, prefix="/api/v1", tags=["art"])
+
+# MCP transport — JSON-RPC 2.0 endpoints for all five systems
+mcp_parent = APIRouter()
+mount_all_mcp_routers(mcp_parent)
+app.include_router(mcp_parent)
