@@ -30,6 +30,7 @@ import EvidenceBadge from "@/components/shared/EvidenceBadge";
 import GeneratingState from "@/components/shared/GeneratingState";
 import IntakeCTA from "@/components/shared/IntakeCTA";
 import JournalCTA from "@/components/shared/JournalCTA";
+import SystemCoachBanner from "@/components/chat/SystemCoachBanner";
 
 // ── Constants ─────────────────────────────────────────────────────
 
@@ -560,6 +561,13 @@ export default function HealingPage() {
                 protocols.
               </p>
             </header>
+          </MotionReveal>
+
+          {/* Coach banner */}
+          <MotionReveal delay={0.05}>
+            <div className="mb-8">
+              <SystemCoachBanner systemKey="healing" />
+            </div>
           </MotionReveal>
 
           {/* Generation in progress */}

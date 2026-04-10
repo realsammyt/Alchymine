@@ -29,7 +29,7 @@ from alchymine.api.auth import get_current_user
 from alchymine.api.deps import get_db_session
 from alchymine.api.main import app
 from alchymine.db.base import Base
-from alchymine.db.models import ChatMessage
+from alchymine.db.models import ChatMessage, User
 from sqlalchemy import select
 
 
@@ -547,3 +547,246 @@ class TestChatAuth:
         finally:
             if original is not None:
                 app.dependency_overrides[get_current_user] = original
+
+
+# ─── Safety guardrails (Sprint 5 — #165) ───────────────────────────
+
+
+class TestChatRateLimit:
+    """Per-user rate limit: 10 messages per minute per user."""
+
+    def test_rate_limit_allows_normal_usage(
+        self,
+        client: TestClient,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """The first 10 messages within the window succeed."""
+        monkeypatch.setenv("LLM_BACKEND", "none")
+        for i in range(10):
+            resp = client.post("/api/v1/chat", json={"message": f"Message {i}"})
+            assert resp.status_code == 200, f"message {i} should succeed"
+
+    def test_rate_limit_rejects_11th_message(
+        self,
+        client: TestClient,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """The 11th message within 60s is rejected with 429."""
+        monkeypatch.setenv("LLM_BACKEND", "none")
+        for i in range(10):
+            resp = client.post("/api/v1/chat", json={"message": f"Message {i}"})
+            _ = resp.text  # drain stream
+        resp = client.post("/api/v1/chat", json={"message": "One too many"})
+        assert resp.status_code == 429
+        assert "too quickly" in resp.json()["detail"].lower()
+
+    def test_rate_limit_resets_after_window(
+        self,
+        client: TestClient,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """After the window expires, the user can send again."""
+        import time as _time
+
+        from alchymine.api.routers import chat as chat_mod
+
+        monkeypatch.setenv("LLM_BACKEND", "none")
+        # Fill up the rate limit bucket.
+        for i in range(10):
+            resp = client.post("/api/v1/chat", json={"message": f"m{i}"})
+            _ = resp.text
+
+        # Manually expire the timestamps by shifting them into the past.
+        user_id = "user-1"
+        past = _time.monotonic() - chat_mod._RATE_LIMIT_WINDOW - 1
+        chat_mod._rate_limit_store[user_id] = [past] * 10
+
+        resp = client.post("/api/v1/chat", json={"message": "After window"})
+        assert resp.status_code == 200
+
+
+class TestChatHistoryCap:
+    """200-message history cap per user per system_key."""
+
+    def test_history_cap_rejects_at_limit(
+        self,
+        client: TestClient,
+        session_factory: async_sessionmaker[AsyncSession],
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """When the DB already has 200 user messages, the next is rejected with 429."""
+        monkeypatch.setenv("LLM_BACKEND", "none")
+
+        from alchymine.api.routers import chat as chat_mod
+
+        # Temporarily lower the rate limit so we don't hit it while seeding.
+        original_max = chat_mod._RATE_LIMIT_MAX
+        chat_mod._RATE_LIMIT_MAX = 999
+
+        # Seed 200 user messages directly via the repository.
+        loop = asyncio.new_event_loop()
+        try:
+            loop.run_until_complete(
+                _seed_user_messages(session_factory, "user-1", "healing", 200)
+            )
+        finally:
+            loop.close()
+
+        try:
+            resp = client.post(
+                "/api/v1/chat",
+                json={"message": "One more please", "system_key": "healing"},
+            )
+            assert resp.status_code == 429, resp.text
+            assert "200-message limit" in resp.json()["detail"]
+        finally:
+            chat_mod._RATE_LIMIT_MAX = original_max
+
+    def test_history_cap_independent_per_system(
+        self,
+        client: TestClient,
+        session_factory: async_sessionmaker[AsyncSession],
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """Hitting the cap in healing does NOT block wealth messages."""
+        monkeypatch.setenv("LLM_BACKEND", "none")
+
+        from alchymine.api.routers import chat as chat_mod
+
+        original_max = chat_mod._RATE_LIMIT_MAX
+        chat_mod._RATE_LIMIT_MAX = 999
+
+        loop = asyncio.new_event_loop()
+        try:
+            loop.run_until_complete(
+                _seed_user_messages(session_factory, "user-1", "healing", 200)
+            )
+        finally:
+            loop.close()
+
+        try:
+            # healing is capped
+            resp = client.post(
+                "/api/v1/chat",
+                json={"message": "healing msg", "system_key": "healing"},
+            )
+            assert resp.status_code == 429
+
+            # wealth is still open
+            resp = client.post(
+                "/api/v1/chat",
+                json={"message": "wealth msg", "system_key": "wealth"},
+            )
+            assert resp.status_code == 200
+        finally:
+            chat_mod._RATE_LIMIT_MAX = original_max
+
+
+async def _seed_user_messages(
+    factory: async_sessionmaker[AsyncSession],
+    user_id: str,
+    system_key: str,
+    count: int,
+) -> None:
+    """Insert *count* user-role ChatMessage rows for history cap testing."""
+    async with factory() as session:
+        # Ensure user exists.
+        existing = await session.execute(
+            select(User).where(User.id == user_id)
+        )
+        if existing.scalar_one_or_none() is None:
+            session.add(User(id=user_id))
+            await session.flush()
+
+        for i in range(count):
+            session.add(
+                ChatMessage(
+                    user_id=user_id,
+                    role="user",
+                    content=f"Seed message {i}",
+                    system_key=system_key,
+                )
+            )
+        await session.commit()
+
+
+# ─── End-to-end smoke test ──────────────────────────────────────────
+
+
+class TestChatE2E:
+    """Integration test exercising the full chat flow: send → stream → history."""
+
+    def test_e2e_chat_send_and_history(
+        self,
+        client: TestClient,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """Full flow: send a message via SSE, verify streaming data, check history.
+
+        This exercises:
+        1. POST /api/v1/chat → receive SSE stream with data frames + done sentinel
+        2. GET /api/v1/chat/history → returns the user message and assistant reply
+        """
+        monkeypatch.setenv("LLM_BACKEND", "none")
+
+        # Step 1: Send a message and verify the SSE stream.
+        send_resp = client.post(
+            "/api/v1/chat",
+            json={"message": "Tell me about my healing journey", "system_key": "healing"},
+        )
+        assert send_resp.status_code == 200
+        assert "text/event-stream" in send_resp.headers["content-type"]
+
+        body = send_resp.text
+        # Must contain at least one data frame with content.
+        data_lines = [
+            ln for ln in body.split("\n")
+            if ln.startswith("data: ") and ln.strip() != "data:"
+        ]
+        assert len(data_lines) > 0, "expected at least one data frame"
+        # Must end with the done sentinel.
+        assert "event: done" in body, "stream must end with done sentinel"
+
+        # Step 2: Verify history returns both user and assistant messages.
+        history_resp = client.get("/api/v1/chat/history?system_key=healing")
+        assert history_resp.status_code == 200
+        items = history_resp.json()
+        assert len(items) >= 2, f"expected user+assistant, got {len(items)}"
+
+        roles = {item["role"] for item in items}
+        assert "user" in roles
+        assert "assistant" in roles
+
+        # The user message content should match what we sent.
+        user_items = [item for item in items if item["role"] == "user"]
+        assert any(
+            "healing journey" in item["content"].lower() for item in user_items
+        ), "user message not found in history"
+
+        # All items should have the correct system_key.
+        for item in items:
+            assert item["system_key"] == "healing"
+
+        # All items should have ISO timestamps.
+        for item in items:
+            assert item["created_at"], "created_at should not be empty"
+
+    def test_e2e_blocked_message_not_in_history(
+        self,
+        client: TestClient,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """Blocked messages (safety/scope) should not appear in history."""
+        monkeypatch.setenv("LLM_BACKEND", "none")
+
+        # Send an off-topic message that gets blocked.
+        resp = client.post(
+            "/api/v1/chat",
+            json={"message": "write me a Python script to parse JSON"},
+        )
+        assert resp.status_code == 400
+
+        # History should be empty — blocked message never persisted.
+        history_resp = client.get("/api/v1/chat/history")
+        assert history_resp.status_code == 200
+        assert history_resp.json() == []
