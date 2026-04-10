@@ -2,7 +2,8 @@
  * ChatPanel — component tests.
  *
  * Mocks ``useChat`` so we can drive the rendering states directly:
- * empty, messages present, and error visible/dismissable.
+ * empty, messages present, error visible/dismissable, and starter
+ * prompt chip clicks.
  */
 
 import { fireEvent, render, screen } from "@testing-library/react";
@@ -23,6 +24,7 @@ jest.mock("react-markdown", () => ({
 type UseChatValue = {
   messages: ChatMessage[];
   isStreaming: boolean;
+  isLoadingHistory: boolean;
   error: string | null;
   sendMessage: jest.Mock;
   cancelStream: jest.Mock;
@@ -43,6 +45,7 @@ function defaults(overrides: Partial<UseChatValue> = {}): UseChatValue {
   return {
     messages: [],
     isStreaming: false,
+    isLoadingHistory: false,
     error: null,
     sendMessage: jest.fn(),
     cancelStream: jest.fn(),
@@ -130,5 +133,66 @@ describe("ChatPanel", () => {
 
     expect(sendMessage).toHaveBeenCalledTimes(1);
     expect(sendMessage).toHaveBeenCalledWith("hello", "wealth");
+  });
+
+  it("renders starter prompt chips when empty and not loading history", () => {
+    useChatMock.mockReturnValue(defaults());
+    render(<ChatPanel systemKey="healing" />);
+
+    // Healing system should show its 3 starter prompts.
+    expect(screen.getByText("Breathwork for me")).toBeInTheDocument();
+    expect(screen.getByText("My healing journey")).toBeInTheDocument();
+    expect(screen.getByText("Shadow work guide")).toBeInTheDocument();
+  });
+
+  it("renders general starter prompts when systemKey is null", () => {
+    useChatMock.mockReturnValue(defaults());
+    render(<ChatPanel systemKey={null} />);
+
+    expect(screen.getByText("Start my journey")).toBeInTheDocument();
+    expect(screen.getByText("Explore my profile")).toBeInTheDocument();
+    expect(screen.getByText("Daily check-in")).toBeInTheDocument();
+  });
+
+  it("sends the starter prompt message when a chip is clicked", () => {
+    const sendMessage = jest.fn();
+    useChatMock.mockReturnValue(defaults({ sendMessage }));
+
+    render(<ChatPanel systemKey="wealth" />);
+    fireEvent.click(screen.getByText("Budget approach"));
+
+    expect(sendMessage).toHaveBeenCalledTimes(1);
+    expect(sendMessage).toHaveBeenCalledWith(
+      "Review my budget approach and suggest improvements based on my profile.",
+      "wealth",
+    );
+  });
+
+  it("hides starter prompts while history is loading", () => {
+    useChatMock.mockReturnValue(defaults({ isLoadingHistory: true }));
+    render(<ChatPanel systemKey="healing" />);
+
+    expect(screen.queryByText("Breathwork for me")).not.toBeInTheDocument();
+    expect(
+      screen.getByText(/loading your conversation history/i),
+    ).toBeInTheDocument();
+  });
+
+  it("hides starter prompts when messages exist", () => {
+    useChatMock.mockReturnValue(
+      defaults({
+        messages: [
+          {
+            id: "u1",
+            role: "user",
+            content: "Hey",
+            createdAt: "2026-04-09T00:00:00.000Z",
+          },
+        ],
+      }),
+    );
+
+    render(<ChatPanel systemKey="healing" />);
+    expect(screen.queryByText("Breathwork for me")).not.toBeInTheDocument();
   });
 });

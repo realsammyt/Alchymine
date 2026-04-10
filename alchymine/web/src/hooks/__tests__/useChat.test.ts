@@ -42,6 +42,14 @@ function makeErrorResponse(status: number, detail: string): Response {
   } as unknown as Response;
 }
 
+function makeJsonResponse(data: unknown): Response {
+  return {
+    ok: true,
+    status: 200,
+    json: jest.fn().mockResolvedValue(data),
+  } as unknown as Response;
+}
+
 beforeEach(() => {
   jest.clearAllMocks();
   (global as unknown as { fetch: jest.Mock }).fetch = jest.fn();
@@ -49,15 +57,21 @@ beforeEach(() => {
 
 describe("useChat", () => {
   it("streams assistant chunks into the last message (happy path)", async () => {
-    (global.fetch as jest.Mock).mockResolvedValueOnce(
-      makeSseResponse([
-        "data: Hello\n\n",
-        "data:  there\n\n",
-        "event: done\ndata: \n\n",
-      ]),
-    );
+    // First call: history fetch; second call: chat stream.
+    (global.fetch as jest.Mock)
+      .mockResolvedValueOnce(makeJsonResponse([]))
+      .mockResolvedValueOnce(
+        makeSseResponse([
+          "data: Hello\n\n",
+          "data:  there\n\n",
+          "event: done\ndata: \n\n",
+        ]),
+      );
 
-    const { result } = renderHook(() => useChat());
+    const { result } = renderHook(() => useChat({ systemKey: null }));
+
+    // Wait for history load.
+    await waitFor(() => expect(result.current.isLoadingHistory).toBe(false));
 
     await act(async () => {
       await result.current.sendMessage("Hi");
@@ -78,11 +92,15 @@ describe("useChat", () => {
   });
 
   it("sends the system_key in the request body when provided", async () => {
-    (global.fetch as jest.Mock).mockResolvedValueOnce(
-      makeSseResponse(["data: ok\n\n", "event: done\ndata: \n\n"]),
-    );
+    (global.fetch as jest.Mock)
+      .mockResolvedValueOnce(makeJsonResponse([]))
+      .mockResolvedValueOnce(
+        makeSseResponse(["data: ok\n\n", "event: done\ndata: \n\n"]),
+      );
 
-    const { result } = renderHook(() => useChat());
+    const { result } = renderHook(() => useChat({ systemKey: "healing" }));
+
+    await waitFor(() => expect(result.current.isLoadingHistory).toBe(false));
 
     await act(async () => {
       await result.current.sendMessage("Hi", "healing");
@@ -90,7 +108,8 @@ describe("useChat", () => {
 
     await waitFor(() => expect(result.current.isStreaming).toBe(false));
 
-    const call = (global.fetch as jest.Mock).mock.calls[0];
+    // The second call is the chat POST.
+    const call = (global.fetch as jest.Mock).mock.calls[1];
     const init = call[1] as RequestInit;
     expect(init.method).toBe("POST");
     expect(init.credentials).toBe("include");
@@ -101,11 +120,15 @@ describe("useChat", () => {
   });
 
   it("surfaces a friendly 400 error and drops the empty assistant bubble", async () => {
-    (global.fetch as jest.Mock).mockResolvedValueOnce(
-      makeErrorResponse(400, "Content flagged by safety filter"),
-    );
+    (global.fetch as jest.Mock)
+      .mockResolvedValueOnce(makeJsonResponse([]))
+      .mockResolvedValueOnce(
+        makeErrorResponse(400, "Content flagged by safety filter"),
+      );
 
-    const { result } = renderHook(() => useChat());
+    const { result } = renderHook(() => useChat({ systemKey: null }));
+
+    await waitFor(() => expect(result.current.isLoadingHistory).toBe(false));
 
     await act(async () => {
       await result.current.sendMessage("bad");
@@ -120,11 +143,15 @@ describe("useChat", () => {
   });
 
   it("maps 401 to a sign-in prompt", async () => {
-    (global.fetch as jest.Mock).mockResolvedValueOnce(
-      makeErrorResponse(401, "Not authenticated"),
-    );
+    (global.fetch as jest.Mock)
+      .mockResolvedValueOnce(makeJsonResponse([]))
+      .mockResolvedValueOnce(
+        makeErrorResponse(401, "Not authenticated"),
+      );
 
-    const { result } = renderHook(() => useChat());
+    const { result } = renderHook(() => useChat({ systemKey: null }));
+
+    await waitFor(() => expect(result.current.isLoadingHistory).toBe(false));
 
     await act(async () => {
       await result.current.sendMessage("hey");
@@ -135,11 +162,13 @@ describe("useChat", () => {
   });
 
   it("records a network error as the error state", async () => {
-    (global.fetch as jest.Mock).mockRejectedValueOnce(
-      new TypeError("Failed to fetch"),
-    );
+    (global.fetch as jest.Mock)
+      .mockResolvedValueOnce(makeJsonResponse([]))
+      .mockRejectedValueOnce(new TypeError("Failed to fetch"));
 
-    const { result } = renderHook(() => useChat());
+    const { result } = renderHook(() => useChat({ systemKey: null }));
+
+    await waitFor(() => expect(result.current.isLoadingHistory).toBe(false));
 
     await act(async () => {
       await result.current.sendMessage("hey");
@@ -169,13 +198,18 @@ describe("useChat", () => {
       }),
       releaseLock: jest.fn(),
     };
-    (global.fetch as jest.Mock).mockResolvedValueOnce({
-      ok: true,
-      status: 200,
-      body: { getReader: () => reader },
-    } as unknown as Response);
 
-    const { result } = renderHook(() => useChat());
+    (global.fetch as jest.Mock)
+      .mockResolvedValueOnce(makeJsonResponse([]))
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        body: { getReader: () => reader },
+      } as unknown as Response);
+
+    const { result } = renderHook(() => useChat({ systemKey: null }));
+
+    await waitFor(() => expect(result.current.isLoadingHistory).toBe(false));
 
     // Kick off a send and immediately cancel.
     let sendPromise: Promise<void>;
@@ -197,11 +231,15 @@ describe("useChat", () => {
   });
 
   it("resetConversation clears messages and error", async () => {
-    (global.fetch as jest.Mock).mockResolvedValueOnce(
-      makeSseResponse(["data: ok\n\n", "event: done\ndata: \n\n"]),
-    );
+    (global.fetch as jest.Mock)
+      .mockResolvedValueOnce(makeJsonResponse([]))
+      .mockResolvedValueOnce(
+        makeSseResponse(["data: ok\n\n", "event: done\ndata: \n\n"]),
+      );
 
-    const { result } = renderHook(() => useChat());
+    const { result } = renderHook(() => useChat({ systemKey: null }));
+
+    await waitFor(() => expect(result.current.isLoadingHistory).toBe(false));
 
     await act(async () => {
       await result.current.sendMessage("hi");
@@ -217,13 +255,72 @@ describe("useChat", () => {
   });
 
   it("blocks empty/whitespace-only messages", async () => {
-    const { result } = renderHook(() => useChat());
+    (global.fetch as jest.Mock).mockResolvedValueOnce(makeJsonResponse([]));
+
+    const { result } = renderHook(() => useChat({ systemKey: null }));
+
+    await waitFor(() => expect(result.current.isLoadingHistory).toBe(false));
 
     await act(async () => {
       await result.current.sendMessage("   ");
     });
 
+    // Only 1 call: the history fetch.  No chat POST.
+    expect(global.fetch).toHaveBeenCalledTimes(1);
+    expect(result.current.messages).toHaveLength(0);
+  });
+
+  it("loads history on mount and populates messages", async () => {
+    const historyItems = [
+      { id: "h1", role: "user", content: "Previous Q", created_at: "2026-04-08T10:00:00Z" },
+      { id: "h2", role: "assistant", content: "Previous A", created_at: "2026-04-08T10:00:01Z" },
+    ];
+
+    (global.fetch as jest.Mock).mockResolvedValueOnce(makeJsonResponse(historyItems));
+
+    const { result } = renderHook(() => useChat({ systemKey: "healing" }));
+
+    await waitFor(() => expect(result.current.isLoadingHistory).toBe(false));
+
+    expect(result.current.messages).toHaveLength(2);
+    expect(result.current.messages[0]).toMatchObject({
+      id: "h1",
+      role: "user",
+      content: "Previous Q",
+    });
+    expect(result.current.messages[1]).toMatchObject({
+      id: "h2",
+      role: "assistant",
+      content: "Previous A",
+    });
+
+    // Verify the history fetch URL includes system_key.
+    const historyCall = (global.fetch as jest.Mock).mock.calls[0];
+    expect(historyCall[0]).toContain("system_key=healing");
+  });
+
+  it("skips history load when systemKey is undefined", async () => {
+    (global.fetch as jest.Mock).mockResolvedValue(makeJsonResponse([]));
+
+    const { result } = renderHook(() => useChat());
+
+    // Give it a tick to see if it would fire.
+    await waitFor(() => expect(result.current.isLoadingHistory).toBe(false));
+
+    // No fetch at all — history loading was skipped.
     expect(global.fetch).not.toHaveBeenCalled();
+    expect(result.current.messages).toHaveLength(0);
+  });
+
+  it("handles history fetch failure gracefully", async () => {
+    (global.fetch as jest.Mock).mockRejectedValueOnce(new Error("Network error"));
+
+    const { result } = renderHook(() => useChat({ systemKey: null }));
+
+    await waitFor(() => expect(result.current.isLoadingHistory).toBe(false));
+
+    // Should not set an error — history failure is non-fatal.
+    expect(result.current.error).toBeNull();
     expect(result.current.messages).toHaveLength(0);
   });
 });
