@@ -75,11 +75,13 @@ export default function MoodSparkline({
       <div
         className="flex items-center gap-2"
         data-testid="mood-sparkline-empty"
+        role="img"
+        aria-label={label ? `${label}: no mood data available` : "No mood data available"}
       >
         {label && (
           <span className="font-body text-xs text-text/40">{label}</span>
         )}
-        <span className="font-body text-xs text-text/30 italic">
+        <span className="font-body text-xs text-text/30 italic" aria-hidden="true">
           No mood data
         </span>
       </div>
@@ -146,10 +148,17 @@ export default function MoodSparkline({
       </svg>
 
       {average !== null && (
-        <span className="font-body text-xs text-text/50 whitespace-nowrap">
+        <span
+          className="font-body text-xs text-text/50 whitespace-nowrap"
+          aria-label={`Average mood score: ${average.toFixed(1)} out of 10`}
+        >
           avg {average.toFixed(1)}
         </span>
       )}
+      {/* Screen-reader-only data summary */}
+      <span className="sr-only">
+        Mood entries: {points.map((p) => `${p.date}: ${p.score} out of 10`).join(", ")}.
+      </span>
     </div>
   );
 }

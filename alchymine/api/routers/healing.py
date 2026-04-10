@@ -1,7 +1,8 @@
 """Healing Engine API endpoints.
 
 Endpoints for healing modality listing, matching, breathwork pattern
-selection, and crisis detection. All calculations are deterministic.
+selection, crisis detection, and spiral-based healing recommendations.
+All calculations are deterministic.
 """
 
 from __future__ import annotations
@@ -30,6 +31,7 @@ from alchymine.engine.profile import (
     Intention,
     PracticeDifficulty,
 )
+from alchymine.engine.spiral.router import route_user
 
 router = APIRouter()
 
@@ -318,3 +320,135 @@ async def detect_crisis_endpoint(
     """
     result = detect_crisis(request.text)
     return _crisis_to_response(result)
+
+
+# --- Healing spiral route models -------------------------------------------------
+
+
+class HealingSpiralModality(BaseModel):
+    """A healing modality recommendation from the spiral router."""
+
+    modality: str
+    category: str
+    description: str
+    evidence_level: str
+    entry_action: str
+
+
+class HealingSpiralRouteResponse(BaseModel):
+    """Spiral-based healing recommendation response.
+
+    Combines the user's current Alchemical Spiral stage with
+    recommended healing modalities for that stage.
+    """
+
+    primary_system: str = Field(..., description="Highest-leverage system for this user")
+    healing_rank: int = Field(
+        ..., ge=1, le=5, description="Where healing ranks among the 5 systems (1=top)"
+    )
+    healing_score: float = Field(..., ge=0, le=100, description="Healing system relevance score")
+    healing_reason: str = Field(..., description="Why healing is recommended at this stage")
+    healing_entry_action: str = Field(
+        ..., description="Suggested first action for the healing system"
+    )
+    for_you_today: str = Field(..., description="Personalized daily suggestion")
+    recommended_modalities: list[HealingSpiralModality] = Field(
+        ..., description="Healing modalities matched to the user's spiral stage"
+    )
+    evidence_level: str = Field(default="strong")
+    calculation_type: str = Field(default="deterministic")
+
+
+# ── Healing-stage → modality mapping ────────────────────────────────────
+# Which modality categories are most useful given how healing ranks
+# in the spiral. If healing is primary, offer deeper modalities; if
+# it's secondary, focus on foundational ones.
+
+_HEALING_RANK_MODALITIES: dict[str, list[str]] = {
+    "primary": [
+        "breathwork",
+        "coherence_meditation",
+        "somatic_practice",
+        "consciousness_journey",
+        "resilience_training",
+    ],
+    "secondary": [
+        "breathwork",
+        "coherence_meditation",
+        "sleep_healing",
+        "nature_healing",
+        "sound_healing",
+    ],
+    "tertiary": [
+        "breathwork",
+        "sleep_healing",
+        "nature_healing",
+    ],
+}
+
+
+@router.get("/healing/spiral-route")
+async def get_healing_spiral_route(
+    intention: str = Query(
+        "health",
+        description="Primary intention (career, love, purpose, money, health, family, business, legacy)",
+    ),
+    life_path: int | None = Query(None, ge=1, le=33),
+    personality_openness: float | None = Query(None, ge=0, le=100),
+    personality_neuroticism: float | None = Query(None, ge=0, le=100),
+    current_user: dict = Depends(get_current_user),
+) -> HealingSpiralRouteResponse:
+    """Return the user's current Spiral stage with healing-specific recommendations.
+
+    Runs the full Spiral routing algorithm, then extracts the healing
+    system rank and augments it with concrete modality recommendations
+    based on the user's stage.
+    """
+    spiral = route_user(
+        intention=intention,
+        life_path=life_path,
+        personality_openness=personality_openness,
+        personality_neuroticism=personality_neuroticism,
+    )
+
+    # Find healing in the ranked recommendations
+    healing_rec = next((r for r in spiral.recommendations if r.system == "healing"), None)
+    healing_rank = healing_rec.priority if healing_rec else 5
+    healing_score = healing_rec.score if healing_rec else 0.0
+    healing_reason = healing_rec.reason if healing_rec else "Healing supports all areas of growth."
+    healing_entry_action = (
+        healing_rec.entry_action if healing_rec else "Start with a short breathwork session."
+    )
+
+    # Determine tier for modality selection
+    if healing_rank <= 1:
+        tier = "primary"
+    elif healing_rank <= 3:
+        tier = "secondary"
+    else:
+        tier = "tertiary"
+
+    modality_keys = _HEALING_RANK_MODALITIES[tier]
+    recommended: list[HealingSpiralModality] = []
+    for key in modality_keys:
+        mod_def = MODALITY_REGISTRY.get(key)
+        if mod_def:
+            recommended.append(
+                HealingSpiralModality(
+                    modality=mod_def.name,
+                    category=mod_def.category,
+                    description=mod_def.description,
+                    evidence_level=mod_def.evidence_level,
+                    entry_action=healing_entry_action,
+                )
+            )
+
+    return HealingSpiralRouteResponse(
+        primary_system=spiral.primary_system,
+        healing_rank=healing_rank,
+        healing_score=healing_score,
+        healing_reason=healing_reason,
+        healing_entry_action=healing_entry_action,
+        for_you_today=spiral.for_you_today,
+        recommended_modalities=recommended,
+    )

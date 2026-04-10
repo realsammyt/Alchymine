@@ -22,6 +22,7 @@ import {
   HealingMatchListResponse,
   OutcomeSummary,
 } from "@/lib/api";
+import SpiralBanner from "@/components/healing/SpiralBanner";
 import { useApi, useIntake, useReportStatus } from "@/lib/useApi";
 import { useAuth } from "@/lib/AuthContext";
 import ProtectedRoute from "@/components/shared/ProtectedRoute";
@@ -561,6 +562,19 @@ export default function HealingPage() {
               </p>
             </header>
           </MotionReveal>
+
+          {/* Spiral Recommendation Banner — personalized system routing */}
+          {hasIntake && (
+            <MotionReveal delay={0.08}>
+              <div className="mb-10">
+                <SpiralBanner
+                  intention={
+                    intakeIntentions[0] ?? "health"
+                  }
+                />
+              </div>
+            </MotionReveal>
+          )}
 
           {/* Generation in progress */}
           {(reportStatus === "pending" || reportStatus === "generating") && (

@@ -169,32 +169,49 @@ export default function BreathworkGuide({
 
   if (state === "idle") {
     return (
-      <div className="card-surface p-6 text-center" data-testid="breathwork-guide-idle">
+      <div
+        className="card-surface p-6 text-center"
+        data-testid="breathwork-guide-idle"
+        role="region"
+        aria-label={`${pattern.name} breathwork session`}
+      >
         <h2 className="font-display text-xl font-light text-text mb-1">
           {pattern.name}
         </h2>
         <p className="font-body text-sm text-text/50 mb-4">{pattern.description}</p>
 
-        <div className="flex flex-wrap justify-center gap-2 mb-4">
+        <div
+          className="flex flex-wrap justify-center gap-2 mb-4"
+          role="list"
+          aria-label="Breathing phases"
+        >
           {pattern.phases.map((ph, i) => (
             <span
               key={i}
+              role="listitem"
               className="px-2.5 py-1 rounded-full text-xs font-body border border-white/10 text-text/60"
             >
               {ph.label} {ph.seconds}s
             </span>
           ))}
-          <span className="px-2.5 py-1 rounded-full text-xs font-body border border-white/10 text-text/40">
+          <span
+            role="listitem"
+            className="px-2.5 py-1 rounded-full text-xs font-body border border-white/10 text-text/40"
+          >
             {pattern.cycles} cycles
           </span>
         </div>
 
         <div className="flex gap-3 justify-center">
-          <Button variant="primary" onClick={start}>
+          <Button
+            variant="primary"
+            onClick={start}
+            aria-label={`Begin ${pattern.name} session`}
+          >
             Begin
           </Button>
           {onExit && (
-            <Button variant="ghost" onClick={onExit}>
+            <Button variant="ghost" onClick={onExit} aria-label="Go back">
               Back
             </Button>
           )}
@@ -208,7 +225,12 @@ export default function BreathworkGuide({
   if (state === "done") {
     const totalSec = Math.round(totalElapsed);
     return (
-      <div className="card-surface p-6 text-center" data-testid="breathwork-guide-done">
+      <div
+        className="card-surface p-6 text-center"
+        data-testid="breathwork-guide-done"
+        role="status"
+        aria-label={`Session complete. ${pattern.cycles} cycles in ${Math.floor(totalSec / 60)} minutes ${totalSec % 60} seconds.`}
+      >
         <h2 className="font-display text-xl font-light mb-2">
           <span className="text-gradient-teal">Session Complete</span>
         </h2>
@@ -217,12 +239,17 @@ export default function BreathworkGuide({
           {pattern.cycles} cycles in {Math.floor(totalSec / 60)}m {totalSec % 60}s
         </p>
         <div className="flex gap-3 justify-center">
-          <Button variant="primary" onClick={start}>
+          <Button
+            variant="primary"
+            onClick={start}
+            aria-label={`Repeat ${pattern.name} session`}
+          >
             Repeat
           </Button>
           <Button
             variant="ghost"
             onClick={() => onComplete?.(totalSec)}
+            aria-label="Mark session as done"
           >
             Done
           </Button>
@@ -305,10 +332,17 @@ export default function BreathworkGuide({
       </div>
 
       {/* Phase indicators */}
-      <div className="flex justify-center gap-2 mb-4 flex-wrap">
+      <div
+        className="flex justify-center gap-2 mb-4 flex-wrap"
+        role="tablist"
+        aria-label="Current breathing phase"
+      >
         {pattern.phases.map((ph, idx) => (
           <span
             key={idx}
+            role="tab"
+            aria-selected={idx === phaseIndex}
+            aria-label={`${ph.label} phase, ${ph.seconds} seconds${idx === phaseIndex ? ", active" : ""}`}
             className={`px-2.5 py-1 rounded-full text-xs font-body transition-all duration-200 ${
               idx === phaseIndex
                 ? "font-semibold border"
@@ -337,6 +371,7 @@ export default function BreathworkGuide({
           setState("idle");
           onExit?.();
         }}
+        aria-label="End breathwork session early"
       >
         End Session
       </Button>
