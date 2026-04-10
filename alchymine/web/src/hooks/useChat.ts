@@ -26,11 +26,22 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import { ChatError, streamChat, type ChatMessage } from "@/lib/chat";
+import {
+  ChatError,
+  fetchChatHistory,
+  streamChat,
+  type ChatMessage,
+} from "@/lib/chat";
+
+interface UseChatOptions {
+  /** System key to load history for on mount.  Pass `undefined` to skip. */
+  systemKey?: string | null;
+}
 
 interface UseChatResult {
   messages: ChatMessage[];
   isStreaming: boolean;
+  isLoadingHistory: boolean;
   error: string | null;
   sendMessage: (content: string, systemKey?: string | null) => Promise<void>;
   cancelStream: () => void;
@@ -47,11 +58,15 @@ function makeId(): string {
   return `msg-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
 }
 
-export function useChat(): UseChatResult {
+export function useChat(options?: UseChatOptions): UseChatResult {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isStreaming, setIsStreaming] = useState(false);
+  const [isLoadingHistory, setIsLoadingHistory] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
+  const historyLoadedRef = useRef(false);
+
+  const systemKey = options?.systemKey;
 
   // Make sure we abort any in-flight fetch if the component unmounts
   // mid-stream — prevents "setState on unmounted component" warnings
@@ -61,6 +76,37 @@ export function useChat(): UseChatResult {
       abortRef.current?.abort();
     };
   }, []);
+
+  // Load persisted chat history on mount.  Only runs once per hook
+  // instance (guarded by historyLoadedRef).  The systemKey is passed
+  // explicitly rather than using the dependency array so a `null`
+  // key still triggers history load (all messages).
+  useEffect(() => {
+    if (historyLoadedRef.current) return;
+    // `systemKey` can be explicitly `undefined` to skip loading.
+    if (systemKey === undefined) return;
+    historyLoadedRef.current = true;
+
+    let cancelled = false;
+    setIsLoadingHistory(true);
+
+    fetchChatHistory(systemKey ?? null)
+      .then((history) => {
+        if (!cancelled && history.length > 0) {
+          setMessages(history);
+        }
+      })
+      .catch(() => {
+        // History load failure is non-fatal — the user can still chat.
+      })
+      .finally(() => {
+        if (!cancelled) setIsLoadingHistory(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [systemKey]);
 
   const cancelStream = useCallback(() => {
     abortRef.current?.abort();
@@ -73,6 +119,9 @@ export function useChat(): UseChatResult {
     setMessages([]);
     setError(null);
     setIsStreaming(false);
+    // Do NOT reset historyLoadedRef — a reset starts a fresh
+    // conversation, not a fresh session.  The user clicked "New
+    // conversation" intentionally.
   }, []);
 
   const sendMessage = useCallback(
@@ -166,6 +215,7 @@ export function useChat(): UseChatResult {
   return {
     messages,
     isStreaming,
+    isLoadingHistory,
     error,
     sendMessage,
     cancelStream,

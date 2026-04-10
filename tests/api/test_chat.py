@@ -387,6 +387,128 @@ class TestChatScopeEnforcement:
         )
 
 
+# ─── Chat history endpoint ────────────────────────────────────────────
+
+
+class TestChatHistory:
+    """GET /api/v1/chat/history returns persisted messages."""
+
+    def test_history_returns_empty_list_initially(
+        self,
+        client: TestClient,
+    ) -> None:
+        """An authenticated user with no messages gets an empty list."""
+        response = client.get("/api/v1/chat/history")
+        assert response.status_code == 200
+        assert response.json() == []
+
+    def test_history_returns_persisted_messages(
+        self,
+        client: TestClient,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """After sending a chat message, history includes both user and assistant."""
+        monkeypatch.setenv("LLM_BACKEND", "none")
+        # Send a message to populate history.
+        resp = client.post(
+            "/api/v1/chat",
+            json={"message": "Tell me about healing", "system_key": "healing"},
+        )
+        # Drain the streaming body so persistence completes.
+        _ = resp.text
+
+        # Now fetch history.
+        response = client.get("/api/v1/chat/history?system_key=healing")
+        assert response.status_code == 200
+        items = response.json()
+        assert len(items) >= 2  # at least user + assistant
+        roles = [item["role"] for item in items]
+        assert "user" in roles
+        assert "assistant" in roles
+        # All items should have system_key set.
+        for item in items:
+            assert item["system_key"] == "healing"
+        # Items must have required fields.
+        for item in items:
+            assert "id" in item
+            assert "content" in item
+            assert "created_at" in item
+
+    def test_history_filters_by_system_key(
+        self,
+        client: TestClient,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """When system_key is provided, only matching messages are returned."""
+        monkeypatch.setenv("LLM_BACKEND", "none")
+        # Send messages to two different systems.
+        resp_h = client.post(
+            "/api/v1/chat",
+            json={"message": "Healing question", "system_key": "healing"},
+        )
+        _ = resp_h.text
+        resp_w = client.post(
+            "/api/v1/chat",
+            json={"message": "Wealth question", "system_key": "wealth"},
+        )
+        _ = resp_w.text
+
+        # Fetch only healing history.
+        response = client.get("/api/v1/chat/history?system_key=healing")
+        assert response.status_code == 200
+        items = response.json()
+        for item in items:
+            assert item["system_key"] == "healing"
+
+    def test_history_rejects_unknown_system_key(
+        self,
+        client: TestClient,
+    ) -> None:
+        """Unknown system_key returns 422."""
+        response = client.get("/api/v1/chat/history?system_key=bogus")
+        assert response.status_code == 422
+
+    def test_history_respects_limit(
+        self,
+        client: TestClient,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """The limit parameter caps the number of returned messages."""
+        monkeypatch.setenv("LLM_BACKEND", "none")
+        # Send multiple messages.
+        for i in range(3):
+            resp = client.post(
+                "/api/v1/chat",
+                json={"message": f"Message {i}"},
+            )
+            _ = resp.text
+
+        # Request with a tight limit — each send produces 2 rows
+        # (user + assistant), so 6 rows total; limit=2 should cap it.
+        response = client.get("/api/v1/chat/history?limit=2")
+        assert response.status_code == 200
+        items = response.json()
+        assert len(items) <= 2
+
+    def test_history_chronological_order(
+        self,
+        client: TestClient,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """Messages are returned in oldest-first order."""
+        monkeypatch.setenv("LLM_BACKEND", "none")
+        for msg in ["first", "second"]:
+            resp = client.post("/api/v1/chat", json={"message": msg})
+            _ = resp.text
+
+        response = client.get("/api/v1/chat/history")
+        items = response.json()
+        if len(items) >= 2:
+            # created_at timestamps should be in ascending order.
+            timestamps = [item["created_at"] for item in items]
+            assert timestamps == sorted(timestamps)
+
+
 # ─── Auth ──────────────────────────────────────────────────────────────
 
 
@@ -406,6 +528,21 @@ class TestChatAuth:
         try:
             monkeypatch.setenv("LLM_BACKEND", "none")
             response = client.post("/api/v1/chat", json={"message": "Hello"})
+            assert response.status_code == 401
+        finally:
+            if original is not None:
+                app.dependency_overrides[get_current_user] = original
+
+    def test_chat_history_unauthenticated_returns_401(
+        self,
+        client: TestClient,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """GET /chat/history without auth returns 401."""
+        original = app.dependency_overrides.pop(get_current_user, None)
+        try:
+            monkeypatch.setenv("LLM_BACKEND", "none")
+            response = client.get("/api/v1/chat/history")
             assert response.status_code == 401
         finally:
             if original is not None:

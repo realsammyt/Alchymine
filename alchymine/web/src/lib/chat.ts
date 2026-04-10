@@ -47,6 +47,15 @@ export class ChatError extends Error {
   }
 }
 
+/** Backend response shape for GET /api/v1/chat/history items. */
+export interface ChatHistoryItem {
+  id: string;
+  role: "user" | "assistant";
+  content: string;
+  system_key: string | null;
+  created_at: string; // ISO 8601
+}
+
 // ─── Transport ──────────────────────────────────────────────────────
 
 const BASE = (process.env.NEXT_PUBLIC_API_URL ?? "") + "/api/v1";
@@ -160,4 +169,50 @@ export async function* streamChat(
       // Reader may already be released on abort/error — safe to ignore.
     }
   }
+}
+
+// ─── Chat history ───────────────────────────────────────────────────
+
+/**
+ * Fetch persisted chat history from the backend.
+ *
+ * Returns messages in chronological (oldest-first) order, matching the
+ * shape used by ``ChatMessage`` in the UI layer.
+ */
+export async function fetchChatHistory(
+  systemKey: string | null,
+  limit: number = 50,
+): Promise<ChatMessage[]> {
+  const params = new URLSearchParams();
+  if (systemKey) params.set("system_key", systemKey);
+  params.set("limit", String(limit));
+
+  const response = await fetch(`${BASE}/chat/history?${params.toString()}`, {
+    method: "GET",
+    credentials: "include",
+    headers: {
+      Accept: "application/json",
+      ...getLegacyAuthHeaders(),
+    },
+  });
+
+  if (!response.ok) {
+    let detail = `HTTP ${response.status}`;
+    try {
+      const body = (await response.json()) as { detail?: unknown };
+      if (typeof body.detail === "string") detail = body.detail;
+    } catch {
+      // Not JSON — use the status message.
+    }
+    throw new ChatError(detail, response.status);
+  }
+
+  const items = (await response.json()) as ChatHistoryItem[];
+
+  return items.map((item) => ({
+    id: item.id,
+    role: item.role,
+    content: item.content,
+    createdAt: item.created_at,
+  }));
 }
