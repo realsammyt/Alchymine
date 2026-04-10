@@ -21,6 +21,7 @@ import { useChatOverlay } from "@/contexts/ChatContext";
 import { usePageContext } from "@/hooks/usePageContext";
 
 import ChatPanel from "@/components/chat/ChatPanel";
+import ChatSearch from "@/components/chat/ChatSearch";
 
 // ---------------------------------------------------------------------------
 // Icon components
@@ -182,6 +183,7 @@ function ChatHeader({
 export default function ChatBubble() {
   const {
     mode,
+    searchOpen,
     systemKey,
     openChat,
     closeChat,
@@ -231,8 +233,12 @@ export default function ChatBubble() {
           onCollapse={collapseChat}
           onClose={closeChat}
         />
-        <div className="min-h-0 flex-1">
-          <ChatPanel systemKey={systemKey} />
+        <div className="flex flex-1 flex-col overflow-hidden">
+          {searchOpen ? (
+            <ChatSearch systemKey={systemKey} onClose={toggleSearch} />
+          ) : (
+            <ChatPanel systemKey={systemKey} />
+          )}
         </div>
       </div>
     );
@@ -249,8 +255,12 @@ export default function ChatBubble() {
         onCollapse={collapseChat}
         onClose={closeChat}
       />
-      <div className="min-h-0 flex-1">
-        <ChatPanel systemKey={systemKey} />
+      <div className="flex flex-1 flex-col overflow-hidden">
+        {searchOpen ? (
+          <ChatSearch systemKey={systemKey} onClose={toggleSearch} />
+        ) : (
+          <ChatPanel systemKey={systemKey} />
+        )}
       </div>
     </div>
   );
