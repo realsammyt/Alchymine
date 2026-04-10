@@ -222,3 +222,174 @@ def build_studio_prompt(
         cleaned = user_extension.strip().replace("\n", " ")
         base = f"{base} Additional theme requested by the user: {cleaned}."
     return apply_style_preset(base, style_preset)
+
+
+# ── Journey milestone prompt builder ─────────────────────────────────
+
+
+# Milestones are keyed by a short slug; each maps to a symbolic scene
+# representing that stage of the user's transformation journey.
+_MILESTONE_SCENES: dict[str, str] = {
+    "intake": "a figure stepping through a luminous threshold into a new realm",
+    "identity": "an intricate mirror reflecting many facets of a single being",
+    "healing": "gentle hands cupping a glowing orb of restorative light",
+    "wealth": "a rising staircase of crystalline steps catching morning light",
+    "creative": "a burst of prismatic colour erupting from an empty canvas",
+    "perspective": "two overlapping lenses revealing hidden depth in a landscape",
+    "synthesis": "converging rivers of light merging into a single radiant stream",
+}
+
+
+def build_journey_milestone_prompt(
+    profile: Any,
+    milestone: str,
+    style_preset: str | None = None,
+) -> str:
+    """Build a prompt for a journey milestone illustration.
+
+    Parameters
+    ----------
+    profile:
+        Identity data (Pydantic model or dict).
+    milestone:
+        A key from ``_MILESTONE_SCENES`` (e.g. ``"identity"``).
+    style_preset:
+        Optional style preset id from ``STYLE_PRESETS``.
+
+    Returns
+    -------
+    str
+        Prompt string suitable for Gemini image generation.
+    """
+    archetype_obj = _get_field(profile, "archetype")
+    archetype = _normalize_archetype(_get_field(archetype_obj, "primary"))
+    archetype_label = archetype.title() if archetype else "Wanderer"
+
+    astrology_obj = _get_field(profile, "astrology")
+    sun_sign = _normalize_sign(_get_field(astrology_obj, "sun_sign"))
+    element = _element_for_sign(sun_sign)
+    palette = _palette_for_element(element)
+
+    scene = _MILESTONE_SCENES.get(
+        milestone.lower(),
+        "a symbolic gateway marking a new stage of personal growth",
+    )
+
+    prompt = (
+        f"A symbolic illustration of the {archetype_label} archetype "
+        f"at the '{milestone}' milestone, depicted as {scene}. "
+        f"Render with {palette}, luminous atmosphere, sacred geometry accents. "
+        f"{_SAFETY_SUFFIX}"
+    )
+    return apply_style_preset(prompt, style_preset)
+
+
+# ── Personal brand prompt builders ───────────────────────────────────
+
+
+def build_brand_logo_prompt(profile: Any) -> str:
+    """Build a prompt for generating a personal brand logo.
+
+    The logo is entirely symbolic — no text, no letters, no real people.
+    It combines the user's archetype imagery with their elemental palette.
+
+    Parameters
+    ----------
+    profile:
+        Identity data (Pydantic model or dict).
+
+    Returns
+    -------
+    str
+        Prompt string suitable for Gemini image generation.
+    """
+    archetype_obj = _get_field(profile, "archetype")
+    archetype = _normalize_archetype(_get_field(archetype_obj, "primary"))
+    archetype_label = archetype.title() if archetype else "Wanderer"
+    imagery = _archetype_imagery(archetype)
+
+    astrology_obj = _get_field(profile, "astrology")
+    sun_sign = _normalize_sign(_get_field(astrology_obj, "sun_sign"))
+    element = _element_for_sign(sun_sign)
+    palette = _palette_for_element(element)
+
+    numerology_obj = _get_field(profile, "numerology")
+    life_path = _get_field(numerology_obj, "life_path")
+    life_path_clause = f" incorporating the energy of the number {life_path}" if life_path else ""
+
+    return (
+        f"A minimalist symbolic logo mark for the {archetype_label} archetype"
+        f"{life_path_clause}, inspired by {imagery}. "
+        f"Flat vector style, centered on a transparent background, "
+        f"{palette}, clean geometric shapes, no text, no letters, "
+        f"no watermarks, suitable as an icon or avatar. {_SAFETY_SUFFIX}"
+    )
+
+
+def derive_brand_palette(profile: Any) -> dict[str, Any]:
+    """Derive a personal brand colour palette from the user's profile.
+
+    Returns a dict with ``primary``, ``secondary``, ``accent``, and
+    ``neutral`` hex colour values plus short labels. The colours are
+    deterministic — same input profile always yields the same palette.
+
+    Parameters
+    ----------
+    profile:
+        Identity data (Pydantic model or dict).
+
+    Returns
+    -------
+    dict
+        ``{"primary": {"hex": "#...", "name": "..."}, ...}``
+    """
+    astrology_obj = _get_field(profile, "astrology")
+    sun_sign = _normalize_sign(_get_field(astrology_obj, "sun_sign"))
+    element = _element_for_sign(sun_sign)
+
+    archetype_obj = _get_field(profile, "archetype")
+    archetype = _normalize_archetype(_get_field(archetype_obj, "primary"))
+
+    # Element → base palette
+    _ELEMENT_PALETTES: dict[str, dict[str, dict[str, str]]] = {
+        "fire": {
+            "primary": {"hex": "#C4503A", "name": "Ember Red"},
+            "secondary": {"hex": "#E8A33A", "name": "Flame Gold"},
+            "accent": {"hex": "#F5D76E", "name": "Sunburst"},
+            "neutral": {"hex": "#2B1D1D", "name": "Charcoal"},
+        },
+        "earth": {
+            "primary": {"hex": "#6B7B3A", "name": "Moss Green"},
+            "secondary": {"hex": "#A0895C", "name": "Sandstone"},
+            "accent": {"hex": "#C4A04A", "name": "Amber"},
+            "neutral": {"hex": "#1E1E18", "name": "Rich Earth"},
+        },
+        "air": {
+            "primary": {"hex": "#5B8FA8", "name": "Sky Blue"},
+            "secondary": {"hex": "#A8C4D4", "name": "Cloud Silver"},
+            "accent": {"hex": "#E8E4DF", "name": "Mist"},
+            "neutral": {"hex": "#1A1A24", "name": "Night Sky"},
+        },
+        "water": {
+            "primary": {"hex": "#2A6B7C", "name": "Deep Teal"},
+            "secondary": {"hex": "#5B4FA8", "name": "Indigo"},
+            "accent": {"hex": "#7B68EE", "name": "Violet Wave"},
+            "neutral": {"hex": "#0F1420", "name": "Abyss"},
+        },
+    }
+
+    palette = _ELEMENT_PALETTES.get(element, _ELEMENT_PALETTES["water"])
+
+    # Archetype can shift the accent colour for differentiation
+    _ARCHETYPE_ACCENT_OVERRIDE: dict[str, dict[str, str]] = {
+        "sage": {"hex": "#7B68EE", "name": "Sage Violet"},
+        "creator": {"hex": "#E07A5F", "name": "Creator Coral"},
+        "hero": {"hex": "#C4503A", "name": "Hero Crimson"},
+        "caregiver": {"hex": "#6B9B7B", "name": "Caregiver Sage"},
+        "jester": {"hex": "#E8A33A", "name": "Jester Gold"},
+    }
+
+    if archetype in _ARCHETYPE_ACCENT_OVERRIDE:
+        palette = {**palette, "accent": _ARCHETYPE_ACCENT_OVERRIDE[archetype]}
+
+    return palette

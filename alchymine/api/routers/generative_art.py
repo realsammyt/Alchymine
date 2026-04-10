@@ -32,7 +32,12 @@ from alchymine.api.auth import get_current_user
 from alchymine.api.deps import get_db_session
 from alchymine.db import repository
 from alchymine.db.models import User
-from alchymine.llm.art_prompts import STYLE_PRESETS, build_studio_prompt
+from alchymine.llm.art_prompts import (
+    STYLE_PRESETS,
+    build_brand_logo_prompt,
+    build_studio_prompt,
+    derive_brand_palette,
+)
 from alchymine.llm.art_storage import delete_image, read_image, write_image
 from alchymine.llm.gemini import GeminiClient, get_gemini_client
 from alchymine.safety.content_filter import FilterAction, filter_content
@@ -379,3 +384,123 @@ async def get_image(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Image not found")
 
     return Response(content=raw, media_type=image.mime_type)
+
+
+# ── Brand endpoints ──────────────────────────────────────────────────
+
+
+class BrandPaletteColor(BaseModel):
+    """A single colour in the brand palette."""
+
+    hex: str
+    name: str
+
+
+class BrandPaletteResponse(BaseModel):
+    """Deterministic colour palette derived from the user's profile."""
+
+    primary: BrandPaletteColor
+    secondary: BrandPaletteColor
+    accent: BrandPaletteColor
+    neutral: BrandPaletteColor
+
+
+class BrandLogoResponse(BaseModel):
+    """Response from the logo generation endpoint."""
+
+    image_id: str
+    url: str
+    prompt: str
+
+
+@router.get(
+    "/brand/palette",
+    response_model=BrandPaletteResponse,
+    responses={
+        200: {"description": "Deterministic colour palette from user profile"},
+        401: {"description": "Authentication required"},
+    },
+)
+async def get_brand_palette(
+    current_user: dict = Depends(get_current_user),
+    session: AsyncSession = Depends(get_db_session),
+) -> BrandPaletteResponse:
+    """Return a personal brand colour palette derived from the user's identity.
+
+    The palette is fully deterministic — same profile always yields
+    the same colours. Element drives the base palette, archetype
+    optionally shifts the accent.
+    """
+    user_id = current_user.get("sub")
+    if not user_id:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="No user")
+
+    identity_dict = await _load_identity_dict(session, user_id)
+    raw = derive_brand_palette(identity_dict)
+
+    return BrandPaletteResponse(
+        primary=BrandPaletteColor(**raw["primary"]),
+        secondary=BrandPaletteColor(**raw["secondary"]),
+        accent=BrandPaletteColor(**raw["accent"]),
+        neutral=BrandPaletteColor(**raw["neutral"]),
+    )
+
+
+@router.post(
+    "/brand/logo",
+    response_model=BrandLogoResponse,
+    status_code=status.HTTP_201_CREATED,
+    responses={
+        201: {"description": "Logo generated and stored"},
+        204: {"description": "Generative art is disabled"},
+        401: {"description": "Authentication required"},
+    },
+)
+async def generate_brand_logo(
+    current_user: dict = Depends(get_current_user),
+    session: AsyncSession = Depends(get_db_session),
+    gemini: GeminiClient = Depends(_gemini_dependency),
+) -> Response | BrandLogoResponse:
+    """Generate a symbolic personal brand logo from the user's profile.
+
+    Uses the user's archetype, element, and numerology to create a
+    minimalist logo mark via Gemini image generation. Returns 204 when
+    Gemini is unavailable.
+    """
+    user_id = current_user.get("sub")
+    if not user_id:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="No user")
+
+    if not gemini.is_available:
+        return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+    identity_dict = await _load_identity_dict(session, user_id)
+    prompt = build_brand_logo_prompt(identity_dict)
+
+    result = await gemini.generate_image(prompt)
+    if result is None:
+        return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+    image_row = await repository.create_generated_image(
+        session,
+        user_id=user_id,
+        prompt=result.prompt,
+        file_path="",
+        mime_type=result.mime_type,
+        style_preset="brand-logo",
+        model=result.model,
+    )
+    rel_path = write_image(
+        user_id=user_id,
+        image_id=image_row.id,
+        image_bytes=result.image_bytes,
+        mime_type=result.mime_type,
+    )
+    image_row.file_path = rel_path
+    await session.flush()
+
+    return BrandLogoResponse(
+        image_id=image_row.id,
+        url=f"/api/v1/art/{image_row.id}",
+        prompt=result.prompt,
+    )

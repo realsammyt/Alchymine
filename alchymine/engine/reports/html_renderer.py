@@ -19,7 +19,11 @@ _env = Environment(
 )
 
 
-def render_report_html(report_data: dict[str, Any]) -> str:
+def render_report_html(
+    report_data: dict[str, Any],
+    *,
+    hero_image_data_uri: str | None = None,
+) -> str:
     """Render a completed report as a standalone HTML page.
 
     Parameters
@@ -27,6 +31,11 @@ def render_report_html(report_data: dict[str, Any]) -> str:
     report_data:
         The report dict from ``report_store`` (or DB), containing
         ``result``, ``report_id``, ``status``, ``created_at``, etc.
+    hero_image_data_uri:
+        Optional ``data:image/png;base64,...`` URI to embed as the report
+        hero image. When *None* (the default) the hero image section is
+        not rendered. Passed in by the ``/reports/{id}/html`` endpoint
+        when the user has generated art.
 
     Returns
     -------
@@ -58,6 +67,8 @@ def render_report_html(report_data: dict[str, Any]) -> str:
         "quality_passed": result.get("quality_passed", False),
         # LLM narratives (optional — absent when LLM is unavailable)
         "narratives": result.get("narratives", {}),
+        # Generated art hero image (optional)
+        "hero_image_data_uri": hero_image_data_uri,
     }
 
     return template.render(**context)
