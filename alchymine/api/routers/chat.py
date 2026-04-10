@@ -17,7 +17,7 @@ import logging
 import re
 from collections.abc import AsyncGenerator
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -162,6 +162,16 @@ class ChatRequest(BaseModel):
     )
 
 
+class ChatHistoryItem(BaseModel):
+    """Single message in the chat history response."""
+
+    id: str
+    role: str
+    content: str
+    system_key: str | None
+    created_at: str  # ISO 8601
+
+
 # ─── Streaming generator ───────────────────────────────────────────────
 
 
@@ -295,6 +305,56 @@ async def chat(
             "X-Accel-Buffering": "no",
         },
     )
+
+
+@router.get("/chat/history")
+async def chat_history(
+    system_key: str | None = Query(
+        None,
+        description=(
+            "Filter by system scope. Pass one of: intelligence, healing, "
+            "wealth, creative, perspective. Omit for all messages."
+        ),
+    ),
+    limit: int = Query(50, ge=1, le=200, description="Maximum messages to return"),
+    current_user: dict = Depends(get_current_user),
+    session: AsyncSession = Depends(get_db_session),
+) -> list[ChatHistoryItem]:
+    """Return persisted chat history for the authenticated user.
+
+    Messages are returned in chronological (oldest-first) order so the
+    frontend can display them from top to bottom.  The ``limit`` caps
+    the result set — the *most recent* N messages are fetched and then
+    reversed into chronological order by the repository layer.
+
+    When ``system_key`` is provided, only messages scoped to that system
+    are returned.  When omitted, all messages regardless of system scope
+    are included.
+    """
+    if system_key is not None and system_key not in _VALID_SYSTEM_KEYS:
+        raise HTTPException(
+            status_code=422,
+            detail=f"Unknown system_key {system_key!r}. Valid: {sorted(_VALID_SYSTEM_KEYS)}",
+        )
+
+    user_id = current_user["sub"]
+    rows = await repository.get_chat_history(
+        session,
+        user_id=user_id,
+        system_key=system_key,
+        limit=limit,
+    )
+
+    return [
+        ChatHistoryItem(
+            id=row.id,
+            role=row.role,
+            content=row.content,
+            system_key=row.system_key,
+            created_at=row.created_at.isoformat() if row.created_at else "",
+        )
+        for row in rows
+    ]
 
 
 async def _ensure_user_exists(session: AsyncSession, user_id: str) -> None:

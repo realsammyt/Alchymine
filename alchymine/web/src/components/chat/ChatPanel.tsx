@@ -2,16 +2,18 @@
 
 /**
  * ChatPanel — composed chat experience: header, message list, input,
- * and dismissable error banner.
+ * starter prompt chips, and dismissable error banner.
  *
  * Owns its own ``useChat`` instance so the parent page only needs to
- * pass an optional ``systemKey``.  Sprint 3 will add starter prompts
- * and history loading; Sprint 5 will add per-page context injection.
+ * pass an optional ``systemKey``.  When the conversation is empty (no
+ * history loaded and no messages sent yet), contextual starter-prompt
+ * chips are rendered so users have a low-friction entry point.
  */
 
 import { useState } from "react";
 
 import { useChat } from "@/hooks/useChat";
+import { getStarterPrompts } from "@/lib/starterPrompts";
 
 import ChatInput from "./ChatInput";
 import ChatMessageList from "./ChatMessageList";
@@ -30,8 +32,14 @@ const SYSTEM_LABELS: Record<string, string> = {
 };
 
 export default function ChatPanel({ systemKey = null }: Props) {
-  const { messages, isStreaming, error, sendMessage, resetConversation } =
-    useChat();
+  const {
+    messages,
+    isStreaming,
+    isLoadingHistory,
+    error,
+    sendMessage,
+    resetConversation,
+  } = useChat({ systemKey });
   const [errorDismissed, setErrorDismissed] = useState(false);
 
   const visibleError = errorDismissed ? null : error;
@@ -42,6 +50,8 @@ export default function ChatPanel({ systemKey = null }: Props) {
     void sendMessage(text, systemKey);
   };
 
+  const starterPrompts = getStarterPrompts(systemKey);
+  const showStarters = messages.length === 0 && !isLoadingHistory;
   const systemLabel = systemKey ? SYSTEM_LABELS[systemKey] ?? systemKey : null;
 
   return (
@@ -112,9 +122,26 @@ export default function ChatPanel({ systemKey = null }: Props) {
               Welcome to your Growth Assistant
             </p>
             <p className="text-sm font-body text-text/50">
-              Ask a question about any pillar of your transformation journey —
-              identity, healing, wealth, creativity, or perspective.
+              {isLoadingHistory
+                ? "Loading your conversation history..."
+                : "Ask a question about any pillar of your transformation journey \u2014 identity, healing, wealth, creativity, or perspective."}
             </p>
+            {/* Starter prompt chips */}
+            {showStarters && starterPrompts.length > 0 && (
+              <div className="mt-4 flex flex-wrap justify-center gap-2">
+                {starterPrompts.map((prompt) => (
+                  <button
+                    key={prompt.label}
+                    type="button"
+                    onClick={() => handleSend(prompt.message)}
+                    disabled={isStreaming}
+                    className="rounded-full border border-primary/20 bg-primary/5 px-3 py-1.5 text-xs font-body text-primary/80 transition-colors hover:bg-primary/15 hover:text-primary disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    {prompt.label}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         }
       />
