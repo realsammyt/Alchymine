@@ -101,7 +101,7 @@ class TestMigrationCompleteness:
             rows = result.fetchall()
 
         assert len(rows) == 1, f"Expected 1 head revision, got {len(rows)}: {rows}"
-        assert rows[0][0] == "0012", f"Expected head at 0012, got {rows[0][0]}"
+        assert rows[0][0] == "0013", f"Expected head at 0013, got {rows[0][0]}"
 
     def test_reports_table_has_all_columns(self, fresh_migration_engine):
         """Reports table (added in migration 0006) has all expected columns."""
@@ -178,12 +178,13 @@ class TestStampAndUpgrade:
         engine = create_engine(sync_url)
         Base.metadata.create_all(engine)
 
-        # Drop tables that later migrations will CREATE (0011 creates feedback_entries
-        # and 0012 creates chat_messages, but create_all() already made them from the
-        # ORM models)
+        # Drop tables that later migrations will CREATE (0011 creates feedback_entries,
+        # 0012 creates chat_messages, 0013 creates generated_images — all already made
+        # by create_all() from ORM models)
         with engine.begin() as conn:
             conn.execute(text("DROP TABLE IF EXISTS feedback_entries"))
             conn.execute(text("DROP TABLE IF EXISTS chat_messages"))
+            conn.execute(text("DROP TABLE IF EXISTS generated_images"))
 
         # Manually drop pdf_data to simulate the missing column
         with engine.begin() as conn:
@@ -218,6 +219,6 @@ class TestStampAndUpgrade:
         with engine.connect() as conn:
             result = conn.execute(text("SELECT version_num FROM alembic_version"))
             version = result.scalar_one()
-        assert version == "0012", f"Expected 0012, got {version}"
+        assert version == "0013", f"Expected 0013, got {version}"
 
         engine.dispose()

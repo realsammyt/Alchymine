@@ -706,3 +706,41 @@ class ChatMessage(Base):
             f"<ChatMessage id={self.id!r} user_id={self.user_id!r} "
             f"role={self.role!r} system_key={self.system_key!r}>"
         )
+
+
+# --- GeneratedImage ────────────────────────────────────────────────────
+
+
+class GeneratedImage(Base):
+    """A single Gemini-generated image owned by a user.
+
+    Image bytes are stored on the filesystem (under ``ART_CACHE_DIR``)
+    keyed by ``id``; only the metadata and relative path live in this
+    table. The router serves bytes by reading the file at request time
+    after verifying ownership.
+    """
+
+    __tablename__ = "generated_images"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    user_id: Mapped[str] = mapped_column(
+        String(36),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    prompt: Mapped[str] = mapped_column(Text, nullable=False)
+    mime_type: Mapped[str] = mapped_column(String(50), nullable=False, default="image/png")
+    file_path: Mapped[str] = mapped_column(
+        String(500),
+        nullable=False,
+        comment="Filesystem path relative to ART_CACHE_DIR",
+    )
+    style_preset: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    model: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), index=True
+    )
+
+    def __repr__(self) -> str:
+        return f"<GeneratedImage id={self.id!r} user_id={self.user_id!r}>"

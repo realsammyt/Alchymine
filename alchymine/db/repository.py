@@ -46,6 +46,7 @@ from alchymine.db.models import (
     ChatMessage,
     CreativeProfile,
     FeedbackEntry,
+    GeneratedImage,
     HealingProfile,
     IdentityProfile,
     IntakeData,
@@ -969,3 +970,93 @@ async def get_feedback_counts(session: AsyncSession) -> dict[str, int]:
         select(FeedbackEntry.status, func.count()).group_by(FeedbackEntry.status)
     )
     return {row[0]: row[1] for row in result.all()}
+
+
+# ─── Generated Image CRUD ──────────────────────────────────────────────
+
+
+async def create_generated_image(
+    session: AsyncSession,
+    *,
+    user_id: str,
+    prompt: str,
+    file_path: str,
+    mime_type: str = "image/png",
+    style_preset: str | None = None,
+    model: str | None = None,
+) -> GeneratedImage:
+    """Insert a new generated_images row.
+
+    Parameters
+    ----------
+    session:
+        Active async session.
+    user_id:
+        Owning user (FK).
+    prompt:
+        The exact prompt used to generate the image.
+    file_path:
+        Path on disk (relative to ``ART_CACHE_DIR``) where the bytes live.
+    mime_type:
+        IANA mime type, default ``image/png``.
+    style_preset:
+        Optional style preset id from ``STYLE_PRESETS``.
+    model:
+        Optional Gemini model id used.
+    """
+    image = GeneratedImage(
+        user_id=user_id,
+        prompt=prompt,
+        file_path=file_path,
+        mime_type=mime_type,
+        style_preset=style_preset,
+        model=model,
+    )
+    session.add(image)
+    await session.flush()
+    await session.refresh(image)
+    return image
+
+
+async def get_generated_image(session: AsyncSession, image_id: str) -> GeneratedImage | None:
+    """Fetch a single generated_images row by id, or ``None``."""
+    result = await session.execute(select(GeneratedImage).where(GeneratedImage.id == image_id))
+    return result.scalar_one_or_none()
+
+
+async def list_generated_images_for_user(
+    session: AsyncSession,
+    user_id: str,
+    *,
+    limit: int = 20,
+    offset: int = 0,
+) -> list[GeneratedImage]:
+    """Return a page of a user's generated images, newest first.
+
+    The caller is expected to strip bytes/paths before returning to
+    clients — this repository helper only loads metadata from the DB.
+    """
+    stmt = (
+        select(GeneratedImage)
+        .where(GeneratedImage.user_id == user_id)
+        .order_by(GeneratedImage.created_at.desc())
+        .limit(limit)
+        .offset(offset)
+    )
+    result = await session.execute(stmt)
+    return list(result.scalars().all())
+
+
+async def delete_generated_image(session: AsyncSession, image_id: str) -> bool:
+    """Delete a generated_images row by id.
+
+    Returns ``True`` if a row was deleted, ``False`` otherwise. The
+    caller is responsible for verifying ownership before calling and
+    for unlinking the corresponding file from disk.
+    """
+    image = await get_generated_image(session, image_id)
+    if image is None:
+        return False
+    await session.delete(image)
+    await session.flush()
+    return True

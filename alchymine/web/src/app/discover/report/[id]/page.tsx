@@ -15,6 +15,7 @@ import { CREATIVE_DNA_SUPPLEMENT_QUESTIONS } from "@/lib/questions";
 import Card from "@/components/shared/Card";
 import Button from "@/components/shared/Button";
 import SupplementModal from "@/components/shared/SupplementModal";
+import ReportHero from "@/components/report/ReportHero";
 import {
   MotionReveal,
   MotionStagger,
@@ -285,6 +286,13 @@ export default function ReportPage() {
               archetypes, and personality science — the foundation for all five
               Alchymine systems.
             </p>
+          </div>
+        </MotionReveal>
+
+        {/* ── Personalized AI hero illustration ─────────────────────── */}
+        <MotionReveal delay={0.05}>
+          <div className="mb-10">
+            <ReportHero reportId={reportId} userId={user?.id ?? ""} />
           </div>
         </MotionReveal>
 
