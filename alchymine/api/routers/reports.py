@@ -83,6 +83,34 @@ class ReportListResponse(BaseModel):
     limit: int
 
 
+# ── Helpers ──────────────────────────────────────────────────────────────
+
+
+async def _build_hero_data_uri(session: AsyncSession, user_id: str) -> str | None:
+    """Read the user's most recent generated image and return a data URI.
+
+    Returns ``None`` when the user has no images or the file is missing.
+    The data URI format is ``data:<mime>;base64,<encoded>`` which can be
+    embedded directly into ``<img src=...>`` in the report HTML/PDF.
+    """
+    import base64
+
+    from alchymine.llm.art_storage import read_image
+
+    rows = await repository.list_generated_images_for_user(session, user_id, limit=1, offset=0)
+    if not rows:
+        return None
+
+    image_row = rows[0]
+    raw = read_image(image_row.file_path)
+    if raw is None:
+        return None
+
+    mime = image_row.mime_type or "image/png"
+    encoded = base64.b64encode(raw).decode("ascii")
+    return f"data:{mime};base64,{encoded}"
+
+
 # ── Endpoints ────────────────────────────────────────────────────────────
 
 
@@ -294,6 +322,10 @@ async def get_report(
 @router.get("/reports/{report_id}/html", response_model=None)
 async def get_report_html(
     report_id: str,
+    embed_art: bool = Query(
+        default=False,
+        description="When true, embed the user's most recent generated image as a hero in the report",
+    ),
     session: AsyncSession = Depends(get_db_session),
     current_user: dict = Depends(get_current_user),
 ) -> HTMLResponse | JSONResponse:
@@ -301,6 +333,11 @@ async def get_report_html(
 
     The HTML is self-contained (inline CSS) and includes a "Save as PDF"
     button that triggers the browser's native print dialog.
+
+    When ``embed_art=true`` is passed, the user's most recently generated
+    image is embedded as a ``data:`` URI hero image at the top of the
+    report. This makes the PDF export self-contained without external
+    image references.
 
     - **200** -- HTML page with report content.
     - **202** -- report is still being generated.
@@ -318,6 +355,18 @@ async def get_report_html(
             content={"status": report.status, "detail": f"Report is {report.status}"},
         )
 
+    # Optionally embed the user's most recent generated art as a data URI.
+    hero_data_uri: str | None = None
+    if embed_art and report.user_id:
+        try:
+            hero_data_uri = await _build_hero_data_uri(session, report.user_id)
+        except Exception:
+            logger.debug(
+                "Failed to embed art for report %s — continuing without hero image",
+                report_id,
+                exc_info=True,
+            )
+
     # Build a dict compatible with render_report_html
     entry = {
         "report_id": report.id,
@@ -326,7 +375,7 @@ async def get_report_html(
         "created_at": report.created_at.isoformat() if report.created_at else "",
     }
 
-    html_content = render_report_html(entry)
+    html_content = render_report_html(entry, hero_image_data_uri=hero_data_uri)
     return HTMLResponse(content=html_content)
 
 

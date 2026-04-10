@@ -171,3 +171,64 @@ export async function deleteGeneratedImage(imageId: string): Promise<boolean> {
   if (res.status === 404) return false;
   throw new Error(`deleteGeneratedImage failed (${res.status})`);
 }
+
+// ── Brand endpoints ─────────────────────────────────────────────────
+
+export interface BrandPaletteColor {
+  hex: string;
+  name: string;
+}
+
+export interface BrandPalette {
+  primary: BrandPaletteColor;
+  secondary: BrandPaletteColor;
+  accent: BrandPaletteColor;
+  neutral: BrandPaletteColor;
+}
+
+/**
+ * Fetch the deterministic brand colour palette derived from the user's
+ * identity profile. Same profile always yields the same palette.
+ */
+export async function getBrandPalette(): Promise<BrandPalette> {
+  const res = await fetch(`${API_BASE}/art/brand/palette`, {
+    headers: { ...authHeaders() },
+  });
+  if (!res.ok) {
+    const message = await res.text().catch(() => "");
+    throw new Error(`getBrandPalette failed (${res.status}): ${message}`);
+  }
+  return (await res.json()) as BrandPalette;
+}
+
+export interface BrandLogoResponse {
+  image_id: string;
+  url: string;
+  prompt: string;
+}
+
+/**
+ * Generate a personal brand logo from the user's profile via Gemini.
+ *
+ * Returns:
+ * - `BrandLogoResponse` on 201 success
+ * - `null` on 204 (Gemini disabled)
+ *
+ * Throws on other errors.
+ */
+export async function generateBrandLogo(): Promise<BrandLogoResponse | null> {
+  const res = await fetch(`${API_BASE}/art/brand/logo`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...authHeaders(),
+    },
+  });
+
+  if (res.status === 204) return null;
+  if (!res.ok) {
+    const message = await res.text().catch(() => "");
+    throw new Error(`generateBrandLogo failed (${res.status}): ${message}`);
+  }
+  return (await res.json()) as BrandLogoResponse;
+}
