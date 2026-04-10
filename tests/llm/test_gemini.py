@@ -80,7 +80,13 @@ async def test_generate_image_returns_result_on_success() -> None:
     fake_client.aio.models.generate_content = AsyncMock(return_value=fake_response)
     fake_genai_module.Client.return_value = fake_client
 
-    with patch("alchymine.llm.gemini._genai", fake_genai_module):
+    # Inject fake google.genai.types into sys.modules so the from-import
+    # inside generate_image resolves to a MagicMock instead of the real SDK.
+    fake_types = MagicMock()
+    with (
+        patch("alchymine.llm.gemini._genai", fake_genai_module),
+        patch.dict("sys.modules", {"google.genai": fake_genai_module, "google.genai.types": fake_types}),
+    ):
         client = GeminiClient(api_key="fake-key", model="gemini-test")
         assert client.is_available is True
         result = await client.generate_image("a serene forest")
