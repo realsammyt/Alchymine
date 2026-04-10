@@ -64,6 +64,18 @@ const NAV_ITEMS: NavItem[] = [
     label: "Perspective Enhancement system",
   },
   {
+    name: "Journey",
+    href: "/journey",
+    icon: "spiral",
+    label: "Visual transformation timeline",
+  },
+  {
+    name: "Brand",
+    href: "/brand",
+    icon: "palette",
+    label: "Personal brand identity",
+  },
+  {
     name: "Journal",
     href: "/journal",
     icon: "book",
