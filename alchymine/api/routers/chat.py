@@ -249,6 +249,7 @@ async def _chat_event_stream(
     message: str,
     system_key: str | None,
     session: AsyncSession,
+    ephemeral: bool = False,
 ) -> AsyncGenerator[str, None]:
     """Stream LLM reply chunks as SSE ``data:`` frames.
 
@@ -257,16 +258,21 @@ async def _chat_event_stream(
     additionally checked against the safety patterns; the stream is
     truncated and a sentinel emitted if blocked content is detected
     in the model's output.
+
+    When *ephemeral* is ``True``, neither the user message nor the
+    assistant reply is written to the database.  Safety checks and scope
+    enforcement still run because they protect the LLM call, not the DB.
     """
     # Persist the user message before any LLM round-trip so it's never lost.
-    await repository.save_chat_message(
-        session,
-        user_id=user_id,
-        role="user",
-        content=message,
-        system_key=system_key,
-    )
-    await session.commit()
+    if not ephemeral:
+        await repository.save_chat_message(
+            session,
+            user_id=user_id,
+            role="user",
+            content=message,
+            system_key=system_key,
+        )
+        await session.commit()
 
     # We don't have a UserProfile loader hooked up here yet — the chat
     # endpoint accepts a system_key for now and the system prompt is
@@ -299,17 +305,19 @@ async def _chat_event_stream(
 
     # Persist the assistant message even when truncated — the partial
     # reply (or the empty string) is part of the conversation history.
-    assistant_text = "".join(full_reply)
-    if blocked:
-        assistant_text = "[response blocked by safety filter]"
-    await repository.save_chat_message(
-        session,
-        user_id=user_id,
-        role="assistant",
-        content=assistant_text,
-        system_key=system_key,
-    )
-    await session.commit()
+    # Skip persistence entirely when running in ephemeral mode.
+    if not ephemeral:
+        assistant_text = "".join(full_reply)
+        if blocked:
+            assistant_text = "[response blocked by safety filter]"
+        await repository.save_chat_message(
+            session,
+            user_id=user_id,
+            role="assistant",
+            content=assistant_text,
+            system_key=system_key,
+        )
+        await session.commit()
 
     yield "event: done\ndata: \n\n"
 
@@ -320,6 +328,7 @@ async def _chat_event_stream(
 @router.post("/chat")
 async def chat(
     request: ChatRequest,
+    ephemeral: bool = Query(False, description="Skip message persistence"),
     current_user: dict = Depends(get_current_user),
     session: AsyncSession = Depends(get_db_session),
 ) -> StreamingResponse:
@@ -333,7 +342,9 @@ async def chat(
     ``event: done`` sentinel.
 
     Both the user message and the full assistant reply are persisted to
-    the ``chat_messages`` table for the authenticated user.
+    the ``chat_messages`` table for the authenticated user.  Pass
+    ``?ephemeral=true`` to skip persistence entirely (useful for
+    one-off queries that should not appear in history).
     """
     safety_message = _check_content_safety(request.message)
     if safety_message:
@@ -365,13 +376,15 @@ async def chat(
     await _ensure_user_exists(session, user_id)
 
     # ── History cap (200 user messages per system_key) ───────────────
-    msg_count = await repository.count_user_chat_messages(
-        session,
-        user_id=user_id,
-        system_key=request.system_key,
-    )
-    if msg_count >= HISTORY_CAP:
-        raise HTTPException(status_code=429, detail=_HISTORY_CAP_MESSAGE)
+    # Skip when ephemeral — there is no point counting rows we won't write.
+    if not ephemeral:
+        msg_count = await repository.count_user_chat_messages(
+            session,
+            user_id=user_id,
+            system_key=request.system_key,
+        )
+        if msg_count >= HISTORY_CAP:
+            raise HTTPException(status_code=429, detail=_HISTORY_CAP_MESSAGE)
 
     return StreamingResponse(
         _chat_event_stream(
@@ -379,6 +392,7 @@ async def chat(
             message=request.message,
             system_key=request.system_key,
             session=session,
+            ephemeral=ephemeral,
         ),
         media_type="text/event-stream",
         headers={
@@ -399,6 +413,7 @@ async def chat_history(
         ),
     ),
     limit: int = Query(50, ge=1, le=200, description="Maximum messages to return"),
+    q: str | None = Query(None, description="Search message content"),
     current_user: dict = Depends(get_current_user),
     session: AsyncSession = Depends(get_db_session),
 ) -> list[ChatHistoryItem]:
@@ -412,6 +427,12 @@ async def chat_history(
     When ``system_key`` is provided, only messages scoped to that system
     are returned.  When omitted, all messages regardless of system scope
     are included.
+
+    When ``q`` is provided, only messages whose content contains the
+    search term (case-insensitive) are returned.  Because the ``content``
+    column is encrypted (EncryptedString), SQL-level filtering is not
+    possible; the search is applied in Python after the DB query returns
+    decrypted values.
     """
     if system_key is not None and system_key not in _VALID_SYSTEM_KEYS:
         raise HTTPException(
@@ -427,6 +448,13 @@ async def chat_history(
         limit=limit,
     )
 
+    # Apply content search filter in Python (content is encrypted, cannot
+    # filter in SQL).
+    messages = list(rows)
+    if q:
+        q_lower = q.lower()
+        messages = [m for m in messages if q_lower in m.content.lower()]
+
     return [
         ChatHistoryItem(
             id=row.id,
@@ -435,7 +463,7 @@ async def chat_history(
             system_key=row.system_key,
             created_at=row.created_at.isoformat() if row.created_at else "",
         )
-        for row in rows
+        for row in messages
     ]
 
 

@@ -58,6 +58,12 @@ const NAV_ITEMS: NavItem[] = [
     label: "Creative Development system",
   },
   {
+    name: "Studio",
+    href: "/creative-studio",
+    icon: "sparkle",
+    label: "Creative Studio — AI image generation",
+  },
+  {
     name: "Perspective",
     href: "/perspective",
     icon: "telescope",

@@ -84,8 +84,12 @@ function getLegacyAuthHeaders(): Record<string, string> {
 export async function* streamChat(
   request: ChatRequest,
   signal?: AbortSignal,
+  ephemeral?: boolean,
 ): AsyncGenerator<string> {
-  const response = await fetch(`${BASE}/chat`, {
+  const url = ephemeral
+    ? `${BASE}/chat?ephemeral=true`
+    : `${BASE}/chat`;
+  const response = await fetch(url, {
     method: "POST",
     credentials: "include",
     headers: {
@@ -182,10 +186,12 @@ export async function* streamChat(
 export async function fetchChatHistory(
   systemKey: string | null,
   limit: number = 50,
+  q?: string,
 ): Promise<ChatMessage[]> {
   const params = new URLSearchParams();
   if (systemKey) params.set("system_key", systemKey);
   params.set("limit", String(limit));
+  if (q) params.set("q", q);
 
   const response = await fetch(`${BASE}/chat/history?${params.toString()}`, {
     method: "GET",
