@@ -58,6 +58,8 @@ export default function SkillDetailDrawer({
 }: SkillDetailDrawerProps) {
   const open = skillName !== null;
   const drawerRef = useRef<HTMLDivElement>(null);
+  const closeButtonRef = useRef<HTMLButtonElement>(null);
+  const previousFocusRef = useRef<HTMLElement | null>(null);
 
   const { data: skill, loading, error } = useApi<HealingSkill>(
     skillName ? (signal) => getHealingSkill(skillName) : null,
@@ -67,7 +69,29 @@ export default function SkillDetailDrawer({
   // Close on Escape key
   const handleKeyDown = useCallback(
     (e: KeyboardEvent) => {
-      if (e.key === "Escape" && open) onClose();
+      if (e.key === "Escape" && open) {
+        onClose();
+        return;
+      }
+
+      // Focus trapping: Tab / Shift+Tab within drawer
+      if (e.key === "Tab" && open && drawerRef.current) {
+        const focusable = drawerRef.current.querySelectorAll<HTMLElement>(
+          'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
+        );
+        if (focusable.length === 0) return;
+
+        const first = focusable[0];
+        const last = focusable[focusable.length - 1];
+
+        if (e.shiftKey && document.activeElement === first) {
+          e.preventDefault();
+          last.focus();
+        } else if (!e.shiftKey && document.activeElement === last) {
+          e.preventDefault();
+          first.focus();
+        }
+      }
     },
     [open, onClose],
   );
@@ -77,12 +101,21 @@ export default function SkillDetailDrawer({
     return () => document.removeEventListener("keydown", handleKeyDown);
   }, [handleKeyDown]);
 
-  // Trap focus inside drawer when open
+  // Lock body scroll and manage focus when open
   useEffect(() => {
     if (open) {
+      // Save current focus to restore on close
+      previousFocusRef.current = document.activeElement as HTMLElement;
       document.body.style.overflow = "hidden";
+      // Move focus into the drawer after a brief delay for the
+      // slide transition to settle.
+      requestAnimationFrame(() => {
+        closeButtonRef.current?.focus();
+      });
     } else {
       document.body.style.overflow = "";
+      // Restore focus to the element that opened the drawer
+      previousFocusRef.current?.focus();
     }
     return () => {
       document.body.style.overflow = "";
@@ -118,9 +151,10 @@ export default function SkillDetailDrawer({
             {loading ? "Loading..." : skill?.title ?? "Skill Detail"}
           </h2>
           <button
+            ref={closeButtonRef}
             onClick={onClose}
             className="text-text/40 hover:text-text/70 transition-colors p-1"
-            aria-label="Close drawer"
+            aria-label="Close skill detail drawer"
             data-testid="drawer-close"
           >
             <svg
@@ -184,7 +218,7 @@ export default function SkillDetailDrawer({
                 <h3 className="font-body text-xs text-text/40 uppercase tracking-wider mb-3">
                   Steps
                 </h3>
-                <ol className="space-y-3">
+                <ol className="space-y-3" aria-label="Practice steps">
                   {skill.steps.map((step, idx) => (
                     <li key={idx} className="flex gap-3">
                       <span className="flex-shrink-0 w-6 h-6 rounded-full bg-accent/15 text-accent text-xs font-body flex items-center justify-center border border-accent/25 mt-0.5">
@@ -200,11 +234,11 @@ export default function SkillDetailDrawer({
 
               {/* Contraindications */}
               {skill.contraindications.length > 0 && (
-                <div>
+                <div role="alert" aria-label="Contraindications warning">
                   <h3 className="font-body text-xs text-text/40 uppercase tracking-wider mb-2">
                     Contraindications
                   </h3>
-                  <ul className="space-y-1.5">
+                  <ul className="space-y-1.5" aria-label="List of contraindications">
                     {skill.contraindications.map((ci, idx) => (
                       <li
                         key={idx}

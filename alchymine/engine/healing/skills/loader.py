@@ -24,18 +24,38 @@ def get_default_yaml_dir() -> Path:
 
 
 class SkillRegistry:
-    """In-memory registry of healing skills loaded from YAML files."""
+    """In-memory registry of healing skills loaded from YAML files.
+
+    Supports loading from multiple directories. Call
+    :meth:`load_directory` once per directory; skills accumulate across
+    calls. Use ``replace=True`` (the default for backward compatibility)
+    to clear previous entries, or ``replace=False`` to merge.
+    """
 
     def __init__(self) -> None:
         self._skills: dict[str, SkillDefinition] = {}
 
-    def load_directory(self, path: Path) -> None:
-        """Replace the registry contents with all *.yaml files under `path`.
+    def load_directory(self, path: Path, *, replace: bool = True) -> None:
+        """Load all ``*.yaml`` files under *path* into the registry.
 
-        Raises:
-            FileNotFoundError: if `path` does not exist.
-            SkillValidationError: if any file fails schema validation or
-                contains a duplicate skill name.
+        Parameters
+        ----------
+        path:
+            Directory containing YAML skill definitions.
+        replace:
+            If ``True`` (default), clear existing skills before loading.
+            If ``False``, merge new skills into the existing registry.
+            Duplicate skill names raise :class:`SkillValidationError`
+            regardless of mode.
+
+        Raises
+        ------
+        FileNotFoundError
+            If *path* does not exist or is not a directory.
+        SkillValidationError
+            If any file fails schema validation or contains a duplicate
+            skill name (within the directory or vs. existing skills when
+            ``replace=False``).
         """
         if not path.exists() or not path.is_dir():
             raise FileNotFoundError(f"Skill YAML directory not found: {path}")
@@ -49,7 +69,16 @@ class SkillRegistry:
                 )
             loaded[skill.name] = skill
 
-        self._skills = loaded
+        if replace:
+            self._skills = loaded
+        else:
+            # Merge — check for cross-directory duplicates
+            for name, _skill in loaded.items():
+                if name in self._skills:
+                    raise SkillValidationError(
+                        f"Duplicate skill name '{name}' conflicts with already-loaded skill"
+                    )
+            self._skills.update(loaded)
 
     def get(self, name: str) -> SkillDefinition:
         try:

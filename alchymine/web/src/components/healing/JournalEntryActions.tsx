@@ -78,7 +78,7 @@ export default function JournalEntryActions({
 
   if (mode === "view") {
     return (
-      <div data-testid="journal-entry-actions">
+      <div data-testid="journal-entry-actions" role="region" aria-label={`Journal entry: ${entry.title}`}>
         {/* Entry display */}
         <div className="mb-4">
           <h3 className="font-display text-lg font-light text-text mb-1">
@@ -99,10 +99,15 @@ export default function JournalEntryActions({
             {entry.content}
           </p>
           {entry.tags.length > 0 && (
-            <div className="flex flex-wrap gap-1.5 mt-3">
+            <div
+              className="flex flex-wrap gap-1.5 mt-3"
+              role="list"
+              aria-label="Tags"
+            >
               {entry.tags.map((tag) => (
                 <span
                   key={tag}
+                  role="listitem"
                   className="px-2 py-0.5 rounded-full text-xs font-body bg-white/5 text-text/50 border border-white/10"
                 >
                   {tag}
@@ -167,7 +172,7 @@ export default function JournalEntryActions({
 
   if (mode === "confirm-delete") {
     return (
-      <div data-testid="journal-delete-confirm">
+      <div data-testid="journal-delete-confirm" role="alertdialog" aria-label="Confirm deletion">
         <div className="bg-red-400/10 border border-red-400/20 rounded-xl p-4 mb-4">
           <p className="font-body text-sm text-red-400 mb-1 font-medium">
             Delete this journal entry?
@@ -186,6 +191,7 @@ export default function JournalEntryActions({
             disabled={deleting}
             className="inline-flex items-center gap-1 px-4 py-2 text-sm font-body font-medium rounded-lg bg-red-500 text-white hover:bg-red-600 disabled:opacity-50 transition-colors"
             data-testid="journal-confirm-delete-btn"
+            aria-label={deleting ? "Deleting journal entry" : `Confirm delete ${entry.title}`}
           >
             {deleting ? "Deleting..." : "Yes, Delete"}
           </button>
@@ -207,7 +213,7 @@ export default function JournalEntryActions({
   // ── Edit mode ──────────────────────────────────────────────────
 
   return (
-    <div data-testid="journal-edit-form">
+    <div data-testid="journal-edit-form" role="form" aria-label={`Edit journal entry: ${entry.title}`}>
       <div className="space-y-4 mb-4">
         {/* Title */}
         <div>
