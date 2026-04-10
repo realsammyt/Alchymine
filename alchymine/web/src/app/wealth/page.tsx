@@ -34,6 +34,7 @@ import GeneratingState from "@/components/shared/GeneratingState";
 import IntakeCTA from "@/components/shared/IntakeCTA";
 import JournalCTA from "@/components/shared/JournalCTA";
 import SystemCoachBanner from "@/components/chat/SystemCoachBanner";
+import CrossSystemBridgePanel from "@/components/shared/CrossSystemBridgePanel";
 
 // ── Constants ─────────────────────────────────────────────────────
 
@@ -1152,37 +1153,10 @@ export default function WealthPage() {
               </MotionReveal>
             </section>
 
-            {/* ── Connections — cycle-timing bridge ───────────────────── */}
+            {/* ── Cross-system bridge connections ─────────────────────── */}
             {hasIntake && (
               <MotionReveal delay={0.05}>
-                <section
-                  className="mb-12"
-                  aria-labelledby="wealth-connections-heading"
-                  data-testid="connections-section"
-                >
-                  <div className="card-surface border border-primary/10 p-5">
-                    <h2
-                      id="wealth-connections-heading"
-                      className="font-display text-sm font-medium text-primary mb-3"
-                    >
-                      Connected: Wealth &amp; Numerology Cycles
-                    </h2>
-                    <p className="font-body text-sm text-text/50 leading-relaxed mb-3">
-                      Your numerology Personal Year cycle influences your
-                      optimal wealth-building timing. Years 1 and 8 favor bold
-                      financial moves and new ventures, while Years 4 and 6 are
-                      best for consolidation, protecting assets, and
-                      strengthening foundations. Align your lever focus with
-                      your current cycle for maximum impact.
-                    </p>
-                    <Link
-                      href="/intelligence"
-                      className="font-body text-xs text-primary underline underline-offset-2"
-                    >
-                      Explore Personal Intelligence &rarr;
-                    </Link>
-                  </div>
-                </section>
+                <CrossSystemBridgePanel system="wealth" />
               </MotionReveal>
             )}
 
