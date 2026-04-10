@@ -87,6 +87,12 @@ class Settings(BaseSettings):
     email_from: str = "noreply@alchymine.app"
     frontend_url: str = "http://localhost:3000"
 
+    # ── Healing ─────────────────────────────────────────────────────────
+    # Optional path to an external directory of healing skill YAML files.
+    # When set, the SkillRegistry will load from both the bundled
+    # ``alchymine/engine/healing/skills/yaml/`` AND this directory.
+    healing_skills_external_dir: str | None = None
+
     # ── Misc ──────────────────────────────────────────────────────────────
     auto_create_tables: bool = False
 

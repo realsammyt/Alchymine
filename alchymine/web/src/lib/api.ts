@@ -923,6 +923,47 @@ export async function getSpiralRoute(
   });
 }
 
+// ─── Healing Spiral Route ─────────────────────────────────────────────
+
+export interface HealingSpiralModality {
+  modality: string;
+  category: string;
+  description: string;
+  evidence_level: string;
+  entry_action: string;
+}
+
+export interface HealingSpiralRouteResponse {
+  primary_system: string;
+  healing_rank: number;
+  healing_score: number;
+  healing_reason: string;
+  healing_entry_action: string;
+  for_you_today: string;
+  recommended_modalities: HealingSpiralModality[];
+  evidence_level: string;
+  calculation_type: string;
+}
+
+export async function getHealingSpiralRoute(opts?: {
+  intention?: string;
+  lifePath?: number;
+  personalityOpenness?: number;
+  personalityNeuroticism?: number;
+}): Promise<HealingSpiralRouteResponse> {
+  const params = new URLSearchParams();
+  if (opts?.intention) params.set("intention", opts.intention);
+  if (opts?.lifePath != null) params.set("life_path", String(opts.lifePath));
+  if (opts?.personalityOpenness != null)
+    params.set("personality_openness", String(opts.personalityOpenness));
+  if (opts?.personalityNeuroticism != null)
+    params.set("personality_neuroticism", String(opts.personalityNeuroticism));
+  const query = params.toString();
+  return request<HealingSpiralRouteResponse>(
+    `${BASE}/healing/spiral-route${query ? `?${query}` : ""}`,
+  );
+}
+
 // ─── Profile API functions ────────────────────────────────────────
 
 export async function getProfile(userId: string): Promise<ProfileResponse> {
