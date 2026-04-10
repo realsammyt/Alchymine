@@ -17,3 +17,11 @@ CVE-2026-27904
 # so this is not exploitable in our deployment context.
 GHSA-qffp-2rhf-9h96
 CVE-2026-29786
+
+# picomatch CVE-2026-33671: ReDoS via crafted extglob patterns
+# Affects picomatch 4.0.3 bundled inside system npm's tinyglobby dep
+# (/usr/local/lib/node_modules/npm/node_modules/tinyglobby/node_modules/picomatch/).
+# Our web container only runs `node server.js` and never invokes npm at runtime,
+# so this is not exploitable in our deployment context. App-level picomatch is
+# pinned to the fixed version via alchymine/web/package-lock.json.
+CVE-2026-33671
