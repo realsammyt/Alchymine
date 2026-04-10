@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
 import Button from "@/components/shared/Button";
 import MethodologyPanel from "@/components/shared/MethodologyPanel";
 import ApiStateView from "@/components/shared/ApiStateView";
@@ -32,6 +31,7 @@ import GeneratingState from "@/components/shared/GeneratingState";
 import IntakeCTA from "@/components/shared/IntakeCTA";
 import JournalCTA from "@/components/shared/JournalCTA";
 import SystemCoachBanner from "@/components/chat/SystemCoachBanner";
+import CrossSystemBridgePanel from "@/components/shared/CrossSystemBridgePanel";
 
 // ── Constants ─────────────────────────────────────────────────────
 
@@ -926,36 +926,10 @@ export default function HealingPage() {
               />
             </section>
           </MotionReveal>
-          {/* Connections — healing-perspective bridge */}
+          {/* Cross-system bridge connections */}
           {hasIntake && (
             <MotionReveal>
-              <section
-                className="mb-12"
-                aria-labelledby="healing-connections-heading"
-                data-testid="connections-section"
-              >
-                <div className="card-surface border border-accent/10 p-5">
-                  <h2
-                    id="healing-connections-heading"
-                    className="font-display text-sm font-medium text-accent mb-3"
-                  >
-                    Connected: Healing &amp; Perspective
-                  </h2>
-                  <p className="font-body text-sm text-text/50 leading-relaxed mb-3">
-                    Your healing practices directly prime your capacity for
-                    perspective shifts. Breathwork and somatic work soften rigid
-                    thinking patterns, making Kegan stage transitions more
-                    accessible. Start with a breathwork session before doing
-                    perspective work for deeper integration.
-                  </p>
-                  <Link
-                    href="/perspective"
-                    className="font-body text-xs text-accent underline underline-offset-2"
-                  >
-                    Explore Perspective Prism &rarr;
-                  </Link>
-                </div>
-              </section>
+              <CrossSystemBridgePanel system="healing" />
             </MotionReveal>
           )}
 

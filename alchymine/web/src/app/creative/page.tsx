@@ -26,6 +26,7 @@ import GeneratingState from "@/components/shared/GeneratingState";
 import IntakeCTA from "@/components/shared/IntakeCTA";
 import JournalCTA from "@/components/shared/JournalCTA";
 import SystemCoachBanner from "@/components/chat/SystemCoachBanner";
+import CrossSystemBridgePanel from "@/components/shared/CrossSystemBridgePanel";
 
 const CREATIVE_DIMENSIONS = [
   {
@@ -545,37 +546,10 @@ export default function CreativePage() {
             </div>
           </MotionReveal>
 
-          {/* Connections — shadow-block bridge */}
+          {/* Cross-system bridge connections */}
           {hasIntake && (
             <MotionReveal delay={0.1}>
-              <section
-                className="mb-12"
-                aria-labelledby="creative-connections-heading"
-                data-testid="connections-section"
-              >
-                <div className="card-surface border border-secondary/10 p-5">
-                  <h2
-                    id="creative-connections-heading"
-                    className="font-display text-sm font-medium text-secondary-light mb-3"
-                  >
-                    Connected: Creative Blocks &amp; Shadow Work
-                  </h2>
-                  <p className="font-body text-sm text-text/50 leading-relaxed mb-3">
-                    Your shadow archetype patterns often manifest as creative
-                    blocks. When you feel stuck creatively, it is frequently
-                    your shadow — the unconscious, disowned parts of yourself —
-                    asserting itself. Understanding your Jungian shadow can
-                    dissolve creative resistance at its root rather than
-                    treating the symptom.
-                  </p>
-                  <Link
-                    href="/intelligence"
-                    className="font-body text-xs text-secondary-light underline underline-offset-2"
-                  >
-                    Explore Personal Intelligence &rarr;
-                  </Link>
-                </div>
-              </section>
+              <CrossSystemBridgePanel system="creative" />
             </MotionReveal>
           )}
 

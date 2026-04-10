@@ -886,6 +886,28 @@ export interface ProfileResponse {
   perspective: Record<string, unknown> | null;
 }
 
+// ─── Cross-system bridges ───────────────────────────────────────
+
+export interface BridgeResponse {
+  id: string;
+  name: string;
+  source_system: string;
+  target_system: string;
+  description: string;
+  insight_keys: string[];
+}
+
+export async function getBridges(
+  source?: string,
+): Promise<BridgeResponse[]> {
+  const params = new URLSearchParams();
+  if (source) params.set("source", source);
+  const qs = params.toString();
+  return request<BridgeResponse[]>(
+    `${BASE}/bridges${qs ? `?${qs}` : ""}`,
+  );
+}
+
 // ─── Integration API functions ────────────────────────────────────
 
 export async function synthesizeCrossSystems(

@@ -23,6 +23,7 @@ import IntakeCTA from "@/components/shared/IntakeCTA";
 import JournalCTA from "@/components/shared/JournalCTA";
 import ProtectedRoute from "@/components/shared/ProtectedRoute";
 import SystemCoachBanner from "@/components/chat/SystemCoachBanner";
+import CrossSystemBridgePanel from "@/components/shared/CrossSystemBridgePanel";
 
 const NUMEROLOGY_NUMBERS = [
   {
@@ -539,6 +540,13 @@ export default function IntelligencePage() {
             />
           </section>
         </MotionReveal>
+
+        {/* Cross-system bridge connections */}
+        {hasIntake && (
+          <MotionReveal delay={0.1}>
+            <CrossSystemBridgePanel system="intelligence" />
+          </MotionReveal>
+        )}
 
         {/* CTA */}
         <MotionReveal delay={0.1}>

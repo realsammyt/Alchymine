@@ -23,6 +23,7 @@ import GeneratingState from "@/components/shared/GeneratingState";
 import IntakeCTA from "@/components/shared/IntakeCTA";
 import JournalCTA from "@/components/shared/JournalCTA";
 import SystemCoachBanner from "@/components/chat/SystemCoachBanner";
+import CrossSystemBridgePanel from "@/components/shared/CrossSystemBridgePanel";
 
 const KEGAN_STAGES = [
   {
@@ -524,37 +525,10 @@ export default function PerspectivePage() {
             </div>
           </MotionReveal>
 
-          {/* Connections — healing-perspective bridge */}
+          {/* Cross-system bridge connections */}
           {hasIntake && (
             <MotionReveal delay={0.1}>
-              <section
-                className="mb-12"
-                aria-labelledby="perspective-connections-heading"
-                data-testid="connections-section"
-              >
-                <div className="card-surface border border-accent/10 p-5">
-                  <h2
-                    id="perspective-connections-heading"
-                    className="font-display text-sm font-medium text-accent mb-3"
-                  >
-                    Connected: Perspective &amp; Healing Readiness
-                  </h2>
-                  <p className="font-body text-sm text-text/50 leading-relaxed mb-3">
-                    Nervous system regulation through healing practices creates
-                    the physiological safety needed for higher-order perspective
-                    work. Kegan stage transitions require a regulated nervous
-                    system — breathwork and somatic healing practices prepare
-                    your system to hold greater complexity without collapsing
-                    into reactivity.
-                  </p>
-                  <Link
-                    href="/healing"
-                    className="font-body text-xs text-accent underline underline-offset-2"
-                  >
-                    Explore Ethical Healing &rarr;
-                  </Link>
-                </div>
-              </section>
+              <CrossSystemBridgePanel system="perspective" />
             </MotionReveal>
           )}
 
