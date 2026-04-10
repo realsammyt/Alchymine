@@ -506,6 +506,34 @@ export async function getBreathwork(
   );
 }
 
+// ─── Healing Skills ─────────────────────────────────────────────────
+
+export interface HealingSkill {
+  name: string;
+  modality: string;
+  title: string;
+  description: string;
+  steps: string[];
+  evidence_rating: "A" | "B" | "C" | "D";
+  contraindications: string[];
+  duration_minutes: number;
+}
+
+export async function listHealingSkills(
+  modality?: string,
+): Promise<HealingSkill[]> {
+  const params = modality
+    ? `?modality=${encodeURIComponent(modality)}`
+    : "";
+  return request<HealingSkill[]>(`${BASE}/healing/skills${params}`);
+}
+
+export async function getHealingSkill(name: string): Promise<HealingSkill> {
+  return request<HealingSkill>(
+    `${BASE}/healing/skills/${encodeURIComponent(name)}`,
+  );
+}
+
 // ─── Biorhythm ──────────────────────────────────────────────────────
 
 export interface BiorhythmResult {
