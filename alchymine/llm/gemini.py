@@ -143,10 +143,13 @@ class GeminiClient:
         if not self._available or self._client is None or _genai is None:
             return None
 
-        try:
-            from google.genai import types  # type: ignore[import-not-found]
-        except ImportError:  # pragma: no cover
-            return None
+        # Use the module-level _genai reference so tests can mock types too.
+        types = getattr(_genai, "types", None)
+        if types is None:
+            try:
+                from google.genai import types  # type: ignore[import-not-found]
+            except ImportError:  # pragma: no cover
+                return None
 
         # Strict default safety settings — block low-severity content and above
         # for the four standard harm categories.
