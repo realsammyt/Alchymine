@@ -144,12 +144,16 @@ class GeminiClient:
             return None
 
         # Use the module-level _genai reference so tests can mock types too.
-        types = getattr(_genai, "types", None)
+        # Typed as ``Any`` because the symbol may come from either the runtime
+        # SDK attribute or a lazy import; this keeps mypy from flagging
+        # attribute access on the optional SDK types module.
+        types: Any = getattr(_genai, "types", None)
         if types is None:
             try:
-                from google.genai import types  # type: ignore[import-not-found]
+                from google.genai import types as genai_types  # type: ignore[import-not-found]
             except ImportError:  # pragma: no cover
                 return None
+            types = genai_types
 
         # Strict default safety settings — block low-severity content and above
         # for the four standard harm categories.
