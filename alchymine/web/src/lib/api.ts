@@ -291,6 +291,56 @@ class ApiError extends Error {
   }
 }
 
+// Maximum time to wait for any single API request before giving up.  Without
+// this, a hung connection (e.g. an unreachable or unresponsive API origin on a
+// deployed site) never settles, so callers that gate UI on the promise — the
+// dashboard "Loading your profile…" spinner, ProtectedRoute, etc. — spin
+// forever with no error and no recovery.  Aborting turns an indefinite hang
+// into a recoverable ApiError the UI can surface.
+const REQUEST_TIMEOUT_MS = 20000;
+
+/**
+ * `fetch` with a hard timeout.  Aborts the request after
+ * `REQUEST_TIMEOUT_MS` and converts the resulting abort into an ApiError so
+ * the UI fails gracefully instead of hanging.  If the caller supplies its own
+ * `signal` (e.g. for unmount cancellation), it is honoured as well.
+ */
+async function fetchWithTimeout(
+  input: RequestInfo | URL,
+  init?: RequestInit,
+): Promise<Response> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  const callerSignal = init?.signal ?? undefined;
+  if (callerSignal) {
+    if (callerSignal.aborted) controller.abort();
+    else
+      callerSignal.addEventListener("abort", () => controller.abort(), {
+        once: true,
+      });
+  }
+  try {
+    return await fetch(input, { ...init, signal: controller.signal });
+  } catch (err) {
+    // Distinguish our timeout from a caller-initiated abort: rethrow the
+    // latter untouched so callers can ignore it, but surface the former as a
+    // friendly, recoverable error.
+    if (
+      err instanceof DOMException &&
+      err.name === "AbortError" &&
+      !callerSignal?.aborted
+    ) {
+      throw new ApiError(
+        0,
+        "Request timed out. Please check your connection and try again.",
+      );
+    }
+    throw err;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 /** Map an ApiError from an auth endpoint to a user-friendly message. */
 export function friendlyAuthError(
   err: unknown,
@@ -334,7 +384,7 @@ async function request<T>(
   options?: RequestInit,
   allow202 = false,
 ): Promise<T> {
-  const res = await fetch(url, {
+  const res = await fetchWithTimeout(url, {
     ...options,
     credentials: "include",
     headers: {
@@ -358,7 +408,7 @@ async function request<T>(
   if (res.status === 401 && typeof window !== "undefined") {
     const legacyRefreshToken = localStorage.getItem("refresh_token");
     try {
-      const refreshRes = await fetch(`${BASE}/auth/refresh`, {
+      const refreshRes = await fetchWithTimeout(`${BASE}/auth/refresh`, {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
@@ -373,7 +423,7 @@ async function request<T>(
         localStorage.setItem("access_token", tokens.access_token);
         localStorage.setItem("refresh_token", tokens.refresh_token);
         // Retry the original request
-        const retryRes = await fetch(url, {
+        const retryRes = await fetchWithTimeout(url, {
           ...options,
           credentials: "include",
           headers: {
@@ -1323,7 +1373,7 @@ export interface WaitlistInviteResponse {
 export async function joinWaitlist(
   email: string,
 ): Promise<{ message: string; already_registered: boolean }> {
-  const res = await fetch(`${BASE}/auth/waitlist`, {
+  const res = await fetchWithTimeout(`${BASE}/auth/waitlist`, {
     method: "POST",
     credentials: "include",
     headers: { "Content-Type": "application/json" },
@@ -1400,7 +1450,7 @@ export interface PaginatedFeedback {
 export async function submitFeedback(
   payload: FeedbackPayload,
 ): Promise<{ id: number; message: string }> {
-  const res = await fetch(`${BASE}/feedback`, {
+  const res = await fetchWithTimeout(`${BASE}/feedback`, {
     method: "POST",
     credentials: "include",
     headers: {
