@@ -12,14 +12,14 @@ Generational Wealth, Creative Development, and Perspective Enhancement.
 
 ## Tech Stack
 
-- **Engine**: Python 3.11+ (numerology, astrology, wealth, creative, perspective — all deterministic)
-- **API**: FastAPI + Celery + Redis
+- **Engine**: Python 3.11+ (numerology, astrology, wealth, creative, perspective + archetype, personality, biorhythm, spiral, bridges — all deterministic)
+- **API**: FastAPI + Celery + Redis, with SSE streaming for the chat coach
 - **Frontend**: Next.js 15+ (App Router), React 18, TypeScript, Tailwind CSS
-- **Database**: PostgreSQL 15+
+- **Database**: PostgreSQL 15+ (SQLAlchemy 2.0 async, Alembic migrations)
 - **Queue**: Celery with Redis broker
-- **PDF**: Puppeteer/Playwright
-- **LLM**: Claude API (recommended) + Ollama fallback
-- **Agents**: CrewAI + LangGraph + MCP
+- **PDF / Art**: Playwright (reports) + optional Gemini generative art (`[gemini]` extra; degrades gracefully when absent)
+- **LLM**: Claude API (recommended, `anthropic` SDK) + Ollama fallback
+- **Agents**: CrewAI + LangGraph + MCP (5 MCP servers, JSON-RPC 2.0 over HTTP transport)
 - **Deployment**: Docker Compose (local-first per ADR-002)
 
 ## Commands
@@ -99,22 +99,43 @@ pytest tests/agents/ -v
 
 ## Project Structure (Quick Reference)
 
+_File counts are approximate — verify with `find alchymine/<pkg> -type f | wc -l`._
+
 ```
 alchymine/
-  engine/    # 103 files — 5 deterministic systems (astrology, numerology, wealth, creative, perspective)
-  api/       # 50 files  — FastAPI routers (24), auth, middleware, deps
-  agents/    # 34 files  — CrewAI crews (6), orchestrator, coordinators, quality
-  web/       # 110 files — Next.js App Router frontend (src/)
-  db/        # 19 files  — SQLAlchemy models, repository, encryption, 7 Alembic migrations
-  mcp/       # 14 files  — 5 MCP servers (one per system)
-  prompts/   # 11 files  — YAML narrative templates + validator
-  safety/    #  8 files  — Ethics checking, output validation
-  outcomes/  #  6 files  — Outcome tracking, analytics
-  llm/       #  6 files  — Anthropic client, narrative generation
-tests/       # 76 files  — pytest (api, engine, agents, db, integration, security, workers, mcp)
-infrastructure/           — 4 Dockerfiles, 4 docker-compose variants
-.github/workflows/        — 5 CI/CD workflows (ci, security, release, prepare-release, diagnose)
+  engine/      # ~79 files — deterministic systems: astrology, numerology, wealth, creative,
+               #             perspective, archetype, personality, biorhythm, spiral, healing,
+               #             reports, integration + cross-system bridges/ + profile.py
+  api/         # ~35 files — FastAPI routers, auth, middleware, deps, services, workers
+  agents/      # ~20 files — CrewAI crews + orchestrator, coordinators, quality (per pillar)
+  web/         # ~177 files — Next.js App Router frontend (src/app, components, contexts, hooks, lib)
+  db/          # ~20 files — SQLAlchemy models, repository, encryption, Alembic migrations
+  mcp/         # ~8 files  — 5 MCP servers (one per system) + base + HTTP/JSON-RPC transport
+  prompts/     # ~10 files — YAML narrative templates + validator
+  safety/      # ~5 files  — Ethics checking, output validation
+  outcomes/    # ~3 files  — Outcome tracking, analytics
+  llm/         # ~6 files  — Anthropic client + Gemini art client, narrative generation
+  knowledge/   # ~5 files  — Knowledge/skill loading (YAML healing skills, multi-dir)
+  workers/     # ~3 files  — Celery task workers
+  cli/         # ~2 files  — Command-line entrypoints
+  themes/      #            — Theming assets
+  config.py / email.py     — App settings (extra='ignore' on .env) + Resend email
+tests/         # ~99 files — pytest (api, engine, agents, db, integration, security, workers,
+               #             mcp, llm, safety, accessibility, e2e, load, *-verification)
+infrastructure/            — Dockerfiles + 4 docker-compose variants (dev/prod/deploy) + nginx/postgres/redis
+skills/                    — Healing-swarm + per-pillar skill packs (loaded by knowledge/)
+.github/workflows/         — 5 CI/CD workflows (ci, security, release, prepare-release, diagnose)
 ```
+
+### Recent capabilities (keep this list current)
+
+- **Chat coach** — SSE streaming backend, per-system context + chat history, starter prompts,
+  scope enforcement, safety hardening, coach banner, and a global chat-bubble overlay.
+- **Healing UX** — YAML skills loader (multi-dir), spiral banner, interactive components,
+  accessibility polish; cross-system bridges surfaced via `CrossSystemBridgePanel` on all 5 pages.
+- **Creative Studio** — Gemini generative art with style presets (optional `[gemini]` extra),
+  PDF art integration, journey timeline + personal-brand views.
+- **MCP** — JSON-RPC 2.0 HTTP transport exposing healing skill tools.
 
 ## Architecture
 
@@ -123,6 +144,21 @@ infrastructure/           — 4 Dockerfiles, 4 docker-compose variants
 - All outputs pass through Quality Swarm validation before delivery
 - Financial data classified as Sensitive — encrypted, isolated, never sent to LLM
 - Hub-and-spoke agent architecture: 1 Master Orchestrator → 5 Coordinators → 28 agents
+- Chat coach answers are scope-enforced per system and pass the same safety/ethics gates as reports
+
+### Architecture Decisions (`docs/adr/`)
+
+| ADR | Decision |
+|---|---|
+| 001 | Standalone monorepo structure |
+| 002 | Local-first data architecture |
+| 003 | Healing-Swarm-Skills integration |
+| 004 | Wealth Engine as peer system |
+| 005 | Creative Forge as fourth pillar |
+| 006 | Perspective Prism as fifth pillar |
+| 007 | Alchemical Spiral user journey |
+| 008 | Agent-driven GitHub issue tracking (see workflow below) |
+| 009 | Archon integration — secrets relocation + Docker wrapper |
 
 ## Agent Workflow — GitHub Issue Tracking (ADR-008)
 
