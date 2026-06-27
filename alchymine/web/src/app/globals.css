@@ -160,29 +160,26 @@
   }
 
   /* ── Grain texture overlay ──────────────────────────────────────────────── */
+  /* Static, full-viewport grain. This layer used to be sized at 200% of the
+     viewport (inset: -50%) and re-painted continuously via an infinite
+     `grainDrift` animation, which forced the compositor to repaint a large
+     fixed SVG-noise layer every 0.5s on *every* page — a significant source of
+     jank, dropped frames, and battery drain (especially on mobile). The drift
+     is imperceptible at 2.5% opacity, so the grain is now rendered once as a
+     static overlay. The noise filter octaves were also reduced (4 → 2) to cut
+     the one-time rasterization cost. */
   .grain-overlay {
     position: relative;
   }
   .grain-overlay::before {
     content: "";
     position: fixed;
-    inset: -50%;
-    width: 200%;
-    height: 200%;
+    inset: 0;
     z-index: 100;
     pointer-events: none;
     opacity: 0.025;
-    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='1'/%3E%3C/svg%3E");
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='1'/%3E%3C/svg%3E");
     background-size: 128px 128px;
-    animation: grainDrift 0.5s steps(1) infinite;
-  }
-
-  /* Disable grain noise overlay for users who prefer reduced motion.
-     The feTurbulence SVG filter + animation causes frame drops on mobile. */
-  @media (prefers-reduced-motion: reduce) {
-    .grain-overlay::before {
-      display: none;
-    }
   }
 
   /* ── Atmospheric background mesh ────────────────────────────────────────── */
