@@ -126,6 +126,11 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
+    # WARNING: only safe on EMPTY tables. These columns hold Fernet ciphertext
+    # (~100+ chars, not booleans), so casting populated rows back to
+    # Boolean/String(50) fails loudly (invalid boolean cast / value too long).
+    # Downgrading a populated database requires decrypting via application code
+    # first; that path is intentionally unsupported.
     conn = op.get_bind()
     dialect_name = conn.dialect.name
 

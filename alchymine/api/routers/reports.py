@@ -261,6 +261,91 @@ async def create_report(
     )
 
 
+# ── Diagnostic endpoint ──────────────────────────────────────────────
+# Registered BEFORE /reports/{report_id}: routes match in registration
+# order, so a later literal path would be shadowed by the parameter route.
+
+
+@router.get("/reports/diagnose")
+async def diagnose_reports(
+    session: AsyncSession = Depends(get_db_session),
+    current_user: dict = Depends(get_current_user),
+) -> JSONResponse:
+    """Diagnostic endpoint to check all components needed for report creation.
+
+    Returns a JSON object with pass/fail status for each component.
+    Requires authentication (same as POST /reports).
+    """
+    from sqlalchemy import select, text
+
+    checks: dict[str, dict[str, object]] = {}
+    user_id = current_user["sub"]
+
+    # 1. DB connectivity
+    try:
+        await session.execute(text("SELECT 1"))
+        checks["db_connection"] = {"status": "pass"}
+    except Exception as exc:
+        checks["db_connection"] = {"status": "fail", "error": f"{type(exc).__name__}: {exc}"}
+
+    # 2. User existence (FK target)
+    try:
+        result = await session.execute(select(User.id).where(User.id == user_id))
+        user_row = result.scalar_one_or_none()
+        if user_row:
+            checks["user_exists"] = {"status": "pass", "user_id": user_id}
+        else:
+            checks["user_exists"] = {
+                "status": "fail",
+                "error": f"No user row for JWT sub={user_id}",
+            }
+    except Exception as exc:
+        checks["user_exists"] = {"status": "fail", "error": f"{type(exc).__name__}: {exc}"}
+
+    # 3. Encryption key availability
+    try:
+        from alchymine.db.encryption import _get_fernet
+
+        _get_fernet()
+        checks["encryption_key"] = {"status": "pass"}
+    except Exception as exc:
+        checks["encryption_key"] = {"status": "fail", "error": f"{type(exc).__name__}: {exc}"}
+
+    # 4. Report table writable (insert + rollback)
+    try:
+        test_id = f"diag-{uuid.uuid4()}"
+        from alchymine.db.models import Report
+
+        test_report = Report(id=test_id, status="diagnostic", user_id=None)
+        session.add(test_report)
+        await session.flush()
+        await session.rollback()
+        checks["report_insert"] = {"status": "pass"}
+    except Exception as exc:
+        await session.rollback()
+        checks["report_insert"] = {"status": "fail", "error": f"{type(exc).__name__}: {exc}"}
+
+    # 5. Celery/Redis connectivity
+    try:
+        from alchymine.workers.celery_app import celery_app
+
+        insp = celery_app.control.inspect(timeout=2)
+        ping = insp.ping()
+        if ping:
+            checks["celery_workers"] = {"status": "pass", "workers": list(ping.keys())}
+        else:
+            checks["celery_workers"] = {"status": "warn", "error": "No workers responded"}
+    except Exception as exc:
+        checks["celery_workers"] = {"status": "fail", "error": f"{type(exc).__name__}: {exc}"}
+
+    all_pass = all(c["status"] == "pass" for c in checks.values())
+
+    return JSONResponse(
+        status_code=200 if all_pass else 503,
+        content={"overall": "pass" if all_pass else "fail", "checks": checks},
+    )
+
+
 @router.get("/reports/{report_id}/status")
 async def get_report_status(
     report_id: str,
@@ -462,87 +547,4 @@ async def list_user_reports(
         count=total,
         skip=skip,
         limit=limit,
-    )
-
-
-# ── Diagnostic endpoint ──────────────────────────────────────────────
-
-
-@router.get("/reports/diagnose")
-async def diagnose_reports(
-    session: AsyncSession = Depends(get_db_session),
-    current_user: dict = Depends(get_current_user),
-) -> JSONResponse:
-    """Diagnostic endpoint to check all components needed for report creation.
-
-    Returns a JSON object with pass/fail status for each component.
-    Requires authentication (same as POST /reports).
-    """
-    from sqlalchemy import select, text
-
-    checks: dict[str, dict[str, object]] = {}
-    user_id = current_user["sub"]
-
-    # 1. DB connectivity
-    try:
-        await session.execute(text("SELECT 1"))
-        checks["db_connection"] = {"status": "pass"}
-    except Exception as exc:
-        checks["db_connection"] = {"status": "fail", "error": f"{type(exc).__name__}: {exc}"}
-
-    # 2. User existence (FK target)
-    try:
-        result = await session.execute(select(User.id).where(User.id == user_id))
-        user_row = result.scalar_one_or_none()
-        if user_row:
-            checks["user_exists"] = {"status": "pass", "user_id": user_id}
-        else:
-            checks["user_exists"] = {
-                "status": "fail",
-                "error": f"No user row for JWT sub={user_id}",
-            }
-    except Exception as exc:
-        checks["user_exists"] = {"status": "fail", "error": f"{type(exc).__name__}: {exc}"}
-
-    # 3. Encryption key availability
-    try:
-        from alchymine.db.encryption import _get_fernet
-
-        _get_fernet()
-        checks["encryption_key"] = {"status": "pass"}
-    except Exception as exc:
-        checks["encryption_key"] = {"status": "fail", "error": f"{type(exc).__name__}: {exc}"}
-
-    # 4. Report table writable (insert + rollback)
-    try:
-        test_id = f"diag-{uuid.uuid4()}"
-        from alchymine.db.models import Report
-
-        test_report = Report(id=test_id, status="diagnostic", user_id=None)
-        session.add(test_report)
-        await session.flush()
-        await session.rollback()
-        checks["report_insert"] = {"status": "pass"}
-    except Exception as exc:
-        await session.rollback()
-        checks["report_insert"] = {"status": "fail", "error": f"{type(exc).__name__}: {exc}"}
-
-    # 5. Celery/Redis connectivity
-    try:
-        from alchymine.workers.celery_app import celery_app
-
-        insp = celery_app.control.inspect(timeout=2)
-        ping = insp.ping()
-        if ping:
-            checks["celery_workers"] = {"status": "pass", "workers": list(ping.keys())}
-        else:
-            checks["celery_workers"] = {"status": "warn", "error": "No workers responded"}
-    except Exception as exc:
-        checks["celery_workers"] = {"status": "fail", "error": f"{type(exc).__name__}: {exc}"}
-
-    all_pass = all(c["status"] == "pass" for c in checks.values())
-
-    return JSONResponse(
-        status_code=200 if all_pass else 503,
-        content={"overall": "pass" if all_pass else "fail", "checks": checks},
     )

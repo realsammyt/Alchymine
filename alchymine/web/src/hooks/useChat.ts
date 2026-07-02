@@ -93,7 +93,10 @@ export function useChat(options?: UseChatOptions): UseChatResult {
     fetchChatHistory(systemKey ?? null)
       .then((history) => {
         if (!cancelled && history.length > 0) {
-          setMessages(history);
+          // Never clobber messages sent while history was loading (e.g. the
+          // auto-sent initialPrompt from a coach-banner deep link) — a plain
+          // setMessages(history) would silently erase the in-flight exchange.
+          setMessages((prev) => (prev.length > 0 ? prev : history));
         }
       })
       .catch(() => {

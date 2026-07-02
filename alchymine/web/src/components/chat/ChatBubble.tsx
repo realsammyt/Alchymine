@@ -207,7 +207,7 @@ export default function ChatBubble() {
         type="button"
         aria-label="Open chat"
         onClick={openChat}
-        className="fixed bottom-6 right-6 z-50 flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-br from-primary to-secondary shadow-lg shadow-black/30 transition-transform hover:scale-105 active:scale-95"
+        className="fixed top-3 right-4 z-50 flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-br from-primary to-secondary shadow-lg shadow-black/30 transition-transform hover:scale-105 active:scale-95 lg:top-4 lg:right-6"
       >
         <svg
           aria-hidden
@@ -246,7 +246,7 @@ export default function ChatBubble() {
 
   // ---- Panel mode --------------------------------------------------------
   return (
-    <div className="fixed bottom-0 right-0 z-50 flex h-full w-full flex-col bg-bg sm:bottom-4 sm:right-4 sm:h-[500px] sm:w-[400px] sm:overflow-hidden sm:rounded-2xl sm:border sm:border-white/10 sm:shadow-2xl sm:shadow-black/40">
+    <div className="fixed inset-0 z-50 flex h-full w-full flex-col bg-bg sm:inset-auto sm:top-16 sm:right-4 sm:h-[500px] sm:w-[400px] sm:overflow-hidden sm:rounded-2xl sm:border sm:border-white/10 sm:shadow-2xl sm:shadow-black/40">
       <ChatHeader
         systemKey={systemKey}
         mode="panel"

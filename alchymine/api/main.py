@@ -101,8 +101,13 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# Middleware (outermost first — execution order is bottom-to-top)
+# Middleware (innermost first — last added is outermost).
+# CORS must be added AFTER RateLimit so it wraps it: otherwise 429
+# short-circuit responses carry no CORS headers (browsers then surface a
+# generic network error) and OPTIONS preflights count against the limit.
 app.add_middleware(ErrorHandlerMiddleware)
+app.add_middleware(RequestLoggingMiddleware)
+app.add_middleware(RateLimitMiddleware)  # type: ignore[arg-type]
 app.add_middleware(
     CORSMiddleware,
     allow_origins=get_settings().get_allowed_origins(),
@@ -110,8 +115,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-app.add_middleware(RequestLoggingMiddleware)
-app.add_middleware(RateLimitMiddleware)  # type: ignore[arg-type]
 app.add_middleware(RequestIdMiddleware)
 
 # Routers

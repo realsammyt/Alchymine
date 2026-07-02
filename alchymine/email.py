@@ -6,6 +6,7 @@ when no API key is configured (useful for local development).
 
 from __future__ import annotations
 
+import html
 import logging
 from datetime import datetime
 
@@ -83,8 +84,12 @@ async def send_feedback_notification_email(
         return False
 
     admin_panel_url = f"{settings.frontend_url}/admin/feedback"
+    # Feedback is an unauthenticated public endpoint — escape everything
+    # user-supplied before interpolating into the HTML body.
+    category = html.escape(category)
+    message = html.escape(message)
     sender_line = (
-        f"<p><strong>From:</strong> {email}</p>"
+        f"<p><strong>From:</strong> {html.escape(email)}</p>"
         if email
         else "<p><strong>From:</strong> <em>anonymous</em></p>"
     )
