@@ -117,26 +117,35 @@ def sample_report_result():
         "profile_summary": {
             "identity": {
                 "numerology": {
-                    "life_path": 7, "expression": 3, "soul_urge": 5,
-                    "personality": 8, "personal_year": 4, "maturity": 1,
+                    "life_path": 7,
+                    "expression": 3,
+                    "soul_urge": 5,
+                    "personality": 8,
+                    "personal_year": 4,
+                    "maturity": 1,
                     "is_master_number": False,
                 },
                 "astrology": {
-                    "sun_sign": "Pisces", "moon_sign": "Leo",
+                    "sun_sign": "Pisces",
+                    "moon_sign": "Leo",
                     "rising_sign": "Virgo",
                 },
                 "archetype": {
-                    "primary": "sage", "secondary": "explorer",
+                    "primary": "sage",
+                    "secondary": "explorer",
                     "shadow": "Detachment",
                 },
                 "personality": {
                     "big_five": {
-                        "openness": 85, "conscientiousness": 70,
-                        "extraversion": 35, "agreeableness": 65,
+                        "openness": 85,
+                        "conscientiousness": 70,
+                        "extraversion": 35,
+                        "agreeableness": 65,
                         "neuroticism": 30,
                     },
                     "attachment_style": "secure",
-                    "enneagram_type": 5, "enneagram_wing": 4,
+                    "enneagram_type": 5,
+                    "enneagram_wing": 4,
                 },
                 "strengths_map": ["Analytical Thinking", "Creative Vision", "Deep Focus"],
             },
@@ -191,7 +200,11 @@ def _patch_pw(mock_fn):
 
 
 async def _seed_report(session, rid, result, pdf_data=None):
-    await repository.create_report(session, report_id=rid, status="complete", user_input="test")
+    # created_by_sub matches the conftest test user ("user-1") so the
+    # ownership check on the PDF endpoint grants access.
+    await repository.create_report(
+        session, report_id=rid, status="complete", user_input="test", created_by_sub="user-1"
+    )
     await repository.update_report_content(session, rid, result=result, status="complete")
     if pdf_data is not None:
         report = await repository.get_report(session, rid)
@@ -278,6 +291,7 @@ class TestPDFRenderer:
             result = await PDFRenderer().render_pdf("<html><body>T</body></html>", output_path=out)
         assert result == fake_pdf_bytes
         from pathlib import Path
+
         assert Path(out).read_bytes() == fake_pdf_bytes
 
     @pytest.mark.asyncio
@@ -299,7 +313,9 @@ class TestPdfEndpoint:
         assert resp.headers["content-type"] == "application/pdf"
 
     @pytest.mark.asyncio
-    async def test_pdf_attachment_header(self, client, session, sample_report_result, fake_pdf_bytes):
+    async def test_pdf_attachment_header(
+        self, client, session, sample_report_result, fake_pdf_bytes
+    ):
         await _seed_report(session, "pdf-123", sample_report_result, pdf_data=fake_pdf_bytes)
         resp = client.get("/api/v1/reports/pdf-123/pdf")
         assert "attachment" in resp.headers["content-disposition"]
@@ -317,7 +333,13 @@ class TestPdfEndpoint:
 
     @pytest.mark.asyncio
     async def test_pdf_404_incomplete(self, client, session):
-        await repository.create_report(session, report_id="gen-id", status="generating", user_input="t")
+        await repository.create_report(
+            session,
+            report_id="gen-id",
+            status="generating",
+            user_input="t",
+            created_by_sub="user-1",
+        )
         await session.commit()
         resp = client.get("/api/v1/reports/gen-id/pdf")
         assert resp.status_code == 404

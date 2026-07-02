@@ -101,7 +101,7 @@ class TestMigrationCompleteness:
             rows = result.fetchall()
 
         assert len(rows) == 1, f"Expected 1 head revision, got {len(rows)}: {rows}"
-        assert rows[0][0] == "0013", f"Expected head at 0013, got {rows[0][0]}"
+        assert rows[0][0] == "0015", f"Expected head at 0015, got {rows[0][0]}"
 
     def test_reports_table_has_all_columns(self, fresh_migration_engine):
         """Reports table (added in migration 0006) has all expected columns."""
@@ -110,6 +110,7 @@ class TestMigrationCompleteness:
         expected = {
             "id",
             "user_id",
+            "created_by_sub",
             "report_type",
             "status",
             "user_input",
@@ -124,6 +125,26 @@ class TestMigrationCompleteness:
         }
         missing = expected - cols
         assert not missing, f"Reports columns missing: {missing}"
+
+    def test_intake_data_table_has_all_columns(self, fresh_migration_engine):
+        """Intake data table has all expected columns (birth_timezone added in 0014)."""
+        inspector = inspect(fresh_migration_engine)
+        cols = {c["name"] for c in inspector.get_columns("intake_data")}
+        expected = {
+            "id",
+            "user_id",
+            "full_name",
+            "birth_date",
+            "birth_time",
+            "birth_city",
+            "birth_timezone",
+            "intention",
+            "intentions",
+            "assessment_responses",
+            "family_structure",
+        }
+        missing = expected - cols
+        assert not missing, f"Intake data columns missing: {missing}"
 
     def test_journal_entries_table_has_all_columns(self, fresh_migration_engine):
         """Journal entries table (added in migration 0006) has all expected columns."""
@@ -219,6 +240,6 @@ class TestStampAndUpgrade:
         with engine.connect() as conn:
             result = conn.execute(text("SELECT version_num FROM alembic_version"))
             version = result.scalar_one()
-        assert version == "0013", f"Expected 0013, got {version}"
+        assert version == "0015", f"Expected 0015, got {version}"
 
         engine.dispose()

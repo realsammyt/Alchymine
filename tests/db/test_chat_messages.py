@@ -229,9 +229,7 @@ async def test_get_chat_history_filter_none_returns_all(session: AsyncSession) -
     await save_chat_message(
         session, user_id=user.id, role="user", content="b", system_key="healing"
     )
-    await save_chat_message(
-        session, user_id=user.id, role="user", content="c", system_key="wealth"
-    )
+    await save_chat_message(session, user_id=user.id, role="user", content="c", system_key="wealth")
 
     history = await get_chat_history(session, user_id=user.id)
     assert [m.content for m in history] == ["a", "b", "c"]
@@ -248,9 +246,7 @@ async def test_get_chat_history_respects_limit(session: AsyncSession) -> None:
     await session.flush()
 
     for i in range(10):
-        await save_chat_message(
-            session, user_id=user.id, role="user", content=f"msg-{i:02d}"
-        )
+        await save_chat_message(session, user_id=user.id, role="user", content=f"msg-{i:02d}")
 
     history = await get_chat_history(session, user_id=user.id, limit=3)
     assert len(history) == 3

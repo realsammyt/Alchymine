@@ -244,9 +244,7 @@ class TestGenerateReportTask:
             assert result["request_id"] == "fake-request-id"
 
             # Verify DB state
-            report = _run_async(
-                _get_report_from_db(engine, "test-report-1")
-            )
+            report = _run_async(_get_report_from_db(engine, "test-report-1"))
             assert report is not None
             assert report.status == "complete"
 
@@ -258,9 +256,7 @@ class TestGenerateReportTask:
 
             generate_report.apply(args=["test-transitions", "test input"]).get()
 
-            report = _run_async(
-                _get_report_from_db(engine, "test-transitions")
-            )
+            report = _run_async(_get_report_from_db(engine, "test-transitions"))
             assert report is not None
             assert report.status == "complete"
 
@@ -272,9 +268,7 @@ class TestGenerateReportTask:
 
             result = generate_report.apply(args=["test-fail-1", "bad input"]).get()
 
-            report = _run_async(
-                _get_report_from_db(engine, "test-fail-1")
-            )
+            report = _run_async(_get_report_from_db(engine, "test-fail-1"))
             assert report is not None
             assert report.status == "failed"
             assert "Something went wrong" in report.error
@@ -288,9 +282,7 @@ class TestGenerateReportTask:
 
             generate_report.apply(args=["new-report", "test input"]).get()
 
-            report = _run_async(
-                _get_report_from_db(engine, "new-report")
-            )
+            report = _run_async(_get_report_from_db(engine, "new-report"))
             assert report is not None
             assert report.status == "complete"
 
@@ -302,9 +294,7 @@ class TestGenerateReportTask:
 
             generate_report.apply(args=["test-result-stored", "numerology please"]).get()
 
-            report = _run_async(
-                _get_report_from_db(engine, "test-result-stored")
-            )
+            report = _run_async(_get_report_from_db(engine, "test-result-stored"))
             assert report is not None
             assert report.result is not None
             assert report.result["request_id"] == "fake-request-id"
@@ -355,9 +345,7 @@ class TestGenerateReportTask:
             with pytest.raises(Exception):
                 generate_report.apply(args=["test-conn-err", "test"]).get()
 
-            report = _run_async(
-                _get_report_from_db(engine, "test-conn-err")
-            )
+            report = _run_async(_get_report_from_db(engine, "test-conn-err"))
             assert report is not None
             # On first retry attempt, status should stay "generating", not "failed"
             assert report.status == "generating"
@@ -371,9 +359,7 @@ class TestGenerateReportTask:
             with pytest.raises(Exception):
                 generate_report.apply(args=["test-timeout", "test"]).get()
 
-            report = _run_async(
-                _get_report_from_db(engine, "test-timeout")
-            )
+            report = _run_async(_get_report_from_db(engine, "test-timeout"))
             assert report is not None
             # On first retry attempt, status should stay "generating", not "failed"
             assert report.status == "generating"

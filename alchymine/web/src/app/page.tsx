@@ -123,7 +123,7 @@ const TRUST_CARDS = [
   {
     title: "Math-Only Finance",
     description:
-      "All financial calculations are deterministic. No AI generates your numbers. Encrypted at rest, never sent to any LLM.",
+      "All financial calculations are deterministic. No AI generates your numbers. Encrypted at rest; our servers never send your financial data to any LLM.",
     icon: "lock",
   },
   {

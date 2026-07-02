@@ -2,6 +2,13 @@
 
 Provides a lightweight MCP-compatible server that exposes
 engine capabilities as tools with JSON Schema validation.
+
+Trust boundary: MCP tool arguments arrive from the calling client
+(typically the user's own LLM), so they pass through that client's
+context by design. The "sensitive data never sent to LLMs" invariant
+applies to Alchymine's server-side pipeline, which never forwards
+stored user data to any LLM; it does not — and cannot — cover data
+the user chooses to supply through their own client.
 """
 
 from __future__ import annotations

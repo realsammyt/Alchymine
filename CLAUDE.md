@@ -1,5 +1,13 @@
 # Alchymine — Claude Code Configuration
 
+## Session Handoff (READ FIRST)
+
+`HANDOFF.md` at the repo root is the living state file for ongoing work: status,
+locked decisions, open questions, next action. Read it before starting work;
+update it (status table + one activity-log line + `Last updated`) before ending
+any session that touched the work. Reality wins over the doc — verify live, then
+fix the doc.
+
 ## Project Overview
 
 Alchymine is an open-source, AI-powered Personal Transformation Operating System
@@ -121,7 +129,7 @@ infrastructure/           — 4 Dockerfiles, 4 docker-compose variants
 - Five systems share data through a unified UserProfile v2.0 (Pydantic model)
 - All financial calculations are deterministic (never LLM-generated)
 - All outputs pass through Quality Swarm validation before delivery
-- Financial data classified as Sensitive — encrypted, isolated, never sent to LLM
+- Financial data classified as Sensitive — encrypted, isolated; the server pipeline never sends stored financial data to any LLM. Exception: MCP tool inputs are user-supplied through the user's own LLM client and pass through that client's context
 - Hub-and-spoke agent architecture: 1 Master Orchestrator → 5 Coordinators → 28 agents
 
 ## Agent Workflow — GitHub Issue Tracking (ADR-008)

@@ -66,9 +66,47 @@ interface IntakeFormData {
   fullName: string;
   birthDate: string;
   birthTime: string;
+  birthTimezone: string;
   birthCity: string;
   intentions: string[];
   wealthContext: WealthContext;
+}
+
+// Major IANA zones per continent. The auto-detected zone is added to the
+// select when it isn't already in this list.
+const COMMON_TIMEZONES = [
+  "America/Los_Angeles",
+  "America/Denver",
+  "America/Chicago",
+  "America/New_York",
+  "America/Toronto",
+  "America/Mexico_City",
+  "America/Sao_Paulo",
+  "America/Argentina/Buenos_Aires",
+  "UTC",
+  "Europe/London",
+  "Europe/Paris",
+  "Europe/Berlin",
+  "Europe/Moscow",
+  "Africa/Cairo",
+  "Africa/Lagos",
+  "Africa/Johannesburg",
+  "Asia/Dubai",
+  "Asia/Kolkata",
+  "Asia/Bangkok",
+  "Asia/Shanghai",
+  "Asia/Singapore",
+  "Asia/Tokyo",
+  "Australia/Sydney",
+  "Pacific/Auckland",
+] as const;
+
+function detectTimezone(): string {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone ?? "";
+  } catch {
+    return "";
+  }
 }
 
 const MAX_INTENTIONS = 3;
@@ -169,6 +207,7 @@ export default function IntakePage() {
     fullName: "",
     birthDate: "",
     birthTime: "",
+    birthTimezone: "",
     birthCity: "",
     intentions: [],
     wealthContext: { ...EMPTY_WEALTH_CONTEXT },
@@ -176,6 +215,14 @@ export default function IntakePage() {
   const [errors, setErrors] = useState<
     Partial<Record<keyof IntakeFormData | "intentions", string>>
   >({});
+
+  // Auto-detect the browser timezone after mount (avoids SSR mismatch).
+  // A saved or user-chosen zone is never overwritten.
+  useEffect(() => {
+    setFormData((prev) =>
+      prev.birthTimezone ? prev : { ...prev, birthTimezone: detectTimezone() },
+    );
+  }, []);
 
   // Pre-fill from saved profile (enables cross-device sync)
   useEffect(() => {
@@ -188,6 +235,8 @@ export default function IntakePage() {
             fullName: profile.intake!.full_name || prev.fullName,
             birthDate: profile.intake!.birth_date || prev.birthDate,
             birthTime: profile.intake!.birth_time || prev.birthTime,
+            birthTimezone:
+              profile.intake!.birth_timezone || prev.birthTimezone,
             birthCity: profile.intake!.birth_city || prev.birthCity,
             intentions: profile.intake!.intentions?.length
               ? profile.intake!.intentions
@@ -277,6 +326,7 @@ export default function IntakePage() {
         full_name: formData.fullName,
         birth_date: formData.birthDate,
         birth_time: formData.birthTime || null,
+        birth_timezone: formData.birthTimezone || null,
         birth_city: formData.birthCity || null,
         intention: formData.intentions[0],
         intentions: formData.intentions,
@@ -414,6 +464,45 @@ export default function IntakePage() {
                 }
                 className={inputClass}
               />
+            </div>
+
+            {/* Birth Timezone (auto-detected, pairs with birth time) */}
+            <div>
+              <label
+                htmlFor="birthTimezone"
+                className="block text-sm font-body font-medium text-text/60 mb-2"
+              >
+                Birth Timezone{" "}
+                <span className="text-text/25 font-normal">
+                  (auto-detected — the local timezone where you were born)
+                </span>
+              </label>
+              <select
+                id="birthTimezone"
+                value={formData.birthTimezone}
+                onChange={(e) =>
+                  setFormData((prev) => ({
+                    ...prev,
+                    birthTimezone: e.target.value,
+                  }))
+                }
+                className={`${inputClass} [&>option]:bg-[#141420] [&>option]:text-text`}
+              >
+                <option value="">Not sure (use time as entered)</option>
+                {formData.birthTimezone &&
+                  !COMMON_TIMEZONES.includes(
+                    formData.birthTimezone as (typeof COMMON_TIMEZONES)[number],
+                  ) && (
+                    <option value={formData.birthTimezone}>
+                      {formData.birthTimezone.replace(/_/g, " ")} (detected)
+                    </option>
+                  )}
+                {COMMON_TIMEZONES.map((tz) => (
+                  <option key={tz} value={tz}>
+                    {tz.replace(/_/g, " ")}
+                  </option>
+                ))}
+              </select>
             </div>
 
             {/* Birth City (optional) */}

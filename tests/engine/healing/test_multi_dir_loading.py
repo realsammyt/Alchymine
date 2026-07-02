@@ -127,9 +127,7 @@ class TestMultiDirectoryLoading:
         with pytest.raises(SkillNotFoundError):
             reg.get("bundled-breathwork")
 
-    def test_cross_directory_duplicate_raises(
-        self, bundled_dir: Path, tmp_path: Path
-    ) -> None:
+    def test_cross_directory_duplicate_raises(self, bundled_dir: Path, tmp_path: Path) -> None:
         """Duplicate skill name across directories raises SkillValidationError."""
         dup_dir = tmp_path / "dup"
         dup_dir.mkdir()
@@ -154,9 +152,7 @@ class TestMultiDirectoryLoading:
         with pytest.raises(SkillValidationError, match="Duplicate"):
             reg.load_directory(dup_dir, replace=False)
 
-    def test_empty_external_directory_is_fine(
-        self, bundled_dir: Path, tmp_path: Path
-    ) -> None:
+    def test_empty_external_directory_is_fine(self, bundled_dir: Path, tmp_path: Path) -> None:
         """Loading an empty external directory adds nothing."""
         empty_dir = tmp_path / "empty"
         empty_dir.mkdir()
@@ -174,9 +170,7 @@ class TestMultiDirectoryLoading:
         with pytest.raises(FileNotFoundError):
             reg.load_directory(Path("/nonexistent/path"), replace=False)
 
-    def test_list_by_modality_spans_both_dirs(
-        self, bundled_dir: Path, external_dir: Path
-    ) -> None:
+    def test_list_by_modality_spans_both_dirs(self, bundled_dir: Path, external_dir: Path) -> None:
         """list_by_modality works across merged directories."""
         reg = SkillRegistry()
         reg.load_directory(bundled_dir)
@@ -189,9 +183,7 @@ class TestMultiDirectoryLoading:
         assert breath[0].name == "bundled-breathwork"
         assert nature[0].name == "external-nature"
 
-    def test_list_all_spans_both_dirs(
-        self, bundled_dir: Path, external_dir: Path
-    ) -> None:
+    def test_list_all_spans_both_dirs(self, bundled_dir: Path, external_dir: Path) -> None:
         """list_all returns all skills from all loaded directories."""
         reg = SkillRegistry()
         reg.load_directory(bundled_dir)

@@ -224,7 +224,9 @@ class TestLeverPrioritization:
         levers_family = prioritize_levers(
             None, RiskTolerance.MODERATE, [Intention.FAMILY], life_path=6
         )
-        levers_money = prioritize_levers(None, RiskTolerance.MODERATE, [Intention.MONEY], life_path=6)
+        levers_money = prioritize_levers(
+            None, RiskTolerance.MODERATE, [Intention.MONEY], life_path=6
+        )
         # PROTECT should be higher with family intention
         assert levers_family.index(WealthLever.PROTECT) < levers_money.index(WealthLever.PROTECT)
 

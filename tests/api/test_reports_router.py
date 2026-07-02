@@ -344,6 +344,129 @@ class TestReportOwnershipIDOR:
         assert response.json()["detail"] == "Access denied"
 
 
+# ── Orphan reports: created_by_sub ownership ──────────────────────────────
+
+
+def _seed_report(
+    engine,
+    report_id: str,
+    *,
+    user_id: str | None,
+    created_by_sub: str | None,
+    status: str = "complete",
+) -> None:
+    """Directly insert a report row with explicit ownership columns."""
+    from alchymine.db.base import get_async_session_factory
+    from alchymine.workers.tasks import _run_async
+
+    async def _insert():
+        factory = get_async_session_factory(engine)
+        async with factory() as sess:
+            await repository.create_report(
+                sess,
+                report_id=report_id,
+                status=status,
+                user_id=user_id,
+                created_by_sub=created_by_sub,
+            )
+            await sess.commit()
+
+    _run_async(_insert())
+
+
+class TestOrphanReportOwnership:
+    """Orphan reports (user_id NULL) are owned via created_by_sub.
+
+    Regression tests for the IDOR where a report created with
+    user_id=None (JWT sub had no users row) was readable by ANY
+    authenticated user.
+    """
+
+    _ENDPOINTS = ("/status", "", "/html", "/pdf")
+
+    def test_post_without_user_row_sets_created_by_sub(self, client: TestClient, engine) -> None:
+        """POST /reports stores the JWT sub even when no user row exists."""
+        resp = client.post("/api/v1/reports", json=_valid_report_payload())
+        assert resp.status_code == 202
+        report_id = resp.json()["id"]
+
+        from alchymine.db.base import get_async_session_factory
+        from alchymine.workers.tasks import _run_async
+
+        async def _fetch():
+            factory = get_async_session_factory(engine)
+            async with factory() as sess:
+                return await repository.get_report(sess, report_id)
+
+        report = _run_async(_fetch())
+        assert report is not None
+        assert report.user_id is None  # no user row — orphan report
+        assert report.created_by_sub == _TEST_USER_ID
+
+    def test_post_with_user_row_sets_created_by_sub(self, seeded_client, engine) -> None:
+        """created_by_sub is ALWAYS set, even when user_id is also set."""
+        resp = seeded_client.post("/api/v1/reports", json=_valid_report_payload())
+        assert resp.status_code == 202
+        report_id = resp.json()["id"]
+
+        from alchymine.db.base import get_async_session_factory
+        from alchymine.workers.tasks import _run_async
+
+        async def _fetch():
+            factory = get_async_session_factory(engine)
+            async with factory() as sess:
+                return await repository.get_report(sess, report_id)
+
+        report = _run_async(_fetch())
+        assert report is not None
+        assert report.user_id == _TEST_USER_ID
+        assert report.created_by_sub == _TEST_USER_ID
+
+    def test_orphan_report_readable_by_creator_sub(self, client: TestClient, engine) -> None:
+        """An orphan report is accessible to the sub that created it."""
+        report_id = "orphan-own-001"
+        _seed_report(engine, report_id, user_id=None, created_by_sub=_TEST_USER_ID)
+
+        assert client.get(f"/api/v1/reports/{report_id}/status").status_code == 200
+        assert client.get(f"/api/v1/reports/{report_id}").status_code == 200
+        assert client.get(f"/api/v1/reports/{report_id}/html").status_code == 200
+        # PDF passes the ownership check but 404s because no PDF was generated.
+        pdf_resp = client.get(f"/api/v1/reports/{report_id}/pdf")
+        assert pdf_resp.status_code == 404
+        assert pdf_resp.json()["detail"] == "PDF has not been generated for this report"
+
+    def test_orphan_report_403_for_other_user(self, client: TestClient, engine) -> None:
+        """An orphan report created by another sub returns 403 on every endpoint."""
+        report_id = "orphan-foreign-001"
+        _seed_report(engine, report_id, user_id=None, created_by_sub=_OTHER_USER_ID)
+
+        for suffix in self._ENDPOINTS:
+            response = client.get(f"/api/v1/reports/{report_id}{suffix}")
+            assert response.status_code == 403, f"{suffix or '/'} should be 403"
+            assert response.json()["detail"] == "Access denied"
+
+    def test_legacy_orphan_report_403_for_everyone(self, client: TestClient, engine) -> None:
+        """A legacy orphan row (user_id AND created_by_sub NULL) is inaccessible."""
+        report_id = "orphan-legacy-001"
+        _seed_report(engine, report_id, user_id=None, created_by_sub=None)
+
+        for suffix in self._ENDPOINTS:
+            response = client.get(f"/api/v1/reports/{report_id}{suffix}")
+            assert response.status_code == 403, f"{suffix or '/'} should be 403"
+            assert response.json()["detail"] == "Access denied"
+
+    def test_list_includes_orphans_owned_by_creator_sub(self, client: TestClient, engine) -> None:
+        """GET /reports/user/{id} lists orphan reports owned via created_by_sub."""
+        _seed_report(engine, "orphan-list-001", user_id=None, created_by_sub=_TEST_USER_ID)
+        _seed_report(engine, "orphan-list-002", user_id=None, created_by_sub=_OTHER_USER_ID)
+
+        response = client.get(f"/api/v1/reports/user/{_TEST_USER_ID}")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["count"] == 1
+        assert [r["id"] for r in data["reports"]] == ["orphan-list-001"]
+
+
 # ── Intake persistence via POST /reports ─────────────────────────────
 
 
@@ -368,6 +491,7 @@ def _intake_report_payload() -> dict:
             "birth_date": "1990-05-15",
             "birth_time": "14:30",
             "birth_city": "Portland",
+            "birth_timezone": "America/Los_Angeles",
             "intention": "career",
             "intentions": ["career", "money"],
             "assessment_responses": {"bf_e1": 4, "bf_e2": 3, "bf_a1": 5},
@@ -400,6 +524,7 @@ class TestIntakePersistence:
                 assert intake is not None, "Intake data was NOT persisted to DB"
                 assert intake.full_name == "Test User"
                 assert intake.intention == "career"
+                assert intake.birth_timezone == "America/Los_Angeles"
                 assert intake.assessment_responses == {"bf_e1": 4, "bf_e2": 3, "bf_a1": 5}
 
         asyncio.get_event_loop().run_until_complete(_verify())

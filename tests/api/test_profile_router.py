@@ -23,8 +23,8 @@ from sqlalchemy.ext.asyncio import (
 import alchymine.db.models  # noqa: F401
 from alchymine.api.auth import get_current_admin, get_current_user
 from alchymine.api.deps import get_db_session
-from alchymine.db.base import Base
 from alchymine.db import repository
+from alchymine.db.base import Base
 from alchymine.db.models import User
 
 # ─── Test fixtures ─────────────────────────────────────────────────────
@@ -116,7 +116,12 @@ async def admin_client(
                 raise
 
     async def _admin_user() -> dict:
-        return {"sub": TEST_USER_ID, "email": "admin@example.com", "is_admin": True, "type": "access"}
+        return {
+            "sub": TEST_USER_ID,
+            "email": "admin@example.com",
+            "is_admin": True,
+            "type": "access",
+        }
 
     async def _admin_user_obj() -> User:
         """Return a mock admin User ORM object for get_current_admin override."""
@@ -229,6 +234,75 @@ async def test_create_profile_validation_short_name(client: AsyncClient) -> None
         },
     )
     assert resp.status_code == 422
+
+
+# ─── POST /api/v1/profile — birth_timezone ────────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_create_profile_with_birth_timezone(client: AsyncClient) -> None:
+    """POST with a valid IANA birth_timezone stores and returns it."""
+    resp = await client.post(
+        "/api/v1/profile",
+        json={**_VALID_PROFILE, "birth_timezone": "America/Toronto"},
+    )
+    assert resp.status_code == 201
+    data = resp.json()
+    assert data["intake"]["birth_timezone"] == "America/Toronto"
+
+    # Round-trip: GET returns the persisted timezone
+    get_resp = await client.get(f"/api/v1/profile/{data['id']}")
+    assert get_resp.status_code == 200
+    assert get_resp.json()["intake"]["birth_timezone"] == "America/Toronto"
+
+
+@pytest.mark.asyncio
+async def test_create_profile_without_birth_timezone(client: AsyncClient) -> None:
+    """birth_timezone is optional — omitting it returns None (legacy behavior)."""
+    resp = await client.post("/api/v1/profile", json=_VALID_PROFILE)
+    assert resp.status_code == 201
+    assert resp.json()["intake"]["birth_timezone"] is None
+
+
+@pytest.mark.asyncio
+async def test_create_profile_invalid_birth_timezone_returns_422(client: AsyncClient) -> None:
+    """POST with a non-IANA timezone string returns 422."""
+    resp = await client.post(
+        "/api/v1/profile",
+        json={**_VALID_PROFILE, "birth_timezone": "Not/A_Real_Zone"},
+    )
+    assert resp.status_code == 422
+    assert "Invalid IANA timezone" in resp.text
+
+
+@pytest.mark.asyncio
+async def test_update_intake_layer_birth_timezone(client: AsyncClient) -> None:
+    """PUT intake layer with a valid birth_timezone persists it."""
+    create_resp = await client.post("/api/v1/profile", json=_VALID_PROFILE)
+    user_id = create_resp.json()["id"]
+
+    resp = await client.put(
+        f"/api/v1/profile/{user_id}/intake",
+        json={"data": {"birth_timezone": "Europe/Paris"}},
+    )
+    assert resp.status_code == 200
+    assert resp.json()["intake"]["birth_timezone"] == "Europe/Paris"
+
+
+@pytest.mark.asyncio
+async def test_update_intake_layer_invalid_birth_timezone_returns_422(
+    client: AsyncClient,
+) -> None:
+    """PUT intake layer with an invalid timezone returns 422."""
+    create_resp = await client.post("/api/v1/profile", json=_VALID_PROFILE)
+    user_id = create_resp.json()["id"]
+
+    resp = await client.put(
+        f"/api/v1/profile/{user_id}/intake",
+        json={"data": {"birth_timezone": "EST5EDT/Bogus"}},
+    )
+    assert resp.status_code == 422
+    assert "Invalid IANA timezone" in resp.json()["detail"]
 
 
 # ─── POST /api/v1/profile — Create with intentions ───────────────────

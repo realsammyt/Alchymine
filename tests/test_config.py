@@ -192,7 +192,6 @@ class TestJWTValidation:
         assert s.jwt_secret_key == "production-secret-that-is-long-enough-abc"  # noqa: S105
 
 
-
 # ─── CORS Origins Parsing ─────────────────────────────────────────────────
 
 

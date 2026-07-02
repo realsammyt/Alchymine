@@ -5,6 +5,7 @@ Public API:
     approximate_sun_sign        — Date-based sun sign approximation
     approximate_sun_degree      — Approximate ecliptic longitude
     approximate_ascendant       — Rising sign approximation
+    birth_datetime_to_utc       — Local birth moment → UTC conversion
     calculate_house_cusps       — House cusp calculation
     HouseSystem                 — House system enum
 
@@ -38,6 +39,7 @@ from .chart import (
     approximate_ascendant,
     approximate_sun_degree,
     approximate_sun_sign,
+    birth_datetime_to_utc,
     calculate_house_cusps,
     calculate_natal_chart,
 )
@@ -56,6 +58,7 @@ __all__ = [
     "approximate_sun_sign",
     "approximate_sun_degree",
     "approximate_ascendant",
+    "birth_datetime_to_utc",
     "calculate_house_cusps",
     "HouseSystem",
     # Aspects

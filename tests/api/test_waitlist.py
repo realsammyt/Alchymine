@@ -270,9 +270,7 @@ class TestInviteWaitlistEntries:
         assert data["results"][0]["entry_id"] == seeded_waitlist_entry.id
         assert len(data["results"][0]["invite_code"]) > 8
 
-    def test_invite_skips_non_pending_entries(
-        self, admin_client: TestClient, db_session_factory
-    ):
+    def test_invite_skips_non_pending_entries(self, admin_client: TestClient, db_session_factory):
         """Non-pending entries should be skipped and counted in total_skipped."""
 
         async def _create_invited():
@@ -299,9 +297,7 @@ class TestInviteWaitlistEntries:
         self, admin_client: TestClient, seeded_waitlist_entry: WaitlistEntry
     ):
         """Email failure should not block the response — code is still created."""
-        with patch.object(
-            admin_module, "send_invitation_email", new=AsyncMock(return_value=False)
-        ):
+        with patch.object(admin_module, "send_invitation_email", new=AsyncMock(return_value=False)):
             response = admin_client.post(
                 "/api/v1/admin/waitlist/invite",
                 json={"entry_ids": [seeded_waitlist_entry.id]},
@@ -330,9 +326,7 @@ class TestDeleteWaitlistEntry:
         self, admin_client: TestClient, seeded_waitlist_entry: WaitlistEntry
     ):
         """Deleting an existing entry should return 204."""
-        response = admin_client.delete(
-            f"/api/v1/admin/waitlist/{seeded_waitlist_entry.id}"
-        )
+        response = admin_client.delete(f"/api/v1/admin/waitlist/{seeded_waitlist_entry.id}")
         assert response.status_code == 204
 
     def test_delete_removes_entry_from_list(

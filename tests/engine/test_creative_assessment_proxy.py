@@ -138,8 +138,12 @@ class TestDeriveProductionMode:
     def test_polish_mode(self) -> None:
         """High elaboration + high conscientiousness → POLISH."""
         guilford = GuilfordScores(
-            fluency=50, flexibility=50, originality=50,
-            elaboration=80, sensitivity=50, redefinition=50,
+            fluency=50,
+            flexibility=50,
+            originality=50,
+            elaboration=80,
+            sensitivity=50,
+            redefinition=50,
         )
         result = derive_production_mode(guilford, conscientiousness=80)
         assert result == CreativeProductionMode.POLISH
@@ -147,8 +151,12 @@ class TestDeriveProductionMode:
     def test_sprint_mode(self) -> None:
         """High fluency + low conscientiousness → SPRINT."""
         guilford = GuilfordScores(
-            fluency=80, flexibility=50, originality=50,
-            elaboration=50, sensitivity=50, redefinition=50,
+            fluency=80,
+            flexibility=50,
+            originality=50,
+            elaboration=50,
+            sensitivity=50,
+            redefinition=50,
         )
         result = derive_production_mode(guilford, conscientiousness=30)
         assert result == CreativeProductionMode.SPRINT
@@ -156,8 +164,12 @@ class TestDeriveProductionMode:
     def test_marathon_mode(self) -> None:
         """High conscientiousness + low fluency → MARATHON."""
         guilford = GuilfordScores(
-            fluency=40, flexibility=50, originality=50,
-            elaboration=50, sensitivity=50, redefinition=50,
+            fluency=40,
+            flexibility=50,
+            originality=50,
+            elaboration=50,
+            sensitivity=50,
+            redefinition=50,
         )
         result = derive_production_mode(guilford, conscientiousness=70)
         assert result == CreativeProductionMode.MARATHON
@@ -165,8 +177,12 @@ class TestDeriveProductionMode:
     def test_harvest_mode(self) -> None:
         """No specific pattern → HARVEST (default)."""
         guilford = GuilfordScores(
-            fluency=50, flexibility=50, originality=50,
-            elaboration=50, sensitivity=50, redefinition=50,
+            fluency=50,
+            flexibility=50,
+            originality=50,
+            elaboration=50,
+            sensitivity=50,
+            redefinition=50,
         )
         result = derive_production_mode(guilford, conscientiousness=50)
         assert result == CreativeProductionMode.HARVEST
@@ -174,8 +190,12 @@ class TestDeriveProductionMode:
     def test_polish_takes_priority_over_marathon(self) -> None:
         """When both polish and marathon conditions overlap, polish wins (checked first)."""
         guilford = GuilfordScores(
-            fluency=40, flexibility=50, originality=50,
-            elaboration=75, sensitivity=50, redefinition=50,
+            fluency=40,
+            flexibility=50,
+            originality=50,
+            elaboration=75,
+            sensitivity=50,
+            redefinition=50,
         )
         result = derive_production_mode(guilford, conscientiousness=75)
         assert result == CreativeProductionMode.POLISH
@@ -183,8 +203,12 @@ class TestDeriveProductionMode:
     def test_returns_creative_production_mode_type(self) -> None:
         """derive_production_mode always returns a CreativeProductionMode."""
         guilford = GuilfordScores(
-            fluency=50, flexibility=50, originality=50,
-            elaboration=50, sensitivity=50, redefinition=50,
+            fluency=50,
+            flexibility=50,
+            originality=50,
+            elaboration=50,
+            sensitivity=50,
+            redefinition=50,
         )
         result = derive_production_mode(guilford, conscientiousness=50)
         assert isinstance(result, CreativeProductionMode)
@@ -192,8 +216,12 @@ class TestDeriveProductionMode:
     def test_boundary_elaboration_70_conscientiousness_70_is_polish(self) -> None:
         """Exact boundary (elaboration=70, conscientiousness=70) → POLISH."""
         guilford = GuilfordScores(
-            fluency=50, flexibility=50, originality=50,
-            elaboration=70, sensitivity=50, redefinition=50,
+            fluency=50,
+            flexibility=50,
+            originality=50,
+            elaboration=70,
+            sensitivity=50,
+            redefinition=50,
         )
         result = derive_production_mode(guilford, conscientiousness=70)
         assert result == CreativeProductionMode.POLISH

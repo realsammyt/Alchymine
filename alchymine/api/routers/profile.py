@@ -9,9 +9,10 @@ from __future__ import annotations
 import logging
 from datetime import date, datetime, time
 from typing import Any
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from alchymine.api.auth import get_current_admin, get_current_user
@@ -22,6 +23,15 @@ from alchymine.db.models import User
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+
+
+def _validate_iana_timezone(value: str) -> str:
+    """Return *value* if it is a valid IANA timezone name, else raise ValueError."""
+    try:
+        ZoneInfo(value)
+    except (ZoneInfoNotFoundError, ValueError, OSError) as exc:
+        raise ValueError(f"Invalid IANA timezone: {value!r}") from exc
+    return value
 
 
 # ─── Request / Response Schemas ────────────────────────────────────────
@@ -36,8 +46,19 @@ class ProfileCreateRequest(BaseModel):
     intentions: list[str] | None = Field(None, min_length=1, max_length=3)
     birth_time: time | None = None
     birth_city: str | None = None
+    birth_timezone: str | None = Field(
+        None, description="IANA timezone of birth location, e.g. 'America/Toronto'"
+    )
     assessment_responses: dict[str, Any] | None = None
     family_structure: str | None = None
+
+    @field_validator("birth_timezone")
+    @classmethod
+    def _check_birth_timezone(cls, v: str | None) -> str | None:
+        """Reject anything that is not a valid IANA timezone name."""
+        if v is None or v == "":
+            return None
+        return _validate_iana_timezone(v)
 
     def resolved_intentions(self) -> list[str]:
         """Return the full intentions list, falling back to the single intention."""
@@ -51,6 +72,7 @@ class IntakeResponse(BaseModel):
     birth_date: date
     birth_time: time | None = None
     birth_city: str | None = None
+    birth_timezone: str | None = None
     intention: str
     intentions: list[str] = Field(default_factory=list)
     assessment_responses: dict[str, Any] | None = None
@@ -122,6 +144,7 @@ def _user_to_response(user: User) -> ProfileResponse:
             birth_date=user.intake.birth_date,
             birth_time=user.intake.birth_time,
             birth_city=user.intake.birth_city,
+            birth_timezone=user.intake.birth_timezone,
             intention=user.intake.intention,
             intentions=user.intake.resolved_intentions,
             assessment_responses=user.intake.assessment_responses,
@@ -179,6 +202,7 @@ async def create_profile(
         intentions=request.resolved_intentions(),
         birth_time=request.birth_time,
         birth_city=request.birth_city,
+        birth_timezone=request.birth_timezone,
         assessment_responses=request.assessment_responses,
         family_structure=request.family_structure,
         user_id=current_user["sub"],
@@ -279,6 +303,14 @@ async def update_layer(
                     status_code=422,
                     detail=f"Invalid birth_time format: {coerced['birth_time']!r}",
                 ) from exc
+    if "birth_timezone" in coerced and coerced["birth_timezone"] is not None:
+        if coerced["birth_timezone"] == "":
+            coerced["birth_timezone"] = None
+        else:
+            try:
+                coerced["birth_timezone"] = _validate_iana_timezone(str(coerced["birth_timezone"]))
+            except ValueError as exc:
+                raise HTTPException(status_code=422, detail=str(exc)) from exc
 
     # When saving intake, route wealth_context to the wealth layer
     wealth_context = coerced.pop("wealth_context", None)

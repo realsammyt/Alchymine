@@ -288,7 +288,14 @@ class TestGetUserDetail:
         assert data["id"] == "admin-1"
         assert data["email"] == "admin@test.com"
         assert data["is_admin"] is True
-        for flag in ("has_intake", "has_identity", "has_healing", "has_wealth", "has_creative", "has_perspective"):
+        for flag in (
+            "has_intake",
+            "has_identity",
+            "has_healing",
+            "has_wealth",
+            "has_creative",
+            "has_perspective",
+        ):
             assert flag in data
 
     def test_get_nonexistent_user_returns_404(self, client: TestClient):

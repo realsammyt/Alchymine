@@ -220,6 +220,7 @@ def _intelligence_astrology(state: CoordinatorState) -> CoordinatorState:
                 birth_date,
                 birth_time=birth_time,
                 birth_city=birth_city,
+                birth_timezone=request_data.get("birth_timezone"),
             )
             results["astrology"] = chart
         else:

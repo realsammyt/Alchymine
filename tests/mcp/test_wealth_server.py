@@ -26,6 +26,16 @@ def test_tool_schemas_valid():
         assert "required" in schema
 
 
+def test_financial_input_tools_disclose_privacy_boundary():
+    """Tools accepting financial figures/context must disclose that inputs
+    pass through the calling LLM client's context."""
+    tools = {t["name"]: t for t in server.list_tools()}
+    for name in ("compare_debt_strategies", "prioritize_levers"):
+        description = tools[name]["description"]
+        assert "LLM client's context" in description
+        assert "never forwards" in description
+
+
 # ─── Test: resource listing ──────────────────────────────────────────────
 
 
@@ -40,6 +50,16 @@ async def test_read_info_resource():
     result = await server.read_resource("alchymine://wealth/info")
     assert result["name"] == "alchymine-wealth"
     assert len(result["tools"]) == 3
+
+
+@pytest.mark.asyncio
+async def test_info_resource_scopes_privacy_claim():
+    """The privacy claim must be scoped to the server pipeline, not stated
+    as an unqualified "never sent to LLMs"."""
+    result = await server.read_resource("alchymine://wealth/info")
+    description = result["description"]
+    assert "server pipeline" in description
+    assert "user-supplied" in description
 
 
 # ─── Test: map_wealth_archetype ──────────────────────────────────────────

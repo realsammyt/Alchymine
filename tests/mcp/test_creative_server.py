@@ -110,8 +110,14 @@ async def test_assess_guilford_empty_responses():
         {"responses": {}},
     )
     # All scores should default to 0 when no responses provided
-    for key in ["fluency", "flexibility", "originality",
-                "elaboration", "sensitivity", "redefinition"]:
+    for key in [
+        "fluency",
+        "flexibility",
+        "originality",
+        "elaboration",
+        "sensitivity",
+        "redefinition",
+    ]:
         assert result[key] == 0.0
 
 

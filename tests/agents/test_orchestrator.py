@@ -219,11 +219,7 @@ class TestCoordinatorSuccessMode:
         mock_profile.personal_month = 3
 
         # Provide Big Five assessment responses for the personality node
-        bf_responses = {
-            f"bf_{t}{i}": 3
-            for t in ("e", "a", "c", "n", "o")
-            for i in (1, 2, 3, 4)
-        }
+        bf_responses = {f"bf_{t}{i}": 3 for t in ("e", "a", "c", "n", "o") for i in (1, 2, 3, 4)}
 
         with (
             patch(

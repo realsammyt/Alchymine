@@ -128,7 +128,7 @@ body:
         Financial data in Alchymine is classified as Sensitive by default.
         Confirm the data handling requirements for this module.
       options:
-        - "Sensitive (default for financial data — encrypted, isolated, never sent to LLM)"
+        - "Sensitive (default for financial data — encrypted, isolated; server never sends it to any LLM)"
         - "Internal (non-PII financial education content — may be processed locally)"
     validations:
       required: true
@@ -202,7 +202,7 @@ body:
       options:
         - label: All financial calculations in this module will be deterministic (never LLM-generated).
           required: true
-        - label: Financial data will be treated as Sensitive (encrypted, isolated, never sent to LLM).
+        - label: Financial data will be treated as Sensitive (encrypted, isolated; the server pipeline never sends it to any LLM).
           required: true
         - label: Appropriate disclaimers will accompany all financial outputs.
           required: true

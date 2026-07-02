@@ -29,9 +29,9 @@ CREATE SCHEMA IF NOT EXISTS public;
 COMMENT ON SCHEMA public IS 'General application data: users, profiles, sessions, content';
 
 -- Financial schema — isolated for wealth/financial data
--- Per ADR: "Financial data classified as Sensitive — encrypted, isolated, never sent to LLM"
+-- Per ADR: financial data is Sensitive — encrypted, isolated; the server pipeline never sends it to any LLM
 CREATE SCHEMA IF NOT EXISTS financial;
-COMMENT ON SCHEMA financial IS 'Isolated schema for wealth and financial data — encrypted, never exposed to LLM';
+COMMENT ON SCHEMA financial IS 'Isolated schema for wealth and financial data — encrypted; server never sends it to any LLM';
 
 -- ─── Roles & Permissions ─────────────────────────────────────────────────
 -- Application role for general access (used by the API)

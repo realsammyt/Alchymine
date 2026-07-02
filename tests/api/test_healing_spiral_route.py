@@ -108,9 +108,7 @@ class TestHealingSpiralRoute:
         assert data["healing_score"] >= data_low["healing_score"]
 
     def test_with_life_path(self, client: TestClient) -> None:
-        response = client.get(
-            "/api/v1/healing/spiral-route?intention=career&life_path=6"
-        )
+        response = client.get("/api/v1/healing/spiral-route?intention=career&life_path=6")
         data = response.json()
         assert response.status_code == 200
         # LP 6 (Nurturer) boosts healing

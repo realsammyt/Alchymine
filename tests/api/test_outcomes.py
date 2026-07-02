@@ -598,9 +598,7 @@ class TestOutcomeProgressSummaryEndpoint:
         assert "strength" in corr
 
     def test_progress_summary_includes_outcome_summary(self, client: TestClient) -> None:
-        response = client.get(
-            "/api/v1/outcomes/user-1/summary?journal_count=3&active_plan_day=15"
-        )
+        response = client.get("/api/v1/outcomes/user-1/summary?journal_count=3&active_plan_day=15")
         data = response.json()
         assert data["outcome_summary"] is not None
 

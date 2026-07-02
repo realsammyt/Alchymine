@@ -93,6 +93,9 @@ def _seed_report(engine, report_id: str, status: str, result: dict | None = None
                 report_id=report_id,
                 status=status,
                 user_input="test",
+                # created_by_sub matches the conftest test user ("user-1")
+                # so the ownership check on the report endpoints grants access.
+                created_by_sub="user-1",
             )
             if result is not None or status in ("complete", "failed"):
                 await repository.update_report_content(

@@ -32,6 +32,7 @@ from alchymine.engine.astrology import (
     approximate_sun_degree,
     approximate_sun_sign,
     aspect_strength,
+    birth_datetime_to_utc,
     calculate_aspects,
     calculate_house_cusps,
     calculate_natal_chart,
@@ -667,6 +668,145 @@ class TestRisingSign:
         )
         assert isinstance(sign, str)
         assert 0 <= degree < 360
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Birth Timezone Tests
+# ═══════════════════════════════════════════════════════════════════════════
+
+
+class TestBirthTimezone:
+    """Tests for local-time → UTC conversion before chart math."""
+
+    def test_utc_conversion_shifts_ascendant(self) -> None:
+        """22:00 America/Los_Angeles is not 22:00 UT — ascendant must differ."""
+        # January date: PST is UTC-8, no DST ambiguity.
+        _, naive_degree = approximate_ascendant(date(1990, 1, 15), time(22, 0), 34.0522, -118.2437)
+        _, tz_degree = approximate_ascendant(
+            date(1990, 1, 15),
+            time(22, 0),
+            34.0522,
+            -118.2437,
+            birth_timezone="America/Los_Angeles",
+        )
+        assert naive_degree != tz_degree
+
+    def test_utc_conversion_shifts_ascendant_in_chart(self) -> None:
+        """calculate_natal_chart applies the timezone on the approximate path."""
+        naive = calculate_natal_chart(
+            date(1990, 1, 15),
+            birth_time=time(22, 0),
+            birth_city="Los Angeles",
+        )
+        converted = calculate_natal_chart(
+            date(1990, 1, 15),
+            birth_time=time(22, 0),
+            birth_city="Los Angeles",
+            birth_timezone="America/Los_Angeles",
+        )
+        assert naive["rising_degree"] is not None
+        assert converted["rising_degree"] is not None
+        assert naive["rising_degree"] != converted["rising_degree"]
+
+    def test_date_boundary_shift_westward(self) -> None:
+        """Late evening west of Greenwich lands on the next UTC day."""
+        utc_date, utc_time = birth_datetime_to_utc(
+            date(1990, 1, 15), time(22, 0), "America/Los_Angeles"
+        )
+        assert utc_date == date(1990, 1, 16)  # PST is UTC-8
+        assert utc_time == time(6, 0)
+
+    def test_date_boundary_shift_eastward(self) -> None:
+        """Early morning east of Greenwich lands on the previous UTC day."""
+        utc_date, utc_time = birth_datetime_to_utc(date(2000, 5, 15), time(3, 0), "Asia/Tokyo")
+        assert utc_date == date(2000, 5, 14)  # JST is UTC+9
+        assert utc_time == time(18, 0)
+
+    def test_dst_offset_respected(self) -> None:
+        """July in Los Angeles is PDT (UTC-7), not PST (UTC-8)."""
+        utc_date, utc_time = birth_datetime_to_utc(
+            date(1990, 7, 15), time(22, 0), "America/Los_Angeles"
+        )
+        assert utc_date == date(1990, 7, 16)
+        assert utc_time == time(5, 0)
+
+    def test_chart_echoes_local_birth_date_across_boundary(self) -> None:
+        """The result dict keeps the wall-clock date even when UTC shifts it."""
+        result = calculate_natal_chart(
+            date(1990, 1, 15),
+            birth_time=time(22, 0),
+            birth_city="Los Angeles",
+            birth_timezone="America/Los_Angeles",
+        )
+        assert result["birth_date"] == date(1990, 1, 15)
+
+    def test_none_timezone_preserves_legacy_output(self) -> None:
+        """birth_timezone=None must be byte-identical to the old behavior."""
+        legacy = calculate_natal_chart(
+            date(1992, 3, 15),
+            birth_time=time(14, 30),
+            birth_city="New York",
+        )
+        explicit_none = calculate_natal_chart(
+            date(1992, 3, 15),
+            birth_time=time(14, 30),
+            birth_city="New York",
+            birth_timezone=None,
+        )
+        assert legacy == explicit_none
+
+    def test_none_timezone_preserves_legacy_ascendant(self) -> None:
+        legacy = approximate_ascendant(date(1992, 3, 15), time(14, 30), 40.7128, -74.0060)
+        explicit_none = approximate_ascendant(
+            date(1992, 3, 15), time(14, 30), 40.7128, -74.0060, birth_timezone=None
+        )
+        assert legacy == explicit_none
+
+    def test_utc_timezone_is_noop(self) -> None:
+        """Explicit UTC gives the same result as treating time as UT."""
+        naive = calculate_natal_chart(
+            date(1992, 3, 15),
+            birth_time=time(14, 30),
+            birth_city="London",
+        )
+        utc = calculate_natal_chart(
+            date(1992, 3, 15),
+            birth_time=time(14, 30),
+            birth_city="London",
+            birth_timezone="UTC",
+        )
+        assert naive["rising_degree"] == utc["rising_degree"]
+        assert naive["sun_degree"] == utc["sun_degree"]
+
+    def test_timezone_without_birth_time_is_ignored(self) -> None:
+        """No birth time means nothing to convert — legacy date-only chart."""
+        legacy = calculate_natal_chart(date(1992, 3, 15))
+        with_tz = calculate_natal_chart(date(1992, 3, 15), birth_timezone="Asia/Tokyo")
+        assert legacy == with_tz
+
+    def test_invalid_timezone_rejected(self) -> None:
+        with pytest.raises(ValueError, match="Unknown IANA timezone"):
+            birth_datetime_to_utc(date(2000, 1, 1), time(12, 0), "Not/AZone")
+
+    def test_invalid_timezone_rejected_in_chart(self) -> None:
+        with pytest.raises(ValueError, match="Unknown IANA timezone"):
+            calculate_natal_chart(
+                date(2000, 1, 1),
+                birth_time=time(12, 0),
+                birth_city="London",
+                birth_timezone="Mars/Olympus_Mons",
+            )
+
+    def test_conversion_deterministic(self) -> None:
+        kwargs = {
+            "birth_date": date(1985, 7, 4),
+            "birth_time": time(3, 15),
+            "birth_city": "New York",
+            "birth_timezone": "America/New_York",
+        }
+        a = calculate_natal_chart(**kwargs)
+        b = calculate_natal_chart(**kwargs)
+        assert a == b
 
 
 # ═══════════════════════════════════════════════════════════════════════════

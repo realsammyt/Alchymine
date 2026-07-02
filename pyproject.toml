@@ -40,6 +40,8 @@ dependencies = [
     "pyyaml>=6.0.0",
     "python-multipart>=0.0.12",
     "jinja2>=3.1.0",
+    # IANA tz database for zoneinfo (birth_timezone) — slim Docker images lack the system copy
+    "tzdata>=2024.1",
 ]
 
 [project.optional-dependencies]
