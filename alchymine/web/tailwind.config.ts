@@ -57,7 +57,6 @@ const config: Config = {
         float: "float 6s ease-in-out infinite",
         "float-delayed": "float 6s 2s ease-in-out infinite",
         "glow-breathe": "glowBreathe 4s ease-in-out infinite",
-        "grain-drift": "grainDrift 0.5s steps(1) infinite",
         "spiral-pulse": "spiralPulse 3s ease-in-out infinite",
         "spiral-pulse-fast": "spiralPulse 2s ease-in-out infinite",
         "spiral-rotate": "spiralRotate 8s linear infinite",
@@ -95,19 +94,6 @@ const config: Config = {
         spiralRotate: {
           from: { transform: "rotate(0deg)" },
           to: { transform: "rotate(360deg)" },
-        },
-        grainDrift: {
-          "0%": { transform: "translate(0, 0)" },
-          "10%": { transform: "translate(-2%, -3%)" },
-          "20%": { transform: "translate(3%, 1%)" },
-          "30%": { transform: "translate(-1%, 2%)" },
-          "40%": { transform: "translate(2%, -1%)" },
-          "50%": { transform: "translate(-3%, 3%)" },
-          "60%": { transform: "translate(1%, -2%)" },
-          "70%": { transform: "translate(-2%, 1%)" },
-          "80%": { transform: "translate(3%, -3%)" },
-          "90%": { transform: "translate(-1%, 2%)" },
-          "100%": { transform: "translate(0, 0)" },
         },
       },
       backgroundImage: {
