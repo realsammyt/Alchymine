@@ -5,7 +5,7 @@
 > ending. If anything here disagrees with reality, reality wins — fix the doc.
 
 **Last updated:** 2026-07-02 by Claude (with Tyler)
-**Active branch:** `main` (fixes branch to be created: see Next action)
+**Active branch:** `fix/review-findings` (PR #210, CI green, awaiting merge)
 **Driving plan / refs:** project `CLAUDE.md` (commands, CI protocol), `Alchymine PRD v7 FiveSystem.docx`
 
 ---
@@ -46,11 +46,11 @@ Statuses: `Not started` · `In progress` · `Blocked` · `Done`.
 | # | Item | Status | Updated | Note |
 | - | ---- | ------ | ------- | ---- |
 | 1 | Full-project review + 7 bug fixes (PR #206) | Done | 2026-07-02 | Squash-merged to main, all 10 CI checks green |
-| 2 | Finding 1: birth time local→UTC conversion | In progress | 2026-07-02 | Implemented on `fix/review-findings` (engine zoneinfo conversion, intake form field, DB column, migration 0014); gates running |
-| 3 | Finding 2: wealth MCP vs "no financial data to LLM" rule | In progress | 2026-07-02 | Promise rescoped everywhere + tool disclosures; gates running |
-| 4 | Finding 3: orphaned reports readable by any authed user | In progress | 2026-07-02 | `created_by_sub` column (migration 0015) + ownership helper on all report reads; gates running |
+| 2 | Finding 1: birth time local→UTC conversion | Done | 2026-07-02 | PR #210, all 10 CI checks green — awaiting merge |
+| 3 | Finding 2: wealth MCP vs "no financial data to LLM" rule | Done | 2026-07-02 | PR #210, promise rescoped + tool disclosures — awaiting merge |
+| 4 | Finding 3: orphaned reports readable by any authed user | Done | 2026-07-02 | PR #210, `created_by_sub` + ownership helper — awaiting merge |
 
-**Next action:** full gates → commit → PR → CI green → merge → mark rows Done.
+**Next action:** merge PR #210 (squash), pull main, delete branch.
 
 ---
 
@@ -82,6 +82,7 @@ _None currently._
 
 ## 7. Activity log (newest first — append, don't overwrite)
 
+- **2026-07-02** — Fixed all 3 findings via 3-agent team on `fix/review-findings`; PR #210 opened, 2317 backend + 333 web tests green, all 10 CI checks green. Backend test count grew to 2317 (was 2281).
 - **2026-07-02** — Merged PR #206 (7 review fixes + CI fixes). Created this handoff. Next: 3 remaining findings via agent team.
 - **2026-07-01** — Full-project review (4 parallel review agents). Fixed: gemini mypy, tsc test error, session poisoning in workers, /reports/diagnose shadowing, CORS/rate-limit order, feedback email HTML injection, debt waterfall math, chat history clobbering. All gates + CI green.
 
