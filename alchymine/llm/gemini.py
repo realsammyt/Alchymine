@@ -147,9 +147,10 @@ class GeminiClient:
         types = getattr(_genai, "types", None)
         if types is None:
             try:
-                from google.genai import types  # type: ignore[import-not-found]
+                from google.genai import types as _sdk_types  # type: ignore[import-not-found]
             except ImportError:  # pragma: no cover
                 return None
+            types = _sdk_types
 
         # Strict default safety settings — block low-severity content and above
         # for the four standard harm categories.

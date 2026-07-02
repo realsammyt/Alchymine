@@ -24,7 +24,7 @@ const mockBridges = [
   },
 ];
 
-const mockGetBridges = jest.fn(() => Promise.resolve(mockBridges));
+const mockGetBridges = jest.fn((..._args: unknown[]) => Promise.resolve(mockBridges));
 
 jest.mock("@/lib/api", () => ({
   getBridges: (...args: unknown[]) => mockGetBridges(...args),
