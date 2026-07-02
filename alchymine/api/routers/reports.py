@@ -19,7 +19,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from alchymine.api.auth import get_current_user
 from alchymine.api.deps import get_db_session
 from alchymine.db import repository
-from alchymine.db.models import User
+from alchymine.db.models import Report, User
 from alchymine.engine.profile import IntakeData
 from alchymine.engine.reports.html_renderer import render_report_html
 from alchymine.safety.audit import AuditEventType
@@ -84,6 +84,25 @@ class ReportListResponse(BaseModel):
 
 
 # ── Helpers ──────────────────────────────────────────────────────────────
+
+
+def _ensure_report_access(report: Report, sub: str) -> None:
+    """Raise 403 unless *sub* owns *report*.
+
+    Ownership: ``user_id`` matches the JWT sub, or — for orphan rows
+    created before the user row existed (``user_id IS NULL``) —
+    ``created_by_sub`` matches.  Legacy orphan rows with neither set are
+    inaccessible to everyone.
+    """
+    if report.user_id == sub:
+        return
+    if (
+        report.user_id is None
+        and report.created_by_sub is not None
+        and report.created_by_sub == sub
+    ):
+        return
+    raise HTTPException(status_code=403, detail="Access denied")
 
 
 async def _build_hero_data_uri(session: AsyncSession, user_id: str) -> str | None:
@@ -183,6 +202,7 @@ async def create_report(
             user_input=request.user_input,
             user_profile=request.user_profile,
             user_id=db_user_id,  # None if user doesn't exist in DB
+            created_by_sub=user_id,  # always the JWT sub — ownership for orphan rows
         )
         await session.commit()
     except Exception as exc:
@@ -314,8 +334,6 @@ async def diagnose_reports(
     # 4. Report table writable (insert + rollback)
     try:
         test_id = f"diag-{uuid.uuid4()}"
-        from alchymine.db.models import Report
-
         test_report = Report(id=test_id, status="diagnostic", user_id=None)
         session.add(test_report)
         await session.flush()
@@ -359,8 +377,7 @@ async def get_report_status(
     report = await repository.get_report(session, report_id)
     if report is None:
         raise HTTPException(status_code=404, detail="Report not found")
-    if report.user_id and report.user_id != current_user["sub"]:
-        raise HTTPException(status_code=403, detail="Access denied")
+    _ensure_report_access(report, current_user["sub"])
 
     return ReportStatus(
         id=report.id,
@@ -385,8 +402,7 @@ async def get_report(
     report = await repository.get_report(session, report_id)
     if report is None:
         raise HTTPException(status_code=404, detail="Report not found")
-    if report.user_id and report.user_id != current_user["sub"]:
-        raise HTTPException(status_code=403, detail="Access denied")
+    _ensure_report_access(report, current_user["sub"])
 
     if report.status in ("pending", "generating"):
         return JSONResponse(
@@ -431,8 +447,7 @@ async def get_report_html(
     report = await repository.get_report(session, report_id)
     if report is None:
         raise HTTPException(status_code=404, detail="Report not found")
-    if report.user_id and report.user_id != current_user["sub"]:
-        raise HTTPException(status_code=403, detail="Access denied")
+    _ensure_report_access(report, current_user["sub"])
 
     if report.status in ("pending", "generating"):
         return JSONResponse(
@@ -483,8 +498,7 @@ async def get_report_pdf(
     report = await repository.get_report(session, report_id)
     if report is None:
         raise HTTPException(status_code=404, detail="Report not found")
-    if report.user_id and report.user_id != current_user["sub"]:
-        raise HTTPException(status_code=403, detail="Access denied")
+    _ensure_report_access(report, current_user["sub"])
 
     if report.status != "complete":
         raise HTTPException(

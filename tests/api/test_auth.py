@@ -53,9 +53,7 @@ def _override_db():
         async with engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)
         async with session_factory() as session:
-            session.add(
-                InviteCode(code=_TEST_INVITE_CODE, max_uses=1000, is_active=True)
-            )
+            session.add(InviteCode(code=_TEST_INVITE_CODE, max_uses=1000, is_active=True))
             await session.commit()
 
     asyncio.run(_init_db())
@@ -200,7 +198,11 @@ class TestRegister:
         """Registering a new user should return 201 with access and refresh tokens."""
         response = client.post(
             "/api/v1/auth/register",
-            json={"email": "new@example.com", "password": "password123", "promo_code": _TEST_INVITE_CODE},
+            json={
+                "email": "new@example.com",
+                "password": "password123",
+                "promo_code": _TEST_INVITE_CODE,
+            },
         )
         assert response.status_code == 201
         data = response.json()
@@ -210,7 +212,11 @@ class TestRegister:
 
     def test_register_duplicate_email(self, client: TestClient):
         """Registering with an already-used email should return 409."""
-        payload = {"email": "dup@example.com", "password": "password123", "promo_code": _TEST_INVITE_CODE}
+        payload = {
+            "email": "dup@example.com",
+            "password": "password123",
+            "promo_code": _TEST_INVITE_CODE,
+        }
         response1 = client.post("/api/v1/auth/register", json=payload)
         assert response1.status_code == 201
 
@@ -230,7 +236,11 @@ class TestRegister:
         """Registering with an invalid email should return 422."""
         response = client.post(
             "/api/v1/auth/register",
-            json={"email": "not-an-email", "password": "password123", "promo_code": _TEST_INVITE_CODE},
+            json={
+                "email": "not-an-email",
+                "password": "password123",
+                "promo_code": _TEST_INVITE_CODE,
+            },
         )
         assert response.status_code == 422
 

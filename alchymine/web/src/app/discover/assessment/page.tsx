@@ -40,6 +40,7 @@ export default function AssessmentPage() {
               fullName: profile.intake.full_name,
               birthDate: profile.intake.birth_date,
               birthTime: profile.intake.birth_time || "",
+              birthTimezone: profile.intake.birth_timezone || "",
               birthCity: profile.intake.birth_city || "",
               intentions: profile.intake.intentions,
               intention: profile.intake.intention,
@@ -84,6 +85,7 @@ export default function AssessmentPage() {
           full_name: intakeData.fullName,
           birth_date: intakeData.birthDate,
           birth_time: intakeData.birthTime || null,
+          birth_timezone: intakeData.birthTimezone || null,
           birth_city: intakeData.birthCity || null,
           intention: intakeData.intention ?? intakeData.intentions?.[0],
           intentions:

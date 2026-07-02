@@ -85,7 +85,9 @@ async def test_generate_image_returns_result_on_success() -> None:
     fake_types = MagicMock()
     with (
         patch("alchymine.llm.gemini._genai", fake_genai_module),
-        patch.dict("sys.modules", {"google.genai": fake_genai_module, "google.genai.types": fake_types}),
+        patch.dict(
+            "sys.modules", {"google.genai": fake_genai_module, "google.genai.types": fake_types}
+        ),
     ):
         client = GeminiClient(api_key="fake-key", model="gemini-test")
         assert client.is_available is True

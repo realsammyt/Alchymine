@@ -4,7 +4,13 @@ Exposes the Generational Wealth system's deterministic engines
 as MCP tools for Claude and other LLMs.
 
 CRITICAL: All monetary calculations use Decimal precision.
-Financial data is classified as Sensitive and never sent to LLMs.
+
+Privacy boundary: Alchymine's server-side pipeline (report and narrative
+generation) never sends stored financial data to any LLM. These MCP tools
+sit at a different trust boundary — their inputs are supplied by the user
+through the user's own LLM client, so any figures passed as tool arguments
+necessarily pass through that client's context. Results are computed only
+from those inputs; the server never forwards them to any LLM.
 """
 
 from __future__ import annotations
@@ -75,7 +81,9 @@ def map_wealth_archetype_tool(life_path: int, archetype: str, risk_tolerance: st
     description=(
         "Prioritize the 5 wealth levers (EARN, KEEP, GROW, PROTECT, TRANSFER) "
         "based on financial context, risk tolerance, intention, and life path. "
-        "Returns all 5 levers in priority order."
+        "Returns all 5 levers in priority order. Privacy: any financial "
+        "context you pass here flows through your LLM client's context; "
+        "Alchymine's server never forwards it to any LLM."
     ),
     input_schema={
         "type": "object",
@@ -139,7 +147,9 @@ def prioritize_levers_tool(
         "Compare snowball vs. avalanche debt payoff strategies. Returns "
         "total paid, total interest, months to payoff, interest savings, "
         "and which strategy is faster. All monetary values use exact "
-        "decimal arithmetic."
+        "decimal arithmetic. Privacy: figures you pass here flow through "
+        "your LLM client's context; Alchymine's server never forwards "
+        "them to any LLM."
     ),
     input_schema={
         "type": "object",
@@ -224,6 +234,9 @@ def wealth_info() -> dict:
             "Generational Wealth system — wealth archetype mapping, lever "
             "prioritization, and debt payoff strategy comparison. All "
             "calculations are deterministic and use exact decimal arithmetic. "
-            "Financial data is Sensitive and never sent to LLMs."
+            "Stored financial data is Sensitive and never sent to LLMs by "
+            "Alchymine's server pipeline; figures passed as MCP tool inputs "
+            "are user-supplied and flow through the calling LLM client's "
+            "context."
         ),
     }

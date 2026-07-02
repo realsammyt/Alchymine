@@ -1147,7 +1147,7 @@ export default function WealthPage() {
                     "Standard amortization and compound interest formulas (mathematical constants)",
                     'Avalanche vs. Snowball debt payoff methods - Gathergood (2012) "Self-control, financial literacy and consumer over-indebtedness"',
                     "Five Wealth Levers framework adapted from Kiyosaki, Ramsey, and Sethi personal finance methodologies",
-                    "Financial data classification: Sensitive (encrypted, isolated, never sent to LLM) per ADR-002",
+                    "Financial data classification: Sensitive (encrypted, isolated; server never sends it to any LLM) per ADR-002",
                   ]}
                 />
               </MotionReveal>

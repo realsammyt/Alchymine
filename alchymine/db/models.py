@@ -198,6 +198,11 @@ class IntakeData(Base):
     birth_date: Mapped[date] = mapped_column(Date, nullable=False)
     birth_time: Mapped[time | None] = mapped_column(Time, nullable=True)
     birth_city: Mapped[str | None] = mapped_column(EncryptedString(), nullable=True)
+    birth_timezone: Mapped[str | None] = mapped_column(
+        Text,
+        nullable=True,
+        comment="IANA timezone of birth location, e.g. 'America/Toronto'",
+    )
     intention: Mapped[str] = mapped_column(String(50), nullable=False)
     intentions: Mapped[list | None] = mapped_column(JSONColumn, nullable=True)
     assessment_responses: Mapped[dict | None] = mapped_column(JSONColumn, nullable=True)
@@ -301,8 +306,8 @@ class WealthProfile(Base):
     """Layer 3 — Wealth Engine data.
 
     ALL financial columns are encrypted at rest using Fernet.
-    Per ADR: "Financial data classified as Sensitive — encrypted,
-    isolated, never sent to LLM."
+    Per ADR: financial data is classified as Sensitive — encrypted,
+    isolated; the server pipeline never sends it to any LLM.
     """
 
     __tablename__ = "wealth_profiles"
@@ -457,6 +462,11 @@ class Report(Base):
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
     user_id: Mapped[str | None] = mapped_column(
         String(36), ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    created_by_sub: Mapped[str | None] = mapped_column(
+        Text,
+        nullable=True,
+        comment="JWT subject that created the report — ownership check for orphan rows",
     )
     report_type: Mapped[str] = mapped_column(
         String(100), default="full", comment="e.g. full, numerology, astrology"

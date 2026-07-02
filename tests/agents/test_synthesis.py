@@ -88,9 +88,7 @@ def _wealth_result(**overrides) -> CoordinatorResult:
         system="wealth",
         status=CoordinatorStatus.SUCCESS.value,
         data={
-            "disclaimers": [
-                "This is not financial advice. Consult a qualified financial advisor."
-            ],
+            "disclaimers": ["This is not financial advice. Consult a qualified financial advisor."],
             "wealth_archetype": {"name": "Builder", "description": "Steady builder"},
             "lever_priorities": ["income", "protection", "growth"],
             "calculations": {"savings_rate": 0.2, "emergency_months": 6},
@@ -334,7 +332,11 @@ class TestConflictDetection:
         conflicts = detect_conflicts(results)
         assert isinstance(conflicts, list)
         # No rest-vs-action or risk conflicts in these results
-        rest_action = [c for c in conflicts if "rest" in c["description"].lower() or "action" in c["description"].lower()]
+        rest_action = [
+            c
+            for c in conflicts
+            if "rest" in c["description"].lower() or "action" in c["description"].lower()
+        ]
         assert len(rest_action) == 0
 
     def test_rest_vs_action_conflict(self) -> None:
@@ -352,7 +354,8 @@ class TestConflictDetection:
         )
         conflicts = detect_conflicts([rest_result, action_result])
         rest_action_conflicts = [
-            c for c in conflicts
+            c
+            for c in conflicts
             if "rest" in c["description"].lower() or "recovery" in c["description"].lower()
         ]
         assert len(rest_action_conflicts) >= 1
@@ -373,7 +376,8 @@ class TestConflictDetection:
         )
         conflicts = detect_conflicts([conservative, aggressive])
         risk_conflicts = [
-            c for c in conflicts
+            c
+            for c in conflicts
             if "caution" in c["description"].lower() or "conservative" in c["description"].lower()
         ]
         assert len(risk_conflicts) >= 1
@@ -419,10 +423,7 @@ class TestConflictDetection:
             quality_passed=True,
         )
         conflicts = detect_conflicts([error_result, action_result])
-        rest_action = [
-            c for c in conflicts
-            if "rest" in c["description"].lower()
-        ]
+        rest_action = [c for c in conflicts if "rest" in c["description"].lower()]
         assert len(rest_action) == 0
 
     def test_overwhelm_conflict_with_many_recommendations(self) -> None:
@@ -966,9 +967,13 @@ class TestStrengthsMap:
         result = _intelligence_result(
             data={
                 "personality": {
-                    "big_five": {"openness": 50.0, "conscientiousness": 50.0,
-                                 "extraversion": 50.0, "agreeableness": 50.0,
-                                 "neuroticism": 50.0},
+                    "big_five": {
+                        "openness": 50.0,
+                        "conscientiousness": 50.0,
+                        "extraversion": 50.0,
+                        "agreeableness": 50.0,
+                        "neuroticism": 50.0,
+                    },
                     "attachment_style": "secure",
                 },
             }
@@ -1037,9 +1042,13 @@ class TestStrengthsMap:
             _intelligence_result(
                 data={
                     "personality": {
-                        "big_five": {"openness": 80.0, "conscientiousness": 30.0,
-                                     "extraversion": 70.0, "agreeableness": 50.0,
-                                     "neuroticism": 10.0},
+                        "big_five": {
+                            "openness": 80.0,
+                            "conscientiousness": 30.0,
+                            "extraversion": 70.0,
+                            "agreeableness": 50.0,
+                            "neuroticism": 10.0,
+                        },
                         "attachment_style": "secure",
                     },
                 }
@@ -1071,9 +1080,13 @@ class TestProfileSummaryStrengthsMap:
                     "numerology": {"life_path": 7},
                     "astrology": {"sun_sign": "Pisces"},
                     "personality": {
-                        "big_five": {"openness": 85.0, "conscientiousness": 70.0,
-                                     "extraversion": 40.0, "agreeableness": 50.0,
-                                     "neuroticism": 30.0},
+                        "big_five": {
+                            "openness": 85.0,
+                            "conscientiousness": 70.0,
+                            "extraversion": 40.0,
+                            "agreeableness": 50.0,
+                            "neuroticism": 30.0,
+                        },
                         "attachment_style": "secure",
                     },
                 }
@@ -1096,9 +1109,13 @@ class TestProfileSummaryStrengthsMap:
             _intelligence_result(
                 data={
                     "personality": {
-                        "big_five": {"openness": 30.0, "conscientiousness": 40.0,
-                                     "extraversion": 20.0, "agreeableness": 50.0,
-                                     "neuroticism": 80.0},
+                        "big_five": {
+                            "openness": 30.0,
+                            "conscientiousness": 40.0,
+                            "extraversion": 20.0,
+                            "agreeableness": 50.0,
+                            "neuroticism": 80.0,
+                        },
                         "attachment_style": "anxious",
                     },
                 }
@@ -1183,7 +1200,11 @@ class TestProfileSummaryKeganShape:
         results = [
             _perspective_result(
                 data={
-                    "kegan_stage": {"stage": 3, "name": "Socialized Mind", "description": "Shaped by others"},
+                    "kegan_stage": {
+                        "stage": 3,
+                        "name": "Socialized Mind",
+                        "description": "Shaped by others",
+                    },
                     "detected_biases": [],
                 }
             ),

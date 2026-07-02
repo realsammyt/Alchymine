@@ -4,6 +4,9 @@ from __future__ import annotations
 
 from datetime import date, datetime
 
+import pytest
+from pydantic import ValidationError
+
 from alchymine.engine.profile import (
     ArchetypeProfile,
     ArchetypeType,
@@ -52,6 +55,47 @@ def test_intake_data_auto_populates_intentions() -> None:
         intention=Intention.FAMILY,
     )
     assert intake.intentions == [Intention.FAMILY]
+
+
+def test_intake_data_birth_timezone_defaults_to_none() -> None:
+    """birth_timezone is optional — omitted means legacy behavior."""
+    intake = IntakeData(
+        full_name="Legacy User",
+        birth_date=date(1992, 3, 15),
+        intention=Intention.CAREER,
+    )
+    assert intake.birth_timezone is None
+
+
+def test_intake_data_valid_birth_timezone_accepted() -> None:
+    intake = IntakeData(
+        full_name="Toronto User",
+        birth_date=date(1992, 3, 15),
+        intention=Intention.CAREER,
+        birth_timezone="America/Toronto",
+    )
+    assert intake.birth_timezone == "America/Toronto"
+
+
+def test_intake_data_invalid_birth_timezone_rejected() -> None:
+    with pytest.raises(ValidationError, match="Unknown IANA timezone"):
+        IntakeData(
+            full_name="Bad TZ User",
+            birth_date=date(1992, 3, 15),
+            intention=Intention.CAREER,
+            birth_timezone="Not/AZone",
+        )
+
+
+def test_intake_data_empty_birth_timezone_rejected() -> None:
+    """Empty string is not a valid IANA name — send None instead."""
+    with pytest.raises(ValidationError, match="Unknown IANA timezone"):
+        IntakeData(
+            full_name="Empty TZ User",
+            birth_date=date(1992, 3, 15),
+            intention=Intention.CAREER,
+            birth_timezone="",
+        )
 
 
 def test_numerology_profile_master_numbers() -> None:

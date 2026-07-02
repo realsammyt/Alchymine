@@ -272,7 +272,7 @@ class TestRateLimitAuthRoutes:
         """Auth routes enforce the stricter 20 req/60s limit."""
         for i in range(20):
             response = client.get("/api/v1/auth/login")
-            assert response.status_code == 200, f"Request {i+1} failed unexpectedly"
+            assert response.status_code == 200, f"Request {i + 1} failed unexpectedly"
         # 21st should be rejected
         response = client.get("/api/v1/auth/login")
         assert response.status_code == 429
@@ -289,7 +289,7 @@ class TestRateLimitAuthRoutes:
             # Send 100 requests — all should succeed
             for i in range(100):
                 response = client.get("/api/v1/items")
-                assert response.status_code == 200, f"Request {i+1} failed unexpectedly"
+                assert response.status_code == 200, f"Request {i + 1} failed unexpectedly"
             # 101st should be rejected
             response = client.get("/api/v1/items")
             assert response.status_code == 429

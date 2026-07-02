@@ -10,6 +10,7 @@ export interface IntakePayload {
   full_name: string;
   birth_date: string; // YYYY-MM-DD
   birth_time?: string | null; // HH:MM or null
+  birth_timezone?: string | null; // IANA name, e.g. "America/Toronto"
   birth_city?: string | null;
   intention: string; // Primary intention (first selected) — backward compat for report creation
   intentions?: string[]; // All selected intentions (1-3)
@@ -865,6 +866,7 @@ export interface IntakeProfileData {
   full_name: string;
   birth_date: string;
   birth_time?: string | null;
+  birth_timezone?: string | null;
   birth_city?: string | null;
   intention: string;
   intentions: string[];
@@ -1056,6 +1058,7 @@ export async function saveIntake(
     full_name: string;
     birth_date: string;
     birth_time?: string | null;
+    birth_timezone?: string | null;
     birth_city?: string | null;
     intention: string;
     intentions: string[];

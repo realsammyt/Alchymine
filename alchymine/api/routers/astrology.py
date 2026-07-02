@@ -40,13 +40,26 @@ async def calculate_chart(
     birth_date: date,
     birth_time: time | None = None,  # noqa: B008
     birth_city: str | None = None,
+    birth_timezone: str | None = None,
     current_user: dict = Depends(get_current_user),
 ) -> AstrologyResponse:
     """Calculate astrological natal chart.
 
     Deterministic calculation via Swiss Ephemeris — no AI involved.
     Birth time is optional but enables Rising sign calculation.
+    birth_timezone (IANA name) converts the birth moment to UTC first;
+    omitted, the time is treated as UT (legacy behavior).
     """
+    if birth_timezone:
+        from zoneinfo import ZoneInfo
+
+        try:
+            ZoneInfo(birth_timezone)
+        except Exception as exc:
+            raise HTTPException(
+                status_code=422, detail=f"Unknown IANA timezone: {birth_timezone!r}"
+            ) from exc
+
     try:
         from alchymine.engine.astrology.chart import calculate_natal_chart
 
@@ -54,6 +67,7 @@ async def calculate_chart(
             birth_date=birth_date,
             birth_time=birth_time,
             birth_city=birth_city,
+            birth_timezone=birth_timezone,
         )
         return AstrologyResponse(**result)
     except ImportError:

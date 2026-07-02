@@ -311,9 +311,7 @@ class TestChatScopeEnforcement:
             "summarize the following document please",
         ],
     )
-    def test_chat_rejects_off_topic_message(
-        self, client: TestClient, message: str
-    ) -> None:
+    def test_chat_rejects_off_topic_message(self, client: TestClient, message: str) -> None:
         """Off-topic messages return 400 before any LLM call."""
         response = client.post("/api/v1/chat", json={"message": message})
         assert response.status_code == 400, f"expected 400 for: {message!r}"
@@ -377,14 +375,10 @@ class TestChatScopeEnforcement:
 
         loop = asyncio.new_event_loop()
         try:
-            messages = loop.run_until_complete(
-                _fetch_chat_messages(session_factory, "user-1")
-            )
+            messages = loop.run_until_complete(_fetch_chat_messages(session_factory, "user-1"))
         finally:
             loop.close()
-        assert messages == [], (
-            f"off-topic messages should not be persisted; found {len(messages)}"
-        )
+        assert messages == [], f"off-topic messages should not be persisted; found {len(messages)}"
 
 
 # ─── Chat history endpoint ────────────────────────────────────────────
@@ -626,9 +620,7 @@ class TestChatHistoryCap:
         # Seed 200 user messages directly via the repository.
         loop = asyncio.new_event_loop()
         try:
-            loop.run_until_complete(
-                _seed_user_messages(session_factory, "user-1", "healing", 200)
-            )
+            loop.run_until_complete(_seed_user_messages(session_factory, "user-1", "healing", 200))
         finally:
             loop.close()
 
@@ -658,9 +650,7 @@ class TestChatHistoryCap:
 
         loop = asyncio.new_event_loop()
         try:
-            loop.run_until_complete(
-                _seed_user_messages(session_factory, "user-1", "healing", 200)
-            )
+            loop.run_until_complete(_seed_user_messages(session_factory, "user-1", "healing", 200))
         finally:
             loop.close()
 
@@ -691,9 +681,7 @@ async def _seed_user_messages(
     """Insert *count* user-role ChatMessage rows for history cap testing."""
     async with factory() as session:
         # Ensure user exists.
-        existing = await session.execute(
-            select(User).where(User.id == user_id)
-        )
+        existing = await session.execute(select(User).where(User.id == user_id))
         if existing.scalar_one_or_none() is None:
             session.add(User(id=user_id))
             await session.flush()
@@ -740,8 +728,7 @@ class TestChatE2E:
         body = send_resp.text
         # Must contain at least one data frame with content.
         data_lines = [
-            ln for ln in body.split("\n")
-            if ln.startswith("data: ") and ln.strip() != "data:"
+            ln for ln in body.split("\n") if ln.startswith("data: ") and ln.strip() != "data:"
         ]
         assert len(data_lines) > 0, "expected at least one data frame"
         # Must end with the done sentinel.
@@ -759,9 +746,9 @@ class TestChatE2E:
 
         # The user message content should match what we sent.
         user_items = [item for item in items if item["role"] == "user"]
-        assert any(
-            "healing journey" in item["content"].lower() for item in user_items
-        ), "user message not found in history"
+        assert any("healing journey" in item["content"].lower() for item in user_items), (
+            "user message not found in history"
+        )
 
         # All items should have the correct system_key.
         for item in items:

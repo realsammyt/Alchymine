@@ -36,7 +36,7 @@ from __future__ import annotations
 from datetime import UTC, date, datetime, time
 from typing import Any
 
-from sqlalchemy import func, select
+from sqlalchemy import and_, func, or_, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -97,6 +97,7 @@ async def create_profile(
     intention: str,
     birth_time: time | None = None,
     birth_city: str | None = None,
+    birth_timezone: str | None = None,
     assessment_responses: dict[str, Any] | None = None,
     family_structure: str | None = None,
     intentions: list[str] | None = None,
@@ -121,6 +122,7 @@ async def create_profile(
         birth_date=birth_date,
         birth_time=birth_time,
         birth_city=birth_city,
+        birth_timezone=birth_timezone,
         intention=_primary,
         intentions=intentions,
         assessment_responses=assessment_responses,
@@ -293,6 +295,7 @@ async def create_report(
     user_input: str | None = None,
     user_profile: dict[str, Any] | None = None,
     user_id: str | None = None,
+    created_by_sub: str | None = None,
     report_type: str = "full",
 ) -> Report:
     """Insert a new report row.
@@ -311,6 +314,9 @@ async def create_report(
         Optional user profile dict forwarded to orchestrator.
     user_id:
         Optional FK to the ``users`` table.
+    created_by_sub:
+        JWT subject of the creator — used for ownership checks on orphan
+        reports (rows where ``user_id`` is ``NULL``).
     report_type:
         Report type identifier (default ``"full"``).
 
@@ -325,6 +331,7 @@ async def create_report(
         user_input=user_input,
         user_profile=user_profile,
         user_id=user_id,
+        created_by_sub=created_by_sub,
         report_type=report_type,
     )
     session.add(report)
@@ -341,6 +348,19 @@ async def get_report(session: AsyncSession, report_id: str) -> Report | None:
     return result.scalar_one_or_none()
 
 
+def _report_ownership_filter(user_id: str) -> Any:
+    """SQL criterion matching reports owned by *user_id*.
+
+    A report is owned when ``user_id`` matches directly, or — for orphan
+    rows created before the user row existed (``user_id IS NULL``) — when
+    ``created_by_sub`` matches the JWT subject.
+    """
+    return or_(
+        Report.user_id == user_id,
+        and_(Report.user_id.is_(None), Report.created_by_sub == user_id),
+    )
+
+
 async def list_reports_by_user(
     session: AsyncSession,
     user_id: str,
@@ -348,10 +368,14 @@ async def list_reports_by_user(
     skip: int = 0,
     limit: int = 20,
 ) -> list[Report]:
-    """Return a paginated list of reports for *user_id* (most recent first)."""
+    """Return a paginated list of reports owned by *user_id* (most recent first).
+
+    Includes orphan reports (``user_id IS NULL``) whose ``created_by_sub``
+    matches *user_id*.
+    """
     result = await session.execute(
         select(Report)
-        .where(Report.user_id == user_id)
+        .where(_report_ownership_filter(user_id))
         .order_by(Report.created_at.desc())
         .offset(skip)
         .limit(limit)
@@ -360,9 +384,9 @@ async def list_reports_by_user(
 
 
 async def count_reports_by_user(session: AsyncSession, user_id: str) -> int:
-    """Return total number of reports for *user_id*."""
+    """Return total number of reports owned by *user_id*."""
     result = await session.execute(
-        select(func.count()).select_from(Report).where(Report.user_id == user_id)
+        select(func.count()).select_from(Report).where(_report_ownership_filter(user_id))
     )
     return result.scalar_one()
 

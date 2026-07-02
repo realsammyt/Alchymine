@@ -17,9 +17,10 @@ All calculations are deterministic.
 from __future__ import annotations
 
 import math
-from datetime import date, time
+from datetime import UTC, date, datetime, time
 from enum import StrEnum
 from typing import Any
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from .aspects import calculate_aspects
 from .transits import (
@@ -219,11 +220,50 @@ def _lookup_city_coordinates(city: str) -> tuple[float, float] | None:
     return None
 
 
+def birth_datetime_to_utc(
+    birth_date: date,
+    birth_time: time,
+    birth_timezone: str,
+) -> tuple[date, time]:
+    """Convert a local birth date+time to UTC.
+
+    Parameters
+    ----------
+    birth_date : date
+        Wall-clock date of birth at the birth location.
+    birth_time : time
+        Wall-clock time of birth at the birth location.
+    birth_timezone : str
+        IANA timezone name of the birth location (e.g. "America/Toronto").
+
+    Returns
+    -------
+    tuple[date, time]
+        (utc_date, utc_time). The date can shift across midnight — a
+        late-evening birth west of Greenwich lands on the next UTC day,
+        and an early-morning birth east of Greenwich on the previous one.
+
+    Raises
+    ------
+    ValueError
+        If birth_timezone is not a known IANA timezone.
+    """
+    try:
+        tz = ZoneInfo(birth_timezone)
+    except (ZoneInfoNotFoundError, ValueError) as exc:
+        raise ValueError(f"Unknown IANA timezone: {birth_timezone!r}") from exc
+
+    local_dt = datetime.combine(birth_date, birth_time, tzinfo=tz)
+    utc_dt = local_dt.astimezone(UTC)
+    return utc_dt.date(), utc_dt.time()
+
+
 def approximate_ascendant(
     birth_date: date,
     birth_time: time,
     latitude: float,
     longitude: float,
+    birth_timezone: str | None = None,
 ) -> tuple[str, float]:
     """Approximate the Ascendant (Rising sign) for a given birth date/time/location.
 
@@ -239,17 +279,25 @@ def approximate_ascendant(
     birth_date : date
         Date of birth.
     birth_time : time
-        Time of birth (local time is assumed; for best accuracy, use UTC).
+        Time of birth. Treated as Universal Time unless birth_timezone
+        is provided, in which case it is the local wall-clock time.
     latitude : float
         Geographic latitude in degrees (positive N, negative S).
     longitude : float
         Geographic longitude in degrees (positive E, negative W).
+    birth_timezone : str | None
+        IANA timezone of the birth location. When provided, birth
+        date+time are converted to UTC before the sidereal-time math.
+        None preserves the legacy behavior (time treated as UT).
 
     Returns
     -------
     tuple[str, float]
         (rising_sign, rising_degree) where rising_degree is 0-360.
     """
+    if birth_timezone is not None:
+        birth_date, birth_time = birth_datetime_to_utc(birth_date, birth_time, birth_timezone)
+
     # Step 1: Approximate days since J2000.0
     ref = date(2000, 1, 1)
     days_since_j2000 = (birth_date - ref).days
@@ -490,6 +538,7 @@ def calculate_natal_chart(
     house_system: HouseSystem = HouseSystem.PLACIDUS,
     include_aspects: bool = True,
     include_minor_aspects: bool = False,
+    birth_timezone: str | None = None,
 ) -> dict[str, Any]:
     """Calculate a natal chart for the given birth data.
 
@@ -517,11 +566,24 @@ def calculate_natal_chart(
         Whether to calculate natal aspects (default True).
     include_minor_aspects : bool
         Whether to include minor aspects (default False).
+    birth_timezone : str | None
+        IANA timezone of the birth location (e.g. "America/Toronto").
+        When provided with birth_time, the wall-clock birth moment is
+        converted to UTC before all time-sensitive math (Julian day,
+        ascendant, houses). None preserves the legacy behavior of
+        treating birth_time as-is.
 
     Returns
     -------
     dict with keys matching AstrologyResponse fields.
     """
+    # Convert local wall-clock birth moment to UTC before any math.
+    # The date can shift across midnight in the conversion; the result
+    # dict still echoes the original (local) birth_date.
+    local_birth_date = birth_date
+    if birth_time is not None and birth_timezone is not None:
+        birth_date, birth_time = birth_datetime_to_utc(birth_date, birth_time, birth_timezone)
+
     # Resolve coordinates from city if not provided directly
     if latitude is None or longitude is None:
         if birth_city is not None:
@@ -530,10 +592,12 @@ def calculate_natal_chart(
                 latitude, longitude = coords
 
     # Step 1: Get core planetary positions (swisseph or approximate)
+    # birth_date/birth_time are already UTC here when a timezone was given.
     try:
         base_result = _calculate_with_swisseph(birth_date, birth_time, birth_city)
     except ImportError:
         base_result = _calculate_base_approximate(birth_date, birth_time)
+    base_result["birth_date"] = local_birth_date
 
     # Step 2: Get full planetary positions for aspects (always approximate-based)
     planetary_positions = _approximate_planetary_positions(birth_date)

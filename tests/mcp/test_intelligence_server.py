@@ -147,8 +147,10 @@ async def test_assess_personality_valid():
     assert "big_five" in result
     assert "enneagram" in result
     bf = result["big_five"]
-    assert all(k in bf for k in ["openness", "conscientiousness", "extraversion",
-                                  "agreeableness", "neuroticism"])
+    assert all(
+        k in bf
+        for k in ["openness", "conscientiousness", "extraversion", "agreeableness", "neuroticism"]
+    )
     assert all(0 <= v <= 100 for v in bf.values())
     enn = result["enneagram"]
     assert 1 <= enn["primary_type"] <= 9

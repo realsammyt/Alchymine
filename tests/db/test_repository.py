@@ -72,6 +72,33 @@ async def test_create_profile_full(session: AsyncSession) -> None:
     assert user.intake.family_structure == "single parent"
 
 
+@pytest.mark.asyncio
+async def test_create_profile_with_birth_timezone(session: AsyncSession) -> None:
+    """create_profile persists the IANA birth_timezone string."""
+    user = await create_profile(
+        session,
+        full_name="Timezone User",
+        birth_date=date(1992, 3, 15),
+        intention="family",
+        birth_timezone="America/Toronto",
+    )
+
+    assert user.intake.birth_timezone == "America/Toronto"
+
+
+@pytest.mark.asyncio
+async def test_create_profile_birth_timezone_defaults_none(session: AsyncSession) -> None:
+    """birth_timezone is optional — omitting it stores NULL (legacy behavior)."""
+    user = await create_profile(
+        session,
+        full_name="Legacy TZ User",
+        birth_date=date(1992, 3, 15),
+        intention="family",
+    )
+
+    assert user.intake.birth_timezone is None
+
+
 # ─── create_profile with intentions ────────────────────────────────────
 
 
@@ -392,13 +419,14 @@ async def test_update_layer_upsert_idempotent(session: AsyncSession) -> None:
     )
 
     # First call creates the identity layer
-    await update_layer(
-        session, user.id, "identity", {"numerology": {"life_path": 7}}
-    )
+    await update_layer(session, user.id, "identity", {"numerology": {"life_path": 7}})
 
     # Second call with same data should succeed (upsert, not duplicate)
     updated = await update_layer(
-        session, user.id, "identity", {"numerology": {"life_path": 7}, "archetype": {"name": "Sage"}}
+        session,
+        user.id,
+        "identity",
+        {"numerology": {"life_path": 7}, "archetype": {"name": "Sage"}},
     )
     assert updated.identity.numerology == {"life_path": 7}
     assert updated.identity.archetype == {"name": "Sage"}
@@ -626,6 +654,44 @@ async def test_count_reports_by_user_empty(session: AsyncSession) -> None:
     """count_reports_by_user returns 0 for unknown user."""
     count = await count_reports_by_user(session, "nobody")
     assert count == 0
+
+
+@pytest.mark.asyncio
+async def test_create_report_stores_created_by_sub(session: AsyncSession) -> None:
+    """create_report persists created_by_sub alongside user_id."""
+    await create_report(
+        session,
+        report_id="rpt-sub-1",
+        user_id="user-a",
+        created_by_sub="user-a",
+    )
+    fetched = await get_report(session, "rpt-sub-1")
+    assert fetched is not None
+    assert fetched.created_by_sub == "user-a"
+
+
+@pytest.mark.asyncio
+async def test_create_report_created_by_sub_defaults_none(session: AsyncSession) -> None:
+    """created_by_sub is optional — omitting it stores NULL (legacy rows)."""
+    await create_report(session, report_id="rpt-sub-2")
+    fetched = await get_report(session, "rpt-sub-2")
+    assert fetched is not None
+    assert fetched.created_by_sub is None
+
+
+@pytest.mark.asyncio
+async def test_list_reports_includes_orphans_owned_by_sub(session: AsyncSession) -> None:
+    """list/count include orphan reports (user_id NULL) matched via created_by_sub."""
+    await create_report(session, report_id="own-1", user_id="user-d", created_by_sub="user-d")
+    await create_report(session, report_id="own-2", user_id=None, created_by_sub="user-d")
+    await create_report(session, report_id="own-3", user_id=None, created_by_sub="someone-else")
+    await create_report(session, report_id="own-4", user_id=None, created_by_sub=None)
+
+    reports = await list_reports_by_user(session, "user-d")
+    assert {r.id for r in reports} == {"own-1", "own-2"}
+
+    count = await count_reports_by_user(session, "user-d")
+    assert count == 2
 
 
 # ═══════════════════════════════════════════════════════════════════════

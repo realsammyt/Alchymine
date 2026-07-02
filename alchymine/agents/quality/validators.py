@@ -202,7 +202,7 @@ def validate_wealth_output(output: dict) -> QualityGateResult:
         passed = False
         details.append(
             "Violation: wealth calculations must be deterministic, "
-            "not LLM-generated (ADR: financial data never sent to LLM)"
+            "not LLM-generated (ADR: server never sends financial data to any LLM)"
         )
 
     # Check calculations are present and numeric

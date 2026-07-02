@@ -17,6 +17,7 @@ from __future__ import annotations
 from datetime import date, datetime, time
 from enum import StrEnum
 from typing import Any
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
@@ -331,6 +332,11 @@ class IntakeData(BaseModel):
     full_name: str = Field(..., min_length=2, max_length=200)
     birth_date: date
     birth_time: time | None = Field(None, description="Optional: enables Rising sign")
+    birth_timezone: str | None = Field(
+        None,
+        description="Optional: IANA timezone of birth place (e.g. 'America/Toronto'); "
+        "converts birth time to UTC for chart math",
+    )
     birth_city: str | None = Field(None, description="Optional: enables house calculations")
     intention: Intention
     intentions: list[Intention] = Field(default_factory=list, description="1-3 user intentions")
@@ -339,6 +345,18 @@ class IntakeData(BaseModel):
     )
     wealth_context: WealthContext | None = None
     family_structure: str | None = None
+
+    @field_validator("birth_timezone")
+    @classmethod
+    def _validate_birth_timezone(cls, v: str | None) -> str | None:
+        """Reject timezone strings that are not known IANA names."""
+        if v is None:
+            return v
+        try:
+            ZoneInfo(v)
+        except (ZoneInfoNotFoundError, ValueError) as exc:
+            raise ValueError(f"Unknown IANA timezone: {v!r}") from exc
+        return v
 
     @model_validator(mode="after")
     def _auto_populate_intentions(self) -> IntakeData:
