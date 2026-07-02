@@ -283,42 +283,48 @@ def _calculate_payoff(
         if month > _MAX_PAYOFF_MONTHS:
             break
 
-        # Calculate available extra payment for this month
-        # Extra = budget minus minimums of still-active debts
         active_names = [name for name in priority_order if balances[name] > Decimal("0")]
-        active_minimums = sum(minimums[name] for name in active_names)
-        available_extra = monthly_budget - active_minimums
 
-        # Process each active debt
+        # Accrue interest first so payment caps reflect what is actually owed.
+        interests: dict[str, Decimal] = {}
+        owed: dict[str, Decimal] = {}
         for name in active_names:
-            balance = balances[name]
-            if balance <= Decimal("0"):
-                continue
-
-            # Calculate interest
-            interest = _monthly_interest(balance, rates[name])
+            interest = _monthly_interest(balances[name], rates[name])
+            interests[name] = interest
+            owed[name] = balances[name] + interest
             total_interest += interest
-            balance += interest
 
-            # Determine payment for this debt
-            payment = minimums[name]
+        # Pass 1: minimum payments, capped at what each debt actually owes.
+        payments: dict[str, Decimal] = {
+            name: min(minimums[name], owed[name]) for name in active_names
+        }
 
-            # First active debt in priority order gets the extra
-            if name == active_names[0] and available_extra > Decimal("0"):
-                payment += available_extra
+        # Pass 2: pour the remaining budget into debts in priority order,
+        # cascading past paid-off debts. Reserving nominal minimums instead
+        # would strand part of the budget on any debt's final payoff month,
+        # inflating months-to-payoff and total interest.
+        leftover = monthly_budget - sum(payments.values())
+        for name in active_names:
+            if leftover <= Decimal("0"):
+                break
+            room = owed[name] - payments[name]
+            if room <= Decimal("0"):
+                continue
+            add = min(room, leftover)
+            payments[name] += add
+            leftover -= add
 
-            # Cap payment at remaining balance
-            if payment > balance:
-                payment = balance
-
-            payment = payment.quantize(_DECIMAL_PLACES, rounding=ROUND_HALF_UP)
+        # Apply payments and record entries
+        for name in active_names:
+            interest = interests[name]
+            payment = payments[name].quantize(_DECIMAL_PLACES, rounding=ROUND_HALF_UP)
             principal = (payment - interest).quantize(_DECIMAL_PLACES, rounding=ROUND_HALF_UP)
 
             # Handle edge case where interest exceeds payment
             if principal < Decimal("0"):
                 principal = Decimal("0.00")
 
-            balance = (balance - payment).quantize(_DECIMAL_PLACES, rounding=ROUND_HALF_UP)
+            balance = (owed[name] - payment).quantize(_DECIMAL_PLACES, rounding=ROUND_HALF_UP)
 
             # Prevent tiny negative balances from rounding
             if balance < Decimal("0"):

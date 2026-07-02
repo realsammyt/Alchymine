@@ -468,6 +468,23 @@ class TestMultipleDebts:
             last_entry = schedule.entries[-1]
             assert last_entry.remaining_balance == Decimal("0.00")
 
+    def test_full_budget_used_when_secondary_debt_finishes(self) -> None:
+        """Budget freed by a debt's final (smaller) payment flows to the priority debt.
+
+        Debt A owes only $40 in month 1 but its nominal minimum is $50 —
+        the unused $10 must go to the priority debt B, not be stranded.
+        """
+        debt_a = _make_debt(
+            name="A", balance="40.00", interest_rate="0.00", minimum_payment="50.00"
+        )
+        debt_b = _make_debt(
+            name="B", balance="1000.00", interest_rate="20.00", minimum_payment="20.00"
+        )
+        # Avalanche order: B (20%) first, A (0%) second. Budget = 50+20+100 = 170.
+        result = calculate_avalanche([debt_a, debt_b], Decimal("100.00"))
+        month1 = [s.entries[0] for s in result.schedules if s.entries[0].month == 1]
+        assert sum(e.payment for e in month1) == Decimal("170.00")
+
 
 # ═══════════════════════════════════════════════════════════════════════════
 # Strategy Comparison Tests

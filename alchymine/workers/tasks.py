@@ -240,7 +240,10 @@ async def _db_populate_profiles(
 
             try:
                 normalized = _normalize_coordinator_data(system, data)
-                await repository.update_layer(session, user_id, layer, normalized)
+                # Savepoint per layer: a failed flush would otherwise poison the
+                # shared session and silently discard every remaining layer.
+                async with session.begin_nested():
+                    await repository.update_layer(session, user_id, layer, normalized)
             except Exception as exc:
                 logger.warning("Failed to populate %s profile for %s: %s", layer, user_id, exc)
 
