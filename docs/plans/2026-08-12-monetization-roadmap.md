@@ -12,7 +12,7 @@ Alchymine is a genuinely strong engine with no commercial surface and no second 
 
 Money can currently leave but not come in: two live cost holes exist today in the invite beta (uncapped Gemini art at ~$5k/day exposure per IP; an authenticated arbitrary-prompt Claude proxy with zero frontend callers).
 
-Unit economics are not the problem: ~$0.07-0.18 per full five-system report, ~$0.01-0.03 per chat message, >90% gross margin at every scale modelled. The path to revenue is roughly 12-14 weeks of solo work: ~4 weeks closing blockers (Phase 0), ~5 weeks building billing (Phase 1), then retention (Phase 2). Sell the artifact first ($79 one-time Blueprint + $299 founding lifetime), open the $19/mo subscription only after the retention spine exists. The product currently has a world-class first session and almost nothing for the second.
+Unit economics are not the problem: ~$0.07-0.18 per full five-system report, ~$0.01-0.03 per chat message, >90% gross margin at every scale modelled. The path to revenue is roughly 12-14 weeks of solo work: ~4 weeks closing blockers (Phase 0), ~5 weeks building billing (Phase 1), then retention (Phase 2). Sell the artifact first ($33 one-time Blueprint + $222 founding lifetime), open the $11/mo subscription only after the retention spine exists. The product currently has a world-class first session and almost nothing for the second.
 
 ## 2. Verdict: the value spine
 
@@ -36,13 +36,13 @@ Hybrid artifact-then-loop. Not subscription-only, not per-system.
 | Tier | Price | Contents | Notes |
 |------|-------|----------|-------|
 | **Snapshot** (free) | $0 | Birth-date-only numerology + archetype + today's transit line, <60s, no assessment | Fully deterministic, ~$0 COGS. Replaces the invite wall as top of funnel. No LLM, no PDF, no chat. |
-| **Blueprint** | $79 one-time | Full intake + assessment + five-system report + narratives + art + PDF + read-only system pages | COGS ~$0.20. The conversion event. Shippable the moment Phase 0 + Stripe land. A/B against $59 and $99. |
-| **Alchymine Pro** | $19/mo or $180/yr | Coach with profile+memory, ~300 msg/mo soft cap (degrade to Haiku, don't hard-block), practice library + streaks, server-side 90-day plan, weekly digest email, journey time series, quarterly report re-run with diff, 30 art images/mo, MCP API key | **Do not open for sale until Phase 2 exit criteria are met.** Selling monthly before the loop exists is the churn pattern that kills astrology apps. |
-| **Founding Member** | $299 lifetime, 100 seats | Everything, forever | Sold through the existing InviteCode table (max_uses/expires_at/is_active + admin UI already work). Converts beta + waitlist into cash during Phase 1; caps perpetual-COGS liability at 100 accounts; produces launch testimonials. |
+| **Blueprint** | $33 one-time (Master 33) | Full intake + assessment + five-system report + narratives + art + PDF + read-only system pages | COGS ~$0.20. The conversion event. Shippable the moment Phase 0 + Stripe land. A/B against $22 (Master Builder — thematically exact for a "Blueprint"). |
+| **Alchymine Pro** | $11/mo (Master 11) or $111/yr | Coach with profile+memory, ~222 msg/mo soft cap (degrade to Haiku, don't hard-block), practice library + streaks, server-side 90-day plan, weekly digest email, journey time series, quarterly report re-run with diff, 22 art images/mo, MCP API key | **Do not open for sale until Phase 2 exit criteria are met.** Selling monthly before the loop exists is the churn pattern that kills astrology apps. |
+| **Founding Member** | $222 lifetime, 111 seats | Everything, forever | Sold through the existing InviteCode table (max_uses/expires_at/is_active + admin UI already work). Converts beta + waitlist into cash during Phase 1; caps perpetual-COGS liability at 111 accounts; produces launch testimonials. |
 
-Blueprint credits toward the first year of Pro ($79 off annual within 30 days), making the one-time SKU a subscription funnel rather than a cannibal.
+Blueprint credits toward the first year of Pro ($33 off the $111 annual within 33 days), making the one-time SKU a subscription funnel rather than a cannibal.
 
-**Pricing rationale:** $19 sits in the verified empty band between astrology/wellness ($9.99-14.99: CHANI, The Pattern, Headspace, Calm, Insight Timer) and AI coaching ($20-49). The deterministic wealth engine is the permission to price above the astrology band. $180/yr is deliberately only a 21% discount (not the ~60% Calm ratio) because the annual price must fund a year of real inference. **Do not finalize the Pro price until 2-4 weeks of real usage_records data from the beta cohort sets p95 cost-per-active-user.**
+**Pricing rationale (revised 2026-08-12, owner decision — numerology-aligned, undeniable):** Prices are drawn from the product's own number system, so the pricing IS a marketing story: Blueprint $33 (Master Teacher — the report that teaches you yourself; A/B $22, Master Builder), Pro $11/mo (Master 11, intuition — the coach surface) or $111/yr, Founding $222 (partnership) × 111 seats, with on-theme meters (222 messages, 22 images). The undeniability logic: $33 sits at the bottom of the one-time deep-report band ($25-90) for an artifact the review independently valued at $79 — the buyer is offered a thing at less than half its assessed worth. $11 lands inside the astrology band (CHANI $11.99, The Pattern) while shipping five systems plus a coach, so the comparison becomes "CHANI's price, five engines." Trade-offs accepted: per-unit revenue roughly halves versus the $79/$19 scheme, betting on conversion volume; the premium-above-the-band story is deferred — the wealth engine becomes price-rise headroom rather than launch positioning. Raising prices later is harder than lowering them, so frame $11/$33 explicitly as launch pricing and grandfather early buyers. $111/yr is a ~16% annual discount (deliberately far from Calm's ~60%; the annual price must fund a year of real inference). Margin floor at $11 depends on the meters: a heavy Pro user at the 222-message cap costs ~$3/mo (~72% margin worst case); blended ~$0.28 keeps >90%. **Still true and now more binding: do not finalize until 2-4 weeks of real usage_records data sets p95 cost-per-active-user.**
 
 **What gates cleanly** (single chokepoint, countable, real cost): report generation (reports.py:137), chat messages (chat.py:332), art (generative_art.py:192), PDF export.
 **What does not:** gating by systems unlocked — intent.py:241-246 forces all five coordinators in one pass, so withholding systems saves zero COGS. Gate narrative depth and regeneration instead. MCP cannot be an entitlement until transport.py gets per-user API keys (it has no auth at all today).
@@ -125,7 +125,7 @@ Grouped; full detail with file:line citations lives in the phase items below.
 | Stop leaking tracebacks to customers | days | tasks.py stores format_exc() as report.error and the frontend renders it. Store a user-safe message; log the traceback. |
 | Stop paying for tokens after disconnect | days | One-line `await request.is_disconnected()` check in the chat stream loop. |
 | Age gate + email verification + legible disclaimers | days | 18+ at signup/intake; email_verified before receipts; raise report disclaimers from 0.6rem/20% opacity (the product's own ethics_check bans buried terms). |
-| Admin revenue + cost/margin views | days | /analytics/revenue (MRR, ARPU, churn, failed payments) + /analytics/costs (spend per user, margin per plan, top-20 costliest accounts). The margin view is what tells you whether $19 works. |
+| Admin revenue + cost/margin views | days | /analytics/revenue (MRR, ARPU, churn, failed payments) + /analytics/costs (spend per user, margin per plan, top-20 costliest accounts). The margin view is what tells you whether $11 works. |
 | Contributor IP + dual-license | days | No CLA/DCO exists while LICENSE already names "Alchymine Contributors" as joint holders — every outside merge adds a consent needed to relicense. Add DCO now; CC-BY-NC-SA stays on the public repo as trust asset; separate proprietary grant covers the hosted service. CC 4.0's anti-TPM clause conflicts with app-store terms. Days now, potentially unresolvable later. |
 
 ## 7. Phase 2 — Retention & value spine (~5-7 weeks; Pro opens only at exit)
@@ -138,7 +138,7 @@ Grouped; full detail with file:line citations lives in the phase items below.
 |------|--------|-----------|
 | Mount the healing practice library | 1-2 wks | 15 evidence-rated practices, API, client fn, finished drawer with Start Practice button — all with zero call sites. Largest built-but-invisible asset in the repo. Add completion logging for all 15. |
 | Real Today card from the transit engine | 1-2 wks | transits.py implements exactly the daily mechanism Co-Star/The Pattern charge for — no route, no UI. Combine with biorhythm + next plan item; delete the 5 hardcoded "For You Today" strings. ~$0/user/day COGS. |
-| Full lifecycle email suite | 1-2 wks | Day-1 welcome, weekly digest (transit + practice + wealth check-in), day-30/60/90 transitions with regenerate offer. PRD §10.4, entirely unbuilt. Converts $79-one-time into defensible $19/mo. |
+| Full lifecycle email suite | 1-2 wks | Day-1 welcome, weekly digest (transit + practice + wealth check-in), day-30/60/90 transitions with regenerate offer. PRD §10.4, entirely unbuilt. Converts $33-one-time into defensible $11/mo. |
 | 90-day plan server-side + cross-system | 1-2 wks | Currently localStorage-only (cache clear wipes a paying user's progress), generic constants, buried at line 1104. plan_progress table, personalized actions, above the fold, beyond wealth-only. |
 | Rebuild /journey as a time series | 1-2 wks | All milestones flip simultaneously at report creation → reads 100% forever. Replace with dated events: mood over weeks, completions, plan days, regenerations. Answers "am I different than in March?" |
 | Personal cross-system bridges | days | Panels show identical frozen XS-01..07 cards to every user; the personalized functions already exist and feed the dashboard. Swap them in — integration is the stated moat. |
@@ -154,12 +154,12 @@ Grouped; full detail with file:line citations lives in the phase items below.
 
 **Goal:** Get the Blueprint in front of the one audience that pays; turn buyers into distribution. Solo-operator motions only; no paid acquisition until CAC is measurable against known LTV.
 
-**Exit:** One repeatable channel producing Blueprint sales without manual recruiting; at least one motion with CAC below one-third of $79.
+**Exit:** One repeatable channel producing Blueprint sales without manual recruiting; at least one motion with CAC below one-third of $33.
 
 - **Pick one ICP and rewrite the hero** (days): the self-employed seeker-builder, 30-45, solo creator/consultant, $60-150k, already paying for an astrology app + Calm + a course. Test: "The operating system for people building a life and a business at the same time." Lead with the collision of inner work and money math — the wealth engine is the pricing permission and the current hero buries it.
-- **Founding Member launch** (days): 100 seats × $299 through the existing InviteCode table.
+- **Founding Member launch** (days): 111 seats × $222 through the existing InviteCode table.
 - **Free Snapshot as top of funnel** (1-2 wks): value in <60s before the 67-question wall; competitors deliver a first personalized hit in under a minute.
-- **Blueprint drops into one narrow community** (1-2 wks): 20 free reads in public, anonymized PDFs published. The report is the marketing asset. Highest-signal test of whether $79 holds.
+- **Blueprint drops into one narrow community** (1-2 wks): 20 free reads in public, anonymized PDFs published. The report is the marketing asset. Highest-signal test of whether $33 converts at volume.
 - **MCP directory distribution** (1-2 wks): five MCP servers shipped, no competitor has this surface, lands directly on the AI-native ICP. Prerequisite: per-user MCP API keys (transport has no auth today).
 - **Compatibility as the referral surface** (days): 334-line router complete and tested, zero UI. "Run this with your partner" is the natural viral loop. Highest value-per-hour on the growth list.
 - **Build in public on transparency, not "open source"** (1-2 wks): weekly engine teardowns convert the skeptics; don't lead with open source (invites "then why pay?") — frame as auditable methodology.
@@ -174,7 +174,7 @@ Grouped; full detail with file:line citations lives in the phase items below.
 - **Opus fallback**: the chain Sonnet→Haiku→Opus makes the final hop a ~5x escalation triggered by 529s that correlate across tenants — every concurrent report escalates at once. Drop or plan-gate Opus.
 - **Gemini severity**: confirmed blocker (zero guardrails in the file, ~hour of work to fix).
 - **"Nothing brings users back day 2" vs "one-time SKU shippable now"**: both true — it blocks the subscription, not the artifact. Hence artifact-first packaging.
-- **Pricing spread** ($59 vs $79-129): settled $79 with $59/$99 A/B.
+- **Pricing spread** ($59 vs $79-129): the synthesis settled $79 with a $59/$99 A/B. Superseded 2026-08-12 by owner decision: numerology-aligned undeniable pricing ($33/$11/$111/$222) — see §3. The review's $79 value assessment stands as evidence of underpricing, which is the point.
 
 **Standing risks:**
 1. **Solo-operator bandwidth is the dominant risk**, not any technical item. Phases 0+1 are 8-10 weeks with no slack. Cut scope (wealth build, demo-gap build are safely deferrable with corrected copy), never compress schedule.
@@ -182,22 +182,22 @@ Grouped; full detail with file:line citations lives in the phase items below.
 3. **Regulatory surface rises with payment**: not-financial-advice and not-medical-advice must live in ToS and marketing, not just prompt-level disclaimers. Breathwork is the sharpest edge.
 4. **License decay is silent and compounding**: every outside merge without DCO adds a relicensing veto. Days now, unresolvable later.
 5. **Single droplet, no offsite backup, no alerting**: the most likely incident destroys data and backups together, unpaged.
-6. **Metering before pricing is a hard dependency**: $19 without 2-4 weeks of usage_records is a guess wrong in either direction.
+6. **Metering before pricing is a hard dependency**: $11 without 2-4 weeks of usage_records is a guess wrong in either direction — and the lower price leaves less room for the guess to be wrong on the high-cost side.
 7. **`get_current_account()` before Stripe** is the single most expensive ordering constraint (else retrofit 25 routers).
-8. **Positioning is coupled to the wealth build**: the $19 slot is only defensible with the wealth engine visible in the pitch, which is uncomfortable while calculations = {}.
+8. **Positioning after the pricing revision**: at $11 the product sits inside the astrology band rather than above it, so launch positioning no longer depends on the wealth build (it becomes upsell and price-rise headroom instead — the coupling risk is deferred, not gone). The flip side: margin now leans harder on the chat meter, the Haiku degrade path, and the 222-message cap actually being enforced.
 
 ## 10. Success metrics (gates, not vanity)
 
 - **Phase 0 — cost**: 0 unguarded LLM/Gemini call sites (today: 4 of 7); verified per-account daily spend cap; 100% of completions writing usage_records with tokens + cost_micros (today: 0%).
 - **Phase 0 — trust**: legal pages live + consent; deletion <60s end-to-end; full export; contraindications visible before first timer start.
 - **Phase 0 — credibility**: 9/10 chat spot-checks reference the user's own profile; scripted engaged-user sim scores >45 and rising (today ~0); rising sign for 95%+ of test cities or birth-time collection removed; fresh droplet build renders a PDF first try.
-- **Phase 1 — revenue**: 25 paying Blueprints in 30 days; checkout completion >45% from pricing page; disputes <0.5%; refunds <8% in 60 days.
+- **Phase 1 — revenue**: 33 paying Blueprints in 30 days (raised from 25 — the $33 price is a volume bet and should convert harder); checkout completion >45% from pricing page; disputes <0.5%; refunds <8% in 60 days.
 - **Phase 1 — funnel**: signup→report >40%; report→day-1 return >25% (near zero today); report-ready email open >55%.
 - **Phase 1 — ops**: p95 report <180s, completion >97%; error time-to-detection <5 min; zero reports stuck >15 min; offsite pg_dump verified every morning.
-- **Phase 1 — economics**: cost per Blueprint ≤$0.30 all-in; margin >95%; p95 cost per active user <$4/mo (the number that validates $19).
+- **Phase 1 — economics**: cost per Blueprint ≤$0.30 all-in; margin >95%; p95 cost per active user <$2.75/mo, i.e. 25% of $11 (the number that validates the Pro price).
 - **Phase 2 — retention**: day-30 Blueprint >35%; Pro m1→m2 >70%, m3 >55%; digest open >40% CTR >12%; 30%+ of Pro logging ≥8 practices/mo.
 - **Phase 2 — conversion**: Blueprint→Pro >20% within 60 days; trial→paid >25% (the gate on opening Pro at all).
-- **Phase 3 — growth**: one channel at 20+ Blueprints/mo unassisted; blended CAC <$25; compatibility referral →second signup on 15%+ of runs; 12-month LTV >$150.
+- **Phase 3 — growth**: one channel at 20+ Blueprints/mo unassisted; blended CAC <$11 (one-third of the $33 price); compatibility referral →second signup on 15%+ of runs; 12-month LTV >$77 (Blueprint plus roughly four Pro months).
 - **North star**: MRR + one-time revenue tracked against p95 cost per active user in the same admin view.
 
 ## 11. First moves (this week)
