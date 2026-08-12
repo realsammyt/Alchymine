@@ -4,8 +4,8 @@
 > what's next. Any agent starting fresh reads this first, then updates it before
 > ending. If anything here disagrees with reality, reality wins — fix the doc.
 
-**Last updated:** 2026-07-02 by Claude (with Tyler)
-**Active branch:** `fix/review-findings` (PR #210, CI green, awaiting merge)
+**Last updated:** 2026-08-12 by Claude (with Tyler)
+**Active branch:** `main` (PRs #209 + #210 merged; main CI green as of 2026-08-12)
 **Driving plan / refs:** project `CLAUDE.md` (commands, CI protocol), `Alchymine PRD v7 FiveSystem.docx`
 
 ---
@@ -49,8 +49,11 @@ Statuses: `Not started` · `In progress` · `Blocked` · `Done`.
 | 2 | Finding 1: birth time local→UTC conversion | Done | 2026-07-02 | PR #210, all 10 CI checks green — awaiting merge |
 | 3 | Finding 2: wealth MCP vs "no financial data to LLM" rule | Done | 2026-07-02 | PR #210, promise rescoped + tool disclosures — awaiting merge |
 | 4 | Finding 3: orphaned reports readable by any authed user | Done | 2026-07-02 | PR #210, `created_by_sub` + ownership helper — awaiting merge |
+| 5 | Monetization roadmap (7-lens agent review + synthesis) | Done | 2026-08-12 | `docs/plans/2026-08-12-monetization-roadmap.md` — 16 blockers, 4 phases, pricing model |
 
-**Next action:** merge PR #210 (squash), pull main, delete branch.
+**Next action:** (1) live-check PDF export on production (`GET /reports/{id}/pdf` — likely broken, worker built from Dockerfile.api without Chromium); (2) ship the cost-exposure hardening PR (uncapped Gemini art, /stream/narrative proxy, Opus fallback); (3) `/plan` Phase 0 of the roadmap.
+
+_Correction 2026-08-12: PR #210 was already merged 2026-07-02 11:54 UTC; the "awaiting merge" status above was stale._
 
 ---
 
@@ -82,6 +85,7 @@ _None currently._
 
 ## 7. Activity log (newest first — append, don't overwrite)
 
+- **2026-08-12** — Ran 7-lens product/monetization review (8 agents: 4 opus + 3 sonnet lenses + opus synthesis, all findings file-verified). Wrote `docs/plans/2026-08-12-monetization-roadmap.md`: $33 Blueprint one-time → $11/mo Pro (gated on retention spine), $222×111 founding lifetime — numerology-aligned undeniable pricing (11/22/33/111/222) per Tyler, revised same day from the synthesis's $79/$19; 16 blockers incl. likely-broken prod PDF (worker image lacks Chromium), uncapped Gemini endpoint (~$5k/day exposure), no ToS/Privacy, no entitlement model. Discovered PR #210 was already merged 2026-07-02 (handoff was stale); PR #209 (web API request timeout) marked ready and squash-merged same day, all main CI workflows green.
 - **2026-07-02** — Fixed all 3 findings via 3-agent team on `fix/review-findings`; PR #210 opened, 2317 backend + 333 web tests green, all 10 CI checks green. Backend test count grew to 2317 (was 2281).
 - **2026-07-02** — Merged PR #206 (7 review fixes + CI fixes). Created this handoff. Next: 3 remaining findings via agent team.
 - **2026-07-01** — Full-project review (4 parallel review agents). Fixed: gemini mypy, tsc test error, session poisoning in workers, /reports/diagnose shadowing, CORS/rate-limit order, feedback email HTML injection, debt waterfall math, chat history clobbering. All gates + CI green.
