@@ -5,10 +5,13 @@ single user message, persists it, streams the LLM reply back to the
 client as Server-Sent Events, and persists the full assistant reply
 when streaming completes.
 
-Safety: the user input is run through the same prompt-injection /
-harmful-content patterns used by ``alchymine/api/routers/streaming.py``
-before any LLM call is made.  Blocked content returns HTTP 400 with no
-LLM round-trip.
+Safety: the user input is run through prompt-injection and
+harmful-content patterns before any LLM call is made.  Blocked content
+returns HTTP 400 with no LLM round-trip.
+
+This is the only streaming LLM surface.  The old ``/stream/narrative``
+proxy, which took an arbitrary prompt and had no frontend caller, was
+removed rather than capped.
 
 Guardrails added in Sprint 5 (#165):
 - **History cap**: 200 user messages per user per system_key.  Beyond
@@ -43,7 +46,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
-# ─── Safety patterns (mirrored from streaming.py) ──────────────────────
+# ─── Safety patterns ───────────────────────────────────────────────────
 
 
 _BLOCKED_PATTERNS = [
