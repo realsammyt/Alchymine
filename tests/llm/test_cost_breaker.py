@@ -155,6 +155,20 @@ class TestGeminiChokepoint:
         client._client.aio.models.generate_content.assert_not_called()
 
 
+@pytest.mark.asyncio(loop_scope="function")
+class TestModelFallbackChain:
+    """The 529-overload fallback chain must never escalate to a pricier model."""
+
+    async def test_chain_holds_no_opus_model(self) -> None:
+        assert not any("opus" in model for model in LLMClient.CLAUDE_MODELS)
+
+    async def test_chain_is_sonnet_then_haiku(self) -> None:
+        assert LLMClient.CLAUDE_MODELS == [
+            "claude-sonnet-4-6",
+            "claude-haiku-4-5-20251001",
+        ]
+
+
 class TestBreakerScope:
     async def test_claude_and_gemini_share_one_global_budget(self, cost_meter_db) -> None:
         """One breaker, not one per vendor — the bill is a single number."""

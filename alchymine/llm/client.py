@@ -489,11 +489,16 @@ class LLMClient:
         for word in fallback_text.split():
             yield word + " "
 
-    # Model fallback chain: Sonnet (fast/cheap) → Haiku (backup) → Opus (last resort)
+    # Model fallback chain, walked on 529 (overloaded): Sonnet, then Haiku.
+    # Both hops go down in price. Opus used to sit on the end as a "last
+    # resort", which meant a provider-side overload silently upgraded every
+    # request to the most expensive model available — the opposite of what a
+    # fallback should do. It could come back as a plan-gated option once
+    # there is an entitlement to gate on; User has no plan field today, so
+    # there is nothing to check.
     CLAUDE_MODELS = [
         "claude-sonnet-4-6",
         "claude-haiku-4-5-20251001",
-        "claude-opus-4-6",
     ]
 
     async def _stream_claude(
