@@ -1,6 +1,11 @@
 """Tests for the Gemini image generation client.
 
 These tests never hit the real Gemini API — every call is mocked.
+
+Tests that reach the ``generate_content`` call take ``cost_meter_db``:
+generate_image charges the global spend breaker just before egress, and
+that meter fails closed, so without a counter table they would see
+CostCeilingExceeded instead of the behaviour under test.
 """
 
 from __future__ import annotations
@@ -63,7 +68,7 @@ def test_client_unavailable_when_sdk_missing() -> None:
 
 
 @pytest.mark.asyncio
-async def test_generate_image_returns_result_on_success() -> None:
+async def test_generate_image_returns_result_on_success(cost_meter_db) -> None:
     """Successful SDK call yields a GeminiImageResult with decoded bytes."""
     raw_bytes = b"\x89PNG\r\n\x1a\nfake-image-payload"
 
@@ -101,7 +106,7 @@ async def test_generate_image_returns_result_on_success() -> None:
 
 
 @pytest.mark.asyncio
-async def test_generate_image_returns_none_on_sdk_exception() -> None:
+async def test_generate_image_returns_none_on_sdk_exception(cost_meter_db) -> None:
     """Network or auth errors are logged and swallowed — never raised."""
     fake_genai_module = MagicMock()
     fake_client = MagicMock()
@@ -118,7 +123,7 @@ async def test_generate_image_returns_none_on_sdk_exception() -> None:
 
 
 @pytest.mark.asyncio
-async def test_generate_image_returns_none_when_no_image_part() -> None:
+async def test_generate_image_returns_none_when_no_image_part(cost_meter_db) -> None:
     """Response with no inline image data returns None gracefully."""
     fake_response = MagicMock()
     fake_response.candidates = []

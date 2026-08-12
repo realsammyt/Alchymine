@@ -35,6 +35,7 @@ from alchymine.agents.growth.system_prompts import build_system_prompt
 from alchymine.api.auth import get_current_user
 from alchymine.api.deps import get_db_session
 from alchymine.db import repository
+from alchymine.db.usage_counters import CostCeilingExceeded
 from alchymine.llm.client import LLMClient
 
 logger = logging.getLogger(__name__)
@@ -283,6 +284,7 @@ async def _chat_event_stream(
     client = LLMClient()
     full_reply: list[str] = []
     blocked = False
+    unavailable = False
 
     try:
         async for chunk in client.stream_generate(
@@ -299,6 +301,16 @@ async def _chat_event_stream(
                 yield "event: error\ndata: Response blocked by safety filter\n\n"
                 break
             yield f"data: {chunk}\n\n"
+    except CostCeilingExceeded:
+        # The response already started, so there is no status code left to
+        # set — the state ships as an error frame the client renders. Text
+        # only: the user does not need our meter names or scope ids.
+        unavailable = True
+        yield (
+            "event: error\n"
+            "data: The assistant is taking a short break while we catch up on "
+            "demand. Please try again later.\n\n"
+        )
     except Exception as exc:  # pragma: no cover - defensive
         logger.exception("Chat streaming failed: %s", exc)
         yield "event: error\ndata: Streaming failed\n\n"
@@ -310,6 +322,8 @@ async def _chat_event_stream(
         assistant_text = "".join(full_reply)
         if blocked:
             assistant_text = "[response blocked by safety filter]"
+        elif unavailable:
+            assistant_text = "[assistant temporarily unavailable]"
         await repository.save_chat_message(
             session,
             user_id=user_id,

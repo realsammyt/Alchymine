@@ -21,6 +21,8 @@ from dataclasses import dataclass, field
 from enum import StrEnum
 
 from alchymine.config import get_settings
+from alchymine.db.usage_counters import CostCeilingExceeded
+from alchymine.llm.cost_guard import charge_paid_call
 
 logger = logging.getLogger(__name__)
 
@@ -385,6 +387,11 @@ class LLMClient:
                     result.output_tokens,
                 )
                 return result
+            except CostCeilingExceeded:
+                # Not a backend failure. Falling through to Ollama (or to
+                # the canned fallback text) would hand the user a made-up
+                # answer while the real state is "spending is capped".
+                raise
             except Exception as exc:
                 logger.warning("[LLM] Claude API failed: %s — trying Ollama fallback", exc)
 
@@ -454,6 +461,9 @@ class LLMClient:
                 ):
                     yield chunk
                 return
+            except CostCeilingExceeded:
+                # See generate(): a tripped breaker is not a backend outage.
+                raise
             except Exception as exc:
                 logger.warning("Claude streaming failed, trying Ollama fallback: %s", exc)
 
@@ -499,6 +509,11 @@ class LLMClient:
         """
         import anthropic
 
+        # Charged once per request, not once per fallback attempt: the
+        # retries below exist because a model was overloaded, and the user
+        # asked for one answer.
+        await charge_paid_call()
+
         client = anthropic.AsyncAnthropic(api_key=self._anthropic_key, timeout=90.0)
         last_exc: Exception | None = None
 
@@ -540,6 +555,9 @@ class LLMClient:
         Tries each model in CLAUDE_MODELS until one succeeds.
         """
         import anthropic
+
+        # See _stream_claude: one charge per request, not per fallback hop.
+        await charge_paid_call()
 
         client = anthropic.AsyncAnthropic(api_key=self._anthropic_key, timeout=90.0)
         last_exc: Exception | None = None

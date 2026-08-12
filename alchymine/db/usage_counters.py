@@ -127,15 +127,14 @@ async def increment_and_get(
     async with _counter_session() as session:
         bind = session.get_bind()
         insert = sqlite_insert if bind.dialect.name == "sqlite" else pg_insert
-        table = UsageCounter.__table__
         stmt = (
-            insert(table)
+            insert(UsageCounter)
             .values(scope=scope, meter=meter, period_key=key, count=amount)
             .on_conflict_do_update(
                 index_elements=["scope", "meter", "period_key"],
-                set_={"count": table.c.count + amount, "updated_at": datetime.now(UTC)},
+                set_={"count": UsageCounter.count + amount, "updated_at": datetime.now(UTC)},
             )
-            .returning(table.c.count)
+            .returning(UsageCounter.count)
         )
         result = await session.execute(stmt)
         new_count = result.scalar_one()

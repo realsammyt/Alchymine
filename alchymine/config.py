@@ -76,6 +76,19 @@ class Settings(BaseSettings):
     # are resolved against the project root at runtime).
     art_cache_dir: str = "data/generated_images"
 
+    # ── Cost ceilings ────────────────────────────────────────────────────
+    # PLACEHOLDER NUMBERS. Both are deliberately arbitrary stand-ins so the
+    # mechanism ships enforced rather than dormant; Tyler sets the real
+    # figures from actual traffic and the monetization roadmap.
+    #
+    # The breaker counts *calls*, not tokens or dollars. Per-token spend
+    # accounting is a separate roadmap item — a call count is enough to stop
+    # a runaway loop or a scraped key from billing all night.
+    # ponytail: swap the count for a token/dollar ledger once per-call cost
+    # varies enough that a flat call count stops approximating spend.
+    global_daily_llm_call_ceiling: int = 1000
+    daily_art_generations_per_user: int = 3
+
     # ── Celery ───────────────────────────────────────────────────────────
     celery_broker_url: str = "redis://localhost:6379/1"
     celery_result_backend: str = "redis://localhost:6379/2"

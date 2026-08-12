@@ -9,8 +9,9 @@ from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime
 
-from fastapi import APIRouter, FastAPI
+from fastapi import APIRouter, FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
 from alchymine import __version__
 from alchymine.api.deps import create_tables_if_enabled, dispose_engine
@@ -47,6 +48,7 @@ from alchymine.api.routers import (
     wealth,
 )
 from alchymine.config import get_settings
+from alchymine.db.usage_counters import CostCeilingExceeded
 from alchymine.mcp.transport import mount_all_mcp_routers
 
 
@@ -116,6 +118,32 @@ app.add_middleware(
     allow_headers=["*"],
 )
 app.add_middleware(RequestIdMiddleware)
+
+
+# Exception handlers. Registered on the app, so they run inside the
+# middleware stack and produce a real response — ErrorHandlerMiddleware
+# never sees these and never flattens them into a generic 500.
+@app.exception_handler(CostCeilingExceeded)
+async def _cost_ceiling_handler(request: Request, exc: CostCeilingExceeded) -> JSONResponse:
+    """Render a tripped cost ceiling as a structured "come back later" state.
+
+    503 rather than 429: the ceiling is ours, not something this caller
+    did wrong, and it clears on a schedule we can name.
+    """
+    return JSONResponse(
+        status_code=503,
+        content={
+            "detail": {
+                "code": "llm_temporarily_unavailable",
+                "message": (
+                    "This feature is taking a short break while we catch up on demand. "
+                    "Please try again later."
+                ),
+                "retry_at": exc.retry_at.isoformat(),
+            }
+        },
+    )
+
 
 # Routers
 app.include_router(health.router, tags=["health"])

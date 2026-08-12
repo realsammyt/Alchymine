@@ -91,7 +91,9 @@ class TestLLMClientClaude:
         mock_usage = type("Usage", (), {"input_tokens": 100, "output_tokens": 50})()
         return type("Response", (), {"content": [mock_block], "usage": mock_usage})()
 
-    async def test_claude_generation(self, mock_claude_response):
+    async def test_claude_generation(self, mock_claude_response, cost_meter_db):
+        # cost_meter_db: _generate_claude charges the global spend breaker
+        # before it calls out, and that meter fails closed.
         with patch.dict("os.environ", {"ANTHROPIC_API_KEY": "test-key"}, clear=False):
             client = LLMClient()
 

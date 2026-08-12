@@ -126,3 +126,39 @@ def sample_personality(sample_big_five: BigFiveScores) -> PersonalityProfile:
         enneagram_type=2,
         enneagram_wing=3,
     )
+
+
+@pytest.fixture
+async def cost_meter_db():
+    """Point the cost meters at a fresh, empty in-memory usage-counter table.
+
+    The LLM and Gemini chokepoints charge every paid call against the
+    global breaker, and that meter FAILS CLOSED — an unreachable counter
+    blocks the call. Any test that reaches a real egress path therefore
+    needs a working counter table, or it will see CostCeilingExceeded
+    instead of the behaviour it meant to exercise.
+
+    Tests that mock ``_generate_claude`` / ``_stream_claude`` / the whole
+    ``GeminiClient`` never reach the meter and do not need this fixture.
+    """
+    from sqlalchemy.ext.asyncio import create_async_engine
+
+    import alchymine.db.models  # noqa: F401 — register models with metadata
+    from alchymine.api.deps import set_db_engine
+    from alchymine.db.models import UsageCounter
+
+    engine = create_async_engine(
+        "sqlite+aiosqlite:///:memory:",
+        connect_args={"check_same_thread": False},
+    )
+    async with engine.begin() as conn:
+        await conn.run_sync(UsageCounter.__table__.create)
+
+    set_db_engine(engine)
+    try:
+        yield engine
+    finally:
+        # None resets the singleton, matching how the other DB-backed
+        # test modules tear their engines down.
+        set_db_engine(None)
+        await engine.dispose()
