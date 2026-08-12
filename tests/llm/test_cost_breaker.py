@@ -23,7 +23,6 @@ from alchymine.db.usage_counters import (
 from alchymine.llm.client import LLMClient
 from alchymine.llm.gemini import GeminiClient
 
-
 pytestmark = pytest.mark.asyncio
 
 
@@ -131,9 +130,7 @@ class TestGeminiChokepoint:
 
         assert await get_count(scope=GLOBAL_SCOPE, meter=METER_LLM_CALLS) == 1
 
-    async def test_tripped_breaker_raises_instead_of_returning_none(
-        self, cost_meter_db
-    ) -> None:
+    async def test_tripped_breaker_raises_instead_of_returning_none(self, cost_meter_db) -> None:
         """The silent-None path must not swallow a tripped breaker.
 
         generate_image returns None for "no image available" — if the
@@ -155,7 +152,6 @@ class TestGeminiChokepoint:
         client._client.aio.models.generate_content.assert_not_called()
 
 
-@pytest.mark.asyncio(loop_scope="function")
 class TestModelFallbackChain:
     """The 529-overload fallback chain must never escalate to a pricier model."""
 
@@ -215,6 +211,4 @@ class TestBreakerScope:
             with patch("anthropic.AsyncAnthropic", return_value=fake_sdk):
                 await client._generate_claude("system", "user", 100, 0.5)
 
-        assert (
-            await get_count(scope=GLOBAL_SCOPE, meter=METER_LLM_CALLS, period_key=tomorrow) == 1
-        )
+        assert await get_count(scope=GLOBAL_SCOPE, meter=METER_LLM_CALLS, period_key=tomorrow) == 1

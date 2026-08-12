@@ -142,9 +142,7 @@ class TestChatStreamSurface:
             _blocked,
         )
 
-        with client.stream(
-            "POST", "/api/v1/chat", json={"message": "hello there"}
-        ) as response:
+        with client.stream("POST", "/api/v1/chat", json={"message": "hello there"}) as response:
             body = "".join(response.iter_text())
 
         assert "event: error" in body
@@ -164,9 +162,7 @@ class TestChatStreamSurface:
             _blocked,
         )
 
-        with client.stream(
-            "POST", "/api/v1/chat", json={"message": "hello there"}
-        ) as response:
+        with client.stream("POST", "/api/v1/chat", json={"message": "hello there"}) as response:
             body = "".join(response.iter_text())
 
         for leak in ("Traceback", "CostCeilingExceeded", "llm_calls", "global"):
