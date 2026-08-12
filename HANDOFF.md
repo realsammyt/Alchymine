@@ -49,7 +49,8 @@ Statuses: `Not started` · `In progress` · `Blocked` · `Done`.
 | 2 | Finding 1: birth time local→UTC conversion | Done | 2026-07-02 | PR #210, all 10 CI checks green — awaiting merge |
 | 3 | Finding 2: wealth MCP vs "no financial data to LLM" rule | Done | 2026-07-02 | PR #210, promise rescoped + tool disclosures — awaiting merge |
 | 4 | Finding 3: orphaned reports readable by any authed user | Done | 2026-07-02 | PR #210, `created_by_sub` + ownership helper — awaiting merge |
-| 5 | Monetization roadmap (7-lens agent review + synthesis) | Done | 2026-08-12 | `docs/plans/2026-08-12-monetization-roadmap.md` — 16 blockers, 4 phases, pricing model |
+| 5 | Monetization roadmap (7-lens agent review + synthesis) | Done | 2026-08-12 | PR #211 merged — `docs/plans/2026-08-12-monetization-roadmap.md`, numerology pricing ($33/$11/$222) |
+| 6 | alch-dev-auto session tooling (skill + 2 agents) | Done | 2026-08-12 | `.claude/skills/alch-dev-auto/` + `alch-implementer`/`alch-reviewer`; ported from Bekin, RED/GREEN tested |
 
 **Next action:** (1) live-check PDF export on production (`GET /reports/{id}/pdf` — likely broken, worker built from Dockerfile.api without Chromium); (2) ship the cost-exposure hardening PR (uncapped Gemini art, /stream/narrative proxy, Opus fallback); (3) `/plan` Phase 0 of the roadmap.
 
@@ -85,6 +86,7 @@ _None currently._
 
 ## 7. Activity log (newest first — append, don't overwrite)
 
+- **2026-08-12** — Built `alch-dev-auto` (session-prompt-builder skill ported from Bekin's `bekin-dev-auto`) plus `alch-implementer`/`alch-reviewer` agents. TDD'd per writing-skills: baseline agent produced a task list with no autonomy grant and invented Redis-as-cost-truth; with-skill agent produced the full 7-part contract with correct facts. PR #211 (roadmap + pricing) merged by Tyler as `5af6b6c`.
 - **2026-08-12** — Ran 7-lens product/monetization review (8 agents: 4 opus + 3 sonnet lenses + opus synthesis, all findings file-verified). Wrote `docs/plans/2026-08-12-monetization-roadmap.md`: $33 Blueprint one-time → $11/mo Pro (gated on retention spine), $222×111 founding lifetime — numerology-aligned undeniable pricing (11/22/33/111/222) per Tyler, revised same day from the synthesis's $79/$19; 16 blockers incl. likely-broken prod PDF (worker image lacks Chromium), uncapped Gemini endpoint (~$5k/day exposure), no ToS/Privacy, no entitlement model. Discovered PR #210 was already merged 2026-07-02 (handoff was stale); PR #209 (web API request timeout) marked ready and squash-merged same day, all main CI workflows green.
 - **2026-07-02** — Fixed all 3 findings via 3-agent team on `fix/review-findings`; PR #210 opened, 2317 backend + 333 web tests green, all 10 CI checks green. Backend test count grew to 2317 (was 2281).
 - **2026-07-02** — Merged PR #206 (7 review fixes + CI fixes). Created this handoff. Next: 3 remaining findings via agent team.

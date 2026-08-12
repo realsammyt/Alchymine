@@ -164,7 +164,12 @@ scripts/setup-resend-key.sh
 .eslintcache
 .stylelintcache
 .parcel-cache/
-.claude/
+# Claude Code: version shareable tooling (agents + selected skills), ignore local state
+.claude/*
+!.claude/agents/
+!.claude/skills/
+.claude/skills/*
+!.claude/skills/alch-dev-auto/
 .ignore/
 .worktrees/
 .superpowers/
