@@ -31,6 +31,20 @@ async def _spend_the_day(ceiling: int) -> None:
     await increment_and_get(scope=GLOBAL_SCOPE, meter=METER_LLM_CALLS, amount=ceiling)
 
 
+def _gemini_client() -> GeminiClient:
+    """Build an *available* GeminiClient.
+
+    Must be called inside a ``patch("alchymine.llm.gemini._genai", ...)``
+    block: the constructor reports the client unavailable when the
+    optional google-genai SDK is missing, which is exactly the case on CI
+    (the ``[gemini]`` extra is not installed there).
+    """
+    client = GeminiClient(api_key="test-key", model="gemini-test")
+    assert client.is_available, "fixture error: patch _genai before constructing"
+    client._client = MagicMock()
+    return client
+
+
 def _claude_client() -> LLMClient:
     with patch.dict("os.environ", {"ANTHROPIC_API_KEY": "test-key"}, clear=False):
         from alchymine.config import get_settings
@@ -115,17 +129,12 @@ class TestClaudeStreamChokepoint:
 
 
 class TestGeminiChokepoint:
-    def _available_client(self) -> GeminiClient:
-        client = GeminiClient(api_key="test-key", model="gemini-test")
-        return client
-
     async def test_charges_the_global_counter_on_a_paid_call(self, cost_meter_db) -> None:
-        client = self._available_client()
-        fake_response = MagicMock(candidates=[])
-        client._client = MagicMock()
-        client._client.aio.models.generate_content = AsyncMock(return_value=fake_response)
-
         with patch("alchymine.llm.gemini._genai", MagicMock()):
+            client = _gemini_client()
+            client._client.aio.models.generate_content = AsyncMock(
+                return_value=MagicMock(candidates=[])
+            )
             await client.generate_image("a serene forest")
 
         assert await get_count(scope=GLOBAL_SCOPE, meter=METER_LLM_CALLS) == 1
@@ -141,15 +150,14 @@ class TestGeminiChokepoint:
 
         await _spend_the_day(get_settings().global_daily_llm_call_ceiling)
 
-        client = self._available_client()
-        client._client = MagicMock()
-        client._client.aio.models.generate_content = AsyncMock()
-
         with patch("alchymine.llm.gemini._genai", MagicMock()):
+            client = _gemini_client()
+            client._client.aio.models.generate_content = AsyncMock()
+
             with pytest.raises(CostCeilingExceeded):
                 await client.generate_image("a serene forest")
 
-        client._client.aio.models.generate_content.assert_not_called()
+            client._client.aio.models.generate_content.assert_not_called()
 
 
 class TestModelFallbackChain:
@@ -178,12 +186,11 @@ class TestBreakerScope:
         with patch("anthropic.AsyncAnthropic", return_value=fake_sdk):
             await client._generate_claude("system", "user", 100, 0.5)
 
-        gemini = GeminiClient(api_key="test-key", model="gemini-test")
-        gemini._client = MagicMock()
-        gemini._client.aio.models.generate_content = AsyncMock(
-            return_value=MagicMock(candidates=[])
-        )
         with patch("alchymine.llm.gemini._genai", MagicMock()):
+            gemini = _gemini_client()
+            gemini._client.aio.models.generate_content = AsyncMock(
+                return_value=MagicMock(candidates=[])
+            )
             await gemini.generate_image("a forest")
 
         assert await get_count(scope=GLOBAL_SCOPE, meter=METER_LLM_CALLS) == 2
