@@ -27,13 +27,75 @@ export interface ArtGenerateResponse {
 }
 
 /**
+ * Thrown when the user has spent their daily image allowance (429) or
+ * when generation is paused by the global spend breaker (503).
+ *
+ * Both are ordinary "come back later" states rather than faults, so they
+ * carry the server's own wording plus the moment the allowance resets.
+ * Callers should render a wait state, not an error dump.
+ */
+export class ArtUnavailableError extends Error {
+  readonly code: "daily_art_cap_reached" | "llm_temporarily_unavailable";
+  readonly retryAt: Date | null;
+
+  constructor(
+    code: "daily_art_cap_reached" | "llm_temporarily_unavailable",
+    message: string,
+    retryAt: Date | null,
+  ) {
+    super(message);
+    this.name = "ArtUnavailableError";
+    this.code = code;
+    this.retryAt = retryAt;
+  }
+}
+
+/** Shape of the structured `detail` object both states return. */
+interface UnavailableDetail {
+  code?: string;
+  message?: string;
+  retry_at?: string;
+}
+
+/**
+ * Turn a 429/503 body into an `ArtUnavailableError`, falling back to
+ * generic wording if the body is missing or not the expected shape.
+ */
+async function readUnavailable(
+  res: Response,
+): Promise<ArtUnavailableError | null> {
+  if (res.status !== 429 && res.status !== 503) return null;
+
+  let detail: UnavailableDetail = {};
+  try {
+    const body = (await res.json()) as { detail?: UnavailableDetail };
+    detail = body?.detail ?? {};
+  } catch {
+    // Non-JSON body: still a wait state, just without the specifics.
+  }
+
+  const code =
+    detail.code === "daily_art_cap_reached"
+      ? "daily_art_cap_reached"
+      : "llm_temporarily_unavailable";
+  const message =
+    detail.message ??
+    "Image generation is taking a short break. Please try again later.";
+  const parsed = detail.retry_at ? new Date(detail.retry_at) : null;
+  const retryAt = parsed && !Number.isNaN(parsed.getTime()) ? parsed : null;
+
+  return new ArtUnavailableError(code, message, retryAt);
+}
+
+/**
  * Request a freshly generated personalized image for the current user.
  *
  * Returns:
  * - `ArtGenerateResponse` on 201 success
  * - `null` on 204 (Gemini disabled — caller should render placeholder)
  *
- * Throws on 4xx/5xx other than 204.
+ * Throws `ArtUnavailableError` on 429 (daily cap spent) and 503 (spend
+ * breaker), and a plain `Error` on any other 4xx/5xx.
  */
 export async function generateArt(
   body: ArtGenerateRequest = {},
@@ -48,6 +110,8 @@ export async function generateArt(
   });
 
   if (res.status === 204) return null;
+  const unavailable = await readUnavailable(res);
+  if (unavailable) throw unavailable;
   if (!res.ok) {
     const message = await res.text().catch(() => "");
     throw new Error(`generateArt failed (${res.status}): ${message}`);
@@ -214,7 +278,8 @@ export interface BrandLogoResponse {
  * - `BrandLogoResponse` on 201 success
  * - `null` on 204 (Gemini disabled)
  *
- * Throws on other errors.
+ * Throws `ArtUnavailableError` when the spend breaker is holding calls
+ * back, and a plain `Error` on other failures.
  */
 export async function generateBrandLogo(): Promise<BrandLogoResponse | null> {
   const res = await fetch(`${API_BASE}/art/brand/logo`, {
@@ -226,6 +291,8 @@ export async function generateBrandLogo(): Promise<BrandLogoResponse | null> {
   });
 
   if (res.status === 204) return null;
+  const unavailable = await readUnavailable(res);
+  if (unavailable) throw unavailable;
   if (!res.ok) {
     const message = await res.text().catch(() => "");
     throw new Error(`generateBrandLogo failed (${res.status}): ${message}`);

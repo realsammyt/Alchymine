@@ -30,8 +30,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from alchymine.api.auth import get_current_user
 from alchymine.api.deps import get_db_session
+from alchymine.config import get_settings
 from alchymine.db import repository
 from alchymine.db.models import User
+from alchymine.db.usage_counters import (
+    METER_ART_GENERATIONS,
+    CostCeilingExceeded,
+    consume,
+)
 from alchymine.llm.art_prompts import (
     STYLE_PRESETS,
     build_brand_logo_prompt,
@@ -175,6 +181,38 @@ def _sanitize_extension(extension: str | None) -> str | None:
     return result.filtered_text
 
 
+async def _charge_daily_allowance(user_id: str) -> None:
+    """Spend one of the user's daily image generations, or say when to return.
+
+    Charged just before the Gemini call, so a capped request never
+    reaches the generator. The global breaker in ``llm/cost_guard`` still
+    applies underneath: this one only bounds what a single account can do
+    to the bill on its own.
+    """
+    try:
+        await consume(
+            scope=user_id,
+            meter=METER_ART_GENERATIONS,
+            ceiling=get_settings().daily_art_generations_per_user,
+        )
+    except CostCeilingExceeded as exc:
+        if exc.reason != "ceiling_reached":
+            # The meter itself is down. That is our problem, not the
+            # user's allowance, and the app handler renders it as a 503.
+            raise
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail={
+                "code": "daily_art_cap_reached",
+                "message": (
+                    "That's all of today's image generations. "
+                    "Your next one unlocks at midnight UTC."
+                ),
+                "retry_at": exc.retry_at.isoformat(),
+            },
+        ) from exc
+
+
 # ── Routes ────────────────────────────────────────────────────────────
 
 
@@ -187,6 +225,8 @@ def _sanitize_extension(extension: str | None) -> str | None:
         204: {"description": "Generative art is disabled or generation returned no image"},
         400: {"description": "Invalid style preset or blocked user prompt"},
         401: {"description": "Authentication required"},
+        429: {"description": "Daily per-user image allowance spent (code: daily_art_cap_reached)"},
+        503: {"description": "Generation is paused by the global spend breaker"},
     },
 )
 async def generate_art(
@@ -206,7 +246,11 @@ async def generate_art(
 
     if not gemini.is_available:
         # The frontend treats 204 as a signal to render its placeholder.
+        # Checked before the cap so an unavailable generator, which costs
+        # nothing, never spends one of the user's daily allowance.
         return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+    await _charge_daily_allowance(user_id)
 
     # Build the personalized prompt from the user's identity layer.
     identity_dict = await _load_identity_dict(session, user_id)
