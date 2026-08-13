@@ -19,7 +19,8 @@ from fastapi.testclient import TestClient
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 import alchymine.db.models  # noqa: F401 — register models with metadata
-from alchymine.api.auth import get_current_user
+from alchymine.api.auth import get_current_account, get_current_user
+from tests.api.conftest import override_account
 from alchymine.api.deps import get_db_session, set_db_engine
 from alchymine.api.main import app
 from alchymine.api.routers.generative_art import _gemini_dependency
@@ -110,6 +111,7 @@ def _as_user(user_id: str) -> None:
         return {"sub": user_id, "email": f"{user_id}@example.com"}
 
     app.dependency_overrides[get_current_user] = _current
+    override_account(user_id)
 
 
 class TestDailyCap:
@@ -160,6 +162,7 @@ class TestDailyCap:
             assert client.post("/api/v1/art/generate", json={}).status_code == 201
         finally:
             app.dependency_overrides.pop(get_current_user, None)
+            app.dependency_overrides.pop(get_current_account, None)
 
     def test_cap_resets_on_the_next_utc_day(
         self, client: TestClient, monkeypatch: pytest.MonkeyPatch
@@ -224,6 +227,7 @@ class TestBrandLogoDailyCap:
             assert client.post("/api/v1/art/brand/logo").status_code == 201
         finally:
             app.dependency_overrides.pop(get_current_user, None)
+            app.dependency_overrides.pop(get_current_account, None)
 
     def test_logos_and_studio_images_share_one_allowance(self, client: TestClient) -> None:
         """Three total across both routes, not three each."""

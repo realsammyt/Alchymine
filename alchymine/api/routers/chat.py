@@ -35,8 +35,9 @@ from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from alchymine.agents.growth.system_prompts import build_system_prompt
-from alchymine.api.auth import get_current_user
+from alchymine.api.auth import Account, get_current_user
 from alchymine.api.deps import get_db_session
+from alchymine.api.entitlements import require_chat
 from alchymine.db import repository
 from alchymine.db.usage_counters import CostCeilingExceeded
 from alchymine.llm.client import LLMClient
@@ -346,10 +347,16 @@ async def _chat_event_stream(
 async def chat(
     request: ChatRequest,
     ephemeral: bool = Query(False, description="Skip message persistence"),
-    current_user: dict = Depends(get_current_user),
+    account: Account = Depends(require_chat),
     session: AsyncSession = Depends(get_db_session),
 ) -> StreamingResponse:
     """Stream a Growth Assistant chat reply via Server-Sent Events.
+
+    The plan gate is a dependency, so it resolves before the
+    ``StreamingResponse`` is constructed and a refusal is still a real
+    402 or 429.  Once the stream opens there is no status code left to
+    set, and a quota state buried in an ``event: error`` frame reads as
+    a successful request to every layer above the parser.
 
     Safety: the user message is checked against the blocked-pattern list
     before any LLM call.  Blocked input returns HTTP 400.
@@ -379,7 +386,7 @@ async def chat(
             ),
         )
 
-    user_id = current_user["sub"]
+    user_id = account.user_id
 
     # ── Per-user rate limit (in-memory, 10 msg/min) ──────────────────
     rate_limit_msg = _check_rate_limit(user_id)

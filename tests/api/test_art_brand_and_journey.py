@@ -19,7 +19,8 @@ from fastapi.testclient import TestClient
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 import alchymine.db.models  # noqa: F401 — register models with metadata
-from alchymine.api.auth import get_current_user
+from alchymine.api.auth import get_current_account, get_current_user
+from tests.api.conftest import override_account
 from alchymine.api.deps import get_db_session, set_db_engine
 from alchymine.api.main import app
 from alchymine.api.routers.generative_art import _gemini_dependency
@@ -141,6 +142,7 @@ def client(_db_factory, tmp_path) -> TestClient:
 
     app.dependency_overrides[get_db_session] = _override_db
     app.dependency_overrides[get_current_user] = _override_user
+    override_account(TEST_USER_ID)
 
     with patch(
         "alchymine.llm.art_storage.get_art_cache_root",
@@ -151,6 +153,7 @@ def client(_db_factory, tmp_path) -> TestClient:
 
     app.dependency_overrides.pop(get_db_session, None)
     app.dependency_overrides.pop(get_current_user, None)
+    app.dependency_overrides.pop(get_current_account, None)
     app.dependency_overrides.pop(_gemini_dependency, None)
 
 
