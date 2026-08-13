@@ -28,6 +28,7 @@ import logging
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime, timedelta
+from time import monotonic
 
 from sqlalchemy import case, select, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
@@ -128,33 +129,51 @@ def next_month_start(now: datetime | None = None) -> datetime:
 # non-connectivity reason such as a constraint violation while reads still
 # succeed. Each process therefore tracks its own writes, which is exactly
 # the blast radius that matters.
+#
+# The flag is a circuit breaker, not a latch. A pure latch would deadlock:
+# every paid call is blocked, so no write is attempted, so nothing can ever
+# clear it, so one failed INSERT takes the process down until someone
+# restarts it. After the cooldown the breaker goes half-open and lets a call
+# through — if its write lands the ledger is healthy again, and if it fails
+# the cooldown starts over. The exposure is at most one unrecorded call per
+# cooldown window, and even that call is in the logs as structured JSON.
 
-_ledger_degraded = False
+LEDGER_DEGRADED_RETRY_SECONDS = 60.0
+
+_ledger_degraded_at: float | None = None
 
 
 def mark_ledger_degraded(reason: str) -> None:
-    """Record that a ledger write failed, blocking the next metered call."""
-    global _ledger_degraded
-    if not _ledger_degraded:
+    """Record that a ledger write failed, blocking the next metered calls."""
+    global _ledger_degraded_at
+    if _ledger_degraded_at is None:
         logger.error(
             "LEDGER_DEGRADED — a usage record could not be written (%s). Cost-bearing "
-            "calls are blocked until a ledger write succeeds.",
+            "calls are blocked for the next %.0fs, or until a write succeeds.",
             reason,
+            LEDGER_DEGRADED_RETRY_SECONDS,
         )
-    _ledger_degraded = True
+    _ledger_degraded_at = monotonic()
 
 
 def clear_ledger_degraded() -> None:
     """Record that a ledger write succeeded, reopening the gate."""
-    global _ledger_degraded
-    if _ledger_degraded:
+    global _ledger_degraded_at
+    if _ledger_degraded_at is not None:
         logger.info("LEDGER_RECOVERED — usage records are being written again.")
-    _ledger_degraded = False
+    _ledger_degraded_at = None
 
 
 def ledger_is_degraded() -> bool:
-    """Return True while the last ledger write in this process failed."""
-    return _ledger_degraded
+    """Return True while a failed ledger write should block paid calls.
+
+    Goes False again once ``LEDGER_DEGRADED_RETRY_SECONDS`` have passed, so
+    the next call through acts as the half-open probe. It also goes False
+    the moment a write succeeds, which is the ordinary recovery path.
+    """
+    if _ledger_degraded_at is None:
+        return False
+    return (monotonic() - _ledger_degraded_at) < LEDGER_DEGRADED_RETRY_SECONDS
 
 
 # ─── Session plumbing ───────────────────────────────────────────────────

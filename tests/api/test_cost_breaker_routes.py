@@ -130,6 +130,75 @@ class TestArtRouteSurface:
         assert "An unexpected error occurred" not in response.text
 
 
+class TestDegradedLedgerSurface:
+    """A ledger that cannot record spend blocks the next paid call.
+
+    It reaches the user through the machinery a tripped breaker already
+    uses: a 503 with a machine-readable code, not a 500 and not a silent
+    success that spends money nobody can account for.
+    """
+
+    def _art_call(self, client: TestClient, *, degraded: bool):  # noqa: ANN202
+        """POST the art route through the real charge_paid_call guard.
+
+        Both counter paths — the per-user art cap in the router and the
+        global call breaker in the guard — are stubbed to healthy. That
+        matters: an unreachable counter fails closed on its own and returns
+        the same 503, so without the stubs this would pass whether or not
+        the degraded-ledger block exists.
+        """
+        from unittest.mock import patch
+
+        from alchymine.db.usage_counters import clear_ledger_degraded, mark_ledger_degraded
+        from alchymine.llm.cost_guard import charge_paid_call
+
+        async def _generate(prompt: str) -> None:
+            await charge_paid_call()
+            return None
+
+        gemini = MagicMock()
+        gemini.is_available = True
+        gemini.generate_image = _generate
+        app.dependency_overrides[_gemini_dependency] = lambda: gemini
+
+        clear_ledger_degraded()
+        if degraded:
+            mark_ledger_degraded("insert failed")
+        consume = AsyncMock(return_value=1)
+        try:
+            with (
+                patch("alchymine.llm.cost_guard.consume", consume),
+                patch("alchymine.api.routers.generative_art.consume", AsyncMock(return_value=1)),
+                patch("alchymine.api.routers.generative_art.refund", AsyncMock()),
+            ):
+                response = client.post("/api/v1/art/generate", json={})
+        finally:
+            clear_ledger_degraded()
+            app.dependency_overrides.pop(_gemini_dependency, None)
+        return response, consume
+
+    def test_a_healthy_ledger_lets_the_call_through(self, client: TestClient) -> None:
+        """The control. Without it, an unrelated 503 would look like a pass."""
+        response, consume = self._art_call(client, degraded=False)
+
+        assert response.status_code != 503
+        assert consume.await_count == 1
+
+    def test_a_degraded_ledger_renders_as_the_existing_503(self, client: TestClient) -> None:
+        response, consume = self._art_call(client, degraded=True)
+
+        assert response.status_code == 503
+        assert response.json()["detail"]["code"] == "llm_temporarily_unavailable"
+        # Blocked means not attempted: the call meter is never touched.
+        assert consume.await_count == 0
+
+    def test_the_503_body_leaks_no_internal_detail(self, client: TestClient) -> None:
+        response, _ = self._art_call(client, degraded=True)
+
+        for leak in ("Traceback", "CostCeilingExceeded", "meter_unavailable", "ledger"):
+            assert leak not in response.text
+
+
 class TestChatStreamSurface:
     def test_tripped_breaker_emits_an_unavailable_frame(
         self, client: TestClient, monkeypatch: pytest.MonkeyPatch
