@@ -729,14 +729,30 @@ async def _record_stream_usage(
     what ``estimated=True`` says to whoever reads the ledger later; the
     alternative is losing the cost of a call we were charged for.
 
-    Never raises. It runs inside a ``finally`` during generator finalization,
-    where an exception would replace whatever was already unwinding.
+    Raises nothing of its own. It runs inside a ``finally`` during generator
+    finalization, where an exception would replace whatever was already
+    unwinding — but a ``CancelledError`` caught on the way through is
+    re-raised at the end, after the row is safely scheduled, because
+    swallowing cancellation breaks the shutdown of whoever asked for it.
+
+    Cancellation is the case that matters here. A disconnect cancels the
+    request task, and ``CancelledError`` is a ``BaseException``: it walks
+    past an ``except Exception`` net, and the exact-usage read and the write
+    would both be abandoned. So the nets below are deliberately wide, and
+    ``record_usage`` writes through a shielded task that a cancelled caller
+    cannot take down with it.
     """
     final: Any = None
+    cancelled: BaseException | None = None
+
     try:
         final = await asyncio.wait_for(
             stream.get_final_message(), timeout=_FINAL_MESSAGE_TIMEOUT_SECONDS
         )
+    except asyncio.CancelledError as exc:
+        # The caller is going away mid-stream. Exact usage is unreachable
+        # now, so fall through to the estimate rather than losing the call.
+        cancelled = exc
     except Exception as exc:
         logger.info(
             "[LLM] Exact usage unavailable for streamed call on %s (%s) — recording an estimate",
@@ -745,7 +761,7 @@ async def _record_stream_usage(
         )
 
     try:
-        usage = getattr(final, "usage", None)
+        usage = getattr(final, "usage", None) if cancelled is None else None
         if usage is not None:
             await record_usage(
                 meter=METER_LLM_CALLS,
@@ -756,17 +772,22 @@ async def _record_stream_usage(
                 cache_read_input_tokens=_usage_int(usage, "cache_read_input_tokens"),
                 cache_creation_input_tokens=_usage_int(usage, "cache_creation_input_tokens"),
             )
-            return
-
-        await record_usage(
-            meter=METER_LLM_CALLS,
-            provider="anthropic",
-            model=model,
-            input_tokens=(len(system_prompt) + len(prompt)) // _CHARS_PER_TOKEN,
-            output_tokens=delivered_chars // _CHARS_PER_TOKEN,
-            estimated=True,
-        )
+        else:
+            await record_usage(
+                meter=METER_LLM_CALLS,
+                provider="anthropic",
+                model=model,
+                input_tokens=(len(system_prompt) + len(prompt)) // _CHARS_PER_TOKEN,
+                output_tokens=delivered_chars // _CHARS_PER_TOKEN,
+                estimated=True,
+            )
+    except asyncio.CancelledError as exc:
+        # The shielded write is already running and will finish on its own.
+        cancelled = cancelled or exc
     except Exception:
-        # record_usage swallows its own failures; anything reaching here is
+        # record_usage handles its own failures; anything reaching here is
         # unexpected, and a broken ledger must not truncate a delivered reply.
         logger.exception("[LLM] Failed to record usage for a streamed call on %s", model)
+
+    if cancelled is not None:
+        raise cancelled

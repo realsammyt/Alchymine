@@ -16,16 +16,24 @@ Rows are written *after* the call returns, never before. We cannot price a
 call before making it, and a ledger that counts money we did not spend
 would produce false upsells.
 
-:func:`record_usage` never raises into its caller. The reply has already
-been delivered by the time it runs, so raising would convert a bookkeeping
-failure into a user-visible fault without unspending anything. Instead a
-failed write is logged at ERROR with the whole row as JSON — so the spend
-is reconstructible — and marks the ledger degraded, which blocks the
-*next* cost-bearing call at ``check_ceiling``.
+:func:`record_usage` does not raise a failure into its caller. The reply
+has already been delivered by the time it runs, so raising would convert a
+bookkeeping failure into a user-visible fault without unspending anything.
+Instead a failed write is logged at ERROR with the whole row as JSON — so
+the spend is reconstructible — and marks the ledger degraded, which blocks
+the *next* cost-bearing call at ``charge_paid_call``.
+
+The write runs as a detached task under ``asyncio.shield``. A cancelled
+caller (a browser that went away mid-stream, which is precisely when the
+recording matters) would otherwise abandon the write at its first await:
+``CancelledError`` is a ``BaseException`` and walks past every ``except
+Exception`` net in this module. Cancellation still reaches the caller; only
+the write is protected from it.
 """
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 from collections.abc import AsyncGenerator
@@ -55,10 +63,17 @@ logger = logging.getLogger(__name__)
 # Scope value for a call that reached an egress site with no attribution.
 UNATTRIBUTED_SCOPE = "unattributed"
 
+# Strong references to in-flight detached writes. Without this the event
+# loop holds only a weak reference and a write can be garbage-collected
+# mid-flight, which is a documented way to lose asyncio tasks silently.
+_pending_writes: set[asyncio.Task[None]] = set()
+
 __all__ = [
     "UNATTRIBUTED_SCOPE",
     "cost_micros",
+    "flush_pending_writes",
     "ledger_is_degraded",
+    "log_ledger_status",
     "record_usage",
 ]
 
@@ -131,7 +146,7 @@ async def record_usage(
     cost_micros_override: int | None = None,
     estimated: bool = False,
     surface: str | None = None,
-) -> None:
+) -> asyncio.Task[None] | None:
     """Write one ledger row for a delivered paid call and charge the meters.
 
     Parameters
@@ -154,11 +169,25 @@ async def record_usage(
         Overrides the ContextVar. Used where the call site knows better
         than the request scope does.
 
-    Never raises. See the module docstring.
+    Returns
+    -------
+    asyncio.Task | None
+        The detached write, already awaited on the normal path. Callers
+        ignore it; tests use it (or :func:`flush_pending_writes`) to wait
+        for a write that outlived a cancelled caller.
+
+    Raises only ``CancelledError``, and only when the caller's own scope is
+    being cancelled — the write itself still completes. See the module
+    docstring.
     """
     settings = get_settings()
     if not settings.usage_ledger_enabled:
-        return
+        # A ledger that is switched off cannot be degraded, and leaving the
+        # flag set would make the kill switch block every paid call with no
+        # way to clear it. Turning the ledger off is how an operator stops a
+        # write storm; it must not be the thing that takes the app down.
+        clear_ledger_degraded()
+        return None
 
     user_id, context_surface, request_id = current_attribution()
     resolved_surface = surface or context_surface or SURFACE_UNKNOWN
@@ -210,24 +239,99 @@ async def record_usage(
             cost,
         )
 
-    await _write_row(row)
-    await _charge_spend_meters(row)
+    return await _write_detached(row)
 
 
-async def _write_row(row: dict[str, Any]) -> None:
-    """INSERT the ledger row, or log it loudly and degrade the ledger."""
+async def _write_detached(row: dict[str, Any]) -> asyncio.Task[None] | None:
+    """Run the write as its own task, then wait for it under a shield.
+
+    The point is the disconnect path. When a browser goes away mid-stream,
+    uvicorn cancels the request task, and a plain ``await`` in the recording
+    code would raise ``CancelledError`` before the row ever reached the
+    database — losing the cost of a call we were billed for in full.
+
+    A separate task does not inherit the caller's cancellation, and
+    ``shield`` means the caller still waits for the write on the normal path
+    while a cancelled caller lets it finish in the background. Task creation
+    copies the current context, so attribution survives either way (the row
+    is fully resolved before this point regardless).
+    """
+    try:
+        loop = asyncio.get_running_loop()
+    except RuntimeError:  # pragma: no cover - every caller is async today
+        await _persist(row)
+        return None
+
+    task = loop.create_task(_persist(row))
+    _pending_writes.add(task)
+    task.add_done_callback(_pending_writes.discard)
+    await asyncio.shield(task)
+    return task
+
+
+async def _persist(row: dict[str, Any]) -> None:
+    """Write the row and charge both meters, declaring recovery only if both land."""
+    wrote_row = await _write_row(row)
+    charged = await _charge_spend_meters(row)
+    if wrote_row and charged:
+        # Only now. Clearing after the INSERT alone would announce recovery
+        # while the meters are still failing, which after the block in
+        # charge_paid_call would let calls through against a counter that is
+        # not moving — the exact "spending against a number we know is
+        # wrong" case the flag exists to prevent.
+        clear_ledger_degraded()
+
+
+async def flush_pending_writes() -> None:
+    """Wait for every detached ledger write to finish.
+
+    For shutdown and for tests. A write that outlived its cancelled caller
+    is still in flight, and dropping it on the way out would lose exactly
+    the spend this design went out of its way to capture.
+    """
+    while _pending_writes:
+        await asyncio.gather(*list(_pending_writes), return_exceptions=True)
+
+
+def log_ledger_status(component: str) -> None:
+    """Announce at startup whether spend is being recorded at all.
+
+    A disabled ledger is a silent blackout otherwise: every paid call still
+    goes out, nothing is written, and the first sign of trouble is an empty
+    usage table weeks later when somebody asks what the beta cost.
+    """
+    if get_settings().usage_ledger_enabled:
+        logger.info("Usage ledger enabled (%s) — paid calls are being recorded.", component)
+        return
+    logger.warning(
+        "USAGE LEDGER DISABLED (%s) — paid calls are NOT being recorded. Spend is "
+        "going out unmetered and unattributed. Set USAGE_LEDGER_ENABLED=true and "
+        "restart to turn recording back on.",
+        component,
+    )
+
+
+async def _write_row(row: dict[str, Any]) -> bool:
+    """INSERT the ledger row. Returns True on success.
+
+    On failure the whole row goes to the log as JSON and the ledger is
+    marked degraded. A cancellation gets the same bookkeeping — the spend
+    stays reconstructible — and is then re-raised, because swallowing it
+    would break cancellation for whoever is unwinding.
+    """
     try:
         async with _ledger_session() as session:
             session.add(UsageRecord(**row))
             await session.commit()
-    except Exception as exc:
+    except BaseException as exc:  # noqa: BLE001 - see docstring
         _degrade("insert failed", row, exc)
-        return
+        if not isinstance(exc, Exception):
+            raise
+        return False
+    return True
 
-    clear_ledger_degraded()
 
-
-async def _charge_spend_meters(row: dict[str, Any]) -> None:
+async def _charge_spend_meters(row: dict[str, Any]) -> bool:
     """Add this call's cost to the global daily and per-user monthly meters.
 
     The global meter is charged for every call including unattributed ones,
@@ -249,15 +353,19 @@ async def _charge_spend_meters(row: dict[str, Any]) -> None:
                 period_key=row["month_key"],
                 amount=cost,
             )
-    except Exception as exc:
+    except BaseException as exc:  # noqa: BLE001 - see _write_row
         # Same class of loss as a failed INSERT: spend that happened is now
         # invisible to the ceiling that is supposed to bound it, so the next
         # cost-bearing call blocks rather than spending against a number we
         # know is wrong.
         _degrade("spend meter increment failed", row, exc)
+        if not isinstance(exc, Exception):
+            raise
+        return False
+    return True
 
 
-def _degrade(reason: str, row: dict[str, Any], exc: Exception) -> None:
+def _degrade(reason: str, row: dict[str, Any], exc: BaseException) -> None:
     """Log the whole row as JSON, then block the next cost-bearing call."""
     logger.error(
         "LEDGER_WRITE_FAILED reason=%s error=%s row=%s",

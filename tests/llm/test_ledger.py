@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Iterator
+from unittest.mock import patch
 
 import pytest
 from sqlalchemy import func, select
@@ -34,7 +35,12 @@ from alchymine.db.usage_counters import (
     ledger_is_degraded,
 )
 from alchymine.llm.attribution import attributed, set_attribution
-from alchymine.llm.ledger import cost_micros, record_usage
+from alchymine.llm.ledger import (
+    cost_micros,
+    flush_pending_writes,
+    log_ledger_status,
+    record_usage,
+)
 
 SONNET = "claude-sonnet-4-6"
 HAIKU = "claude-haiku-4-5-20251001"
@@ -300,6 +306,108 @@ class TestUnattributedSpend:
                 meter=METER_LLM_CALLS, provider="anthropic", model=HAIKU, input_tokens=1000
             )
         assert any(r.levelno >= logging.WARNING for r in caplog.records)
+
+
+class TestCancellation:
+    """A cancelled caller has still spent the money.
+
+    Every net in this module is an ``except Exception``, and
+    ``CancelledError`` is not one — it inherits from ``BaseException``. A
+    disconnect that cancels the request task would otherwise sail straight
+    through the estimate fallback and the write, and the call would vanish
+    from the ledger entirely.
+    """
+
+    async def test_a_write_in_flight_survives_its_callers_cancellation(
+        self, cost_meter_db
+    ) -> None:
+        """Cancel the caller while the row is mid-write.
+
+        This is the disconnect, precisely: the request task is cancelled
+        while the recording code is sitting on an await. An inline write
+        would be cancelled with its caller and the row would never land.
+        """
+        import asyncio
+
+        from alchymine.llm import ledger
+
+        entered = asyncio.Event()
+        release = asyncio.Event()
+        original_write_row = ledger._write_row
+
+        async def slow_write_row(row: dict) -> bool:
+            entered.set()
+            await release.wait()
+            return await original_write_row(row)
+
+        async def caller() -> None:
+            set_attribution(user_id="user-cancelled", surface="chat")
+            await record_usage(
+                meter=METER_LLM_CALLS,
+                provider="anthropic",
+                model=HAIKU,
+                input_tokens=1000,
+                estimated=True,
+            )
+
+        with patch("alchymine.llm.ledger._write_row", slow_write_row):
+            task = asyncio.create_task(caller())
+            await entered.wait()
+            task.cancel()
+            with pytest.raises(asyncio.CancelledError):
+                await task
+            release.set()
+            await flush_pending_writes()
+
+        rows = await _rows(cost_meter_db)
+        assert len(rows) == 1, "a cancelled caller has still spent the money"
+        assert rows[0].user_id == "user-cancelled"
+        assert rows[0].estimated is True
+
+    async def test_cancellation_still_reaches_the_caller(self, cost_meter_db) -> None:
+        """Surviving the write must not swallow the cancellation itself."""
+        import asyncio
+
+        async def caller() -> None:
+            try:
+                await asyncio.sleep(3600)
+            except asyncio.CancelledError:
+                await record_usage(
+                    meter=METER_LLM_CALLS, provider="anthropic", model=HAIKU, input_tokens=1
+                )
+                raise
+
+        task = asyncio.create_task(caller())
+        await asyncio.sleep(0)
+        task.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await task
+        assert task.cancelled()
+        await flush_pending_writes()
+
+
+class TestLedgerStatusLogging:
+    """A disabled ledger is a spend blackout, and it should announce itself."""
+
+    def test_warns_when_the_ledger_is_disabled(
+        self, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        monkeypatch.setenv("USAGE_LEDGER_ENABLED", "false")
+        get_settings.cache_clear()
+        try:
+            with caplog.at_level(logging.WARNING):
+                log_ledger_status("api")
+        finally:
+            get_settings.cache_clear()
+
+        messages = [r.getMessage() for r in caplog.records if r.levelno >= logging.WARNING]
+        assert messages, "a disabled ledger must be announced at WARNING"
+        assert any("NOT being recorded" in message for message in messages)
+
+    def test_says_nothing_alarming_when_enabled(self, caplog: pytest.LogCaptureFixture) -> None:
+        with caplog.at_level(logging.WARNING):
+            log_ledger_status("api")
+        assert [r for r in caplog.records if r.levelno >= logging.WARNING] == []
 
 
 class TestFailClosedOnLedgerWriteFailure:

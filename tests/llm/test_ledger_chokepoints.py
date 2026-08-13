@@ -32,6 +32,7 @@ from alchymine.db.usage_counters import (
 from alchymine.llm.attribution import attributed
 from alchymine.llm.client import LLMClient
 from alchymine.llm.gemini import GeminiClient
+from alchymine.llm.ledger import flush_pending_writes
 
 pytestmark = pytest.mark.asyncio
 
@@ -309,6 +310,51 @@ class TestStreamChokepoint:
         await broken.dispose()
         assert chunks == ["a", "b", "c"]
 
+    async def test_cancellation_inside_the_recording_path_still_leaves_a_row(
+        self, cost_meter_db
+    ) -> None:
+        """uvicorn cancels the request task; the cancel lands mid-capture.
+
+        CancelledError is a BaseException, so it walks straight past every
+        ``except Exception`` net. Cancel the task while the recording code
+        is waiting on ``get_final_message()`` and, without explicit
+        handling, the estimate is never written and a call we were billed
+        for in full disappears from the ledger.
+        """
+        import asyncio
+
+        client = _claude_client()
+        reached_capture = asyncio.Event()
+
+        class _HangingFinalStream(_FakeStream):
+            async def get_final_message(self) -> _FinalMessage:
+                reached_capture.set()
+                await asyncio.sleep(3600)
+                raise AssertionError("unreachable")
+
+        stream = _HangingFinalStream(["hello "], final=None)
+        fake_sdk = MagicMock()
+        fake_sdk.messages.stream = MagicMock(return_value=_FakeStreamManager(stream))
+
+        async def consume() -> None:
+            with attributed(user_id="user-gone", surface="chat"):
+                async for _ in client._stream_claude("prompt", "system", 100, 0.5):
+                    pass
+
+        with patch("anthropic.AsyncAnthropic", return_value=fake_sdk):
+            task = asyncio.create_task(consume())
+            await reached_capture.wait()
+            task.cancel()
+            with pytest.raises(asyncio.CancelledError):
+                await task
+            await flush_pending_writes()
+
+        rows = await _rows(cost_meter_db)
+        assert len(rows) == 1, "a cancelled stream must still be recorded"
+        assert rows[0].estimated is True
+        assert rows[0].user_id == "user-gone"
+        assert rows[0].output_tokens == len("hello ") // 4
+
     async def test_the_stream_records_once_per_model_that_delivered(self, cost_meter_db) -> None:
         """A 529 before any text is delivered leaves no ledger row behind."""
         import anthropic
@@ -365,6 +411,30 @@ class TestGeminiChokepoint:
         assert rows[0].images == 1
         assert rows[0].model == "gemini-test"
         assert rows[0].surface == "art"
+        assert rows[0].cost_micros == get_settings().gemini_image_cost_micros
+
+    async def test_an_undecodable_image_is_still_recorded(self, cost_meter_db) -> None:
+        """Google billed for the image it produced; the ledger must see it.
+
+        A payload we cannot decode is our problem, not evidence that the
+        generation never happened. Returning None without a row would hide
+        real spend behind a client-side parse failure.
+        """
+        inline = MagicMock(data="not base64 !!!", mime_type="image/png")
+        part = MagicMock(inline_data=inline)
+        candidate = MagicMock(content=MagicMock(parts=[part]))
+
+        with patch("alchymine.llm.gemini._genai", MagicMock()):
+            client = _gemini_client()
+            client._client.aio.models.generate_content = AsyncMock(
+                return_value=MagicMock(candidates=[candidate])
+            )
+            assert await client.generate_image("a serene forest") is None
+
+        rows = await _rows(cost_meter_db)
+        assert len(rows) == 1
+        assert rows[0].images == 1
+        assert rows[0].estimated is True
         assert rows[0].cost_micros == get_settings().gemini_image_cost_micros
 
     async def test_a_generation_that_produced_no_image_writes_no_row(self, cost_meter_db) -> None:

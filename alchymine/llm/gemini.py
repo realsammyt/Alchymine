@@ -227,6 +227,19 @@ class GeminiClient:
                         image_bytes = base64.b64decode(data)
                     except (ValueError, TypeError):
                         logger.warning("Gemini returned non-decodable image payload")
+                        # The image was generated and billed for. A payload we
+                        # cannot decode is our problem, not evidence that the
+                        # spend never happened, so it goes in the ledger like
+                        # any other image — flagged estimated, because we
+                        # never saw what we paid for.
+                        await record_usage(
+                            meter=METER_ART_GENERATIONS,
+                            provider="google",
+                            model=self._model,
+                            images=1,
+                            cost_micros_override=get_settings().gemini_image_cost_micros,
+                            estimated=True,
+                        )
                         return None
                 else:
                     image_bytes = bytes(data)
