@@ -4,8 +4,8 @@
 > what's next. Any agent starting fresh reads this first, then updates it before
 > ending. If anything here disagrees with reality, reality wins — fix the doc.
 
-**Last updated:** 2026-08-12 by Claude (with Tyler)
-**Active branch:** `main` (PRs #209 + #210 merged; main CI green as of 2026-08-12)
+**Last updated:** 2026-08-13 by Claude (autonomous unit-economics session, orchestrator; in progress)
+**Active branch:** `main` (CI + CodeQL green at b9404d2; PR #214 merged, branch deleted)
 **Driving plan / refs:** project `CLAUDE.md` (commands, CI protocol), `Alchymine PRD v7 FiveSystem.docx`
 
 ---
@@ -51,8 +51,10 @@ Statuses: `Not started` · `In progress` · `Blocked` · `Done`.
 | 4 | Finding 3: orphaned reports readable by any authed user | Done | 2026-07-02 | PR #210, `created_by_sub` + ownership helper — awaiting merge |
 | 5 | Monetization roadmap (7-lens agent review + synthesis) | Done | 2026-08-12 | PR #211 merged — `docs/plans/2026-08-12-monetization-roadmap.md`, numerology pricing ($33/$11/$222) |
 | 6 | alch-dev-auto session tooling (skill + 2 agents) | Done | 2026-08-12 | `.claude/skills/alch-dev-auto/` + `alch-implementer`/`alch-reviewer`; ported from Bekin, RED/GREEN tested |
+| 7 | Cost-exposure hardening (issue #213: usage counter + global breaker + art cap + drop Opus + delete /stream/narrative) | Done | 2026-08-13 | Merged to main as b9404d2 (PR #214, squash), main CI + CodeQL green, #213/#215 closed. Ceilings set: 2000 global LLM calls/day, 3 art/user/day (env-tunable, rationale in config.py). Follow-ups open: #216-#220 |
+| 8 | Unit economics (epic #221: entitlement schema 0017 + get_current_account, dollar cost ledger, per-plan monthly allowances + upsell UI, revenue-linked global budget + /admin/usage, Haiku chat routing + prompt caching) | In progress | 2026-08-13 | Design-first, 5 sequential PRs (slices #222-#227). Scout done at b9404d2; baselines green (2366 backend / 356 web); architect (opus) drafting docs/plans/2026-08-13-unit-economics.md. All numbers provisional env defaults pending 2-4wk beta cost data |
 
-**Next action:** (1) live-check PDF export on production (`GET /reports/{id}/pdf` — likely broken, worker built from Dockerfile.api without Chromium); (2) ship the cost-exposure hardening PR (uncapped Gemini art, /stream/narrative proxy, Opus fallback); (3) `/plan` Phase 0 of the roadmap.
+**Next action:** (1) Tyler: publish the auto-drafted release when ready to deploy (breaker goes live with it; migration 0016 runs on deploy); (2) live-check PDF export on production (`GET /reports/{id}/pdf` — likely broken, worker built from Dockerfile.api without Chromium); (3) `/plan` Phase 0 of the roadmap.
 
 _Correction 2026-08-12: PR #210 was already merged 2026-07-02 11:54 UTC; the "awaiting merge" status above was stale._
 
@@ -86,6 +88,10 @@ _None currently._
 
 ## 7. Activity log (newest first — append, don't overwrite)
 
+- **2026-08-13** — Launched autonomous unit-economics session (epic #221, slices #222-#227 filed per ADR-008). Phase 0 scout verified prompt against b9404d2: alembic head 0016 (0017 claimed, no competing PRs), 3 egress chokepoints confirmed only SDK sites (client.py:504/:551, gemini.py:137), get_current_user JWT-only vs get_current_admin template (auth.py:212), 4 product chokepoints + frontend upsell precedents located, baselines green (2366 backend / 356 web). claude-api skill loaded before pinning prices: Sonnet 4.6 = 3/15 micros/token, Haiku 4.5 = 1/5, cache read 0.1x / write 1.25x, stream.get_final_message() for SSE capture, Haiku min cacheable prefix 4096 tok. Architect (opus) dispatched for slice-0 design doc.
+- **2026-08-13** — Tyler authorized merge + ceiling numbers. Set global ceiling 2000 LLM calls/day (bounds runaway at ~$100-200/day, above a legitimate beta day) and kept art at 3/user/day (upsell scarcity signal), commit 7e4af19; full gates re-run (2366 backend green). Squash-merged PR #214 as b9404d2; main CI + CodeQL green; closed #213 and #215 with evidence; local main synced, feature branch deleted. Release draft auto-created — publishing and deploy stay Tyler's.
+- **2026-08-13** — Cost-exposure hardening parked. PR #214 CI-green at e0965c8, 9 commits: migration 0016 usage_counters (fail-closed, atomic, UTC reset, live-verified on real Postgres), global daily breaker on all 3 paid chokepoints (structured 503/SSE frame), per-user art cap on BOTH art routes with refund-on-delivered-nothing (period-key threaded across midnight) + wait-states on 3 pages, Opus dropped from fallback chain, /stream/narrative deleted. Gates: 2366 backend + 356 web tests green, ruff/mypy clean. Review: security pass zero findings; alch-reviewer + test-analyzer findings all landed over 2 fix rounds; delta review APPROVE. Follow-ups #215-#220 filed. Awaiting Tyler: merge, real ceiling numbers, issue closure.
+- **2026-08-12** — Launched autonomous cost-exposure hardening session (build-and-park). Phase 0 scout confirmed all 4 findings live at 9f97ecb: uncapped `/art/generate` (real caller artApi.ts:41), `/stream/narrative` proxy with zero web callers (delete-safe), CLAUDE_MODELS Sonnet→Haiku→Opus 529-walk, no spend counter anywhere; alembic head 0015 (0016 free, no competing PRs). Filed issue #213; dispatched alch-implementer (opus) on `fix/cost-exposure-hardening` for 6 slices TDD red-first. Pre-merge gate queued: alch-reviewer (sonnet) + blocking security-review + pr-test-analyzer.
 - **2026-08-12** — Built `alch-dev-auto` (session-prompt-builder skill ported from Bekin's `bekin-dev-auto`) plus `alch-implementer`/`alch-reviewer` agents. TDD'd per writing-skills: baseline agent produced a task list with no autonomy grant and invented Redis-as-cost-truth; with-skill agent produced the full 7-part contract with correct facts. PR #211 (roadmap + pricing) merged by Tyler as `5af6b6c`.
 - **2026-08-12** — Ran 7-lens product/monetization review (8 agents: 4 opus + 3 sonnet lenses + opus synthesis, all findings file-verified). Wrote `docs/plans/2026-08-12-monetization-roadmap.md`: $33 Blueprint one-time → $11/mo Pro (gated on retention spine), $222×111 founding lifetime — numerology-aligned undeniable pricing (11/22/33/111/222) per Tyler, revised same day from the synthesis's $79/$19; 16 blockers incl. likely-broken prod PDF (worker image lacks Chromium), uncapped Gemini endpoint (~$5k/day exposure), no ToS/Privacy, no entitlement model. Discovered PR #210 was already merged 2026-07-02 (handoff was stale); PR #209 (web API request timeout) marked ready and squash-merged same day, all main CI workflows green.
 - **2026-07-02** — Fixed all 3 findings via 3-agent team on `fix/review-findings`; PR #210 opened, 2317 backend + 333 web tests green, all 10 CI checks green. Backend test count grew to 2317 (was 2281).
