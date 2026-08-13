@@ -60,6 +60,7 @@ from alchymine.db.usage_counters import (
     mark_ledger_degraded,
 )
 from alchymine.llm.attribution import SURFACE_UNKNOWN, current_attribution
+from alchymine.llm.budget import check_monthly_budget
 
 logger = logging.getLogger(__name__)
 
@@ -308,6 +309,11 @@ async def _persist(attempt: _WriteAttempt) -> None:
     """Write the row and charge both meters, declaring recovery only if both land."""
     wrote_row = await _write_row(attempt)
     charged = await _charge_spend_meters(attempt)
+    if wrote_row:
+        # New spend is in the table, so the month is worth re-reading. The
+        # call is throttled and never raises, which is what makes it safe on
+        # this path; see alchymine/llm/budget.py.
+        await check_monthly_budget()
     if wrote_row and charged:
         # Only now. Clearing after the INSERT alone would announce recovery
         # while the meters are still failing, which after the block in

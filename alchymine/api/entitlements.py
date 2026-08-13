@@ -250,3 +250,20 @@ require_brand_logo = PlanGate(
     upgrade_message="Logo generation is part of a paid plan. Upgrade to make yours.",
     allowance_message="You've used this month's included images. Upgrade to keep going.",
 )
+
+# The sixth paid surface, which the design's chokepoint table missed
+# (issue #243). PATCH /profile/{id}/layers/{system}/reassess re-runs a
+# coordinator graph, which is deterministic and free, and then optionally
+# regenerates that system's narrative, which is a paid Claude call through
+# the same NarrativeGenerator the report worker uses.
+#
+# So this gate is applied by the route by hand rather than as a dependency:
+# only the narrative half costs money, and taking the deterministic re-run
+# away from free accounts would contradict the free tier's whole shape.
+# ``report_narrative`` rather than a new surface value, because that is
+# exactly what it generates and the ledger should not grow a synonym.
+require_profile_narrative = PlanGate(
+    "report_narrative",
+    upgrade_message="Rewriting a narrative is part of a paid plan. Upgrade to refresh yours.",
+    allowance_message="You've used this month's included narrative writing. Upgrade to keep going.",
+)

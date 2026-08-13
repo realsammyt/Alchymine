@@ -454,6 +454,8 @@ $300/month gives $10/day flat, x1.5 headroom = **$15/day**.
 
 **No automated monthly kill switch.** Month-to-date spend is surfaced in `/admin/usage` with budget remaining, and crossing 80% logs at ERROR with the same `COST_BREAKER`-style marker used at `cost_guard.py:56`. It does not automatically stop anything. An automatic monthly cutoff converts an overspend into an outage of unknown length, potentially weeks, and the person who should make that call is a human looking at the number.
 
+**Resolved 2026-08-13 (slice 4).** The check lives on the ledger's post-write path (`alchymine/llm/budget.py`, called from `ledger._persist`), not on the admin endpoint. An alert that only fires when an admin opens a page is not an alert: by then they are already reading the number it would have told them. It stays affordable there by being throttled to at most one aggregate per process per 300 seconds, and each threshold (80%, then 100%) announces once per month per process, so a busy month leaves two lines rather than one per paid call. It reads `usage_records`, the same table `/admin/usage` sums, so the two can never disagree about the month.
+
 ### 7.2 Enforcement, using the machinery that already exists
 
 All three egress sites already call `charge_paid_call()` (`client.py:520`, `client.py:565`, `gemini.py:191`). Extend that one function rather than adding call sites:
@@ -520,6 +522,8 @@ Counters answer "are we blocked"; the ledger answers "what did it cost". The end
 ```
 
 `by_surface` and `by_model` cover both today and the month (two blocks, or a `?window=today|month` param; either is fine, pick one and be consistent). `top_users` is the view that answers the question the roadmap says validates the Pro price: what does the p95 active user actually cost.
+
+**Resolved 2026-08-13 (slice 4).** Two blocks, not a window param: `by_surface` and `by_model` are each `{ "today": [...], "month": [...] }`. `top_users` stays a flat monthly list, because the allowance it is measured against is monthly and a daily percentage of a monthly allowance would mean nothing. Three fields are supersets of the shape above and are there for a stated reason: `today.record_count` (without a denominator the estimated count cannot be read as a share, which is what 6.2 asks for), `cache_creation_input_tokens` on `by_model` rows (a cache write bills at 1.25x, so pricing it and not reporting it would hide the more expensive half of 8.2), and `remaining_micros`, which is allowed to go negative rather than clamping, because the overshoot in 3.1 is bounded by concurrency and clamping would make an overrun look identical to a day that landed exactly on the line. The `unattributed` row in `by_surface` is a relabel of rows with no `user_id` rather than an extra row, so the breakdown still sums to the window total, and it is present at zero.
 
 ---
 
@@ -594,6 +598,7 @@ Report narratives are out of scope for caching. Their system prompts are per-sys
 | `GET /reports/{id}/pdf` (`reports.py:482`) | free is refused | none | Serves `report.pdf_data` bytes that were already paid for. Entitlement gate, not a spend meter. |
 | `POST /chat` (`chat.py:345`) | free is refused | monthly spend | Checked in the endpoint **before** `StreamingResponse` is returned, so a real status code is still available. |
 | `POST /art/generate` (`generative_art.py:248`) and `POST /art/brand/logo` (`generative_art.py:531`) | free is refused | monthly spend, on top of the existing 3/day count cap | Both already share `_charge_daily_allowance` (`generative_art.py:185`) deliberately, since they hit the same paid generator. |
+| `PATCH /profile/{id}/layers/{system}/reassess` (`profile.py:383`) — **added 2026-08-13 (slice 4), issue #243** | free is refused, but only when `regenerate_narrative` is true | monthly spend, same condition | The table above missed this one. The route re-runs a coordinator graph (deterministic, free for everyone) and then optionally regenerates that system's narrative through the same `NarrativeGenerator` the report worker uses, which is a paid Claude call. So the gate is applied inside the handler rather than as a route dependency, and it runs before the graph so a refusal leaves nothing written. Surface is `report_narrative`, not a new value. |
 
 Response envelope extends the one the frontend already parses (`readUnavailable`, `web/src/lib/artApi.ts:64`):
 

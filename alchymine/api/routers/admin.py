@@ -12,6 +12,7 @@ Endpoints:
 - ``DELETE /admin/invite-codes/{code_id}``   — Hard-delete an unused invite code.
 - ``GET    /admin/analytics/overview``       — Aggregate platform stats.
 - ``GET    /admin/analytics/users``          — Daily new-user counts.
+- ``GET    /admin/usage``                    — Spend, gate state, and top spenders.
 """
 
 from __future__ import annotations
@@ -22,22 +23,32 @@ from datetime import UTC, datetime, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, EmailStr, Field
-from sqlalchemy import asc, desc, func, select
+from sqlalchemy import Case, asc, case, desc, func, literal, select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
+from sqlalchemy.orm import InstrumentedAttribute, selectinload
 
 from alchymine.api.auth import get_current_admin
 from alchymine.api.deps import get_db_session
+from alchymine.config import get_settings
 from alchymine.db.models import (
     AdminAuditLog,
     FeedbackEntry,
     InviteCode,
     JournalEntry,
     Report,
+    UsageRecord,
     User,
     WaitlistEntry,
 )
+from alchymine.db.usage_counters import (
+    GLOBAL_SCOPE,
+    METER_LLM_CALLS,
+    current_month_key,
+    current_period_key,
+    get_count,
+)
 from alchymine.email import send_invitation_email
+from alchymine.llm.ledger import UNATTRIBUTED_SCOPE
 from alchymine.safety.audit import AuditEventType
 from alchymine.safety.audit import log_event as safety_log_event
 
@@ -294,6 +305,96 @@ class InviteWaitlistResponse(BaseModel):
     total_invited: int
     total_emails_sent: int
     total_skipped: int
+
+
+class UsageSurfaceRow(BaseModel):
+    """What one product surface cost inside a window."""
+
+    surface: str
+    calls: int
+    cost_micros: int
+    cost_cents: int
+
+
+class UsageModelRow(BaseModel):
+    """What one model cost inside a window, with the tokens behind it."""
+
+    model: str
+    calls: int
+    input_tokens: int
+    output_tokens: int
+    cache_read_input_tokens: int
+    cache_creation_input_tokens: int
+    cost_micros: int
+
+
+class UsageSurfaceBreakdown(BaseModel):
+    """The per-surface rollup, for both windows."""
+
+    today: list[UsageSurfaceRow]
+    month: list[UsageSurfaceRow]
+
+
+class UsageModelBreakdown(BaseModel):
+    """The per-model rollup, for both windows."""
+
+    today: list[UsageModelRow]
+    month: list[UsageModelRow]
+
+
+class UsageTodayBlock(BaseModel):
+    """The day: what it cost, and how close the two breakers are to tripping."""
+
+    period_key: str
+    spend_micros: int
+    spend_cents: int
+    ceiling_micros: int
+    # Negative when the day went past its ceiling. Reported rather than
+    # clamped: an overshoot is bounded by concurrency, not by one call, and
+    # hiding it behind a floor of zero would make the two look identical.
+    remaining_micros: int
+    llm_calls: int
+    llm_call_ceiling: int
+    record_count: int
+    # The denominator matters. A count with nothing to compare it against
+    # cannot answer the question section 6.2 asks: is the estimated share
+    # more than a few percent, and does the disconnect path need a look.
+    estimated_record_count: int
+
+
+class UsageMonthBlock(BaseModel):
+    """The month against the budget. Nothing here stops anything."""
+
+    month_key: str
+    spend_micros: int
+    spend_cents: int
+    budget_micros: int
+    remaining_micros: int
+    pct_of_budget: float
+
+
+class UsageTopUserRow(BaseModel):
+    """One account's month-to-date spend, against what its plan funds."""
+
+    user_id: str
+    email: str | None
+    plan: str
+    calls: int
+    cost_micros: int
+    cost_cents: int
+    allowance_cents: int
+    pct_of_allowance: float
+
+
+class AdminUsageResponse(BaseModel):
+    """Spend and gate state, for the human who decides what to do about it."""
+
+    as_of: str
+    today: UsageTodayBlock
+    month: UsageMonthBlock
+    by_surface: UsageSurfaceBreakdown
+    by_model: UsageModelBreakdown
+    top_users: list[UsageTopUserRow]
 
 
 # ─── Helpers ─────────────────────────────────────────────────────────────
@@ -924,6 +1025,238 @@ async def analytics_users(
         daily_counts.append(DailyUserCount(date=date_key, count=counts.get(date_key, 0)))
 
     return UserAnalyticsResponse(daily_counts=daily_counts, period_days=days)
+
+
+# ─── Usage and Spend ──────────────────────────────────────────────────────
+#
+# Nothing on this router is mounted at a bare "/{param}", so no
+# parameterized sibling can shadow "/usage". Keep it that way: a catch-all
+# added above this line would swallow the route silently, and FastAPI
+# matches in registration order without warning about it.
+
+
+def _spend_cents(micros: int) -> int:
+    """Convert micro-dollars to cents, rounding up.
+
+    Once, at the aggregate, never per call. Per-call cents would round a
+    half-cent chat turn up to a whole one, a 96% over-count, which at the
+    allowance level tells users they are out of budget at roughly half
+    their real usage. Ceiling here satisfies the never-under-count rail
+    without distorting the per-call number.
+    """
+    return -(-micros // 10_000)
+
+
+def _surface_or_unattributed() -> Case[str]:
+    """``usage_records.surface``, except that unattributed spend gets its own.
+
+    A relabel rather than an extra row, so the breakdown still sums to the
+    window total. Design section 5.5 wants that number visible rather than
+    buried inside whichever surface happened to lose its attribution; which
+    surface it came from is already in the WARNING the ledger logged when
+    it wrote the row.
+    """
+    return case(
+        (UsageRecord.user_id.is_(None), literal(UNATTRIBUTED_SCOPE)),
+        else_=UsageRecord.surface,
+    )
+
+
+async def _window_totals(
+    db: AsyncSession, window: InstrumentedAttribute[str], key: str
+) -> tuple[int, int, int]:
+    """Return ``(record_count, cost_micros, estimated_count)`` for one window."""
+    row = (
+        await db.execute(
+            select(
+                func.count(UsageRecord.id),
+                func.coalesce(func.sum(UsageRecord.cost_micros), 0),
+                func.coalesce(func.sum(case((UsageRecord.estimated.is_(True), 1), else_=0)), 0),
+            ).where(window == key)
+        )
+    ).one()
+    return int(row[0]), int(row[1]), int(row[2])
+
+
+async def _by_surface(
+    db: AsyncSession, window: InstrumentedAttribute[str], key: str
+) -> list[UsageSurfaceRow]:
+    """Roll one window up by surface, costliest first."""
+    surface = _surface_or_unattributed().label("surface")
+    result = await db.execute(
+        select(
+            surface,
+            func.count(UsageRecord.id),
+            func.coalesce(func.sum(UsageRecord.cost_micros), 0),
+        )
+        .where(window == key)
+        .group_by(surface)
+    )
+    rows = [
+        UsageSurfaceRow(
+            surface=str(name),
+            calls=int(calls),
+            cost_micros=int(micros),
+            cost_cents=_spend_cents(int(micros)),
+        )
+        for name, calls, micros in result
+    ]
+    if not any(row.surface == UNATTRIBUTED_SCOPE for row in rows):
+        # Always present, even at zero. A missing row reads as "we do not
+        # measure this"; a zero reads as "there was none", which is the
+        # thing an operator actually wants to know.
+        rows.append(
+            UsageSurfaceRow(surface=UNATTRIBUTED_SCOPE, calls=0, cost_micros=0, cost_cents=0)
+        )
+    rows.sort(key=lambda row: row.cost_micros, reverse=True)
+    return rows
+
+
+async def _by_model(
+    db: AsyncSession, window: InstrumentedAttribute[str], key: str
+) -> list[UsageModelRow]:
+    """Roll one window up by model id, costliest first.
+
+    Both cache fields are reported, not just reads: slice 5's acceptance
+    criterion is read off this block, and a cache write bills at 1.25x.
+    """
+    result = await db.execute(
+        select(
+            UsageRecord.model,
+            func.count(UsageRecord.id),
+            func.coalesce(func.sum(UsageRecord.input_tokens), 0),
+            func.coalesce(func.sum(UsageRecord.output_tokens), 0),
+            func.coalesce(func.sum(UsageRecord.cache_read_input_tokens), 0),
+            func.coalesce(func.sum(UsageRecord.cache_creation_input_tokens), 0),
+            func.coalesce(func.sum(UsageRecord.cost_micros), 0),
+        )
+        .where(window == key)
+        .group_by(UsageRecord.model)
+        .order_by(desc(func.coalesce(func.sum(UsageRecord.cost_micros), 0)))
+    )
+    return [
+        UsageModelRow(
+            model=str(model),
+            calls=int(calls),
+            input_tokens=int(tokens_in),
+            output_tokens=int(tokens_out),
+            cache_read_input_tokens=int(cache_read),
+            cache_creation_input_tokens=int(cache_write),
+            cost_micros=int(micros),
+        )
+        for model, calls, tokens_in, tokens_out, cache_read, cache_write, micros in result
+    ]
+
+
+async def _top_users(db: AsyncSession, month_key: str, top: int) -> list[UsageTopUserRow]:
+    """The costliest accounts this month, against what their plans fund.
+
+    This is the view that answers the question the roadmap says validates
+    the Pro price: what does a p95 active user actually cost.
+
+    Monthly only, because the allowance it is measured against is monthly.
+    The inner join is what keeps unattributed spend out: those rows have no
+    user, and they are already visible as their own row in ``by_surface``.
+    """
+    settings = get_settings()
+    total_micros = func.coalesce(func.sum(UsageRecord.cost_micros), 0)
+    result = await db.execute(
+        select(UsageRecord.user_id, User.email, User.plan, func.count(UsageRecord.id), total_micros)
+        .join(User, User.id == UsageRecord.user_id)
+        .where(UsageRecord.month_key == month_key)
+        .group_by(UsageRecord.user_id, User.email, User.plan)
+        .order_by(desc(total_micros))
+        .limit(top)
+    )
+
+    rows: list[UsageTopUserRow] = []
+    for user_id, email, plan, calls, micros in result:
+        allowance_cents = settings.allowance_cents_for(str(plan))
+        allowance_micros = allowance_cents * 10_000
+        rows.append(
+            UsageTopUserRow(
+                user_id=str(user_id),
+                email=email,
+                plan=str(plan),
+                calls=int(calls),
+                cost_micros=int(micros),
+                cost_cents=_spend_cents(int(micros)),
+                allowance_cents=allowance_cents,
+                # free has an allowance of zero by design, so this guard is
+                # a real case rather than defensive noise.
+                pct_of_allowance=(
+                    round(int(micros) * 100 / allowance_micros, 1) if allowance_micros else 0.0
+                ),
+            )
+        )
+    return rows
+
+
+@router.get("/usage", response_model=AdminUsageResponse)
+async def admin_usage(
+    top: int = Query(default=20, ge=1, le=100),
+    db: AsyncSession = Depends(get_db),
+    _admin: User = Depends(get_current_admin),
+) -> AdminUsageResponse:
+    """Return what the paid surfaces have cost, and how close the gates are.
+
+    Two sources, and the split is the point. Gate numbers — call counts and
+    ceilings — come from ``usage_counters``, which answers "are we blocked".
+    Every dollar comes from ``usage_records``, which answers "what did it
+    cost". Reading spend off the counters would work today and drift the
+    moment a counter is reset or a meter is renamed.
+
+    Two windows: ``today`` carries the daily ceiling that can actually block
+    a call, ``month`` carries the budget that deliberately cannot. There is
+    no automatic monthly kill switch (design section 7.1); crossing 80% logs
+    at ERROR from the ledger's write path, so the alert does not wait for
+    somebody to open this page.
+    """
+    settings = get_settings()
+    period_key = current_period_key()
+    month_key = current_month_key()
+
+    today_records, today_micros, today_estimated = await _window_totals(
+        db, UsageRecord.period_key, period_key
+    )
+    _, month_micros, _ = await _window_totals(db, UsageRecord.month_key, month_key)
+
+    ceiling_micros = settings.daily_global_spend_ceiling_micros()
+    budget_micros = settings.monthly_llm_spend_budget_micros()
+
+    return AdminUsageResponse(
+        as_of=datetime.now(UTC).isoformat(),
+        today=UsageTodayBlock(
+            period_key=period_key,
+            spend_micros=today_micros,
+            spend_cents=_spend_cents(today_micros),
+            ceiling_micros=ceiling_micros,
+            remaining_micros=ceiling_micros - today_micros,
+            llm_calls=await get_count(
+                scope=GLOBAL_SCOPE, meter=METER_LLM_CALLS, period_key=period_key
+            ),
+            llm_call_ceiling=settings.global_daily_llm_call_ceiling,
+            record_count=today_records,
+            estimated_record_count=today_estimated,
+        ),
+        month=UsageMonthBlock(
+            month_key=month_key,
+            spend_micros=month_micros,
+            spend_cents=_spend_cents(month_micros),
+            budget_micros=budget_micros,
+            remaining_micros=budget_micros - month_micros,
+            pct_of_budget=(round(month_micros * 100 / budget_micros, 1) if budget_micros else 0.0),
+        ),
+        by_surface=UsageSurfaceBreakdown(
+            today=await _by_surface(db, UsageRecord.period_key, period_key),
+            month=await _by_surface(db, UsageRecord.month_key, month_key),
+        ),
+        by_model=UsageModelBreakdown(
+            today=await _by_model(db, UsageRecord.period_key, period_key),
+            month=await _by_model(db, UsageRecord.month_key, month_key),
+        ),
+        top_users=await _top_users(db, month_key, top),
+    )
 
 
 # ─── Waitlist Admin Endpoints ─────────────────────────────────────────────

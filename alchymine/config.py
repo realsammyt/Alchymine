@@ -113,6 +113,28 @@ class Settings(BaseSettings):
     # comma-separated value that comes out of a docker-compose env file.
     plan_allowance_cents: str = "free:0,beta:555,blueprint:99,pro:275,founding:333"
 
+    # ── Global spend budget ──────────────────────────────────────────────
+    # PLACEHOLDER, awaiting Tyler's sign-off. There is no revenue yet, so
+    # this figure is modelled rather than derived: a busy beta day is about
+    # 20 reports ($2.20) plus 500 chat turns ($5.00 at Sonnet) plus 30 images
+    # ($2.01), around $9.20, and a $200 budget would yield a $10/day ceiling
+    # that such a day nearly trips. Section 7.1 of
+    # docs/plans/2026-08-13-unit-economics.md has the arithmetic; section 10
+    # lists this alongside every other provisional number so they can be
+    # revisited as a set once the ledger has real data.
+    monthly_llm_spend_budget_usd: float = 300.0
+
+    # Usage is burstier than a budget: a launch day, a batch of reports, one
+    # enthusiastic beta tester. A flat monthly/30 ceiling trips on any
+    # above-average day and takes every paid surface down until UTC
+    # midnight, so the daily number carries 50% headroom. The cost of that
+    # choice is stated rather than hidden: a sustained month at the daily
+    # ceiling lands at 1.5x the budget. The daily ceiling is a runaway stop,
+    # not a budget enforcer — the budget itself is watched by a human
+    # (see GET /admin/usage), and there is deliberately no automatic monthly
+    # kill switch. PLACEHOLDER, same as the budget above.
+    daily_spend_headroom_factor: float = 1.5
+
     # ── Cost ledger ──────────────────────────────────────────────────────
     # Per-model prices in MICRO-DOLLARS PER TOKEN, as
     # ``model:input_micros:output_micros`` entries. $3/MTok is 3 micros per
@@ -232,6 +254,43 @@ class Settings(BaseSettings):
             free,
         )
         return free
+
+    def monthly_llm_spend_budget_micros(self) -> int:
+        """Return the monthly LLM budget in micro-dollars.
+
+        The denominator behind ``pct_of_budget`` in the admin readout and
+        behind the 80% alert. Clamped at zero so a negative env value reads
+        as "no budget" rather than as a negative one nothing can exceed.
+        """
+        return max(0, int(self.monthly_llm_spend_budget_usd * 1_000_000))
+
+    def daily_global_spend_ceiling_micros(self) -> int:
+        """Return the global daily spend ceiling in micro-dollars.
+
+        ``monthly / 30 x headroom``. At the provisional defaults that is
+        $300/month, $10/day flat, $15/day with headroom — 15,000,000
+        micro-dollars.
+
+        Derived rather than configured directly on purpose: a daily number
+        set by hand drifts away from the monthly budget it is supposed to
+        protect, and then two people disagree about what the budget is.
+        Move ``MONTHLY_LLM_SPEND_BUDGET_USD`` and the daily ceiling follows.
+
+        A budget of zero yields a ceiling of zero, which blocks every paid
+        call. That is the fail-closed direction and it is deliberate: a
+        misconfigured budget should stop spending rather than quietly
+        disable the ceiling. Negative values clamp to zero for the same
+        reason.
+        """
+        return max(
+            0,
+            int(
+                self.monthly_llm_spend_budget_usd
+                * 1_000_000
+                / 30
+                * self.daily_spend_headroom_factor
+            ),
+        )
 
     def get_llm_prices(self) -> dict[str, tuple[int, int]]:
         """Return *llm_price_table* parsed into ``{model: (in, out)}`` micros.
