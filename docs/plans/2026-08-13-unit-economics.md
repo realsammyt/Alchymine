@@ -150,7 +150,7 @@ That is the whole method. Everything below is that formula plus a stated margin 
 | `pro` | $11/mo | 75% | **275** | 11 x 0.25 = 2.75, which is exactly the roadmap's stated economics gate: "p95 cost per active user <$2.75/mo, i.e. 25% of $11 (the number that validates the Pro price)" (section 10). |
 | `founding` | $222 lifetime, 111 seats | n/a | **333** | Above Pro as the perk. Worst case is 111 x $3.33 = $370/month in perpetuity against $24,642 collected once, roughly 5.5 years of runway at total saturation, which will not happen. The seat cap is what makes an unbounded-duration grant safe. |
 
-**Does 275 cents actually buy a Pro month?** With slice 5 shipped (Haiku, 10-turn history at roughly 3,100 input and 400 output tokens per turn), a chat turn costs 5,100 micro-dollars. 275 cents buys 539 turns. The roadmap's on-theme 222-message cap costs $1.13, leaving $1.62 for art (24 images) or a quarterly report re-run. On Sonnet the same turn costs 15,300 micros, so 275 cents buys 180 turns, which is *under* the 222-message cap the product advertises. That gap is the entire argument for slice 5: without Haiku routing, the advertised meter and the funded meter disagree.
+**Does 275 cents actually buy a Pro month?** With slice 5 shipped (Haiku, 10-turn history at roughly 3,100 input and 400 output tokens per turn), a chat turn costs 5,100 micro-dollars. 275 cents buys 539 turns. The roadmap's on-theme 222-message cap costs $1.13, leaving $1.62 for art (24 images) or a quarterly report re-run. On Sonnet the same turn costs 15,300 micros, so 275 cents buys 179 turns, which is *under* the 222-message cap the product advertises. That gap is the entire argument for slice 5: without Haiku routing, the advertised meter and the funded meter disagree.
 
 All five numbers are provisional env defaults. Config field:
 
@@ -176,7 +176,7 @@ Issue #220 observes that `consume()` (`usage_counters.py:217-241`) increments fi
 2. The paid call goes out.
 3. `increment_and_get(amount=cost_micros)` records what it actually cost.
 
-The cost of this ordering is a bounded overshoot: a call authorized at 99% of budget still runs to completion, so the day or month can exceed its ceiling by at most one call's cost. That is the correct trade, because we cannot price a call before making it, and the alternative (charge an estimate up front, refund the difference) doubles the write volume to correct a rounding error. The count breaker remains the outer backstop for the pathological case.
+The cost of this ordering is a bounded overshoot: a call authorized at 99% of budget still runs to completion, so the day or month can exceed its ceiling by roughly one call's cost per concurrent caller. The bound is concurrency, not one: `check_ceiling` is a plain read, so several calls near the ceiling can all pass it before any of them records, and `narrative.py:347-348` already fires five concurrent paid calls per report, meaning one report at the ceiling can overshoot by up to five calls' cost. That is still the correct trade, because we cannot price a call before making it, and the alternative (charge an estimate up front, refund the difference) doubles the write volume to correct a rounding error. The atomic count breaker, not `check_ceiling`, is the hard backstop for the pathological case; slice 4 must not assume `check_ceiling` gives a strict one-call bound.
 
 ### 3.2 New primitives in `alchymine/db/usage_counters.py`
 
@@ -207,7 +207,7 @@ def next_month_start(now: datetime | None = None) -> datetime:
 | `spend_micros_daily` | `global` | `YYYY-MM-DD` | micro-dollars delivered | derived, section 7 | 4 |
 | `spend_micros_monthly` | `<user_id>` | `YYYY-MM` | micro-dollars delivered | per-plan allowance x 10,000 | 3 |
 
-The period shape is baked into the meter *name* on purpose. `get_count(scope=user, meter="spend")` with no `period_key` would silently default to today's date key (`usage_counters.py:125`) and return 0 for a monthly meter, reading as "no spend" when the truth is "wrong row." Encoding `daily` and `monthly` in the name makes that mistake impossible to write.
+The period shape is baked into the meter *name* on purpose. `get_count(scope=user, meter="spend")` with no `period_key` would silently default to today's date key (`usage_counters.py:185`) and return 0 for a monthly meter, reading as "no spend" when the truth is "wrong row." Encoding `daily` and `monthly` in the name makes that mistake impossible to write.
 
 **#220 is closed by this design**, with a comment pointing at this section: counters are attempt meters by design and now say so in their docstring; the number that drives money is delivery-priced and lives in a separate meter and a separate table.
 
@@ -280,19 +280,22 @@ New leaf module `alchymine/llm/attribution.py`:
 ```python
 _user_id: ContextVar[str | None] = ContextVar("alchymine_user_id", default=None)
 _surface: ContextVar[str | None] = ContextVar("alchymine_surface", default=None)
+_request_id: ContextVar[str | None] = ContextVar("alchymine_request_id", default=None)
 
-def set_attribution(*, user_id: str | None, surface: str | None) -> None
-def current_attribution() -> tuple[str | None, str | None]
+def set_attribution(*, user_id: str | None, surface: str | None,
+                    request_id: str | None = None) -> None
+def current_attribution() -> tuple[str | None, str | None, str | None]
 
 @contextmanager
-def attributed(*, user_id: str | None, surface: str | None) -> Iterator[None]
+def attributed(*, user_id: str | None, surface: str | None,
+               request_id: str | None = None) -> Iterator[None]
 ```
 
 A leaf module under `alchymine/llm/` rather than `alchymine/api/deps.py`, because `alchymine.api.deps` imports `alchymine.db`, and `usage_counters.py:100-103` already documents the import cycle that creates. Both the API and the Celery worker must import this, so it must depend on nothing.
 
 ### 5.2 Where routes set it
 
-`get_current_account()` calls `set_attribution()` and returns the `Account`. No reset needed: each request runs in its own asyncio task with its own copied context, so the value dies with the task and cannot leak between requests.
+`get_current_account()` calls `set_attribution()` and returns the `Account`. It reads `request.state.request_id` (set by `RequestIdMiddleware`, `middleware.py:63`) and passes it as the third field, which is how `usage_records.request_id` gets populated; the leaf module itself never touches `request.state`. Celery-side calls through `attributed(...)` leave `request_id` as `None`, which is honest (there is no HTTP request). No reset needed: each request runs in its own asyncio task with its own copied context, so the value dies with the task and cannot leak between requests.
 
 Surface is set per route: `chat`, `report`, `art`, `brand_logo`.
 
@@ -367,34 +370,36 @@ This is deliberately *not* fail-closed, and the distinction matters. The fail-cl
 
 ### 6.1 The pinned mechanism
 
+**There is exactly one recording call site per streamed call: the `finally` block.** The loop body never records. That single site runs on every exit path (normal completion, disconnect, exception), so it cannot double-record the common path and cannot miss the rare one.
+
 ```python
 async with client.messages.stream(...) as stream:
-    async for text in stream.text_stream:
-        delivered_chars += len(text)
-        yield text
-    final = await stream.get_final_message()   # .usage carries all four token counts
+    try:
+        async for text in stream.text_stream:
+            delivered_chars += len(text)
+            yield text
+    finally:
+        # The ONLY recording site for this call. Runs once on every path.
+        try:
+            final = await asyncio.wait_for(stream.get_final_message(), timeout=5.0)
+            record exact usage from final.usage
+        except Exception:
+            record estimated usage (estimated=True), section 6.2
 ```
 
-`get_final_message()` returns the accumulated `Message` after `message_stop`, and its `.usage` carries `input_tokens`, `output_tokens`, `cache_creation_input_tokens` and `cache_read_input_tokens`. This is the only place in the codebase that can learn what a streamed reply cost; today the SSE path discards it entirely.
+`get_final_message()` returns the accumulated `Message` after `message_stop`, and its `.usage` carries `input_tokens`, `output_tokens`, `cache_creation_input_tokens` and `cache_read_input_tokens`. On normal completion the stream is already drained, so the awaited call returns immediately with exact numbers. This is the only place in the codebase that can learn what a streamed reply cost; today the SSE path discards it entirely.
 
 `_generate_claude` (`client.py:551`) already reads `response.usage.input_tokens` and `.output_tokens` for a log line at 586-591 and puts them on `LLMResponse`. It needs the two cache fields added and a ledger write, nothing more.
 
 ### 6.2 Client disconnect, and capture-on-close
 
-If the browser goes away mid-stream, the consumer stops iterating and the async generator is finalized: `GeneratorExit` is raised at the `yield`, and the `async with` exits. The `await` in the completion path never runs, so a naive implementation loses the cost of a call that was fully paid for.
-
-Design for capture-on-close:
+If the browser goes away mid-stream, the consumer stops iterating and the async generator is finalized: `GeneratorExit` is raised at the `yield`, and the `async with` exits. A capture placed after the loop would never run, so a naive implementation loses the cost of a call that was fully paid for. The single-site `finally` in 6.1 is the answer: on disconnect it still runs, `get_final_message()` usually cannot complete against a torn-down stream, and the `except` arm records the estimate instead:
 
 ```python
-finally:
-    try:
-        final = await asyncio.wait_for(stream.get_final_message(), timeout=5.0)
-        record exact usage
-    except Exception:
-        record estimated usage:
-            input_tokens  = len(system_prompt + prompt) // 4
-            output_tokens = delivered_chars // 4
-            estimated = True
+record estimated usage:
+    input_tokens  = len(system_prompt + prompt) // 4
+    output_tokens = delivered_chars // 4
+    estimated = True
 ```
 
 Awaiting during async-generator finalization is permitted (that is why `aclose()` is a coroutine); yielding a value after `GeneratorExit` is not, and this code does not. The bounded `wait_for` matters because after a disconnect the upstream HTTP response may still be undrained, and `get_final_message()` could otherwise block until the 90-second client timeout.
@@ -546,7 +551,7 @@ system=[{"type": "text", "text": stable_prefix,
 
 **The constraint that decides whether this pays.** The minimum cacheable prefix is model-dependent: 4,096 tokens on `claude-haiku-4-5`, 1,024 on `claude-sonnet-4-6`. A shorter prefix is silently not cached. No error, no warning, no cache-hit tokens.
 
-Measured against the actual prompts: `MAIN_COACH_PROMPT` plus `_SAFETY_PREAMBLE` plus one specialist focus block (`agents/growth/system_prompts.py:33-159`) is roughly 4,100 characters, on the order of 1,000 tokens. That is right at Sonnet's minimum and **far below Haiku's 4,096**. So:
+Measured against the actual prompts: the five assembled specialist prompts in `agents/growth/system_prompts.py` run 3,453 to 3,528 characters each, roughly 860 to 880 tokens. That is right at Sonnet's minimum and **far below Haiku's 4,096**. So:
 
 > On chat as it stands today, with Haiku routing on, prompt caching will produce **zero cache hits**. Ship the breakpoint anyway (it is a no-op below the minimum and costs nothing), but do not book a saving the token math does not support.
 
