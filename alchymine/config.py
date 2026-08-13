@@ -168,6 +168,37 @@ class Settings(BaseSettings):
     # code change.
     ledger_degraded_retry_seconds: float = 60.0
 
+    # ── Chat model and prompt caching ────────────────────────────────────
+    # The model the chat coach asks for. It becomes the HEAD of the
+    # existing fallback chain rather than replacing it, so a 529 still
+    # escalates to Sonnet instead of telling the user the coach is down.
+    # An empty string means "use the default chain unchanged", which is the
+    # off switch for this routing.
+    #
+    # Haiku is a fifth of Sonnet's price, which is what makes the advertised
+    # 222-message monthly allowance fit inside the funded one: 222 turns
+    # with history costs $1.13 on Haiku against $3.40 on Sonnet, and the Pro
+    # allowance is $2.75.
+    llm_chat_model: str = "claude-haiku-4-5-20251001"
+
+    # Whether the chat system prompt carries a cache breakpoint.
+    #
+    # Honest expectation: this produces NO cache hits today. The minimum
+    # cacheable prefix is 4,096 tokens on claude-haiku-4-5 and 1,024 on
+    # claude-sonnet-4-6, and the assembled chat system prompt is around 880
+    # tokens, so the breakpoint is silently ignored — no error, no warning,
+    # no cache-hit tokens. It ships anyway because it is free to carry and
+    # starts paying the moment the chat context grows past the minimum.
+    # The acceptance test is a query, not an assumption: sum
+    # cache_read_input_tokens over usage_records where surface='chat'
+    # within 24h of the prefix growing, and if it is still zero, either grow
+    # the prefix or turn this off.
+    llm_prompt_cache_enabled: bool = True
+
+    # Both of the above are read through the lru_cached get_settings(), so
+    # they are read once per process: flipping either one takes a container
+    # restart, not just an env change.
+
     # ── Celery ───────────────────────────────────────────────────────────
     celery_broker_url: str = "redis://localhost:6379/1"
     celery_result_backend: str = "redis://localhost:6379/2"
