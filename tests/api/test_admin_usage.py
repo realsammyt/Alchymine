@@ -119,9 +119,7 @@ def seeded_db() -> Iterator[async_sessionmaker[AsyncSession]]:
                 [
                     # today
                     _record(input_tokens=1000, output_tokens=100, cost_micros=2000),
-                    _record(
-                        input_tokens=500, output_tokens=50, cost_micros=1000, estimated=True
-                    ),
+                    _record(input_tokens=500, output_tokens=50, cost_micros=1000, estimated=True),
                     _record(
                         user_id=USER_B,
                         scope=USER_B,
@@ -158,9 +156,7 @@ def seeded_db() -> Iterator[async_sessionmaker[AsyncSession]]:
     asyncio.run(_seed())
     set_db_engine(engine)
     asyncio.run(
-        increment_and_get(
-            scope=GLOBAL_SCOPE, meter=METER_LLM_CALLS, amount=SEEDED_LLM_CALLS
-        )
+        increment_and_get(scope=GLOBAL_SCOPE, meter=METER_LLM_CALLS, amount=SEEDED_LLM_CALLS)
     )
 
     async def _session() -> AsyncGenerator[AsyncSession, None]:
@@ -229,9 +225,7 @@ class TestTodayBlock:
         """70,500 micros is 7.05 cents, which must never round down to 7."""
         assert _get(client)["today"]["spend_cents"] == 8
 
-    def test_the_ceiling_and_what_is_left_of_it_come_from_config(
-        self, client: TestClient
-    ) -> None:
+    def test_the_ceiling_and_what_is_left_of_it_come_from_config(self, client: TestClient) -> None:
         today = _get(client)["today"]
 
         assert today["ceiling_micros"] == 15_000_000
@@ -256,9 +250,7 @@ class TestTodayBlock:
         assert today["llm_call_ceiling"] == 2000
         assert today["record_count"] == 4
 
-    def test_estimated_rows_are_counted_so_their_share_is_visible(
-        self, client: TestClient
-    ) -> None:
+    def test_estimated_rows_are_counted_so_their_share_is_visible(self, client: TestClient) -> None:
         """More than a few percent means the disconnect path needs a look."""
         today = _get(client)["today"]
 
@@ -274,9 +266,7 @@ class TestMonthBlock:
         assert month["spend_micros"] == MONTH_MICROS
         assert month["spend_cents"] == 9  # 8.35 cents, ceiling
 
-    def test_the_budget_and_what_is_left_of_it_come_from_config(
-        self, client: TestClient
-    ) -> None:
+    def test_the_budget_and_what_is_left_of_it_come_from_config(self, client: TestClient) -> None:
         month = _get(client)["month"]
 
         assert month["budget_micros"] == 300_000_000
@@ -382,9 +372,7 @@ class TestTopUsers:
 
         assert [row["user_id"] for row in rows] == [USER_B, USER_A]
 
-    def test_each_row_carries_its_plan_and_allowance_context(
-        self, client: TestClient
-    ) -> None:
+    def test_each_row_carries_its_plan_and_allowance_context(self, client: TestClient) -> None:
         """The view that answers what a p95 active user actually costs."""
         rows = {row["user_id"]: row for row in _get(client)["top_users"]}
 
@@ -402,9 +390,7 @@ class TestTopUsers:
         assert rows[USER_B]["cost_micros"] == 76_000
         assert rows[USER_B]["cost_cents"] == 8
 
-    def test_percent_of_allowance_is_measured_against_the_plan(
-        self, client: TestClient
-    ) -> None:
+    def test_percent_of_allowance_is_measured_against_the_plan(self, client: TestClient) -> None:
         rows = {row["user_id"]: row for row in _get(client)["top_users"]}
 
         # 76,000 micros against 275 cents (2,750,000 micros).

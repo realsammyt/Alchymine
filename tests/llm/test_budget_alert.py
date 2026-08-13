@@ -159,9 +159,7 @@ class TestItStopsNothing:
 
 
 class TestItIsCheapEnoughToLiveOnTheWritePath:
-    async def test_repeat_calls_are_throttled_rather_than_re_querying(
-        self, cost_meter_db
-    ) -> None:
+    async def test_repeat_calls_are_throttled_rather_than_re_querying(self, cost_meter_db) -> None:
         """One aggregate per paid call would be a real cost; this is not that."""
         with _env(monthly_llm_spend_budget_usd=1.0):
             await _spend(cost_meter_db, 100)

@@ -47,8 +47,8 @@ from alchymine.db.usage_counters import (
     METER_SPEND_MICROS_DAILY,
     METER_SPEND_MICROS_MONTHLY,
     clear_ledger_degraded,
-    get_count,
     current_month_key,
+    get_count,
 )
 from alchymine.llm.budget import reset_budget_alerts
 from alchymine.workers.tasks import _set_task_engine, generate_report
@@ -169,9 +169,7 @@ def _run_the_task() -> None:
                     return_value=_FakeOrchestratorResult()
                 )
                 with patch("anthropic.AsyncAnthropic", return_value=fake_sdk):
-                    generate_report.apply(
-                        args=[REPORT_ID, "tell me about numerology"]
-                    ).get()
+                    generate_report.apply(args=[REPORT_ID, "tell me about numerology"]).get()
         finally:
             get_settings.cache_clear()
 
@@ -224,9 +222,7 @@ class TestTheWholeChain:
 
         factory = async_sessionmaker(engine, expire_on_commit=False)
         async with factory() as session:
-            await create_report(
-                session, report_id=REPORT_ID, user_id=None, user_input="orphan"
-            )
+            await create_report(session, report_id=REPORT_ID, user_id=None, user_input="orphan")
             await session.commit()
 
         _run_the_task()

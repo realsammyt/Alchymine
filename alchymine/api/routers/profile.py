@@ -15,10 +15,12 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field, field_validator
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from alchymine.api.auth import get_current_admin, get_current_user
+from alchymine.api.auth import Account, get_current_account, get_current_admin, get_current_user
 from alchymine.api.deps import get_db_session
+from alchymine.api.entitlements import require_profile_narrative
 from alchymine.db import repository
 from alchymine.db.models import User
+from alchymine.db.usage_counters import CostCeilingExceeded
 
 logger = logging.getLogger(__name__)
 
@@ -386,20 +388,37 @@ async def reassess_layer(
     system: str,
     request: ReassessRequest,
     session: AsyncSession = Depends(get_db_session),
-    current_user: dict = Depends(get_current_user),
+    account: Account = Depends(get_current_account),
 ) -> ReassessResponse:
     """Re-run a system's coordinator graph with new assessment responses.
 
     Merges the new responses with existing data, re-runs the graph, and
     updates the profile layer in the database.
+
+    Half of this route is free and half of it is not. The graph re-run is
+    deterministic, so it stays open to every account. Regenerating the
+    narrative is a paid Claude call, which is why this is the sixth paid
+    surface (issue #243) and why the plan gate below is applied by hand
+    instead of as a route dependency.
+
+    Uses ``get_current_account`` rather than ``get_current_user``: the gate
+    needs a plan, which never travels in the JWT, and the account
+    dependency is also what sets attribution, so a narrative regenerated
+    here stops landing in the ledger as unattributed spend.
     """
-    if current_user["sub"] != user_id:
+    if account.user_id != user_id:
         raise HTTPException(status_code=403, detail="Access denied")
     if system not in _VALID_REASSESS_SYSTEMS:
         raise HTTPException(
             status_code=422,
             detail=f"Invalid system: {system}. Must be one of {sorted(_VALID_REASSESS_SYSTEMS)}",
         )
+
+    # Before anything is written, not after. Refusing once the graph has
+    # run and the layer has been updated would leave the account changed
+    # and the response an error, which is the worst of both.
+    if request.regenerate_narrative:
+        await require_profile_narrative(account)
 
     user = await repository.get_profile(session, user_id)
     if user is None:
@@ -469,6 +488,12 @@ async def reassess_layer(
             generator = NarrativeGenerator()
             result = await generator.generate(system, results)
             narrative_text = result.narrative
+        except CostCeilingExceeded:
+            # A tripped breaker is not a narrative failure. Swallowing it
+            # here would answer with a silent null while the real situation
+            # is that spending is capped and somebody needs to know, so it
+            # goes back out to the 503 handler like everywhere else.
+            raise
         except Exception:
             logger.warning(
                 "Narrative regeneration failed for user %s system %s",

@@ -31,6 +31,7 @@ from alchymine.api.entitlements import (
     require_art,
     require_brand_logo,
     require_chat,
+    require_profile_narrative,
     require_report,
     require_report_download,
 )
@@ -43,8 +44,21 @@ from alchymine.db.usage_counters import (
     next_month_start,
 )
 
-ALL_GATES = [require_report, require_report_download, require_chat, require_art, require_brand_logo]
-SPENDING_GATES = [require_report, require_chat, require_art, require_brand_logo]
+ALL_GATES = [
+    require_report,
+    require_report_download,
+    require_chat,
+    require_art,
+    require_brand_logo,
+    require_profile_narrative,
+]
+SPENDING_GATES = [
+    require_report,
+    require_chat,
+    require_art,
+    require_brand_logo,
+    require_profile_narrative,
+]
 
 # Every plan in the config default, and the allowance each one buys.
 # Restated here rather than imported so a silent edit to the config

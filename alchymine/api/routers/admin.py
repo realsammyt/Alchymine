@@ -1112,7 +1112,9 @@ async def _by_surface(
     return rows
 
 
-async def _by_model(db: AsyncSession, window: InstrumentedAttribute[str], key: str) -> list[UsageModelRow]:
+async def _by_model(
+    db: AsyncSession, window: InstrumentedAttribute[str], key: str
+) -> list[UsageModelRow]:
     """Roll one window up by model id, costliest first.
 
     Both cache fields are reported, not just reads: slice 5's acceptance

@@ -139,9 +139,7 @@ class TestSpendCeilingAtTheChokepoint:
 
     async def test_a_day_under_the_ceiling_still_passes(self, cost_meter_db) -> None:
         with _env(monthly_llm_spend_budget_usd=0.03, daily_spend_headroom_factor=1.0):
-            await increment_and_get(
-                scope=GLOBAL_SCOPE, meter=METER_SPEND_MICROS_DAILY, amount=999
-            )
+            await increment_and_get(scope=GLOBAL_SCOPE, meter=METER_SPEND_MICROS_DAILY, amount=999)
 
             await charge_paid_call()  # must not raise
 
@@ -199,9 +197,7 @@ class TestSpendCeilingAtTheChokepoint:
 
 
 class TestTheTwoBreakersAreIndependent:
-    async def test_the_count_backstop_still_trips_when_spend_is_empty(
-        self, cost_meter_db
-    ) -> None:
+    async def test_the_count_backstop_still_trips_when_spend_is_empty(self, cost_meter_db) -> None:
         """Cheap calls are exactly what a dollar ceiling misses."""
         with _env(global_daily_llm_call_ceiling=5):
             await increment_and_get(scope=GLOBAL_SCOPE, meter=METER_LLM_CALLS, amount=5)
