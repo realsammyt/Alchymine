@@ -13,6 +13,7 @@ import asyncio
 import os
 from collections.abc import AsyncGenerator, Iterator
 from datetime import UTC, datetime
+from unittest.mock import patch
 
 import pytest
 import pytest_asyncio
@@ -25,6 +26,7 @@ from alchymine.db.usage_counters import (
     GLOBAL_SCOPE,
     CostCeilingExceeded,
     check_ceiling,
+    claim_ledger_admission,
     clear_ledger_degraded,
     consume,
     current_month_key,
@@ -336,23 +338,76 @@ class TestCheckCeiling:
             await broken.dispose()
 
 
-@pytest.mark.asyncio
-class TestLedgerDegradedFlag:
-    """A ledger write that failed must block the *next* cost-bearing call."""
+class TestLedgerHealth:
+    """The state behind "a failed write blocks the next paid call".
 
-    async def test_starts_clear(self, counter_engine: AsyncEngine) -> None:
+    The block itself lives in ``charge_paid_call`` — one gate, at the one
+    function every egress site already calls — and is tested in
+    ``tests/llm/test_ledger_fail_closed.py``. What lives here is the state
+    machine it reads: a degraded episode, a cooldown, and a single probe.
+    """
+
+    def test_starts_healthy(self) -> None:
         assert ledger_is_degraded() is False
+        assert claim_ledger_admission() is True
 
-    async def test_a_degraded_ledger_blocks_the_next_check(
-        self, counter_engine: AsyncEngine
-    ) -> None:
+    def test_a_failed_write_opens_a_degraded_episode(self) -> None:
         mark_ledger_degraded("insert failed")
-        with pytest.raises(CostCeilingExceeded) as excinfo:
-            await check_ceiling(scope=GLOBAL_SCOPE, meter="spend_micros_daily", ceiling=1_000_000)
-        assert excinfo.value.reason == "meter_unavailable"
+        assert ledger_is_degraded() is True
+        assert claim_ledger_admission() is False
 
-    async def test_clearing_the_flag_reopens_the_gate(self, counter_engine: AsyncEngine) -> None:
+    def test_a_successful_write_ends_the_episode(self) -> None:
         mark_ledger_degraded("insert failed")
         clear_ledger_degraded()
         assert ledger_is_degraded() is False
+        assert claim_ledger_admission() is True
+
+    def test_the_episode_survives_the_cooldown_lapsing(self) -> None:
+        """The cooldown governs admission, not health.
+
+        Only a successful write makes the ledger healthy again; the lapse
+        just buys one call the right to try.
+        """
+        mark_ledger_degraded("insert failed")
+        with patch("alchymine.db.usage_counters.LEDGER_DEGRADED_RETRY_SECONDS", 0.0):
+            assert claim_ledger_admission() is True
+            assert ledger_is_degraded() is True
+
+    def test_only_one_probe_is_admitted_per_cooldown(self) -> None:
+        mark_ledger_degraded("insert failed")
+        with patch("alchymine.db.usage_counters.LEDGER_DEGRADED_RETRY_SECONDS", 0.0):
+            assert [claim_ledger_admission() for _ in range(4)] == [True, False, False, False]
+
+
+@pytest.mark.asyncio
+class TestCheckCeilingIgnoresLedgerHealth:
+    """check_ceiling is a meter read, not the ledger's gate.
+
+    Slice 3 calls it at the route layer to price a user's allowance, where a
+    degraded ledger is not that user's problem and would render an upsell
+    for an internal fault. The 503 belongs at the chokepoint, which is where
+    charge_paid_call puts it — and having only one gate is also what keeps
+    the half-open probe from being claimed twice for a single call.
+    """
+
+    async def test_a_degraded_ledger_does_not_block_a_ceiling_read(
+        self, counter_engine: AsyncEngine
+    ) -> None:
+        mark_ledger_degraded("insert failed")
         assert await check_ceiling(scope=GLOBAL_SCOPE, meter="spend_micros_daily", ceiling=10) == 0
+
+    async def test_an_unreadable_counter_still_fails_closed(
+        self, counter_engine: AsyncEngine
+    ) -> None:
+        """Its own fail-closed rule is untouched."""
+        from alchymine.api.deps import set_db_engine
+
+        broken = create_async_engine("postgresql+asyncpg://nobody@127.0.0.1:1/nothing")
+        set_db_engine(broken)
+        try:
+            with pytest.raises(CostCeilingExceeded) as excinfo:
+                await check_ceiling(scope=GLOBAL_SCOPE, meter="spend_micros_daily", ceiling=10)
+            assert excinfo.value.reason == "meter_unavailable"
+        finally:
+            set_db_engine(counter_engine)
+            await broken.dispose()

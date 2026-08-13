@@ -364,6 +364,50 @@ class TestCancellation:
         assert rows[0].user_id == "user-cancelled"
         assert rows[0].estimated is True
 
+    async def test_a_write_killed_before_it_finishes_is_still_logged(
+        self, cost_meter_db, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """Loop teardown can cancel a detached write outright.
+
+        The task's own nets never run in that case — there is nothing left
+        to catch — so the last thing standing between that spend and total
+        silence is the done callback. It has to log the row and degrade the
+        ledger the same way a failed INSERT does.
+        """
+        import asyncio
+
+        from alchymine.llm import ledger
+
+        started = asyncio.Event()
+
+        async def blocked_persist(attempt: object) -> None:
+            started.set()
+            await asyncio.Event().wait()
+
+        with patch("alchymine.llm.ledger._persist", blocked_persist):
+            with caplog.at_level(logging.ERROR):
+                set_attribution(user_id="user-teardown", surface="chat")
+                caller = asyncio.create_task(
+                    record_usage(
+                        meter=METER_LLM_CALLS,
+                        provider="anthropic",
+                        model=HAIKU,
+                        input_tokens=1000,
+                    )
+                )
+                await started.wait()
+
+                write_task = next(iter(ledger._pending_writes))
+                write_task.cancel()
+                with pytest.raises(asyncio.CancelledError):
+                    await caller
+                await asyncio.sleep(0)  # let the done callback run
+
+        assert ledger_is_degraded() is True, "a killed write must not look healthy"
+        logged = [r.getMessage() for r in caplog.records if "row={" in r.getMessage()]
+        assert logged, "the row must survive in the log when the write cannot"
+        assert "user-teardown" in logged[-1]
+
     async def test_cancellation_still_reaches_the_caller(self, cost_meter_db) -> None:
         """Surviving the write must not swallow the cancellation itself."""
         import asyncio

@@ -24,6 +24,7 @@ from alchymine.db.usage_counters import (
     GLOBAL_SCOPE,
     METER_LLM_CALLS,
     CostCeilingExceeded,
+    claim_ledger_admission,
     clear_ledger_degraded,
     get_count,
     ledger_is_degraded,
@@ -81,20 +82,105 @@ class TestDegradedLedgerRecoversOnItsOwn:
     the cooldown restarts.
     """
 
-    async def test_the_flag_expires_after_the_cooldown(self, cost_meter_db) -> None:
+    async def test_exactly_one_call_is_admitted_when_the_cooldown_lapses(
+        self, cost_meter_db
+    ) -> None:
+        """One probe, not an open door.
+
+        A purely time-based lapse admits every caller until somebody's write
+        fails and re-arms it. Under a sustained database failure with steady
+        traffic that is a whole cooldown's worth of unrecorded spend per
+        cycle — and the report path alone fires five paid calls at once.
+        """
+        import asyncio
+
         mark_ledger_degraded("insert failed")
-        assert ledger_is_degraded() is True
 
         with patch("alchymine.db.usage_counters.LEDGER_DEGRADED_RETRY_SECONDS", 0.0):
-            assert ledger_is_degraded() is False
-            await charge_paid_call()  # the half-open probe goes through
+            results = await asyncio.gather(
+                *[charge_paid_call() for _ in range(5)], return_exceptions=True
+            )
 
-    async def test_a_failure_during_the_probe_restarts_the_cooldown(self, cost_meter_db) -> None:
+        admitted = [r for r in results if not isinstance(r, BaseException)]
+        blocked = [r for r in results if isinstance(r, CostCeilingExceeded)]
+        assert len(admitted) == 1, "the half-open window admits one probe, not everyone"
+        assert len(blocked) == 4
+
+    async def test_the_probe_holds_the_gate_until_its_write_resolves(
+        self, cost_meter_db
+    ) -> None:
+        mark_ledger_degraded("insert failed")
+
+        with patch("alchymine.db.usage_counters.LEDGER_DEGRADED_RETRY_SECONDS", 0.0):
+            await charge_paid_call()  # claims the probe
+            # The probe has not written anything yet, so the gate stays shut
+            # even though the cooldown has long since lapsed.
+            with pytest.raises(CostCeilingExceeded):
+                await charge_paid_call()
+
+    async def test_a_successful_probe_write_reopens_the_gate(self, cost_meter_db) -> None:
+        mark_ledger_degraded("insert failed")
+
+        with patch("alchymine.db.usage_counters.LEDGER_DEGRADED_RETRY_SECONDS", 0.0):
+            await charge_paid_call()
+            await record_usage(
+                meter=METER_LLM_CALLS, provider="anthropic", model=HAIKU, input_tokens=1000
+            )
+            assert ledger_is_degraded() is False
+            await charge_paid_call()
+            await charge_paid_call()
+
+    async def test_a_failed_probe_re_arms_the_cooldown(self, cost_meter_db) -> None:
         with patch("alchymine.db.usage_counters.LEDGER_DEGRADED_RETRY_SECONDS", 0.0):
             mark_ledger_degraded("insert failed")
-            assert ledger_is_degraded() is False
-        mark_ledger_degraded("insert failed again")
-        assert ledger_is_degraded() is True
+            await charge_paid_call()  # the probe
+
+        mark_ledger_degraded("insert failed again")  # the probe's write failed
+        with pytest.raises(CostCeilingExceeded):
+            await charge_paid_call()
+
+    async def test_an_abandoned_probe_does_not_wedge_the_gate(self, cost_meter_db) -> None:
+        """A probe whose call dies before it writes must not block forever.
+
+        Otherwise the fix for the deadlock introduces a second one: the
+        probe is claimed, nothing resolves it, and every later call is
+        refused for the life of the process.
+        """
+        mark_ledger_degraded("insert failed")
+
+        with patch("alchymine.db.usage_counters.LEDGER_DEGRADED_RETRY_SECONDS", 0.0):
+            await charge_paid_call()  # claims the probe, then vanishes
+            with pytest.raises(CostCeilingExceeded):
+                await charge_paid_call()
+
+            with patch("alchymine.db.usage_counters.LEDGER_PROBE_TIMEOUT_SECONDS", 0.0):
+                await charge_paid_call()  # a fresh probe replaces the abandoned one
+
+    def test_the_claim_is_atomic_across_threads(self) -> None:
+        """Celery runs the async work in a worker thread, so asyncio's
+        single-threaded guarantee is not enough on its own."""
+        import threading
+
+        mark_ledger_degraded("insert failed")
+        results: list[bool] = []
+        results_lock = threading.Lock()
+
+        with patch("alchymine.db.usage_counters.LEDGER_DEGRADED_RETRY_SECONDS", 0.0):
+            barrier = threading.Barrier(16)
+
+            def worker() -> None:
+                barrier.wait()
+                admitted = claim_ledger_admission()
+                with results_lock:
+                    results.append(admitted)
+
+            threads = [threading.Thread(target=worker) for _ in range(16)]
+            for thread in threads:
+                thread.start()
+            for thread in threads:
+                thread.join()
+
+        assert results.count(True) == 1, f"exactly one probe may be claimed, got {results}"
 
 
 class TestTheKillSwitchIsAnEscapeHatch:

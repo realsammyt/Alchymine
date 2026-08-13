@@ -25,6 +25,7 @@ caller is blocked rather than allowed through unmetered.
 from __future__ import annotations
 
 import logging
+import threading
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime, timedelta
@@ -130,50 +131,104 @@ def next_month_start(now: datetime | None = None) -> datetime:
 # succeed. Each process therefore tracks its own writes, which is exactly
 # the blast radius that matters.
 #
-# The flag is a circuit breaker, not a latch. A pure latch would deadlock:
+# This is a circuit breaker, not a latch. A pure latch would deadlock:
 # every paid call is blocked, so no write is attempted, so nothing can ever
 # clear it, so one failed INSERT takes the process down until someone
-# restarts it. After the cooldown the breaker goes half-open and lets a call
-# through — if its write lands the ledger is healthy again, and if it fails
-# the cooldown starts over. The exposure is at most one unrecorded call per
-# cooldown window, and even that call is in the logs as structured JSON.
+# restarts it. So the breaker goes half-open after a cooldown — but half-open
+# means ONE probe, not an open door. A purely time-based lapse would admit
+# every caller until somebody's write failed and re-armed it, which under a
+# sustained database failure with steady traffic is a cooldown's worth of
+# unrecorded spend per cycle; the report path alone fires five paid calls at
+# once. So the first caller after the lapse claims the probe and everyone
+# else keeps getting refused until that probe resolves: a successful write
+# ends the episode, a failed one re-arms the cooldown.
+#
+# An abandoned probe (its call died before writing anything) would wedge the
+# gate shut forever, which is the same deadlock in a new place, so a claim
+# older than LEDGER_PROBE_TIMEOUT_SECONDS is treated as gone and can be
+# replaced. That figure sits above the 90-second LLM client timeout, so a
+# slow-but-alive call is never mistaken for an abandoned one.
+#
+# The state is guarded by a threading.Lock rather than relying on asyncio's
+# single thread: the Celery path runs its coroutines in a worker thread, so
+# two threads really can reach the claim at once.
 
 LEDGER_DEGRADED_RETRY_SECONDS = 60.0
+LEDGER_PROBE_TIMEOUT_SECONDS = 120.0
 
+_ledger_lock = threading.Lock()
 _ledger_degraded_at: float | None = None
+_probe_claimed_at: float | None = None
 
 
 def mark_ledger_degraded(reason: str) -> None:
-    """Record that a ledger write failed, blocking the next metered calls."""
-    global _ledger_degraded_at
-    if _ledger_degraded_at is None:
+    """Record that a ledger write failed, blocking the paid calls that follow.
+
+    Logs once per failure episode and once per failed probe, so a database
+    that stays down leaves a heartbeat in the log rather than one line and
+    then silence.
+    """
+    global _ledger_degraded_at, _probe_claimed_at
+    with _ledger_lock:
+        announce = _ledger_degraded_at is None or _probe_claimed_at is not None
+        _ledger_degraded_at = monotonic()
+        _probe_claimed_at = None
+
+    if announce:
         logger.error(
-            "LEDGER_DEGRADED — a usage record could not be written (%s). Cost-bearing "
-            "calls are blocked for the next %.0fs, or until a write succeeds.",
+            "LEDGER_DEGRADED — a usage record could not be written (%s). Paid model "
+            "calls are blocked for the next %.0fs, then one call may probe.",
             reason,
             LEDGER_DEGRADED_RETRY_SECONDS,
         )
-    _ledger_degraded_at = monotonic()
 
 
-def clear_ledger_degraded() -> None:
-    """Record that a ledger write succeeded, reopening the gate."""
-    global _ledger_degraded_at
-    if _ledger_degraded_at is not None:
-        logger.info("LEDGER_RECOVERED — usage records are being written again.")
-    _ledger_degraded_at = None
+def clear_ledger_degraded(*, reason: str = "usage records are being written again") -> None:
+    """End the degraded episode. Called when a write lands, and on shutdown paths."""
+    global _ledger_degraded_at, _probe_claimed_at
+    with _ledger_lock:
+        was_degraded = _ledger_degraded_at is not None
+        _ledger_degraded_at = None
+        _probe_claimed_at = None
+
+    if was_degraded:
+        logger.info("LEDGER_HEALTHY — %s.", reason)
 
 
 def ledger_is_degraded() -> bool:
-    """Return True while a failed ledger write should block paid calls.
+    """Return True while the ledger is in a failed-write episode.
 
-    Goes False again once ``LEDGER_DEGRADED_RETRY_SECONDS`` have passed, so
-    the next call through acts as the half-open probe. It also goes False
-    the moment a write succeeds, which is the ordinary recovery path.
+    Health, not admission: only a successful write makes this False again.
+    The cooldown lapsing does not, it merely lets one call through to try.
+    Use :func:`claim_ledger_admission` to decide whether a call may proceed.
     """
-    if _ledger_degraded_at is None:
-        return False
-    return (monotonic() - _ledger_degraded_at) < LEDGER_DEGRADED_RETRY_SECONDS
+    return _ledger_degraded_at is not None
+
+
+def claim_ledger_admission() -> bool:
+    """Return True if this call may proceed under the ledger's health rules.
+
+    Healthy: always. Degraded: only the one probe that claims the half-open
+    window after the cooldown, and only until that probe resolves.
+
+    Claiming is the side effect, which is why this is not a predicate named
+    ``can_...``. Call it once per paid call, at the chokepoint.
+    """
+    global _probe_claimed_at
+    now = monotonic()
+
+    with _ledger_lock:
+        if _ledger_degraded_at is None:
+            return True
+        if now - _ledger_degraded_at < LEDGER_DEGRADED_RETRY_SECONDS:
+            return False
+        probe_is_live = (
+            _probe_claimed_at is not None and now - _probe_claimed_at < LEDGER_PROBE_TIMEOUT_SECONDS
+        )
+        if probe_is_live:
+            return False
+        _probe_claimed_at = now
+        return True
 
 
 # ─── Session plumbing ───────────────────────────────────────────────────
@@ -380,28 +435,20 @@ async def check_ceiling(
     breaker, not this function, is the hard backstop for the pathological
     case.
 
+    Ledger health is deliberately *not* consulted here. That block lives in
+    ``charge_paid_call``, the one function every paid egress site already
+    calls, for two reasons: slice 3 reads ceilings at the route layer to
+    price a user's allowance, where a degraded ledger is not that user's
+    problem and would render an upsell for an internal fault; and one gate
+    means the half-open probe cannot be claimed twice for a single call.
+
     Raises
     ------
     CostCeilingExceeded
-        When the ceiling is already met; when the counter cannot be read;
-        or when a ledger write has failed since the last successful one. All
-        three are the fail-closed direction — an unreadable or untrustworthy
-        meter blocks spending rather than permitting it unmetered.
+        When the ceiling is already met, or when the counter cannot be read.
+        The second is the fail-closed path: an unreadable meter blocks
+        spending rather than permitting it unmetered.
     """
-    if ledger_is_degraded():
-        logger.error(
-            "Blocking a cost-bearing call (meter=%s scope=%s): the usage ledger is "
-            "degraded, so spend cannot be accounted for.",
-            meter,
-            scope,
-        )
-        raise CostCeilingExceeded(
-            meter=meter,
-            scope=scope,
-            retry_at=_retry_at_for(period_key),
-            reason="meter_unavailable",
-        )
-
     try:
         count = await get_count(scope=scope, meter=meter, period_key=period_key)
     except Exception as exc:

@@ -36,8 +36,11 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+from asyncio import CancelledError
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
+from dataclasses import dataclass, field
+from functools import partial
 from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -67,6 +70,20 @@ UNATTRIBUTED_SCOPE = "unattributed"
 # loop holds only a weak reference and a write can be garbage-collected
 # mid-flight, which is a documented way to lose asyncio tasks silently.
 _pending_writes: set[asyncio.Task[None]] = set()
+
+
+@dataclass
+class _WriteAttempt:
+    """One row on its way to the ledger, and whether anyone has logged it.
+
+    ``logged`` is what keeps the done callback from double-reporting a row
+    the write already complained about, and what tells it to report a row
+    nobody ever got to.
+    """
+
+    row: dict[str, Any] = field(default_factory=dict)
+    logged: bool = False
+
 
 __all__ = [
     "UNATTRIBUTED_SCOPE",
@@ -186,7 +203,11 @@ async def record_usage(
         # flag set would make the kill switch block every paid call with no
         # way to clear it. Turning the ledger off is how an operator stops a
         # write storm; it must not be the thing that takes the app down.
-        clear_ledger_degraded()
+        # The reason is spelled out because "recovered" would be a lie here:
+        # nothing recovered, we simply stopped keeping the books.
+        clear_ledger_degraded(
+            reason="the usage ledger is switched off, so its degraded state no longer applies"
+        )
         return None
 
     user_id, context_surface, request_id = current_attribution()
@@ -239,10 +260,10 @@ async def record_usage(
             cost,
         )
 
-    return await _write_detached(row)
+    return await _write_detached(_WriteAttempt(row=row))
 
 
-async def _write_detached(row: dict[str, Any]) -> asyncio.Task[None] | None:
+async def _write_detached(attempt: _WriteAttempt) -> asyncio.Task[None] | None:
     """Run the write as its own task, then wait for it under a shield.
 
     The point is the disconnect path. When a browser goes away mid-stream,
@@ -259,20 +280,34 @@ async def _write_detached(row: dict[str, Any]) -> asyncio.Task[None] | None:
     try:
         loop = asyncio.get_running_loop()
     except RuntimeError:  # pragma: no cover - every caller is async today
-        await _persist(row)
+        await _persist(attempt)
         return None
 
-    task = loop.create_task(_persist(row))
+    task = loop.create_task(_persist(attempt))
     _pending_writes.add(task)
-    task.add_done_callback(_pending_writes.discard)
+    task.add_done_callback(partial(_on_write_done, attempt))
     await asyncio.shield(task)
     return task
 
 
-async def _persist(row: dict[str, Any]) -> None:
+def _on_write_done(attempt: _WriteAttempt, task: asyncio.Task[None]) -> None:
+    """Last line of defence for a write that was killed outright.
+
+    Loop teardown — ``asyncio.run`` finishing on the Celery path, an
+    interpreter shutting down — cancels pending tasks. A write cancelled
+    before it reached its own nets has nothing left to catch it, so the row
+    would vanish with no INSERT, no log, and a ledger that still looks
+    healthy. This is where that case gets its ERROR line.
+    """
+    _pending_writes.discard(task)
+    if task.cancelled() and not attempt.logged:
+        _degrade("write task cancelled before it completed", attempt, CancelledError())
+
+
+async def _persist(attempt: _WriteAttempt) -> None:
     """Write the row and charge both meters, declaring recovery only if both land."""
-    wrote_row = await _write_row(row)
-    charged = await _charge_spend_meters(row)
+    wrote_row = await _write_row(attempt)
+    charged = await _charge_spend_meters(attempt)
     if wrote_row and charged:
         # Only now. Clearing after the INSERT alone would announce recovery
         # while the meters are still failing, which after the block in
@@ -311,7 +346,7 @@ def log_ledger_status(component: str) -> None:
     )
 
 
-async def _write_row(row: dict[str, Any]) -> bool:
+async def _write_row(attempt: _WriteAttempt) -> bool:
     """INSERT the ledger row. Returns True on success.
 
     On failure the whole row goes to the log as JSON and the ledger is
@@ -321,23 +356,24 @@ async def _write_row(row: dict[str, Any]) -> bool:
     """
     try:
         async with _ledger_session() as session:
-            session.add(UsageRecord(**row))
+            session.add(UsageRecord(**attempt.row))
             await session.commit()
     except BaseException as exc:  # noqa: BLE001 - see docstring
-        _degrade("insert failed", row, exc)
+        _degrade("insert failed", attempt, exc)
         if not isinstance(exc, Exception):
             raise
         return False
     return True
 
 
-async def _charge_spend_meters(row: dict[str, Any]) -> bool:
+async def _charge_spend_meters(attempt: _WriteAttempt) -> bool:
     """Add this call's cost to the global daily and per-user monthly meters.
 
     The global meter is charged for every call including unattributed ones,
     so spend we cannot name still cannot escape the budget. The per-user
     meter is skipped when there is no user to charge.
     """
+    row = attempt.row
     cost = int(row["cost_micros"])
     try:
         await increment_and_get(
@@ -358,19 +394,20 @@ async def _charge_spend_meters(row: dict[str, Any]) -> bool:
         # invisible to the ceiling that is supposed to bound it, so the next
         # cost-bearing call blocks rather than spending against a number we
         # know is wrong.
-        _degrade("spend meter increment failed", row, exc)
+        _degrade("spend meter increment failed", attempt, exc)
         if not isinstance(exc, Exception):
             raise
         return False
     return True
 
 
-def _degrade(reason: str, row: dict[str, Any], exc: BaseException) -> None:
+def _degrade(reason: str, attempt: _WriteAttempt, exc: BaseException) -> None:
     """Log the whole row as JSON, then block the next cost-bearing call."""
+    attempt.logged = True
     logger.error(
         "LEDGER_WRITE_FAILED reason=%s error=%s row=%s",
         reason,
         exc,
-        json.dumps(row, default=str, sort_keys=True),
+        json.dumps(attempt.row, default=str, sort_keys=True),
     )
     mark_ledger_degraded(reason)

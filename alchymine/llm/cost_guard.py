@@ -25,8 +25,8 @@ from alchymine.db.usage_counters import (
     GLOBAL_SCOPE,
     METER_LLM_CALLS,
     CostCeilingExceeded,
+    claim_ledger_admission,
     consume,
-    ledger_is_degraded,
     next_period_start,
 )
 
@@ -49,15 +49,19 @@ async def charge_paid_call() -> None:
 
     # A ledger that could not record the previous call cannot account for
     # this one either, and spending money we cannot account for is the thing
-    # this whole mechanism exists to prevent. The block is skipped when the
-    # ledger is switched off: an operator who disables it has decided to fly
-    # without spend accounting for a while, and a flag that a disabled
-    # ledger can no longer clear would turn that switch into an outage.
-    if settings.usage_ledger_enabled and ledger_is_degraded():
+    # this whole mechanism exists to prevent. This is the only place that
+    # claims the half-open probe, which is why the ledger check sits here
+    # rather than in check_ceiling: one gate, one claim per call.
+    #
+    # The block is skipped when the ledger is switched off: an operator who
+    # disables it has decided to fly without spend accounting for a while,
+    # and a flag that a disabled ledger can no longer clear would turn that
+    # switch into an outage.
+    if settings.usage_ledger_enabled and not claim_ledger_admission():
         logger.error(
             "COST_BREAKER_TRIPPED reason=ledger_degraded — the last usage record could "
-            "not be written, so paid model calls are blocked until a write succeeds "
-            "or the degraded window lapses"
+            "not be written, so paid model calls are blocked until a probe call's "
+            "write succeeds"
         )
         raise CostCeilingExceeded(
             meter=METER_LLM_CALLS,
