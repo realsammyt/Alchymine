@@ -256,3 +256,76 @@ class TestGetSettings:
         s1 = get_settings()
         s2 = get_settings()
         assert s1 is s2
+
+
+# ─── Plan Allowances ──────────────────────────────────────────────────────
+
+
+class TestPlanAllowances:
+    """PLAN_ALLOWANCE_CENTS is a CSV string for the same reason ALLOWED_ORIGINS is.
+
+    pydantic-settings v2 JSON-parses structured field types at source level,
+    before any validator runs, so a ``dict`` field blows up on a plain
+    comma-separated env var out of docker-compose.
+    """
+
+    def test_default_string_parses(self, monkeypatch):
+        monkeypatch.setenv("JWT_SECRET_KEY", _SAFE_JWT_KEY)
+
+        s = _make_settings()
+        assert s.get_plan_allowance_cents() == {
+            "free": 0,
+            "beta": 555,
+            "blueprint": 99,
+            "pro": 275,
+            "founding": 333,
+        }
+
+    def test_free_allowance_is_zero(self, monkeypatch):
+        """Structural, not a policy someone has to remember: no recurring cost
+        on a plan that pays nothing."""
+        monkeypatch.setenv("JWT_SECRET_KEY", _SAFE_JWT_KEY)
+
+        s = _make_settings()
+        assert s.allowance_cents_for("free") == 0
+
+    def test_known_plan_returns_its_allowance(self, monkeypatch):
+        monkeypatch.setenv("JWT_SECRET_KEY", _SAFE_JWT_KEY)
+
+        s = _make_settings()
+        assert s.allowance_cents_for("pro") == 275
+        assert s.allowance_cents_for("beta") == 555
+
+    def test_unknown_plan_falls_back_to_free_and_logs(self, monkeypatch, caplog):
+        monkeypatch.setenv("JWT_SECRET_KEY", _SAFE_JWT_KEY)
+        monkeypatch.setenv("PLAN_ALLOWANCE_CENTS", "free:7,pro:275")
+
+        s = _make_settings()
+        with caplog.at_level("ERROR"):
+            assert s.allowance_cents_for("enterprise") == 7
+        assert any("enterprise" in r.message for r in caplog.records)
+
+    def test_env_override_parses(self, monkeypatch):
+        monkeypatch.setenv("JWT_SECRET_KEY", _SAFE_JWT_KEY)
+        monkeypatch.setenv("PLAN_ALLOWANCE_CENTS", "free:0,pro:500")
+
+        s = _make_settings()
+        assert s.get_plan_allowance_cents() == {"free": 0, "pro": 500}
+
+    def test_malformed_entries_are_skipped_not_fatal(self, monkeypatch, caplog):
+        """A typo in an env var must not take the app down at import time."""
+        monkeypatch.setenv("JWT_SECRET_KEY", _SAFE_JWT_KEY)
+        monkeypatch.setenv("PLAN_ALLOWANCE_CENTS", "free:0,broken,pro:abc,beta:555")
+
+        s = _make_settings()
+        with caplog.at_level("ERROR"):
+            parsed = s.get_plan_allowance_cents()
+        assert parsed == {"free": 0, "beta": 555}
+
+    def test_missing_free_key_resolves_to_zero(self, monkeypatch):
+        """Fail closed: an allowance we cannot read is not an unlimited one."""
+        monkeypatch.setenv("JWT_SECRET_KEY", _SAFE_JWT_KEY)
+        monkeypatch.setenv("PLAN_ALLOWANCE_CENTS", "pro:275")
+
+        s = _make_settings()
+        assert s.allowance_cents_for("anything") == 0
