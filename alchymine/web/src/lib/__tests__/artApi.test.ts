@@ -14,7 +14,11 @@ import {
 } from "../artApi";
 
 function mockResponse(status: number, body?: unknown): Response {
-  return {
+  // `clone` is not optional here. readPlanGate clones before reading, so
+  // that the generic path still has a body to consume, and a mock
+  // without it would make every plan refusal fall through to the
+  // fallback wording while the tests still went green.
+  const res = {
     status,
     ok: status >= 200 && status < 300,
     json: async () => {
@@ -22,6 +26,10 @@ function mockResponse(status: number, body?: unknown): Response {
       return body;
     },
     text: async () => JSON.stringify(body ?? ""),
+  };
+  return {
+    ...res,
+    clone: () => res as unknown as Response,
   } as unknown as Response;
 }
 
@@ -127,5 +135,87 @@ describe("generateBrandLogo cost states", () => {
     await expect(generateBrandLogo()).rejects.toBeInstanceOf(
       ArtUnavailableError,
     );
+  });
+});
+
+describe("plan refusals in the art wrappers", () => {
+  const UPGRADE_BODY = {
+    detail: {
+      code: "plan_upgrade_required",
+      message: "Image generation is part of a paid plan. Upgrade to make yours.",
+      retry_at: null,
+      meter: null,
+      plan: "free",
+      upgrade_url: "/pricing",
+    },
+  };
+
+  const ALLOWANCE_BODY = {
+    detail: {
+      code: "plan_allowance_reached",
+      message: "You've used this month's included images. Upgrade to keep going.",
+      retry_at: "2026-09-01T00:00:00+00:00",
+      meter: "spend_micros_monthly",
+      plan: "pro",
+      upgrade_url: "/pricing",
+    },
+  };
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  it("turns a 402 into an upsell carrying somewhere to go", async () => {
+    global.fetch = jest.fn().mockResolvedValue(mockResponse(402, UPGRADE_BODY));
+
+    const error = await generateArt().catch((e) => e);
+
+    expect(error).toBeInstanceOf(ArtUnavailableError);
+    expect(error.code).toBe("plan_upgrade_required");
+    expect(error.upgradeUrl).toBe("/pricing");
+    expect(error.message).toBe(UPGRADE_BODY.detail.message);
+    // Waiting does not fix an entitlement refusal.
+    expect(error.retryAt).toBeNull();
+  });
+
+  it("turns a plan 429 into an upsell with the reset moment", async () => {
+    global.fetch = jest.fn().mockResolvedValue(mockResponse(429, ALLOWANCE_BODY));
+
+    const error = await generateArt().catch((e) => e);
+
+    expect(error.code).toBe("plan_allowance_reached");
+    expect(error.upgradeUrl).toBe("/pricing");
+    expect(error.retryAt).toEqual(new Date("2026-09-01T00:00:00+00:00"));
+  });
+
+  it("leaves the daily cap without an upgrade pitch", async () => {
+    // Same 429 status, different cause. The cap clears at midnight on
+    // its own, so offering an upgrade for it would sell a fix for
+    // something that is already fixing itself.
+    global.fetch = jest.fn().mockResolvedValue(mockResponse(429, CAP_BODY));
+
+    const error = await generateArt().catch((e) => e);
+
+    expect(error.code).toBe("daily_art_cap_reached");
+    expect(error.upgradeUrl).toBeNull();
+  });
+
+  it("leaves the global breaker without one either", async () => {
+    global.fetch = jest.fn().mockResolvedValue(mockResponse(503, BREAKER_BODY));
+
+    const error = await generateArt().catch((e) => e);
+
+    expect(error.code).toBe("llm_temporarily_unavailable");
+    expect(error.upgradeUrl).toBeNull();
+  });
+
+  it("refuses the logo route the same way", async () => {
+    global.fetch = jest.fn().mockResolvedValue(mockResponse(402, UPGRADE_BODY));
+
+    const error = await generateBrandLogo().catch((e) => e);
+
+    expect(error).toBeInstanceOf(ArtUnavailableError);
+    expect(error.code).toBe("plan_upgrade_required");
+    expect(error.upgradeUrl).toBe("/pricing");
   });
 });

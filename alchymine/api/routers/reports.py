@@ -16,8 +16,9 @@ from fastapi.responses import HTMLResponse, JSONResponse, Response, StreamingRes
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from alchymine.api.auth import get_current_user
+from alchymine.api.auth import Account, get_current_user
 from alchymine.api.deps import get_db_session
+from alchymine.api.entitlements import require_report, require_report_download
 from alchymine.db import repository
 from alchymine.db.models import Report, User
 from alchymine.engine.profile import IntakeData
@@ -137,15 +138,20 @@ async def _build_hero_data_uri(session: AsyncSession, user_id: str) -> str | Non
 async def create_report(
     request: ReportRequest,
     session: AsyncSession = Depends(get_db_session),
-    current_user: dict = Depends(get_current_user),
+    account: Account = Depends(require_report),
 ) -> ReportStatus:
     """Queue generation of a full Alchymine report.
 
     Returns a report ID and ``"pending"`` status immediately.  Use
     ``GET /reports/{id}/status`` to poll for progress or
     ``GET /reports/{id}`` to retrieve the completed result.
+
+    Gated on the caller's plan: free is refused with 402 and a spent
+    monthly allowance with 429.  Deliberately *not* gated by system
+    count — ``intent.py`` forces all five coordinators in one pass, so
+    withholding systems would save nothing on the bill.
     """
-    user_id = current_user["sub"]
+    user_id = account.user_id
 
     # ── Safety guardrail: rate-limit report generation per user ───────
     try:
@@ -183,6 +189,13 @@ async def create_report(
     # If the JWT references a user that doesn't exist in the DB, the FK
     # constraint on Report.user_id will cause an IntegrityError.  Check
     # first and fall back to user_id=None (orphan report).
+    #
+    # ``require_report`` re-reads the user from Postgres and 401s when the
+    # row is gone, so this should now be unreachable in production and the
+    # orphan rows it creates are no longer produced here.  Kept because it
+    # still covers the narrow race where the account is deleted between
+    # the dependency and this INSERT, where an IntegrityError would
+    # otherwise surface as a 500.
     from sqlalchemy import select
 
     result = await session.execute(select(User.id).where(User.id == user_id))
@@ -483,7 +496,7 @@ async def get_report_html(
 async def get_report_pdf(
     report_id: str,
     session: AsyncSession = Depends(get_db_session),
-    current_user: dict = Depends(get_current_user),
+    account: Account = Depends(require_report_download),
 ) -> Response:
     """Download a completed report as a PDF file.
 
@@ -492,13 +505,17 @@ async def get_report_pdf(
     has not yet been rendered to PDF, a 404 is returned with a
     message indicating the PDF has not been generated.
 
+    Entitlement only, no spend meter: these bytes were paid for when the
+    report was generated, so re-reading them costs nothing.
+
     - **200** -- PDF binary download with ``Content-Disposition: attachment``.
+    - **402** -- the caller's plan does not include report downloads.
     - **404** -- report not found, not complete, or PDF not yet generated.
     """
     report = await repository.get_report(session, report_id)
     if report is None:
         raise HTTPException(status_code=404, detail="Report not found")
-    _ensure_report_access(report, current_user["sub"])
+    _ensure_report_access(report, account.user_id)
 
     if report.status != "complete":
         raise HTTPException(

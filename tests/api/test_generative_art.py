@@ -17,7 +17,8 @@ from fastapi.testclient import TestClient
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 import alchymine.db.models  # noqa: F401 — register models with metadata
-from alchymine.api.auth import get_current_user
+from alchymine.api.auth import get_current_account, get_current_user
+from tests.api.conftest import override_account
 from alchymine.api.deps import get_db_session, set_db_engine
 from alchymine.api.main import app
 from alchymine.api.routers.generative_art import _gemini_dependency
@@ -154,6 +155,7 @@ def client(_db_factory, tmp_path) -> TestClient:
 
     app.dependency_overrides[get_db_session] = _override_db
     app.dependency_overrides[get_current_user] = _override_user
+    override_account(TEST_USER_ID)
 
     # Point the storage helper at a temp dir for the duration of the test
     with patch(
@@ -165,6 +167,7 @@ def client(_db_factory, tmp_path) -> TestClient:
 
     app.dependency_overrides.pop(get_db_session, None)
     app.dependency_overrides.pop(get_current_user, None)
+    app.dependency_overrides.pop(get_current_account, None)
     app.dependency_overrides.pop(_gemini_dependency, None)
 
 
@@ -239,8 +242,10 @@ class TestGenerateArt:
 
     def test_unauthenticated_returns_401(self, client: TestClient) -> None:
         """Removing the auth override produces 401 from the real dependency."""
-        # Drop the auth override and the gemini override
+        # Drop both auth overrides and the gemini override: the route
+        # authenticates through the plan gate, which reads the account.
         app.dependency_overrides.pop(get_current_user, None)
+        app.dependency_overrides.pop(get_current_account, None)
 
         response = client.post("/api/v1/art/generate", json={})
         assert response.status_code == 401
@@ -274,6 +279,7 @@ class TestGetImage:
             return {"sub": OTHER_USER_ID, "email": "other-art-test@example.com"}
 
         app.dependency_overrides[get_current_user] = _override_other
+        override_account(OTHER_USER_ID)
         response = client.get(f"/api/v1/art/{image_id}")
         assert response.status_code == 404
 
@@ -360,6 +366,7 @@ class TestListUserImages:
             return {"sub": OTHER_USER_ID, "email": "other-art-test@example.com"}
 
         app.dependency_overrides[get_current_user] = _override_other
+        override_account(OTHER_USER_ID)
         response = client.get("/api/v1/art/list")
         assert response.status_code == 200
         assert response.json()["images"] == []
@@ -395,6 +402,7 @@ class TestDeleteUserImage:
             return {"sub": OTHER_USER_ID, "email": "other-art-test@example.com"}
 
         app.dependency_overrides[get_current_user] = _override_other
+        override_account(OTHER_USER_ID)
         response = client.delete(f"/api/v1/art/{image_id}")
         assert response.status_code == 404
 
@@ -403,6 +411,7 @@ class TestDeleteUserImage:
             return {"sub": TEST_USER_ID, "email": "art-test@example.com"}
 
         app.dependency_overrides[get_current_user] = _override_primary
+        override_account(TEST_USER_ID)
         follow_up = client.get(f"/api/v1/art/{image_id}")
         assert follow_up.status_code == 200
 

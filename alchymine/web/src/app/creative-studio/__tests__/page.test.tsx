@@ -57,15 +57,36 @@ jest.mock("@/lib/artApi", () => {
   class MockArtUnavailableError extends Error {
     code: string;
     retryAt: Date | null;
-    constructor(code: string, message: string, retryAt: Date | null) {
+    upgradeUrl: string | null;
+    constructor(
+      code: string,
+      message: string,
+      retryAt: Date | null,
+      upgradeUrl: string | null = null,
+    ) {
       super(message);
       this.name = "ArtUnavailableError";
       this.code = code;
       this.retryAt = retryAt;
+      this.upgradeUrl = upgradeUrl;
     }
   }
+  // Mirrors the real narrowing: the two plan codes become an upsell with
+  // somewhere to click, everything else stays a plain wait state.
+  const { PlanGateError } = jest.requireActual("@/lib/planGate");
   return {
     ArtUnavailableError: MockArtUnavailableError,
+    asPlanGate: (error: MockArtUnavailableError) =>
+      error.code === "plan_upgrade_required" ||
+      error.code === "plan_allowance_reached"
+        ? new PlanGateError(
+            error.code,
+            error.message,
+            error.retryAt,
+            null,
+            error.upgradeUrl ?? "/pricing",
+          )
+        : null,
     generateArt: jest.fn(),
     listGeneratedImages: jest.fn().mockResolvedValue({ images: [] }),
     deleteGeneratedImage: jest.fn(),
@@ -173,5 +194,74 @@ describe("CreativeStudioPage daily cap", () => {
     await waitFor(() => {
       expect(screen.getByRole("alert")).toHaveTextContent(/network down/i);
     });
+  });
+});
+
+describe("CreativeStudioPage plan upsell", () => {
+  const UPGRADE_MESSAGE =
+    "Image generation is part of a paid plan. Upgrade to make yours.";
+  const ALLOWANCE_MESSAGE =
+    "You've used this month's included images. Upgrade to keep going.";
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it("offers an upgrade when the plan does not include art", async () => {
+    (generateArt as jest.Mock).mockRejectedValue(
+      new ArtUnavailableError("plan_upgrade_required", UPGRADE_MESSAGE, null, "/pricing"),
+    );
+
+    render(<CreativeStudioPage />);
+    await generateWithPrompt();
+
+    await waitFor(() => {
+      expect(screen.getByRole("status")).toHaveTextContent(/part of a paid plan/i);
+    });
+    expect(screen.getByRole("link", { name: /see plans/i })).toHaveAttribute(
+      "href",
+      "/pricing",
+    );
+    // A sales moment, never a fault.
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
+  it("says when a spent allowance comes back", async () => {
+    (generateArt as jest.Mock).mockRejectedValue(
+      new ArtUnavailableError(
+        "plan_allowance_reached",
+        ALLOWANCE_MESSAGE,
+        new Date("2026-09-01T00:00:00Z"),
+        "/pricing",
+      ),
+    );
+
+    render(<CreativeStudioPage />);
+    await generateWithPrompt();
+
+    await waitFor(() => {
+      expect(screen.getByText(/Resets on September 1/)).toBeInTheDocument();
+    });
+    expect(screen.getByRole("link", { name: /see plans/i })).toBeInTheDocument();
+  });
+
+  it("keeps the daily cap free of an upgrade pitch", async () => {
+    // Waiting fixes the daily cap, so selling an upgrade for it would be
+    // selling something that changes nothing.
+    (generateArt as jest.Mock).mockRejectedValue(
+      new ArtUnavailableError(
+        "daily_art_cap_reached",
+        CAP_MESSAGE,
+        new Date("2099-01-01T00:00:00Z"),
+      ),
+    );
+
+    render(<CreativeStudioPage />);
+    await generateWithPrompt();
+
+    await waitFor(() => {
+      expect(screen.getByRole("status")).toBeInTheDocument();
+    });
+    expect(screen.queryByRole("link", { name: /see plans/i })).not.toBeInTheDocument();
   });
 });

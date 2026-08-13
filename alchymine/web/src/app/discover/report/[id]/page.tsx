@@ -3,6 +3,8 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useAuth } from "@/lib/AuthContext";
+import UpsellNotice from "@/components/shared/UpsellNotice";
+import { PlanGateError, readPlanGate } from "@/lib/planGate";
 import Markdown from "react-markdown";
 import {
   getReport,
@@ -120,6 +122,48 @@ export default function ReportPage() {
   const { user } = useAuth();
   const [showCreativeDNA, setShowCreativeDNA] = useState(false);
   const [supplementLoading, setSupplementLoading] = useState(false);
+
+  // Download state lives on the page rather than in an alert(): a plan
+  // refusal is a sales moment and needs somewhere to click, and a modal
+  // alert is unreadable to a screen reader in the flow of the page.
+  const [pdfUpsell, setPdfUpsell] = useState<PlanGateError | null>(null);
+  const [pdfError, setPdfError] = useState<string | null>(null);
+
+  const handleDownloadPdf = useCallback(async () => {
+    setPdfUpsell(null);
+    setPdfError(null);
+    try {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "";
+      const token = localStorage.getItem("access_token");
+      const response = await fetch(`${apiUrl}/api/v1/reports/${reportId}/pdf`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      if (!response.ok) {
+        const gate = await readPlanGate(response);
+        if (gate) {
+          setPdfUpsell(gate);
+          return;
+        }
+        setPdfError(
+          response.status === 404
+            ? "The PDF is not ready yet. Please try again shortly."
+            : "The download did not go through. Please try again.",
+        );
+        return;
+      }
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `alchymine-report-${reportId}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      URL.revokeObjectURL(url);
+      a.remove();
+    } catch {
+      setPdfError("Could not reach the server. Please check your connection.");
+    }
+  }, [reportId]);
 
   const handleReassess = useCallback(
     async (system: string, responses: Record<string, number | string>) => {
@@ -1045,44 +1089,28 @@ export default function ReportPage() {
           </MotionReveal>
         )}
 
+        {/* Download states. Yellow status for a plan refusal, red alert
+            for an actual failure. */}
+        {pdfUpsell && (
+          <div className="mt-8 mx-auto max-w-md">
+            <UpsellNotice error={pdfUpsell} />
+          </div>
+        )}
+        {pdfError && (
+          <div
+            role="alert"
+            className="mt-8 mx-auto max-w-md rounded-lg border border-red-700/30 bg-red-900/20 px-4 py-3 text-sm font-body text-red-200"
+          >
+            {pdfError}
+          </div>
+        )}
+
         {/* Actions */}
         <MotionReveal delay={0.5}>
           <div className="mt-12 flex flex-col sm:flex-row items-center justify-center gap-4">
             <Button
               variant="ghost"
-              onClick={async () => {
-                try {
-                  const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "";
-                  const token = localStorage.getItem("access_token");
-                  const response = await fetch(
-                    `${apiUrl}/api/v1/reports/${reportId}/pdf`,
-                    {
-                      headers: token
-                        ? { Authorization: `Bearer ${token}` }
-                        : {},
-                    },
-                  );
-                  if (!response.ok) {
-                    alert(
-                      response.status === 404
-                        ? "PDF has not been generated yet. Please try again shortly."
-                        : "Failed to download PDF. Please try again.",
-                    );
-                    return;
-                  }
-                  const blob = await response.blob();
-                  const url = URL.createObjectURL(blob);
-                  const a = document.createElement("a");
-                  a.href = url;
-                  a.download = `alchymine-report-${reportId}.pdf`;
-                  document.body.appendChild(a);
-                  a.click();
-                  URL.revokeObjectURL(url);
-                  a.remove();
-                } catch {
-                  alert("Network error — could not download PDF.");
-                }
-              }}
+              onClick={handleDownloadPdf}
             >
               <svg
                 className="w-4 h-4"

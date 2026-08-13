@@ -10,6 +10,7 @@ import { fireEvent, render, screen } from "@testing-library/react";
 
 import ChatPanel from "@/components/chat/ChatPanel";
 import type { ChatMessage } from "@/lib/chat";
+import { PlanGateError } from "@/lib/planGate";
 
 // Mock react-markdown because jest+ESM interop blows up on the real
 // module in jsdom without extra config.  The component under test
@@ -26,6 +27,7 @@ type UseChatValue = {
   isStreaming: boolean;
   isLoadingHistory: boolean;
   error: string | null;
+  upsell: PlanGateError | null;
   sendMessage: jest.Mock;
   cancelStream: jest.Mock;
   resetConversation: jest.Mock;
@@ -47,6 +49,7 @@ function defaults(overrides: Partial<UseChatValue> = {}): UseChatValue {
     isStreaming: false,
     isLoadingHistory: false,
     error: null,
+    upsell: null,
     sendMessage: jest.fn(),
     cancelStream: jest.fn(),
     resetConversation: jest.fn(),
@@ -194,5 +197,52 @@ describe("ChatPanel", () => {
 
     render(<ChatPanel systemKey="healing" />);
     expect(screen.queryByText("Breathwork for me")).not.toBeInTheDocument();
+  });
+
+  describe("plan upsell banner", () => {
+    const upsell = new PlanGateError(
+      "plan_allowance_reached",
+      "You've used this month's included coaching. Upgrade to keep going.",
+      new Date("2026-09-01T00:00:00Z"),
+      "pro",
+      "/pricing",
+    );
+
+    it("renders a spent allowance as a status, not an alert", () => {
+      // Nothing is broken. Dressing a sales moment as a fault trains
+      // people to ignore real faults.
+      useChatMock.mockReturnValue(defaults({ upsell }));
+      render(<ChatPanel systemKey={null} />);
+
+      expect(screen.getByRole("status")).toHaveTextContent(
+        /included coaching/i,
+      );
+      expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    });
+
+    it("offers somewhere to go and says when it resets", () => {
+      useChatMock.mockReturnValue(defaults({ upsell }));
+      render(<ChatPanel systemKey={null} />);
+
+      expect(screen.getByRole("link", { name: /see plans/i })).toHaveAttribute(
+        "href",
+        "/pricing",
+      );
+      expect(screen.getByText(/Resets on September 1/)).toBeInTheDocument();
+    });
+
+    it("shows nothing when the plan is fine", () => {
+      useChatMock.mockReturnValue(defaults());
+      render(<ChatPanel systemKey={null} />);
+
+      expect(screen.queryByRole("link", { name: /see plans/i })).not.toBeInTheDocument();
+    });
+
+    it("keeps the red error banner for actual faults", () => {
+      useChatMock.mockReturnValue(defaults({ error: "Streaming failed" }));
+      render(<ChatPanel systemKey={null} />);
+
+      expect(screen.getByRole("alert")).toHaveTextContent("Streaming failed");
+    });
   });
 });

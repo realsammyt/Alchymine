@@ -28,8 +28,9 @@ from fastapi.responses import Response
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from alchymine.api.auth import get_current_user
+from alchymine.api.auth import Account, get_current_user
 from alchymine.api.deps import get_db_session
+from alchymine.api.entitlements import require_art, require_brand_logo
 from alchymine.config import get_settings
 from alchymine.db import repository, usage_counters
 from alchymine.db.models import User
@@ -254,20 +255,30 @@ async def _refund_daily_allowance(user_id: str, period_key: str) -> None:
         204: {"description": "Generative art is disabled or generation returned no image"},
         400: {"description": "Invalid style preset or blocked user prompt"},
         401: {"description": "Authentication required"},
-        429: {"description": "Daily per-user image allowance spent (code: daily_art_cap_reached)"},
+        402: {"description": "Plan does not include image generation"},
+        429: {
+            "description": (
+                "Daily per-user image allowance spent (code: daily_art_cap_reached) "
+                "or the monthly plan allowance is gone (code: plan_allowance_reached)"
+            )
+        },
         503: {"description": "Generation is paused by the global spend breaker"},
     },
 )
 async def generate_art(
     request: ArtGenerateRequest,
-    current_user: dict = Depends(get_current_user),
+    account: Account = Depends(require_art),
     session: AsyncSession = Depends(get_db_session),
     gemini: GeminiClient = Depends(_gemini_dependency),
 ) -> Response | ArtGenerateResponse:
-    """Generate a single personalized hero image for the authenticated user."""
-    user_id = current_user.get("sub")
-    if not user_id:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="No user")
+    """Generate a single personalized hero image for the authenticated user.
+
+    Two caps stack here and each can trip on its own: the plan's monthly
+    spend allowance (checked in ``require_art``, before this body runs)
+    and the 3-per-day count cap below.  They answer different questions,
+    so they carry different codes.
+    """
+    user_id = account.user_id
 
     # Validate inputs early so 400s never reach the generator.
     _validate_style_preset(request.style_preset)
@@ -536,12 +547,18 @@ async def get_brand_palette(
         201: {"description": "Logo generated and stored"},
         204: {"description": "Generative art is disabled or generation returned no image"},
         401: {"description": "Authentication required"},
-        429: {"description": "Daily per-user image allowance spent (code: daily_art_cap_reached)"},
+        402: {"description": "Plan does not include logo generation"},
+        429: {
+            "description": (
+                "Daily per-user image allowance spent (code: daily_art_cap_reached) "
+                "or the monthly plan allowance is gone (code: plan_allowance_reached)"
+            )
+        },
         503: {"description": "Generation is paused by the global spend breaker"},
     },
 )
 async def generate_brand_logo(
-    current_user: dict = Depends(get_current_user),
+    account: Account = Depends(require_brand_logo),
     session: AsyncSession = Depends(get_db_session),
     gemini: GeminiClient = Depends(_gemini_dependency),
 ) -> Response | BrandLogoResponse:
@@ -551,9 +568,7 @@ async def generate_brand_logo(
     minimalist logo mark via Gemini image generation. Returns 204 when
     Gemini is unavailable.
     """
-    user_id = current_user.get("sub")
-    if not user_id:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="No user")
+    user_id = account.user_id
 
     if not gemini.is_available:
         return Response(status_code=status.HTTP_204_NO_CONTENT)

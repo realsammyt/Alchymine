@@ -17,6 +17,7 @@ import { useEffect, useRef, useState } from "react";
 
 import { useChat } from "@/hooks/useChat";
 import { getStarterPrompts } from "@/lib/starterPrompts";
+import UpsellNotice from "@/components/shared/UpsellNotice";
 
 import ChatInput from "./ChatInput";
 import ChatMessageList from "./ChatMessageList";
@@ -45,6 +46,7 @@ export default function ChatPanel({
     isStreaming,
     isLoadingHistory,
     error,
+    upsell,
     sendMessage,
     resetConversation,
   } = useChat({ systemKey });
@@ -99,6 +101,15 @@ export default function ChatPanel({
           </button>
         )}
       </header>
+
+      {/* Plan upsell banner. Yellow and role="status" — the coach is
+          working fine, this account just cannot pay for another turn. */}
+      {upsell && (
+        <UpsellNotice
+          error={upsell}
+          className="rounded-none border-x-0 border-t-0"
+        />
+      )}
 
       {/* Error banner */}
       {visibleError && (

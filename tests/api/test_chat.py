@@ -25,7 +25,7 @@ from sqlalchemy.ext.asyncio import (
 )
 
 import alchymine.db.models  # noqa: F401
-from alchymine.api.auth import get_current_user
+from alchymine.api.auth import get_current_account, get_current_user
 from alchymine.api.deps import get_db_session
 from alchymine.api.main import app
 from alchymine.db.base import Base
@@ -515,17 +515,23 @@ class TestChatAuth:
         monkeypatch: pytest.MonkeyPatch,
     ) -> None:
         """Without the auth override the endpoint returns 401."""
-        # Temporarily clear the global auth override that conftest applies
+        # Temporarily clear the global auth overrides that conftest applies
         # to all API tests so we can verify the real dependency rejects
-        # missing credentials.
-        original = app.dependency_overrides.pop(get_current_user, None)
+        # missing credentials.  Both have to go: the endpoint authenticates
+        # through the plan gate, which depends on get_current_account, and
+        # leaving that one overridden would let an anonymous call through.
+        originals = {
+            dep: app.dependency_overrides.pop(dep, None)
+            for dep in (get_current_user, get_current_account)
+        }
         try:
             monkeypatch.setenv("LLM_BACKEND", "none")
             response = client.post("/api/v1/chat", json={"message": "Hello"})
             assert response.status_code == 401
         finally:
-            if original is not None:
-                app.dependency_overrides[get_current_user] = original
+            for dep, original in originals.items():
+                if original is not None:
+                    app.dependency_overrides[dep] = original
 
     def test_chat_history_unauthenticated_returns_401(
         self,

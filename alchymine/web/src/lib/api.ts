@@ -2,6 +2,8 @@
  * Alchymine API client — typed fetch wrappers for the FastAPI backend.
  */
 
+import { readPlanGate } from "@/lib/planGate";
+
 const BASE = (process.env.NEXT_PUBLIC_API_URL ?? "") + "/api/v1";
 
 // ─── Shared types ────────────────────────────────────────────────────
@@ -445,6 +447,13 @@ async function request<T>(
   }
 
   if (!res.ok) {
+    // A plan refusal has a structured `detail` object, so the generic
+    // path below would stringify it to "[object Object]" and show that
+    // to a user. It is also not a fault, so it gets its own type and
+    // renders as an upsell.
+    const gate = await readPlanGate(res);
+    if (gate) throw gate;
+
     const body = await res.json().catch(() => ({ detail: "Unknown error" }));
     throw new ApiError(res.status, body.detail || `HTTP ${res.status}`);
   }

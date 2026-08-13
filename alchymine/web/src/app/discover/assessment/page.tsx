@@ -8,6 +8,8 @@ import { useAuth } from "@/lib/AuthContext";
 import Button from "@/components/shared/Button";
 import ProgressBar from "@/components/shared/ProgressBar";
 import { MotionReveal } from "@/components/shared/MotionReveal";
+import UpsellNotice from "@/components/shared/UpsellNotice";
+import { PlanGateError } from "@/lib/planGate";
 
 export default function AssessmentPage() {
   const router = useRouter();
@@ -16,6 +18,9 @@ export default function AssessmentPage() {
   const [responses, setResponses] = useState<Record<string, number>>({});
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Kept apart from ``error``: a plan refusal is a sales moment with
+  // somewhere to go, not a fault the user should read as breakage.
+  const [upsell, setUpsell] = useState<PlanGateError | null>(null);
   const [direction, setDirection] = useState<"next" | "prev">("next");
   const [showCompletion, setShowCompletion] = useState(false);
 
@@ -71,6 +76,7 @@ export default function AssessmentPage() {
     async (finalResponses: Record<string, number>) => {
       setSubmitting(true);
       setError(null);
+      setUpsell(null);
 
       try {
         const intakeRaw = sessionStorage.getItem("alchymine_intake");
@@ -99,11 +105,15 @@ export default function AssessmentPage() {
         sessionStorage.setItem("alchymine_report_id", result.id);
         router.push(`/discover/generating/${result.id}`);
       } catch (err) {
-        setError(
-          err instanceof Error
-            ? err.message
-            : "Something went wrong. Please try again.",
-        );
+        if (err instanceof PlanGateError) {
+          setUpsell(err);
+        } else {
+          setError(
+            err instanceof Error
+              ? err.message
+              : "Something went wrong. Please try again.",
+          );
+        }
         setSubmitting(false);
       }
     },
@@ -275,6 +285,12 @@ export default function AssessmentPage() {
             </div>
           </MotionReveal>
 
+          {upsell && (
+            <MotionReveal y={8}>
+              <UpsellNotice error={upsell} className="mt-6" />
+            </MotionReveal>
+          )}
+
           {error && (
             <MotionReveal y={8}>
               <div className="mt-6 p-4 rounded-xl card-surface border-primary-dark/20 text-primary-dark text-sm font-body">
@@ -401,6 +417,12 @@ export default function AssessmentPage() {
         </div>
 
         {/* Error message */}
+        {upsell && (
+          <MotionReveal y={8}>
+            <UpsellNotice error={upsell} className="mt-4" />
+          </MotionReveal>
+        )}
+
         {error && (
           <MotionReveal y={8}>
             <div className="mt-4 p-4 rounded-xl card-surface border-primary-dark/20 text-primary-dark text-sm font-body">

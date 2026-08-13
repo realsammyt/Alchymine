@@ -54,15 +54,36 @@ jest.mock("@/lib/artApi", () => {
   class MockArtUnavailableError extends Error {
     code: string;
     retryAt: Date | null;
-    constructor(code: string, message: string, retryAt: Date | null) {
+    upgradeUrl: string | null;
+    constructor(
+      code: string,
+      message: string,
+      retryAt: Date | null,
+      upgradeUrl: string | null = null,
+    ) {
       super(message);
       this.name = "ArtUnavailableError";
       this.code = code;
       this.retryAt = retryAt;
+      this.upgradeUrl = upgradeUrl;
     }
   }
+  // Mirrors the real narrowing: the two plan codes become an upsell with
+  // somewhere to click, everything else stays a plain wait state.
+  const { PlanGateError } = jest.requireActual("@/lib/planGate");
   return {
     ArtUnavailableError: MockArtUnavailableError,
+    asPlanGate: (error: MockArtUnavailableError) =>
+      error.code === "plan_upgrade_required" ||
+      error.code === "plan_allowance_reached"
+        ? new PlanGateError(
+            error.code,
+            error.message,
+            error.retryAt,
+            null,
+            error.upgradeUrl ?? "/pricing",
+          )
+        : null,
     getBrandPalette: jest.fn().mockResolvedValue({
       primary: { hex: "#C4503A", name: "Ember Red" },
       secondary: { hex: "#E8A33A", name: "Flame Gold" },

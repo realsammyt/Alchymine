@@ -7,6 +7,12 @@
  * having to inspect HTTP status codes.
  */
 
+import {
+  PlanGateError,
+  readPlanGate,
+  type PlanGateCode,
+} from "@/lib/planGate";
+
 const API_BASE = (process.env.NEXT_PUBLIC_API_URL ?? "") + "/api/v1";
 
 function authHeaders(): Record<string, string> {
@@ -26,31 +32,74 @@ export interface ArtGenerateResponse {
   prompt: string;
 }
 
+/** Every reason art generation can be refused without being broken. */
+export type ArtUnavailableCode =
+  | "daily_art_cap_reached"
+  | "llm_temporarily_unavailable"
+  | "plan_upgrade_required"
+  | "plan_allowance_reached";
+
 /**
- * Thrown when the user has spent their daily image allowance (429) or
- * when generation is paused by the global spend breaker (503).
+ * Thrown when the user has spent their daily image allowance (429), when
+ * their plan cannot pay (402 or 429), or when generation is paused by
+ * the global spend breaker (503).
  *
- * Both are ordinary "come back later" states rather than faults, so they
- * carry the server's own wording plus the moment the allowance resets.
- * Callers should render a wait state, not an error dump.
+ * All of them are ordinary "not right now" states rather than faults, so
+ * they carry the server's own wording plus the moment the allowance
+ * resets. Callers should render a wait or upsell state, not an error
+ * dump.
+ *
+ * `upgradeUrl` is set only on the two plan codes: the daily cap and the
+ * global breaker clear on their own, so offering an upgrade for them
+ * would be selling something that fixes nothing.
  */
 export class ArtUnavailableError extends Error {
-  readonly code: "daily_art_cap_reached" | "llm_temporarily_unavailable";
+  readonly code: ArtUnavailableCode;
   readonly retryAt: Date | null;
+  readonly upgradeUrl: string | null;
 
   constructor(
-    code: "daily_art_cap_reached" | "llm_temporarily_unavailable",
+    code: ArtUnavailableCode,
     message: string,
     retryAt: Date | null,
+    upgradeUrl: string | null = null,
   ) {
     super(message);
     this.name = "ArtUnavailableError";
     this.code = code;
     this.retryAt = retryAt;
+    this.upgradeUrl = upgradeUrl;
   }
 }
 
-/** Shape of the structured `detail` object both states return. */
+/** True when this refusal is answered by upgrading rather than waiting. */
+export function isPlanUpsell(error: ArtUnavailableError): boolean {
+  return (
+    error.code === "plan_upgrade_required" ||
+    error.code === "plan_allowance_reached"
+  );
+}
+
+/**
+ * Narrow an art refusal back to a plan refusal, or `null` when it is one
+ * of the states that clears on its own.
+ *
+ * Lets a page render `UpsellNotice` for the two plan codes and keep its
+ * existing plain wait state for the daily cap and the global breaker,
+ * without every page repeating the code check.
+ */
+export function asPlanGate(error: ArtUnavailableError): PlanGateError | null {
+  if (!isPlanUpsell(error)) return null;
+  return new PlanGateError(
+    error.code as PlanGateCode,
+    error.message,
+    error.retryAt,
+    null,
+    error.upgradeUrl ?? "/pricing",
+  );
+}
+
+/** Shape of the structured `detail` object these states return. */
 interface UnavailableDetail {
   code?: string;
   message?: string;
@@ -58,13 +107,28 @@ interface UnavailableDetail {
 }
 
 /**
- * Turn a 429/503 body into an `ArtUnavailableError`, falling back to
+ * Turn a 402/429/503 body into an `ArtUnavailableError`, falling back to
  * generic wording if the body is missing or not the expected shape.
  */
 async function readUnavailable(
   res: Response,
 ): Promise<ArtUnavailableError | null> {
-  if (res.status !== 429 && res.status !== 503) return null;
+  if (res.status !== 402 && res.status !== 429 && res.status !== 503) {
+    return null;
+  }
+
+  // A plan refusal carries more than this error can hold (the plan name,
+  // where to upgrade), so it is parsed by the module that owns it and
+  // then narrowed to the shape art callers already handle.
+  const planGate = await readPlanGate(res);
+  if (planGate) {
+    return new ArtUnavailableError(
+      planGate.code,
+      planGate.message,
+      planGate.retryAt,
+      planGate.upgradeUrl,
+    );
+  }
 
   let detail: UnavailableDetail = {};
   try {
