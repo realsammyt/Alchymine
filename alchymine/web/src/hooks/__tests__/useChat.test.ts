@@ -324,3 +324,141 @@ describe("useChat", () => {
     expect(result.current.messages).toHaveLength(0);
   });
 });
+
+// ─── Plan refusals ───────────────────────────────────────────────────
+
+function makePlanGateResponse(status: number, detail: unknown): Response {
+  // `clone` matters: readPlanGate clones before reading so the generic
+  // error path still has a body. A mock without it would send every
+  // refusal down the plain-error branch and pass for the wrong reason.
+  const res = {
+    ok: false,
+    status,
+    body: null,
+    json: jest.fn().mockResolvedValue({ detail }),
+  };
+  return {
+    ...res,
+    clone: () => res as unknown as Response,
+  } as unknown as Response;
+}
+
+const ALLOWANCE_DETAIL = {
+  code: "plan_allowance_reached",
+  message: "You've used this month's included coaching. Upgrade to keep going.",
+  retry_at: "2026-09-01T00:00:00+00:00",
+  meter: "spend_micros_monthly",
+  plan: "pro",
+  upgrade_url: "/pricing",
+};
+
+describe("useChat plan refusals", () => {
+  it("sets upsell rather than error when the plan cannot pay", async () => {
+    // The two are kept apart because they render differently: a yellow
+    // banner with somewhere to go versus a red one that reads as broken.
+    (global.fetch as jest.Mock)
+      .mockResolvedValueOnce(makeJsonResponse([]))
+      .mockResolvedValueOnce(makePlanGateResponse(429, ALLOWANCE_DETAIL));
+
+    const { result } = renderHook(() => useChat({ systemKey: null }));
+    await waitFor(() => expect(result.current.isLoadingHistory).toBe(false));
+
+    await act(async () => {
+      await result.current.sendMessage("How do I start?");
+    });
+
+    await waitFor(() => expect(result.current.upsell).not.toBeNull());
+    expect(result.current.upsell?.code).toBe("plan_allowance_reached");
+    expect(result.current.upsell?.upgradeUrl).toBe("/pricing");
+    expect(result.current.upsell?.retryAt).toEqual(
+      new Date("2026-09-01T00:00:00+00:00"),
+    );
+    expect(result.current.error).toBeNull();
+  });
+
+  it("drops the empty assistant bubble but keeps what the user typed", async () => {
+    (global.fetch as jest.Mock)
+      .mockResolvedValueOnce(makeJsonResponse([]))
+      .mockResolvedValueOnce(makePlanGateResponse(429, ALLOWANCE_DETAIL));
+
+    const { result } = renderHook(() => useChat({ systemKey: null }));
+    await waitFor(() => expect(result.current.isLoadingHistory).toBe(false));
+
+    await act(async () => {
+      await result.current.sendMessage("How do I start?");
+    });
+
+    await waitFor(() => expect(result.current.upsell).not.toBeNull());
+    expect(result.current.messages).toHaveLength(1);
+    expect(result.current.messages[0]).toMatchObject({
+      role: "user",
+      content: "How do I start?",
+    });
+  });
+
+  it("clears the upsell on the next send", async () => {
+    (global.fetch as jest.Mock)
+      .mockResolvedValueOnce(makeJsonResponse([]))
+      .mockResolvedValueOnce(makePlanGateResponse(429, ALLOWANCE_DETAIL))
+      .mockResolvedValueOnce(
+        makeSseResponse(["data: Sure\n\n", "event: done\ndata: \n\n"]),
+      );
+
+    const { result } = renderHook(() => useChat({ systemKey: null }));
+    await waitFor(() => expect(result.current.isLoadingHistory).toBe(false));
+
+    await act(async () => {
+      await result.current.sendMessage("first");
+    });
+    await waitFor(() => expect(result.current.upsell).not.toBeNull());
+
+    await act(async () => {
+      await result.current.sendMessage("second");
+    });
+
+    await waitFor(() => expect(result.current.upsell).toBeNull());
+  });
+
+  it("treats an entitlement refusal the same way", async () => {
+    (global.fetch as jest.Mock)
+      .mockResolvedValueOnce(makeJsonResponse([]))
+      .mockResolvedValueOnce(
+        makePlanGateResponse(402, {
+          code: "plan_upgrade_required",
+          message: "Coaching chat is part of a paid plan. Upgrade to start a conversation.",
+          retry_at: null,
+          meter: null,
+          plan: "free",
+          upgrade_url: "/pricing",
+        }),
+      );
+
+    const { result } = renderHook(() => useChat({ systemKey: null }));
+    await waitFor(() => expect(result.current.isLoadingHistory).toBe(false));
+
+    await act(async () => {
+      await result.current.sendMessage("hello");
+    });
+
+    await waitFor(() => expect(result.current.upsell).not.toBeNull());
+    expect(result.current.upsell?.code).toBe("plan_upgrade_required");
+    expect(result.current.upsell?.retryAt).toBeNull();
+    expect(result.current.error).toBeNull();
+  });
+
+  it("still reports a genuine fault as an error", async () => {
+    (global.fetch as jest.Mock)
+      .mockResolvedValueOnce(makeJsonResponse([]))
+      .mockResolvedValueOnce(makeErrorResponse(500, "boom"));
+
+    const { result } = renderHook(() => useChat({ systemKey: null }));
+    await waitFor(() => expect(result.current.isLoadingHistory).toBe(false));
+
+    await act(async () => {
+      await result.current.sendMessage("hello");
+    });
+
+    await waitFor(() => expect(result.current.error).not.toBeNull());
+    expect(result.current.upsell).toBeNull();
+  });
+});
