@@ -36,7 +36,9 @@ from functools import lru_cache
 from typing import Any
 
 from alchymine.config import get_settings
+from alchymine.db.usage_counters import METER_ART_GENERATIONS
 from alchymine.llm.cost_guard import charge_paid_call
+from alchymine.llm.ledger import record_usage
 
 logger = logging.getLogger(__name__)
 
@@ -230,6 +232,17 @@ class GeminiClient:
                     image_bytes = bytes(data)
 
                 mime_type = getattr(inline, "mime_type", None) or "image/png"
+                # One delivered image, one ledger row. Gemini reports no
+                # token accounting here, so the price is the flat per-image
+                # figure from config; nothing is recorded for a call that
+                # produced no image.
+                await record_usage(
+                    meter=METER_ART_GENERATIONS,
+                    provider="google",
+                    model=self._model,
+                    images=1,
+                    cost_micros_override=get_settings().gemini_image_cost_micros,
+                )
                 return GeminiImageResult(
                     image_bytes=image_bytes,
                     mime_type=mime_type,

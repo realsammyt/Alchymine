@@ -13,18 +13,44 @@ Environment Variables:
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import os
 from collections.abc import AsyncGenerator
 from dataclasses import dataclass, field
 from enum import StrEnum
+from typing import Any
 
 from alchymine.config import get_settings
-from alchymine.db.usage_counters import CostCeilingExceeded
+from alchymine.db.usage_counters import METER_LLM_CALLS, CostCeilingExceeded
 from alchymine.llm.cost_guard import charge_paid_call
+from alchymine.llm.ledger import record_usage
 
 logger = logging.getLogger(__name__)
+
+# How long the streaming path waits for the accumulated final message before
+# giving up and recording an estimate. On a normal completion the stream is
+# already drained and this returns immediately; after a client disconnect the
+# upstream response may never drain, and an unbounded await there would hang
+# the generator's finalization until the 90-second client timeout.
+_FINAL_MESSAGE_TIMEOUT_SECONDS = 5.0
+
+# Rough characters-per-token used only when the exact usage is unreachable.
+_CHARS_PER_TOKEN = 4
+
+
+def _usage_int(usage: Any, field_name: str) -> int:
+    """Read one integer usage field, defaulting to 0.
+
+    The two cache fields are absent on older SDK responses, and a test
+    double may carry anything at all. Anything that is not a plain int
+    reads as 0 rather than propagating into the cost arithmetic.
+    """
+    value = getattr(usage, field_name, 0)
+    if isinstance(value, bool) or not isinstance(value, int):
+        return 0
+    return value
 
 
 class LLMBackend(StrEnum):
@@ -524,6 +550,7 @@ class LLMClient:
 
         for model in self.CLAUDE_MODELS:
             try:
+                delivered_chars = 0
                 async with client.messages.stream(
                     model=model,
                     max_tokens=max_tokens,
@@ -531,8 +558,25 @@ class LLMClient:
                     system=system_prompt,
                     messages=[{"role": "user", "content": prompt}],
                 ) as stream:
-                    async for text in stream.text_stream:
-                        yield text
+                    try:
+                        async for text in stream.text_stream:
+                            delivered_chars += len(text)
+                            yield text
+                    finally:
+                        # The ONLY recording site for this call. It runs on
+                        # every exit path — normal completion, client
+                        # disconnect (GeneratorExit at the yield above), or
+                        # an exception — so it can neither double-record the
+                        # common case nor miss the rare one. A capture placed
+                        # after the loop would silently lose the cost of every
+                        # stream the browser walked away from.
+                        await _record_stream_usage(
+                            stream=stream,
+                            model=model,
+                            system_prompt=system_prompt,
+                            prompt=prompt,
+                            delivered_chars=delivered_chars,
+                        )
                 return  # Success — stop trying models
             except anthropic.APIStatusError as exc:
                 if exc.status_code == 529:  # overloaded
@@ -548,7 +592,7 @@ class LLMClient:
         if last_exc:
             raise last_exc
 
-    async def _generate_claude(
+    async def _generate_claude(  # noqa: C901
         self,
         system_prompt: str,
         user_prompt: str,
@@ -583,18 +627,38 @@ class LLMClient:
                     if hasattr(block, "text"):
                         text += block.text
 
+                input_tokens = _usage_int(response.usage, "input_tokens")
+                output_tokens = _usage_int(response.usage, "output_tokens")
+                # The two cache fields are read here and nowhere else. Pricing
+                # only input and output would under-count every cached call
+                # once prompt caching is switched on.
+                cache_read = _usage_int(response.usage, "cache_read_input_tokens")
+                cache_creation = _usage_int(response.usage, "cache_creation_input_tokens")
+
                 logger.info(
                     "[LLM] Claude model %s succeeded — %d input tokens, %d output tokens",
                     model,
-                    response.usage.input_tokens,
-                    response.usage.output_tokens,
+                    input_tokens,
+                    output_tokens,
+                )
+                # ``model`` is the one that actually served: the 529 walk can
+                # move the request onto a cheaper model, and pricing has to
+                # follow it rather than what was asked for.
+                await record_usage(
+                    meter=METER_LLM_CALLS,
+                    provider="anthropic",
+                    model=model,
+                    input_tokens=input_tokens,
+                    output_tokens=output_tokens,
+                    cache_read_input_tokens=cache_read,
+                    cache_creation_input_tokens=cache_creation,
                 )
                 return LLMResponse(
                     text=text,
                     backend=LLMBackend.CLAUDE.value,
                     model=model,
-                    input_tokens=response.usage.input_tokens,
-                    output_tokens=response.usage.output_tokens,
+                    input_tokens=input_tokens,
+                    output_tokens=output_tokens,
                 )
             except anthropic.APIStatusError as exc:
                 if exc.status_code == 529:  # overloaded
@@ -639,3 +703,70 @@ class LLMClient:
             backend=LLMBackend.NONE.value,
             model="none",
         )
+
+
+async def _record_stream_usage(
+    *,
+    stream: Any,
+    model: str,
+    system_prompt: str,
+    prompt: str,
+    delivered_chars: int,
+) -> None:
+    """Write the ledger row for one streamed Claude call.
+
+    Called from exactly one place: the ``finally`` inside ``_stream_claude``.
+
+    ``get_final_message()`` returns the accumulated message after
+    ``message_stop``, and its usage carries all four token fields. On a
+    normal completion the stream is already drained, so the await returns
+    immediately with exact numbers — this is the only place in the codebase
+    that can learn what a streamed reply cost.
+
+    After a disconnect the stream is usually torn down and that call cannot
+    complete, so the fallback records an estimate from characters sent and
+    delivered. An estimate is a floor rather than a measurement, which is
+    what ``estimated=True`` says to whoever reads the ledger later; the
+    alternative is losing the cost of a call we were charged for.
+
+    Never raises. It runs inside a ``finally`` during generator finalization,
+    where an exception would replace whatever was already unwinding.
+    """
+    final: Any = None
+    try:
+        final = await asyncio.wait_for(
+            stream.get_final_message(), timeout=_FINAL_MESSAGE_TIMEOUT_SECONDS
+        )
+    except Exception as exc:
+        logger.info(
+            "[LLM] Exact usage unavailable for streamed call on %s (%s) — recording an estimate",
+            model,
+            exc,
+        )
+
+    try:
+        usage = getattr(final, "usage", None)
+        if usage is not None:
+            await record_usage(
+                meter=METER_LLM_CALLS,
+                provider="anthropic",
+                model=model,
+                input_tokens=_usage_int(usage, "input_tokens"),
+                output_tokens=_usage_int(usage, "output_tokens"),
+                cache_read_input_tokens=_usage_int(usage, "cache_read_input_tokens"),
+                cache_creation_input_tokens=_usage_int(usage, "cache_creation_input_tokens"),
+            )
+            return
+
+        await record_usage(
+            meter=METER_LLM_CALLS,
+            provider="anthropic",
+            model=model,
+            input_tokens=(len(system_prompt) + len(prompt)) // _CHARS_PER_TOKEN,
+            output_tokens=delivered_chars // _CHARS_PER_TOKEN,
+            estimated=True,
+        )
+    except Exception:
+        # record_usage swallows its own failures; anything reaching here is
+        # unexpected, and a broken ledger must not truncate a delivered reply.
+        logger.exception("[LLM] Failed to record usage for a streamed call on %s", model)
