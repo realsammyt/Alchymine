@@ -43,8 +43,16 @@ logger = logging.getLogger(__name__)
 GLOBAL_SCOPE = "global"
 
 # Meter names. Keep these stable — they are persisted in every row.
+#
+# The period shape is baked into the spend meter names on purpose.
+# ``get_count(scope=user, meter="spend")`` with no period_key silently
+# defaults to today's date key and would return 0 for a monthly meter,
+# reading as "no spend" when the truth is "wrong row". Encoding `daily` and
+# `monthly` in the name makes that mistake impossible to write.
 METER_LLM_CALLS = "llm_calls"
 METER_ART_GENERATIONS = "art_generations"
+METER_SPEND_MICROS_DAILY = "spend_micros_daily"
+METER_SPEND_MICROS_MONTHLY = "spend_micros_monthly"
 
 
 class CostCeilingExceeded(RuntimeError):
@@ -83,6 +91,70 @@ def next_period_start(now: datetime | None = None) -> datetime:
     """Return the next UTC midnight — when the current period's count resets."""
     moment = (now or datetime.now(UTC)).astimezone(UTC)
     return (moment + timedelta(days=1)).replace(hour=0, minute=0, second=0, microsecond=0)
+
+
+def current_month_key(now: datetime | None = None) -> str:
+    """Return the UTC calendar month that *now* falls in, as ``YYYY-MM``.
+
+    The period key for monthly meters (per-user spend allowances). It fits
+    the ``String(16)`` ``period_key`` column with room to spare.
+    """
+    return (now or datetime.now(UTC)).astimezone(UTC).strftime("%Y-%m")
+
+
+def next_month_start(now: datetime | None = None) -> datetime:
+    """Return the next UTC month boundary — the retry_at for monthly meters.
+
+    A monthly allowance that tells the user to try again tomorrow is a lie,
+    so monthly ceilings report the first of next month instead.
+    """
+    moment = (now or datetime.now(UTC)).astimezone(UTC)
+    if moment.month == 12:
+        return datetime(moment.year + 1, 1, 1, tzinfo=UTC)
+    return datetime(moment.year, moment.month + 1, 1, tzinfo=UTC)
+
+
+# ─── Ledger health ──────────────────────────────────────────────────────
+#
+# The cost ledger writes one row per delivered paid call. If that INSERT
+# fails, we have spent money we cannot account for. Raising at the point of
+# failure would not unspend it — it would only convert a logging fault into
+# a user-visible one after the reply was already delivered — so the rule is:
+# loud now, and block the NEXT cost-bearing call.
+#
+# Process-local by design. In the common case (Postgres unreachable) the
+# counter read in check_ceiling hits the same database and fails closed on
+# its own; this flag covers what that misses, an INSERT that fails for a
+# non-connectivity reason such as a constraint violation while reads still
+# succeed. Each process therefore tracks its own writes, which is exactly
+# the blast radius that matters.
+
+_ledger_degraded = False
+
+
+def mark_ledger_degraded(reason: str) -> None:
+    """Record that a ledger write failed, blocking the next metered call."""
+    global _ledger_degraded
+    if not _ledger_degraded:
+        logger.error(
+            "LEDGER_DEGRADED — a usage record could not be written (%s). Cost-bearing "
+            "calls are blocked until a ledger write succeeds.",
+            reason,
+        )
+    _ledger_degraded = True
+
+
+def clear_ledger_degraded() -> None:
+    """Record that a ledger write succeeded, reopening the gate."""
+    global _ledger_degraded
+    if _ledger_degraded:
+        logger.info("LEDGER_RECOVERED — usage records are being written again.")
+    _ledger_degraded = False
+
+
+def ledger_is_degraded() -> bool:
+    """Return True while the last ledger write in this process failed."""
+    return _ledger_degraded
 
 
 # ─── Session plumbing ───────────────────────────────────────────────────
@@ -207,6 +279,21 @@ async def consume(
     Call this immediately before the spend it meters, so a blocked call is
     never actually made. Returns the new count on success.
 
+    **Counts here are attempts, by design** (issue #220). The increment
+    happens first and the ceiling check second, so a blocked call still
+    moves the counter. That is deliberate: ``llm_calls`` and
+    ``art_generations`` measure pressure on a resource, and a client in a
+    retry loop against an exhausted cap *should* read as 40 attempts rather
+    than 3. Suppressing blocked attempts would erase the abuse signal the
+    meter exists for while changing no gate behaviour — once the count is
+    past the ceiling, every later call is blocked however far it has
+    drifted, and the counter resets at UTC midnight either way.
+
+    Money is metered differently. Spend is never charged speculatively: the
+    flow is :func:`check_ceiling`, then the paid call, then
+    :func:`increment_and_get` with what it actually cost. See section 3 of
+    ``docs/plans/2026-08-13-unit-economics.md``.
+
     Raises
     ------
     CostCeilingExceeded
@@ -239,3 +326,83 @@ async def consume(
             retry_at=next_period_start(),
         )
     return new_count
+
+
+def _retry_at_for(period_key: str | None) -> datetime:
+    """When the counter behind *period_key* resets.
+
+    Inferred from the key's shape rather than the meter name: ``YYYY-MM`` is
+    a monthly counter, anything else is the daily default.
+    """
+    if period_key is not None and len(period_key) == 7:
+        return next_month_start()
+    return next_period_start()
+
+
+async def check_ceiling(
+    *,
+    scope: str,
+    meter: str,
+    ceiling: int,
+    period_key: str | None = None,
+) -> int:
+    """Return the current count, raising if it is at or past *ceiling*.
+
+    The read-only half of a spend meter. Does not increment: a ledger that
+    counts money we did not spend is simply wrong, and it would produce
+    false upsells. The caller checks, makes the paid call, then records what
+    it actually cost.
+
+    The cost of that ordering is a bounded overshoot — a call authorized at
+    99% of budget still runs to completion — and the bound is concurrency,
+    not one call: several callers can pass this read before any of them
+    records. The report path fires five concurrent paid calls, so one report
+    at the ceiling can overshoot by five calls' cost. The atomic count
+    breaker, not this function, is the hard backstop for the pathological
+    case.
+
+    Raises
+    ------
+    CostCeilingExceeded
+        When the ceiling is already met; when the counter cannot be read;
+        or when a ledger write has failed since the last successful one. All
+        three are the fail-closed direction — an unreadable or untrustworthy
+        meter blocks spending rather than permitting it unmetered.
+    """
+    if ledger_is_degraded():
+        logger.error(
+            "Blocking a cost-bearing call (meter=%s scope=%s): the usage ledger is "
+            "degraded, so spend cannot be accounted for.",
+            meter,
+            scope,
+        )
+        raise CostCeilingExceeded(
+            meter=meter,
+            scope=scope,
+            retry_at=_retry_at_for(period_key),
+            reason="meter_unavailable",
+        )
+
+    try:
+        count = await get_count(scope=scope, meter=meter, period_key=period_key)
+    except Exception as exc:
+        logger.error(
+            "Cost meter unavailable (meter=%s scope=%s) — blocking the call: %s",
+            meter,
+            scope,
+            exc,
+        )
+        raise CostCeilingExceeded(
+            meter=meter,
+            scope=scope,
+            retry_at=_retry_at_for(period_key),
+            reason="meter_unavailable",
+        ) from exc
+
+    if count >= ceiling:
+        raise CostCeilingExceeded(
+            meter=meter,
+            scope=scope,
+            retry_at=_retry_at_for(period_key),
+        )
+    return count
