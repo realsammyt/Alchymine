@@ -632,6 +632,7 @@ Every figure below is an env default chosen from the roadmap's model, not from m
 | `LLM_CHAT_MODEL` | `claude-haiku-4-5-20251001` | section 8.1 |
 | `LLM_PROMPT_CACHE_ENABLED` | `true` | no-op until the prefix clears 4,096 tokens, section 8.2 |
 | `USAGE_LEDGER_ENABLED` | `true` | kill switch for slice 2 |
+| `LEDGER_DEGRADED_RETRY_SECONDS` | `60.0` | circuit-breaker cooldown before a single probe is admitted, section 6.3 as amended (added in slice 2 review) |
 
 The two figures the ledger will settle first: cost per full report (roadmap models $0.07-0.18, gate is $0.30 all-in) and p95 cost per active user per month (gate is $2.75). Neither is knowable today, because nothing in the codebase has ever recorded a token.
 
