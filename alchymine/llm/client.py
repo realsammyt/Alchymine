@@ -53,6 +53,36 @@ def _usage_int(usage: Any, field_name: str) -> int:
     return value
 
 
+def _system_payload(system_prompt: str) -> Any:
+    """Return the ``system`` argument for one streamed Claude request.
+
+    With prompt caching on, the assembled system prompt is the stable
+    prefix of every chat turn, so it becomes a single text block carrying
+    one cache breakpoint. Anything that varies per request stays in the
+    user message, after the breakpoint, where it cannot invalidate the
+    cached prefix. With caching off the plain string goes out, byte for
+    byte the request this code sent before the flag existed.
+
+    The breakpoint is a no-op below the model's minimum cacheable prefix —
+    4,096 tokens on claude-haiku-4-5, 1,024 on claude-sonnet-4-6 — and the
+    chat prefix is around 880 tokens today, so it will report no cache
+    reads until the chat context grows. It costs nothing to carry until
+    then. See docs/plans/2026-08-13-unit-economics.md section 8.2.
+
+    An empty system prompt is never wrapped: a text block with no text is
+    not a valid request, and there is nothing to cache either way.
+    """
+    if not system_prompt or not get_settings().llm_prompt_cache_enabled:
+        return system_prompt
+    return [
+        {
+            "type": "text",
+            "text": system_prompt,
+            "cache_control": {"type": "ephemeral"},
+        }
+    ]
+
+
 class LLMBackend(StrEnum):
     """Available LLM backends."""
 
@@ -447,6 +477,7 @@ class LLMClient:
         system_prompt: str = "",
         max_tokens: int = 2048,
         temperature: float = 0.7,
+        model: str | None = None,
     ) -> AsyncGenerator[str, None]:
         """Stream LLM response chunks using the best available backend.
 
@@ -463,6 +494,10 @@ class LLMClient:
             Maximum output tokens.
         temperature:
             Sampling temperature.
+        model:
+            Optional Claude model to put at the head of the fallback chain.
+            Empty or unset keeps the default chain. Only the Claude backend
+            reads it; the Ollama fallback keeps its own model.
 
         Yields
         ------
@@ -483,7 +518,7 @@ class LLMClient:
                 self._last_backend = LLMBackend.CLAUDE.value
                 logger.info("Streaming LLM response via Claude backend")
                 async for chunk in self._stream_claude(
-                    prompt, system_prompt, max_tokens, temperature
+                    prompt, system_prompt, max_tokens, temperature, model=model
                 ):
                     yield chunk
                 return
@@ -527,16 +562,37 @@ class LLMClient:
         "claude-haiku-4-5-20251001",
     ]
 
+    @classmethod
+    def _model_chain(cls, model: str | None) -> list[str]:
+        """Return the fallback chain with *model* at its head.
+
+        An empty or unset *model* leaves CLAUDE_MODELS exactly as it is,
+        which is what non-chat callers get. A named model leads and the
+        remaining entries stay behind it as fallbacks, with the duplicate
+        removed so a model that is already in the chain is not tried twice.
+
+        Putting the requested model first rather than replacing the chain
+        keeps a 529 recoverable. It also means the chain can run *uphill*
+        in price for one hop, which is the deliberate trade: 529s are rare,
+        and the alternative is telling the user the coach is unavailable.
+        Whichever model answers is the one the ledger prices.
+        """
+        if not model:
+            return list(cls.CLAUDE_MODELS)
+        return [model] + [m for m in cls.CLAUDE_MODELS if m != model]
+
     async def _stream_claude(
         self,
         prompt: str,
         system_prompt: str,
         max_tokens: int,
         temperature: float,
+        model: str | None = None,
     ) -> AsyncGenerator[str, None]:
         """Stream text from the Claude API using server-sent events.
 
-        Tries each model in CLAUDE_MODELS until one succeeds.
+        Tries each model in the chain (see :meth:`_model_chain`) until one
+        succeeds.
         """
         import anthropic
 
@@ -547,15 +603,16 @@ class LLMClient:
 
         client = anthropic.AsyncAnthropic(api_key=self._anthropic_key, timeout=90.0)
         last_exc: Exception | None = None
+        system_payload = _system_payload(system_prompt)
 
-        for model in self.CLAUDE_MODELS:
+        for candidate in self._model_chain(model):
             try:
                 delivered_chars = 0
                 async with client.messages.stream(
-                    model=model,
+                    model=candidate,
                     max_tokens=max_tokens,
                     temperature=temperature,
-                    system=system_prompt,
+                    system=system_payload,
                     messages=[{"role": "user", "content": prompt}],
                 ) as stream:
                     try:
@@ -572,7 +629,10 @@ class LLMClient:
                         # stream the browser walked away from.
                         await _record_stream_usage(
                             stream=stream,
-                            model=model,
+                            # Whichever candidate is running is the one that
+                            # delivered, and pricing follows it rather than
+                            # what the caller asked for.
+                            model=candidate,
                             system_prompt=system_prompt,
                             prompt=prompt,
                             delivered_chars=delivered_chars,
@@ -580,12 +640,14 @@ class LLMClient:
                 return  # Success — stop trying models
             except anthropic.APIStatusError as exc:
                 if exc.status_code == 529:  # overloaded
-                    logger.warning("Claude model %s overloaded, trying next fallback", model)
+                    logger.warning("Claude model %s overloaded, trying next fallback", candidate)
                     last_exc = exc
                     continue
                 raise  # Other API errors (auth, bad request) — don't retry
             except (anthropic.APIConnectionError, anthropic.APITimeoutError) as exc:
-                logger.warning("Claude model %s unavailable: %s, trying next fallback", model, exc)
+                logger.warning(
+                    "Claude model %s unavailable: %s, trying next fallback", candidate, exc
+                )
                 last_exc = exc
                 continue
 

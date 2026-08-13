@@ -38,6 +38,7 @@ from alchymine.agents.growth.system_prompts import build_system_prompt
 from alchymine.api.auth import Account, get_current_user
 from alchymine.api.deps import get_db_session
 from alchymine.api.entitlements import require_chat
+from alchymine.config import get_settings
 from alchymine.db import repository
 from alchymine.db.usage_counters import CostCeilingExceeded
 from alchymine.llm.client import LLMClient
@@ -294,6 +295,11 @@ async def _chat_event_stream(
         async for chunk in client.stream_generate(
             prompt=message,
             system_prompt=system_prompt,
+            # Chat is the only surface that names its own model. It heads
+            # the fallback chain rather than replacing it, so a 529 still
+            # escalates instead of failing. Report narratives pass nothing
+            # and keep the Sonnet-first chain.
+            model=get_settings().llm_chat_model,
         ):
             full_reply.append(chunk)
             if _check_content_safety("".join(full_reply)) is not None:

@@ -783,3 +783,58 @@ class TestChatE2E:
         history_resp = client.get("/api/v1/chat/history")
         assert history_resp.status_code == 200
         assert history_resp.json() == []
+
+
+# ─── Model routing ──────────────────────────────────────────────────────
+
+
+class TestChatModelRouting:
+    """The route names the chat model; the client does the rest.
+
+    Slice 5 of the unit-economics work (docs/plans/2026-08-13-unit-economics.md
+    section 8.1). The route is the only place that knows this request is
+    chat, so it is the place that reads ``LLM_CHAT_MODEL``. Report
+    narratives go through the same client and pass nothing.
+    """
+
+    def _captured_model(self, client: TestClient, monkeypatch: pytest.MonkeyPatch) -> object:
+        seen: dict[str, object] = {}
+
+        async def _capture(
+            self_: object, *args: object, **kwargs: object
+        ) -> AsyncGenerator[str, None]:
+            seen.update(kwargs)
+            yield "hello"
+
+        monkeypatch.setattr(
+            "alchymine.api.routers.chat.LLMClient.stream_generate",
+            _capture,
+        )
+        response = client.post("/api/v1/chat", json={"message": "Hello"})
+        _ = response.text
+        assert "model" in seen, "the chat route must name its model"
+        return seen["model"]
+
+    def test_the_route_passes_the_configured_chat_model(
+        self, client: TestClient, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        from alchymine.config import get_settings
+
+        monkeypatch.setenv("LLM_CHAT_MODEL", "claude-haiku-4-5-20251001")
+        get_settings.cache_clear()
+        try:
+            assert self._captured_model(client, monkeypatch) == "claude-haiku-4-5-20251001"
+        finally:
+            get_settings.cache_clear()
+
+    def test_an_empty_setting_reaches_the_client_as_the_default_chain(
+        self, client: TestClient, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        from alchymine.config import get_settings
+
+        monkeypatch.setenv("LLM_CHAT_MODEL", "")
+        get_settings.cache_clear()
+        try:
+            assert self._captured_model(client, monkeypatch) == ""
+        finally:
+            get_settings.cache_clear()
