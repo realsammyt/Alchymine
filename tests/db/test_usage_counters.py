@@ -369,13 +369,13 @@ class TestLedgerHealth:
         just buys one call the right to try.
         """
         mark_ledger_degraded("insert failed")
-        with patch("alchymine.db.usage_counters.LEDGER_DEGRADED_RETRY_SECONDS", 0.0):
+        with patch("alchymine.db.usage_counters._degraded_retry_seconds", return_value=0.0):
             assert claim_ledger_admission() is True
             assert ledger_is_degraded() is True
 
     def test_only_one_probe_is_admitted_per_cooldown(self) -> None:
         mark_ledger_degraded("insert failed")
-        with patch("alchymine.db.usage_counters.LEDGER_DEGRADED_RETRY_SECONDS", 0.0):
+        with patch("alchymine.db.usage_counters._degraded_retry_seconds", return_value=0.0):
             assert [claim_ledger_admission() for _ in range(4)] == [True, False, False, False]
 
 

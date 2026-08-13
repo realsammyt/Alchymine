@@ -36,6 +36,7 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from alchymine.config import get_settings
 from alchymine.db.base import get_async_session_factory
 from alchymine.db.models import UsageCounter
 
@@ -124,12 +125,18 @@ def next_month_start(now: datetime | None = None) -> datetime:
 # a user-visible one after the reply was already delivered — so the rule is:
 # loud now, and block the NEXT cost-bearing call.
 #
-# Process-local by design. In the common case (Postgres unreachable) the
-# counter read in check_ceiling hits the same database and fails closed on
-# its own; this flag covers what that misses, an INSERT that fails for a
-# non-connectivity reason such as a constraint violation while reads still
-# succeed. Each process therefore tracks its own writes, which is exactly
-# the blast radius that matters.
+# The gate is charge_paid_call, and only charge_paid_call. check_ceiling
+# deliberately stays out of it: slice 3 reads ceilings at the route layer to
+# price a user's allowance, where a degraded ledger is not that user's fault
+# and would render an upsell for an internal fault, and a second gate would
+# claim the probe below twice for one call.
+#
+# Process-local by design. In the common case (Postgres unreachable) every
+# counter operation hits the same database and fails closed on its own; this
+# state covers what that misses, an INSERT that fails for a non-connectivity
+# reason such as a constraint violation while reads still succeed. Each
+# process therefore tracks its own writes, which is exactly the blast radius
+# that matters.
 #
 # This is a circuit breaker, not a latch. A pure latch would deadlock:
 # every paid call is blocked, so no write is attempted, so nothing can ever
@@ -146,19 +153,26 @@ def next_month_start(now: datetime | None = None) -> datetime:
 # An abandoned probe (its call died before writing anything) would wedge the
 # gate shut forever, which is the same deadlock in a new place, so a claim
 # older than LEDGER_PROBE_TIMEOUT_SECONDS is treated as gone and can be
-# replaced. That figure sits above the 90-second LLM client timeout, so a
-# slow-but-alive call is never mistaken for an abandoned one.
+# replaced.
 #
 # The state is guarded by a threading.Lock rather than relying on asyncio's
 # single thread: the Celery path runs its coroutines in a worker thread, so
 # two threads really can reach the claim at once.
 
-LEDGER_DEGRADED_RETRY_SECONDS = 60.0
+# Not a tuning knob: this one is derived from the 90-second timeout on the
+# Anthropic client, so a call that is slow but alive is never mistaken for an
+# abandoned probe. It moves when that timeout moves, not when traffic does,
+# which is why it stays a constant while the cooldown is an env var.
 LEDGER_PROBE_TIMEOUT_SECONDS = 120.0
 
 _ledger_lock = threading.Lock()
 _ledger_degraded_at: float | None = None
 _probe_claimed_at: float | None = None
+
+
+def _degraded_retry_seconds() -> float:
+    """The cooldown before a degraded ledger admits a probe (env-configurable)."""
+    return get_settings().ledger_degraded_retry_seconds
 
 
 def mark_ledger_degraded(reason: str) -> None:
@@ -179,7 +193,7 @@ def mark_ledger_degraded(reason: str) -> None:
             "LEDGER_DEGRADED — a usage record could not be written (%s). Paid model "
             "calls are blocked for the next %.0fs, then one call may probe.",
             reason,
-            LEDGER_DEGRADED_RETRY_SECONDS,
+            _degraded_retry_seconds(),
         )
 
 
@@ -220,7 +234,7 @@ def claim_ledger_admission() -> bool:
     with _ledger_lock:
         if _ledger_degraded_at is None:
             return True
-        if now - _ledger_degraded_at < LEDGER_DEGRADED_RETRY_SECONDS:
+        if now - _ledger_degraded_at < _degraded_retry_seconds():
             return False
         probe_is_live = (
             _probe_claimed_at is not None and now - _probe_claimed_at < LEDGER_PROBE_TIMEOUT_SECONDS

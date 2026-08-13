@@ -136,6 +136,16 @@ class Settings(BaseSettings):
     # which is a separate, older mechanism.
     usage_ledger_enabled: bool = True
 
+    # How long a failed ledger write blocks paid calls before one of them may
+    # probe to see whether the ledger is writable again. Tuning this trades
+    # two costs against each other: too short and a database that is properly
+    # down gets probed by a paid call every few seconds, too long and a
+    # transient failure keeps every paid surface dark for no reason. 60s is a
+    # guess like everything else in this design, which is why it is an env
+    # var — a wrong number under real beta traffic should be a restart, not a
+    # code change.
+    ledger_degraded_retry_seconds: float = 60.0
+
     # ── Celery ───────────────────────────────────────────────────────────
     celery_broker_url: str = "redis://localhost:6379/1"
     celery_result_backend: str = "redis://localhost:6379/2"

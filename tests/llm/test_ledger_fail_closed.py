@@ -96,7 +96,7 @@ class TestDegradedLedgerRecoversOnItsOwn:
 
         mark_ledger_degraded("insert failed")
 
-        with patch("alchymine.db.usage_counters.LEDGER_DEGRADED_RETRY_SECONDS", 0.0):
+        with patch("alchymine.db.usage_counters._degraded_retry_seconds", return_value=0.0):
             results = await asyncio.gather(
                 *[charge_paid_call() for _ in range(5)], return_exceptions=True
             )
@@ -111,7 +111,7 @@ class TestDegradedLedgerRecoversOnItsOwn:
     ) -> None:
         mark_ledger_degraded("insert failed")
 
-        with patch("alchymine.db.usage_counters.LEDGER_DEGRADED_RETRY_SECONDS", 0.0):
+        with patch("alchymine.db.usage_counters._degraded_retry_seconds", return_value=0.0):
             await charge_paid_call()  # claims the probe
             # The probe has not written anything yet, so the gate stays shut
             # even though the cooldown has long since lapsed.
@@ -121,7 +121,7 @@ class TestDegradedLedgerRecoversOnItsOwn:
     async def test_a_successful_probe_write_reopens_the_gate(self, cost_meter_db) -> None:
         mark_ledger_degraded("insert failed")
 
-        with patch("alchymine.db.usage_counters.LEDGER_DEGRADED_RETRY_SECONDS", 0.0):
+        with patch("alchymine.db.usage_counters._degraded_retry_seconds", return_value=0.0):
             await charge_paid_call()
             await record_usage(
                 meter=METER_LLM_CALLS, provider="anthropic", model=HAIKU, input_tokens=1000
@@ -131,7 +131,7 @@ class TestDegradedLedgerRecoversOnItsOwn:
             await charge_paid_call()
 
     async def test_a_failed_probe_re_arms_the_cooldown(self, cost_meter_db) -> None:
-        with patch("alchymine.db.usage_counters.LEDGER_DEGRADED_RETRY_SECONDS", 0.0):
+        with patch("alchymine.db.usage_counters._degraded_retry_seconds", return_value=0.0):
             mark_ledger_degraded("insert failed")
             await charge_paid_call()  # the probe
 
@@ -148,7 +148,7 @@ class TestDegradedLedgerRecoversOnItsOwn:
         """
         mark_ledger_degraded("insert failed")
 
-        with patch("alchymine.db.usage_counters.LEDGER_DEGRADED_RETRY_SECONDS", 0.0):
+        with patch("alchymine.db.usage_counters._degraded_retry_seconds", return_value=0.0):
             await charge_paid_call()  # claims the probe, then vanishes
             with pytest.raises(CostCeilingExceeded):
                 await charge_paid_call()
@@ -165,7 +165,7 @@ class TestDegradedLedgerRecoversOnItsOwn:
         results: list[bool] = []
         results_lock = threading.Lock()
 
-        with patch("alchymine.db.usage_counters.LEDGER_DEGRADED_RETRY_SECONDS", 0.0):
+        with patch("alchymine.db.usage_counters._degraded_retry_seconds", return_value=0.0):
             barrier = threading.Barrier(16)
 
             def worker() -> None:
@@ -181,6 +181,28 @@ class TestDegradedLedgerRecoversOnItsOwn:
                 thread.join()
 
         assert results.count(True) == 1, f"exactly one probe may be claimed, got {results}"
+
+
+class TestTheCooldownIsConfigurable:
+    """A wrong cooldown under real traffic should be a restart, not a patch."""
+
+    def test_the_default_is_sixty_seconds(self) -> None:
+        assert get_settings().ledger_degraded_retry_seconds == 60.0
+
+    def test_the_env_var_reaches_the_gate(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """End to end: env var, Settings field, the value the breaker reads."""
+        from alchymine.db.usage_counters import _degraded_retry_seconds
+
+        monkeypatch.setenv("LEDGER_DEGRADED_RETRY_SECONDS", "0")
+        get_settings.cache_clear()
+        try:
+            assert _degraded_retry_seconds() == 0.0
+            mark_ledger_degraded("insert failed")
+            # A zero cooldown means the very next call is the probe.
+            assert claim_ledger_admission() is True
+            assert claim_ledger_admission() is False
+        finally:
+            get_settings.cache_clear()
 
 
 class TestTheKillSwitchIsAnEscapeHatch:
