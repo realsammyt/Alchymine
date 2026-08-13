@@ -25,6 +25,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from alchymine.api.deps import get_db_session
 from alchymine.config import get_settings
 from alchymine.db.models import User
+from alchymine.llm.attribution import set_attribution
 
 # ─── Configuration ────────────────────────────────────────────────────────
 # Convenience aliases so existing call-sites (and tests that import these
@@ -337,9 +338,24 @@ async def get_current_account(
             detail="Account is disabled",
         )
 
-    # Slice 2 sets the attribution ContextVars here, from the resolved user id
-    # and request.state.request_id, so the LLM egress sites can name who a
-    # paid call belongs to.
+    # Attribute everything this request goes on to do to this user. The LLM
+    # egress sites have no request and no session, so this ContextVar is the
+    # only thing that lets a ledger row name an owner.
+    #
+    # No reset needed: each request runs in its own asyncio task with its own
+    # copied context, so the value dies with the task and cannot be read by
+    # the next request. The surface is left to the route (slice 3); an
+    # unattributed surface records as "unknown" rather than blocking.
+    #
+    # request.state.request_id is set by RequestIdMiddleware. It is absent
+    # when the dependency is called directly, or on an app that does not
+    # mount the middleware, and a missing correlation id is not a reason to
+    # fail an authenticated request.
+    set_attribution(
+        user_id=user.id,
+        surface=None,
+        request_id=getattr(request.state, "request_id", None),
+    )
 
     return Account(
         user_id=user.id,

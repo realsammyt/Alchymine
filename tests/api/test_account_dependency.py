@@ -150,6 +150,57 @@ class TestGetCurrentAccount:
         assert account.is_admin is True
 
 
+class TestAttributionSideEffect:
+    """The dependency is where a paid call learns whose it is.
+
+    The ledger sites live under ``alchymine/llm/`` with no request and no
+    session; this ContextVar is the only thing that names the user.
+    """
+
+    async def test_sets_the_user_id_for_the_egress_sites(self, db):
+        from alchymine.llm.attribution import current_attribution
+
+        await _add_user(db, id="u-attr", email="attr@test.com")
+        token = create_access_token({"sub": "u-attr"})
+
+        await get_current_account(_request(), token, db)
+
+        assert current_attribution()[0] == "u-attr"
+
+    async def test_carries_the_request_id_when_the_middleware_set_one(self, db):
+        from alchymine.llm.attribution import current_attribution
+
+        await _add_user(db, id="u-req", email="req@test.com")
+        token = create_access_token({"sub": "u-req"})
+        request = _request()
+        request.state.request_id = "11111111-1111-4111-8111-111111111111"
+
+        await get_current_account(request, token, db)
+
+        assert current_attribution()[2] == "11111111-1111-4111-8111-111111111111"
+
+    async def test_works_without_a_request_id_on_state(self, db):
+        """RequestIdMiddleware is not mounted in every test app, or in unit calls."""
+        from alchymine.llm.attribution import current_attribution
+
+        await _add_user(db, id="u-nore", email="nore@test.com")
+        token = create_access_token({"sub": "u-nore"})
+
+        await get_current_account(_request(), token, db)
+
+        assert current_attribution()[2] is None
+
+    async def test_a_rejected_request_attributes_nothing(self, db):
+        """A 401 must not leave a stale user id in the context."""
+        from alchymine.llm.attribution import current_attribution, set_attribution
+
+        set_attribution(user_id=None, surface=None, request_id=None)
+        with pytest.raises(HTTPException):
+            await get_current_account(_request(), "not-a-jwt", db)
+
+        assert current_attribution()[0] is None
+
+
 # ─── effective_plan ───────────────────────────────────────────────────────
 
 

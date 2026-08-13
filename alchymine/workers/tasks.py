@@ -17,6 +17,7 @@ the async database and orchestrator calls.
 from __future__ import annotations
 
 import asyncio
+import contextvars
 import json
 import logging
 import traceback
@@ -38,6 +39,7 @@ from alchymine.db.repository import (
     update_report_content,
     update_report_status,
 )
+from alchymine.llm.attribution import attributed
 from alchymine.safety.audit import AuditEventType
 from alchymine.safety.audit import log_event as audit_log_event
 from alchymine.safety.content_filter import FilterAction, filter_content
@@ -66,12 +68,19 @@ def _run_async(coro: Any) -> Any:
     try:
         asyncio.get_running_loop()
     except RuntimeError:
-        # No running loop — safe to use asyncio.run()
+        # No running loop — safe to use asyncio.run(), which stays in the
+        # calling thread's context and so carries ContextVars with it.
         return asyncio.run(coro)
 
-    # An event loop is already running — execute in a background thread
+    # An event loop is already running — execute in a background thread.
+    # A new thread starts with a fresh, empty context, so the attribution
+    # ContextVars would read their defaults and every paid call made under
+    # this path would land in the ledger unattributed. Copying the context
+    # across the boundary is what keeps report spend nameable. This is also
+    # the CELERY_ALWAYS_EAGER path, which is how the test suite runs.
+    ctx = contextvars.copy_context()
     with ThreadPoolExecutor(max_workers=1) as pool:
-        future: Future = pool.submit(asyncio.run, coro)
+        future: Future = pool.submit(ctx.run, asyncio.run, coro)
         return future.result(timeout=560)  # Just above Celery soft_time_limit (540s)
 
 
@@ -418,6 +427,15 @@ def generate_report(
     # ── Mark as generating ────────────────────────────────────────────
     _run_async(_db_set_generating(report_id))
 
+    # Resolve the owner once, here, rather than after the narratives run.
+    # The paid calls happen inside the narrative block below, and a ledger
+    # row can only name a user the task has already looked up. This can
+    # legitimately be None: reports.py creates orphan rows when the JWT
+    # subject has no matching user, and that spend is genuinely
+    # unattributable.
+    _report_row = _run_async(_db_get_report(report_id))
+    _owner_id = _report_row.user_id if _report_row else None
+
     # Resolve intentions: prefer the list, fall back to the single string
     _resolved_intentions = intentions or ([intention] if intention else None)
 
@@ -473,7 +491,10 @@ def generate_report(
                     systems,
                 )
                 t_narr = _time.monotonic()
-                narratives = _run_async(generator.generate_all(systems, engine_data))
+                # Every paid call in generate_all — one per system, fanned
+                # out through asyncio.gather — inherits this attribution.
+                with attributed(user_id=_owner_id, surface="report_narrative"):
+                    narratives = _run_async(generator.generate_all(systems, engine_data))
                 logger.info(
                     "[task] Report %s: narrative generation complete in %.1fs",
                     report_id,
@@ -507,11 +528,8 @@ def generate_report(
             )
 
         # ── Safety content filter on LLM-generated narratives ─────────
-        # Resolve user_id early for audit logging
-        _report_row_for_filter = _run_async(_db_get_report(report_id))
-        _filter_user_id = _report_row_for_filter.user_id if _report_row_for_filter else None
         try:
-            _filter_narratives(serialised, report_id, _filter_user_id)
+            _filter_narratives(serialised, report_id, _owner_id)
         except Exception as exc:
             logger.warning("Content filter failed (non-fatal): %s", exc)
 
@@ -524,12 +542,10 @@ def generate_report(
 
         # ── Populate profile layer tables from coordinator results ────
         try:
-            # Resolve user_id from the Report row (set at creation by the API).
+            # _owner_id came from the Report row (set at creation by the API).
             # The user_profile dict does NOT contain "id" — it has intake fields.
-            report_row = _run_async(_db_get_report(report_id))
-            _user_id = report_row.user_id if report_row else None
             _coordinator_results = serialised.get("coordinator_results", [])
-            _run_async(_db_populate_profiles(_user_id, _coordinator_results))
+            _run_async(_db_populate_profiles(_owner_id, _coordinator_results))
         except Exception as exc:
             logger.warning("Failed to populate profile tables: %s", exc)
 
