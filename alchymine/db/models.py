@@ -32,6 +32,7 @@ from sqlalchemy import (
     DateTime,
     Float,
     ForeignKey,
+    Index,
     Integer,
     LargeBinary,
     String,
@@ -98,6 +99,38 @@ class User(Base):
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     last_login_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     invite_code_used: Mapped[str | None] = mapped_column(String(64), nullable=True)
+
+    # Entitlements (migration 0017). Source of truth for what this account is
+    # allowed to spend. Deliberately NOT mirrored into the JWT: access tokens
+    # live 30 minutes and refresh tokens 7 days, so a plan claim in a token
+    # would hand a cancelled subscriber a week of inference we pay for.
+    plan: Mapped[str] = mapped_column(
+        String(20),
+        nullable=False,
+        default="free",
+        server_default="free",
+        comment="free | beta | blueprint | pro | founding",
+    )
+    plan_status: Mapped[str] = mapped_column(
+        String(20),
+        nullable=False,
+        default="active",
+        server_default="active",
+        comment="active | trialing | past_due | canceled | expired",
+    )
+    # Fernet is non-deterministic, so these two columns cannot be indexed and
+    # cannot be matched by equality in SQL. That is a constraint the Stripe
+    # slice must respect, not a defect to work around: the webhook handler
+    # resolves the user from metadata.user_id (which we set ourselves at
+    # checkout-session creation) and never issues a
+    # WHERE stripe_customer_id = ... . Reads are always keyed by users.id.
+    stripe_customer_id: Mapped[str | None] = mapped_column(EncryptedString, nullable=True)
+    stripe_subscription_id: Mapped[str | None] = mapped_column(EncryptedString, nullable=True)
+    plan_period_end: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    cancel_at_period_end: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default="false"
+    )
+    trial_ends_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     # Cross-system fields
     active_plan_day: Mapped[int | None] = mapped_column(Integer, nullable=True)
@@ -798,3 +831,143 @@ class UsageCounter(Base):
             f"<UsageCounter scope={self.scope!r} meter={self.meter!r} "
             f"period={self.period_key!r} count={self.count!r}>"
         )
+
+
+# ─── Cost Ledger ────────────────────────────────────────────────────────
+
+# SQLite only aliases a primary key to its rowid when the declared type is
+# exactly INTEGER, so a BIGINT primary key cannot autoincrement there and
+# inserts fail on a NULL id. The variant keeps Postgres on BIGINT (these two
+# tables grow one row per paid call) and lets the SQLite test suite write.
+_LedgerPK = BigInteger().with_variant(Integer, "sqlite")
+
+
+class UsageRecord(Base):
+    """One row per delivered paid call. The source of truth for spend.
+
+    ``usage_counters`` answers "are we blocked"; this table answers "what did
+    it cost". Rows are written after the call returns, never before, because
+    a ledger that counts money we did not spend is simply wrong.
+
+    ``user_id`` is nullable and ``ON DELETE SET NULL`` for the same reason
+    ``UsageCounter`` has no FK at all: a deleted user should not take the
+    spend history with them, and nulling the id satisfies erasure while
+    keeping the aggregate honest. A NULL id also covers calls that reached an
+    egress site with no attribution set, which are logged loudly and still
+    charged to the global meter.
+
+    ``period_key`` and ``month_key`` are denormalized off ``created_at`` so
+    the rollups the admin usage view runs are plain indexed equality reads.
+    """
+
+    __tablename__ = "usage_records"
+    __table_args__ = (
+        Index("ix_usage_records_period_surface", "period_key", "surface"),
+        Index("ix_usage_records_user_month", "user_id", "month_key"),
+    )
+
+    id: Mapped[int] = mapped_column(_LedgerPK, primary_key=True, autoincrement=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False, index=True
+    )
+    user_id: Mapped[str | None] = mapped_column(
+        String(36),
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+        comment="NULL means unattributed spend",
+    )
+    scope: Mapped[str] = mapped_column(
+        String(64), nullable=False, comment="user id, or 'unattributed'"
+    )
+    surface: Mapped[str] = mapped_column(
+        String(32),
+        nullable=False,
+        comment="chat | report_narrative | art | brand_logo | unknown",
+    )
+    meter: Mapped[str] = mapped_column(String(64), nullable=False)
+    provider: Mapped[str] = mapped_column(String(16), nullable=False)
+    model: Mapped[str] = mapped_column(String(100), nullable=False)
+    input_tokens: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=0, server_default="0"
+    )
+    output_tokens: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=0, server_default="0"
+    )
+    cache_read_input_tokens: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=0, server_default="0"
+    )
+    cache_creation_input_tokens: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=0, server_default="0"
+    )
+    images: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
+    cost_micros: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=0, server_default="0", comment="micro-dollars"
+    )
+    estimated: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        default=False,
+        server_default="false",
+        comment="true when tokens were inferred, not reported",
+    )
+    period_key: Mapped[str] = mapped_column(
+        String(16), nullable=False, comment="UTC calendar date, YYYY-MM-DD"
+    )
+    month_key: Mapped[str] = mapped_column(
+        String(7), nullable=False, comment="UTC calendar month, YYYY-MM"
+    )
+    request_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+
+    def __repr__(self) -> str:
+        return (
+            f"<UsageRecord id={self.id!r} surface={self.surface!r} "
+            f"model={self.model!r} cost_micros={self.cost_micros!r}>"
+        )
+
+
+# ─── Billing Events ─────────────────────────────────────────────────────
+
+
+class BillingEvent(Base):
+    """Inbox for Stripe webhook deliveries. No writers until billing ships.
+
+    ``stripe_event_id`` is the idempotency key: Stripe retries deliveries, and
+    a duplicate hits the unique constraint and is discarded rather than
+    granting a plan twice.
+
+    ``payload`` is encrypted because Stripe payloads carry an email address
+    and payment identifiers.
+    """
+
+    __tablename__ = "billing_events"
+    __table_args__ = (
+        UniqueConstraint("stripe_event_id", name="uq_billing_events_stripe_event_id"),
+    )
+
+    id: Mapped[int] = mapped_column(_LedgerPK, primary_key=True, autoincrement=True)
+    stripe_event_id: Mapped[str] = mapped_column(
+        String(255),
+        nullable=False,
+        comment="idempotency key — a duplicate delivery hits the constraint",
+    )
+    event_type: Mapped[str] = mapped_column(String(100), nullable=False, index=True)
+    user_id: Mapped[str | None] = mapped_column(
+        String(36), ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    payload: Mapped[dict | None] = mapped_column(EncryptedJSON, nullable=True)
+    status: Mapped[str] = mapped_column(
+        String(20),
+        nullable=False,
+        default="received",
+        server_default="received",
+        comment="received | processed | failed | ignored",
+    )
+    error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    processed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False, index=True
+    )
+
+    def __repr__(self) -> str:
+        return f"<BillingEvent id={self.id!r} type={self.event_type!r} status={self.status!r}>"

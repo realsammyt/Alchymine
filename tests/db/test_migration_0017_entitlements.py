@@ -102,7 +102,10 @@ class TestDataMigration:
 
         assert row[0] == "free"
         assert row[1] == "active"
-        assert row[2] in (0, False)
+        # SQLite keeps a boolean server_default as the literal text it was
+        # given; Postgres parses it as a real boolean. Same convention the
+        # is_admin / is_active columns have used since 0003.
+        assert row[2] in (0, False, "false")
 
     def test_migration_is_safe_on_an_empty_table(self, db_at_0016):
         """No rows is not an error; the upgrade still completes."""
