@@ -64,7 +64,31 @@ MICROS_PER_CENT = 10_000
 
 
 def allowance_micros_for(plan: str) -> int:
-    """Return *plan*'s monthly spend allowance in micro-dollars."""
+    """Return *plan*'s spend allowance in micro-dollars, per calendar month.
+
+    **Every plan is metered by UTC calendar month in v1, including
+    blueprint.** The design says two different things about this:
+    section 2.2 describes blueprint's 99 cents as "per 33-day window",
+    while section 3.3 defines exactly one monthly period key shape,
+    ``YYYY-MM``, which is what the ledger writes. This resolves in favour
+    of 3.3.
+
+    The consequence is real and accepted: a 33-day window that straddles
+    a month boundary has its meter reset partway through, so such a buyer
+    can spend up to two allowances inside one window. The leak is bounded
+    at one extra allowance per sale (99 provisional cents), there is no
+    purchase flow yet to produce one, and every figure here is revisited
+    once beta data exists. Building a second, window-keyed meter to close
+    a 99-cent hole before anything can buy it is not the trade.
+
+    ``plan_period_end`` still bounds the *duration* of the grant: once
+    the window closes, ``Account.effective_plan`` degrades to free and
+    the entitlement gate refuses outright. So the exposure is bounded in
+    time regardless of how the meter resets.
+
+    Pinned by ``TestBlueprintIsMeteredByCalendarMonth``. Revisit with the
+    provisional-numbers register (design section 10).
+    """
     return get_settings().allowance_cents_for(plan) * MICROS_PER_CENT
 
 

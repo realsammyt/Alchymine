@@ -24,7 +24,7 @@ from __future__ import annotations
 
 import asyncio
 from collections.abc import AsyncGenerator
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -71,14 +71,19 @@ def _image() -> GeminiImageResult:
     )
 
 
-def _account(plan: str, user_id: str = OWNER_ID) -> Account:
+def _account(
+    plan: str,
+    user_id: str = OWNER_ID,
+    *,
+    period_end: datetime | None = None,
+) -> Account:
     return Account(
         user_id=user_id,
         email=f"{user_id}@example.com",
         plan=plan,
         plan_status="active",
         is_admin=False,
-        plan_period_end=None,
+        plan_period_end=period_end,
         trial_ends_at=None,
     )
 
@@ -104,18 +109,36 @@ class _Env:
         self._loop = loop
         self.gemini: MagicMock | None = None
 
-    def as_plan(self, plan: str, user_id: str = OWNER_ID) -> None:
+    def as_plan(
+        self,
+        plan: str,
+        user_id: str = OWNER_ID,
+        *,
+        period_end: datetime | None = None,
+    ) -> None:
         """Call every subsequent request as an account on *plan*."""
-        account = _account(plan, user_id)
+        account = _account(plan, user_id, period_end=period_end)
         app.dependency_overrides[get_current_account] = lambda: account
+
+    def as_lapsed(self, plan: str, user_id: str = OWNER_ID) -> None:
+        """As an account whose paid window closed yesterday.
+
+        ``effective_plan`` degrades these to free, which is what stops a
+        one-time purchase becoming a perpetual monthly liability.
+        """
+        self.as_plan(plan, user_id, period_end=datetime.now(UTC) - timedelta(days=1))
 
     def spend(self, micros: int, *, user_id: str = OWNER_ID) -> None:
         """Put delivered spend on the user's monthly meter."""
+        self.spend_in_month(micros, user_id=user_id, month=current_month_key())
+
+    def spend_in_month(self, micros: int, *, user_id: str = OWNER_ID, month: str) -> None:
+        """Put delivered spend on a specific month's meter row."""
         self._loop.run_until_complete(
             increment_and_get(
                 scope=user_id,
                 meter=METER_SPEND_MICROS_MONTHLY,
-                period_key=current_month_key(),
+                period_key=month,
                 amount=micros,
             )
         )
@@ -477,6 +500,139 @@ class TestOwnershipSurvivesTheDependencySwap:
                 return result.scalars().first()
 
         assert env._loop.run_until_complete(_owner()) == STRANGER_ID
+
+
+class TestFreeKeepsEverythingElse:
+    """The gate has to be as precise about what it does *not* touch.
+
+    The free tier's whole shape is "artifact-shaped things yes, recurring
+    cost no" (roadmap section 3). A gate that crept onto the read paths
+    would take away what someone already has, which is a different and
+    worse product than the one being designed. Nothing else in the suite
+    exercises an ungated route as free, because the shared conftest
+    account defaults to beta.
+    """
+
+    # Read paths: no LLM call, no image, no marginal cost of any kind.
+    UNGATED = [
+        "/api/v1/reports/{report_id}",
+        "/api/v1/reports/{report_id}/status",
+        "/api/v1/reports/{report_id}/html",
+        "/api/v1/chat/history",
+        "/api/v1/healing/modalities",
+    ]
+
+    @pytest.mark.parametrize("path", UNGATED)
+    def test_free_still_reads_what_it_already_has(self, env, path) -> None:
+        env.add_report("rep-free-read", user_id=OWNER_ID)
+        env.as_plan("free")
+
+        response = env.client.get(path.format(report_id="rep-free-read"))
+
+        # 200 rather than "not 402/429": the weaker assertion would pass
+        # just as happily on a 500, which is not what this is checking.
+        assert response.status_code == 200, response.text
+
+    def test_a_lapsed_blueprint_still_reads_the_report_it_bought(self, env) -> None:
+        """Spec 2.2: a closed window falls back to the free allowance
+        "while keeping read access to what it bought".
+
+        The report itself is a one-time artifact that was paid for. Only
+        the surfaces that would spend money again are refused.
+        """
+        env.add_report("rep-bought", user_id=OWNER_ID)
+        env.as_lapsed("blueprint")
+
+        assert env.client.get("/api/v1/reports/rep-bought").status_code == 200
+        assert env.client.get("/api/v1/reports/rep-bought/status").status_code == 200
+
+    def test_but_it_cannot_start_a_new_one(self, env) -> None:
+        """The other half of the same rule: reading is free, spending is not."""
+        env.as_lapsed("blueprint")
+
+        assert _post_report(env).status_code == 402
+
+
+class TestBlueprintIsMeteredByCalendarMonth:
+    """The one place this slice knowingly departs from the design text.
+
+    Design 2.2 describes the blueprint allowance as "99 cents per 33-day
+    window", but 3.3 defines exactly one monthly period key shape,
+    ``YYYY-MM``, and that is what the ledger writes. v1 meters blueprint
+    by calendar month like every other plan rather than building a
+    window-keyed meter.
+
+    The consequence, pinned below so it is a decision and not a surprise:
+    a 33-day window that straddles a month boundary gets its meter reset
+    partway through. The leak is bounded by one extra allowance per sale
+    (99 provisional cents), no purchase flow exists yet to produce one,
+    and every number here is revisited once beta data lands.
+    """
+
+    BLUEPRINT_MICROS = 99 * 10_000
+
+    def test_spending_the_window_inside_the_current_month_is_refused(self, env) -> None:
+        env.as_plan("blueprint", period_end=datetime.now(UTC) + timedelta(days=20))
+        env.spend(self.BLUEPRINT_MICROS)
+
+        response = _post_chat(env)
+
+        assert response.status_code == 429
+        assert response.json()["detail"]["code"] == "plan_allowance_reached"
+        assert response.json()["detail"]["plan"] == "blueprint"
+
+    def test_the_month_boundary_resets_the_meter_mid_window(self, env) -> None:
+        """Documented v1 behaviour, not an accident.
+
+        The same spend that closes the allowance above is invisible once
+        it sits under last month's key, even though the purchase window
+        is still open. Metering blueprint by its own 33-day window would
+        need a period key shape the ledger does not write.
+        """
+        now = datetime.now(UTC)
+        last_month = (now.replace(day=1) - timedelta(days=1)).strftime("%Y-%m")
+        env.as_plan("blueprint", period_end=now + timedelta(days=20))
+        env.spend_in_month(self.BLUEPRINT_MICROS, month=last_month)
+
+        assert _post_chat(env).status_code == 200
+
+    def test_a_closed_window_is_refused_outright(self, env) -> None:
+        """After 33 days the plan degrades to free, so it is a 402 and
+        not a 429: no amount of waiting reopens it."""
+        env.as_lapsed("blueprint")
+
+        response = _post_chat(env)
+
+        assert response.status_code == 402
+        assert response.json()["detail"]["code"] == "plan_upgrade_required"
+        assert response.json()["detail"]["plan"] == "free"
+
+
+class TestUnknownPlanFailsClosed:
+    """A plan name the config does not know locks the account out."""
+
+    def test_an_unconfigured_plan_gets_the_free_allowance(self, env) -> None:
+        """Deliberate and visible, but the message is wrong for the cause.
+
+        ``allowance_cents_for`` falls back to the free allowance and logs
+        at ERROR, so an unknown plan resolves to a ceiling of zero and
+        every paid surface 429s immediately. Failing closed is right: the
+        alternative is an unpriced plan spending without limit.
+
+        What the user sees is "you've used this month's included
+        coaching", which is untrue for someone who has spent nothing. The
+        real cause is config drift, PLAN_ALLOWANCE_CENTS missing a plan
+        that exists in the database, and the ERROR log is where that gets
+        noticed. This test exists so the lockout is a known cost of the
+        fail-closed choice rather than a field report.
+        """
+        env.as_plan("legacy_lifetime")
+
+        response = _post_chat(env)
+
+        assert response.status_code == 429
+        assert response.json()["detail"]["code"] == "plan_allowance_reached"
+        assert response.json()["detail"]["plan"] == "legacy_lifetime"
 
 
 class TestMeterOutageIsNotAnUpsell:
