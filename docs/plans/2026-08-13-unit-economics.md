@@ -414,13 +414,22 @@ The precise rule:
 
 > **A ledger-write failure must be loud and must fail the *next* call, not the current one.**
 
-Mechanically:
-1. On ledger `INSERT` failure, log at ERROR with the full row as structured JSON, so the spend is reconstructible from logs.
-2. Set a process-local `_ledger_degraded` flag.
-3. `check_ceiling` treats a degraded ledger as an unreachable meter and raises `CostCeilingExceeded(reason="meter_unavailable")` on the next cost-bearing call, which the existing handler at `main.py:125-144` renders as a structured 503.
-4. The flag clears on the next successful write.
+Mechanically — **amended 2026-08-13 (PR #232) to what slice 2 actually shipped.** The original draft put this block in `check_ceiling`; review moved it, for the reasons below.
 
-In the common case (Postgres unreachable) this is belt and braces, because the counter read in `check_ceiling` hits the same database and fails closed on its own. The flag covers the case the natural path misses: an `INSERT` that fails for a non-connectivity reason, such as a constraint violation or an oversized field, while reads still succeed.
+1. On ledger `INSERT` failure — or on a failed spend-meter increment, which loses the same accounting — log at ERROR with the full row as structured JSON, so the spend is reconstructible from logs.
+2. Open a process-local degraded episode. The row and both meters have to land before it ends, so recovery is never declared while the meters are still failing.
+3. `charge_paid_call` calls `claim_ledger_admission()` before `consume()` and raises `CostCeilingExceeded(reason="meter_unavailable")` when it is refused, which the existing handler at `main.py:125-144` renders as a structured 503. **This is the only admission gate.**
+4. The episode ends on the next successful write.
+
+**`check_ceiling` never consults ledger health.** It is a pure counter read. Slice 3 calls it at the route layer to price a per-user allowance, where a degraded ledger is not that user's fault and would render a 402/429 upsell for an internal fault; a degraded ledger is a global 503 at the chokepoint or it is nothing. A second gate would also claim the probe below twice for a single call. `check_ceiling` keeps its own fail-closed rule for an unreadable counter, which is a different failure.
+
+**The episode is a circuit breaker, not a latch.** A pure latch deadlocks: every paid call is blocked, so no write is attempted, so nothing can clear it, so one failed `INSERT` takes the process down until somebody restarts it. After `LEDGER_DEGRADED_RETRY_SECONDS` (env, default 60) the breaker goes half-open — and half-open means **one probe, not an open door**. A purely time-based lapse would admit every caller until somebody's write failed and re-armed it, which under a sustained database failure with steady traffic is a cooldown's worth of unrecorded spend per cycle; the report path alone fires five paid calls at once. So the first caller after the lapse claims the probe under a `threading.Lock` — the Celery path runs its coroutines in a worker thread, so the race is real — and everyone else stays refused until that probe resolves: a successful write ends the episode, a failed one re-arms the cooldown.
+
+A claim older than `LEDGER_PROBE_TIMEOUT_SECONDS` is treated as abandoned and can be replaced, because a probe whose call died before writing would otherwise wedge the gate shut forever, which is the same deadlock in a new place. That one stays a module constant rather than an env var: it is derived from the 90-second LLM client timeout so a slow-but-alive call is never mistaken for a dead one, and it should move when that timeout moves, not when traffic does.
+
+With the ledger switched off (`USAGE_LEDGER_ENABLED=false`) the gate is skipped and the episode is cleared. Turning the ledger off is how an operator stops a write storm; it must not be the thing that takes every paid surface down.
+
+In the common case (Postgres unreachable) this is belt and braces, because `consume()` hits the same database and fails closed on its own. The episode covers the case the natural path misses: an `INSERT` that fails for a non-connectivity reason, such as a constraint violation or an oversized field, while reads still succeed.
 
 ---
 
@@ -574,7 +583,7 @@ Report narratives are out of scope for caching. Their system prompts are per-sys
 | **1** | Migration 0017, `Account`, `get_current_account()` | The migration itself. Every column is nullable or defaulted, so no rewrite and no lock that matters. The `UPDATE users SET plan='beta'` is the risky line: if it does not run, every beta account lands on the free allowance and slice 3 locks them all out. | Alembic up and down against a copy of production. Assert every pre-existing row is `plan='beta'`, a fresh insert is `plan='free'`, and `get_current_account` matches `get_current_admin`'s 401/403 behaviour on a disabled account. |
 | **2** | `usage_records`, `ledger.record_usage()`, contextvars, `_run_async` context fix, SSE `get_final_message()` | One extra DB write per paid call on the same pool (single-digit ms). A bug in the `finally` could break narrative generation or truncate a chat stream. | Ledger row written for stream, non-stream and Gemini paths; five rows with one `user_id` after the `narrative.py:348` gather; a row with `estimated=True` on simulated disconnect; attribution survives eager-mode Celery. |
 | **3** | Per-plan allowances, `require_allowance()`, 402/429 upsell responses, frontend states | **First slice that can tell a user no.** Beta at 555 cents should never bind. Free at 0 binds immediately, by design. A wrong plan value from slice 1 locks out the beta. | Each plan against each of the four chokepoints; assert `beta` passes at realistic volume; assert the 429 body carries `code`, `message`, `retry_at`, `upgrade_url`; assert the SSE path returns a real 429 before the stream opens rather than an error frame. |
-| **4** | Spend meters, `check_ceiling` in `charge_paid_call`, `GET /admin/usage` | A mis-set budget takes every paid surface down until UTC midnight. Default is generous ($15/day against measured beta usage nearer $1-2/day). | Ceiling arithmetic; a tripped spend breaker renders the existing 503 shape; `/admin/usage` totals reconcile against a hand-summed `usage_records` fixture. |
+| **4** | Spend meters, `check_ceiling` in `charge_paid_call`, `GET /admin/usage` | A mis-set budget takes every paid surface down until UTC midnight. Default is generous ($15/day against measured beta usage nearer $1-2/day). **Wire the spend ceiling into `charge_paid_call`, next to the admission gate slice 2 put there. Do NOT re-add a ledger-health check inside `check_ceiling`** — see 6.3: one gate, or the half-open probe gets claimed twice for one call. | Ceiling arithmetic; a tripped spend breaker renders the existing 503 shape; `/admin/usage` totals reconcile against a hand-summed `usage_records` fixture. |
 | **5** | Haiku chat routing, prompt cache breakpoint | Reply quality on the most-touched surface. Reversible by env plus restart. | Model id recorded in `usage_records` equals `llm_chat_model`; report narratives still record Sonnet; cache tokens appear or the criterion in 8.2 fails and the flag goes off. |
 
 ### The four product chokepoints and how each is gated
