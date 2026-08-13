@@ -303,6 +303,36 @@ class TestAllowanceRefund:
         counted = asyncio.run(get_count(scope=TEST_USER_ID, meter=METER_ART_GENERATIONS))
         assert counted == 0
 
+    def test_refund_credits_the_day_that_was_charged(
+        self, client: TestClient, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """A request straddling UTC midnight refunds the day it charged.
+
+        Charged at 23:59:59, refunded at 00:00:01: reading the clock again
+        at refund time would credit the new day, whose counter row does not
+        exist yet, and the clamp would turn that into a silent no-op.
+        """
+        charged_day = "2026-08-12"
+        rolled_day = "2026-08-13"
+        # The charge reads the clock once; every read after it is past midnight.
+        reads = iter([charged_day])
+        monkeypatch.setattr(
+            "alchymine.db.usage_counters.current_period_key",
+            lambda *_args, **_kwargs: next(reads, rolled_day),
+        )
+        client.gemini.generate_image = AsyncMock(return_value=None)  # type: ignore[attr-defined]
+
+        assert client.post("/api/v1/art/generate", json={}).status_code == 204
+
+        charged = asyncio.run(
+            get_count(scope=TEST_USER_ID, meter=METER_ART_GENERATIONS, period_key=charged_day)
+        )
+        rolled = asyncio.run(
+            get_count(scope=TEST_USER_ID, meter=METER_ART_GENERATIONS, period_key=rolled_day)
+        )
+        assert charged == 0, "the charged day kept the slot"
+        assert rolled == 0, "the refund landed on the day after the charge"
+
 
 class TestMeterDownIsNotACap:
     """429 means 'you spent your allowance'. 503 means 'our meter is down'."""

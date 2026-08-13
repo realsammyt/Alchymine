@@ -31,7 +31,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from alchymine.api.auth import get_current_user
 from alchymine.api.deps import get_db_session
 from alchymine.config import get_settings
-from alchymine.db import repository
+from alchymine.db import repository, usage_counters
 from alchymine.db.models import User
 from alchymine.db.usage_counters import (
     METER_ART_GENERATIONS,
@@ -182,19 +182,26 @@ def _sanitize_extension(extension: str | None) -> str | None:
     return result.filtered_text
 
 
-async def _charge_daily_allowance(user_id: str) -> None:
+async def _charge_daily_allowance(user_id: str) -> str:
     """Spend one of the user's daily image generations, or say when to return.
 
     Charged just before the Gemini call, so a capped request never
     reaches the generator. The global breaker in ``llm/cost_guard`` still
     applies underneath: this one only bounds what a single account can do
     to the bill on its own.
+
+    Returns the period key the charge landed on, which the caller hands to
+    :func:`_refund_daily_allowance`. A request charged at 23:59 whose
+    refund fires after midnight has to credit the day it charged, not the
+    day it finished.
     """
+    period_key = usage_counters.current_period_key()
     try:
         await consume(
             scope=user_id,
             meter=METER_ART_GENERATIONS,
             ceiling=get_settings().daily_art_generations_per_user,
+            period_key=period_key,
         )
     except CostCeilingExceeded as exc:
         if exc.reason != "ceiling_reached":
@@ -212,18 +219,23 @@ async def _charge_daily_allowance(user_id: str) -> None:
                 "retry_at": exc.retry_at.isoformat(),
             },
         ) from exc
+    return period_key
 
 
-async def _refund_daily_allowance(user_id: str) -> None:
+async def _refund_daily_allowance(user_id: str, period_key: str) -> None:
     """Give back an allowance slot that produced no image.
 
     The charge happens before the Gemini call so an exhausted cap blocks
     before we spend anything. That ordering means a generator that fails,
     is filtered, or returns an undecodable payload would otherwise cost
     the user one of their three for nothing.
+
+    *period_key* is the one the charge used. Reading the clock here
+    instead would send a post-midnight refund at a counter row that does
+    not exist yet, where the clamp turns it into a silent no-op.
     """
     try:
-        await refund(scope=user_id, meter=METER_ART_GENERATIONS)
+        await refund(scope=user_id, meter=METER_ART_GENERATIONS, period_key=period_key)
     except Exception as exc:
         # Failing to refund costs the user one generation, which is the
         # safe direction to fail. It must never turn a 204 into a 500.
@@ -267,7 +279,7 @@ async def generate_art(
         # nothing, never spends one of the user's daily allowance.
         return Response(status_code=status.HTTP_204_NO_CONTENT)
 
-    await _charge_daily_allowance(user_id)
+    charged_period = await _charge_daily_allowance(user_id)
 
     # Everything from here can end without an image reaching the user: a
     # filtered prompt, an SDK hiccup, an undecodable payload, or the
@@ -283,11 +295,11 @@ async def generate_art(
         )
         result = await gemini.generate_image(prompt)
     except Exception:
-        await _refund_daily_allowance(user_id)
+        await _refund_daily_allowance(user_id, charged_period)
         raise
 
     if result is None:
-        await _refund_daily_allowance(user_id)
+        await _refund_daily_allowance(user_id, charged_period)
         return Response(status_code=status.HTTP_204_NO_CONTENT)
 
     # Persist bytes to disk + metadata row to DB.
@@ -549,18 +561,18 @@ async def generate_brand_logo(
     # Same allowance as the studio route, deliberately: this endpoint hits
     # the same paid generator, so counting it separately would just be a
     # second door to the same bill.
-    await _charge_daily_allowance(user_id)
+    charged_period = await _charge_daily_allowance(user_id)
 
     try:
         identity_dict = await _load_identity_dict(session, user_id)
         prompt = build_brand_logo_prompt(identity_dict)
         result = await gemini.generate_image(prompt)
     except Exception:
-        await _refund_daily_allowance(user_id)
+        await _refund_daily_allowance(user_id, charged_period)
         raise
 
     if result is None:
-        await _refund_daily_allowance(user_id)
+        await _refund_daily_allowance(user_id, charged_period)
         return Response(status_code=status.HTTP_204_NO_CONTENT)
 
     image_row = await repository.create_generated_image(

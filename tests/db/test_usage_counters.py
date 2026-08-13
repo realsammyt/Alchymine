@@ -39,7 +39,7 @@ async def counter_engine() -> AsyncGenerator[AsyncEngine, None]:
 
     Defaults to in-memory SQLite. Set ``TEST_COUNTER_DATABASE_URL`` to an
     asyncpg URL to run this same file against a real PostgreSQL instance
-    that has already had ``alembic upgrade head`` applied — that is what
+    that has already had ``alembic upgrade head`` applied. That is what
     proves ``increment_and_get``'s ``pg_insert`` branch actually infers
     its conflict target from migration 0016's unique constraint. SQLite
     exercises a different dialect's ON CONFLICT and cannot show that.
