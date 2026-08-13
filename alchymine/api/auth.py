@@ -12,6 +12,7 @@ Configuration via environment variables:
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 
 import bcrypt
@@ -251,3 +252,101 @@ async def get_current_admin(
         )
 
     return user
+
+
+# ─── Entitlement Dependency ───────────────────────────────────────────────
+
+
+@dataclass(frozen=True, slots=True)
+class Account:
+    """An immutable snapshot of what this account is entitled to, right now.
+
+    Frozen because the gates downstream read it several times per request
+    (entitlement, then allowance, then the response envelope) and every read
+    has to agree.
+    """
+
+    user_id: str
+    email: str | None
+    plan: str
+    plan_status: str
+    is_admin: bool
+    plan_period_end: datetime | None
+    trial_ends_at: datetime | None
+
+    @property
+    def effective_plan(self) -> str:
+        """The plan actually in force right now.
+
+        A lapsed window degrades to 'free' rather than keeping paid access,
+        so a cancelled subscriber stops costing money at the period end
+        instead of at their next token refresh.
+        """
+        if self.plan_period_end is None:
+            return self.plan
+
+        period_end = self.plan_period_end
+        if period_end.tzinfo is None:
+            # SQLite hands back naive datetimes. Everything we write is UTC.
+            period_end = period_end.replace(tzinfo=UTC)
+
+        return "free" if period_end <= datetime.now(UTC) else self.plan
+
+
+async def get_current_account(
+    request: Request,
+    bearer_token: str | None = Depends(oauth2_scheme),
+    db: AsyncSession = Depends(get_db_session),
+) -> Account:
+    """FastAPI dependency returning the caller's entitlement snapshot.
+
+    The DB-backed sibling of :func:`get_current_admin`, minus the admin
+    requirement. ``get_current_user`` stays JWT-only and never touches the
+    database, which is why there is nowhere on it to hang an entitlement.
+
+    The plan is read from Postgres on every gated request, never from the
+    token. Access tokens live 30 minutes and refresh tokens 7 days, so a plan
+    claim baked into a JWT would hand a cancelled subscriber a week of
+    inference we are paying for.
+
+    There is deliberately no Redis cache here. A 30 to 60 second read-through
+    cache is worth adding once Stripe webhooks exist to invalidate it; until
+    then one SELECT per gated request is the affordable, correct answer.
+
+    Raises
+    ------
+    HTTPException
+        401 if the token is missing, invalid, or names a user that no longer
+        exists; 403 if the account is disabled.
+    """
+    payload = await get_current_user(request, bearer_token)
+    user_id = payload.get("sub")
+
+    result = await db.execute(select(User).where(User.id == user_id))
+    user = result.scalar_one_or_none()
+
+    if user is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="User not found",
+        )
+
+    if not user.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Account is disabled",
+        )
+
+    # Slice 2 sets the attribution ContextVars here, from the resolved user id
+    # and request.state.request_id, so the LLM egress sites can name who a
+    # paid call belongs to.
+
+    return Account(
+        user_id=user.id,
+        email=user.email,
+        plan=user.plan,
+        plan_status=user.plan_status,
+        is_admin=user.is_admin,
+        plan_period_end=user.plan_period_end,
+        trial_ends_at=user.trial_ends_at,
+    )
