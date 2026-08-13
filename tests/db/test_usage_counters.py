@@ -10,11 +10,13 @@ rather than letting it through unmetered.
 from __future__ import annotations
 
 import asyncio
+import os
 from collections.abc import AsyncGenerator
 from datetime import UTC, datetime
 
 import pytest
 import pytest_asyncio
+from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
 
 import alchymine.db.models  # noqa: F401 — register models with metadata
@@ -27,20 +29,38 @@ from alchymine.db.usage_counters import (
     get_count,
     increment_and_get,
     next_period_start,
+    refund,
 )
 
 
 @pytest_asyncio.fixture
 async def counter_engine() -> AsyncGenerator[AsyncEngine, None]:
-    """Point the counter module's engine at a fresh in-memory SQLite DB."""
+    """Point the counter module's engine at an empty usage_counters table.
+
+    Defaults to in-memory SQLite. Set ``TEST_COUNTER_DATABASE_URL`` to an
+    asyncpg URL to run this same file against a real PostgreSQL instance
+    that has already had ``alembic upgrade head`` applied — that is what
+    proves ``increment_and_get``'s ``pg_insert`` branch actually infers
+    its conflict target from migration 0016's unique constraint. SQLite
+    exercises a different dialect's ON CONFLICT and cannot show that.
+    """
     from alchymine.api.deps import set_db_engine
 
-    engine = create_async_engine(
-        "sqlite+aiosqlite:///:memory:",
-        connect_args={"check_same_thread": False},
-    )
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
+    pg_url = os.environ.get("TEST_COUNTER_DATABASE_URL")
+    if pg_url:
+        engine = create_async_engine(pg_url)
+        # Schema comes from the migration, deliberately not create_all:
+        # the point is to test against the shape production will have.
+        async with engine.begin() as conn:
+            await conn.execute(text("DELETE FROM usage_counters"))
+    else:
+        engine = create_async_engine(
+            "sqlite+aiosqlite:///:memory:",
+            connect_args={"check_same_thread": False},
+        )
+        async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
+
     set_db_engine(engine)
     yield engine
     set_db_engine(None)
@@ -157,3 +177,48 @@ class TestConsume:
         finally:
             set_db_engine(counter_engine)
             await broken.dispose()
+
+
+@pytest.mark.asyncio
+class TestRefund:
+    """Giving back usage that was charged but delivered nothing."""
+
+    async def test_refund_gives_the_unit_back(self, counter_engine: AsyncEngine) -> None:
+        await increment_and_get(scope="user-a", meter="art_generations")
+        await increment_and_get(scope="user-a", meter="art_generations")
+
+        await refund(scope="user-a", meter="art_generations")
+
+        assert await get_count(scope="user-a", meter="art_generations") == 1
+
+    async def test_refund_restores_a_blocked_allowance(self, counter_engine: AsyncEngine) -> None:
+        """A refunded slot is usable again, not merely cosmetic."""
+        for _ in range(3):
+            await consume(scope="user-a", meter="art_generations", ceiling=3)
+        await refund(scope="user-a", meter="art_generations")
+
+        # The slot came back, so this must not raise.
+        await consume(scope="user-a", meter="art_generations", ceiling=3)
+
+    async def test_refund_never_goes_negative(self, counter_engine: AsyncEngine) -> None:
+        """A double refund must not mint free allowance."""
+        await increment_and_get(scope="user-a", meter="art_generations")
+
+        await refund(scope="user-a", meter="art_generations")
+        await refund(scope="user-a", meter="art_generations")
+
+        assert await get_count(scope="user-a", meter="art_generations") == 0
+
+    async def test_refund_of_an_unknown_counter_is_a_no_op(
+        self, counter_engine: AsyncEngine
+    ) -> None:
+        await refund(scope="user-nobody", meter="art_generations")
+        assert await get_count(scope="user-nobody", meter="art_generations") == 0
+
+    async def test_refund_touches_only_its_own_counter(self, counter_engine: AsyncEngine) -> None:
+        await increment_and_get(scope="user-a", meter="art_generations")
+        await increment_and_get(scope="user-b", meter="art_generations")
+
+        await refund(scope="user-a", meter="art_generations")
+
+        assert await get_count(scope="user-b", meter="art_generations") == 1

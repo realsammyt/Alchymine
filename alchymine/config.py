@@ -81,11 +81,11 @@ class Settings(BaseSettings):
     # mechanism ships enforced rather than dormant; Tyler sets the real
     # figures from actual traffic and the monetization roadmap.
     #
-    # The breaker counts *calls*, not tokens or dollars. Per-token spend
-    # accounting is a separate roadmap item — a call count is enough to stop
-    # a runaway loop or a scraped key from billing all night.
-    # ponytail: swap the count for a token/dollar ledger once per-call cost
-    # varies enough that a flat call count stops approximating spend.
+    # The breaker counts *calls*, not tokens or dollars. A call count is
+    # enough to stop a runaway loop or a scraped key from billing all night.
+    # NOTE: per-token dollar accounting is a separate roadmap item. Swap the
+    # count for a token/dollar ledger once per-call cost varies enough that a
+    # flat call count stops approximating spend.
     global_daily_llm_call_ceiling: int = 1000
     daily_art_generations_per_user: int = 3
 

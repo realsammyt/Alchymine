@@ -11,6 +11,7 @@ from __future__ import annotations
 
 from unittest.mock import AsyncMock, MagicMock, patch
 
+import httpx
 import pytest
 
 from alchymine.db.usage_counters import (
@@ -158,6 +159,35 @@ class TestGeminiChokepoint:
                 await client.generate_image("a serene forest")
 
             client._client.aio.models.generate_content.assert_not_called()
+
+
+class TestChargeIsPerRequest:
+    async def test_walking_the_529_chain_charges_once(self, cost_meter_db) -> None:
+        """Two model attempts, one user request, one charge.
+
+        Charging per attempt would let a bad hour at the provider eat the
+        day's budget at twice the rate the traffic justifies.
+        """
+        import anthropic
+
+        client = _claude_client()
+        overloaded = anthropic.APIStatusError(
+            "overloaded",
+            response=httpx.Response(529, request=httpx.Request("POST", "https://api")),
+            body=None,
+        )
+        ok = MagicMock()
+        ok.content = [MagicMock(text="hello")]
+        ok.usage = MagicMock(input_tokens=1, output_tokens=1)
+
+        fake_sdk = MagicMock()
+        fake_sdk.messages.create = AsyncMock(side_effect=[overloaded, ok])
+
+        with patch("anthropic.AsyncAnthropic", return_value=fake_sdk):
+            await client._generate_claude("system", "user", 100, 0.5)
+
+        assert fake_sdk.messages.create.call_count == 2, "the chain should have walked"
+        assert await get_count(scope=GLOBAL_SCOPE, meter=METER_LLM_CALLS) == 1
 
 
 class TestModelFallbackChain:

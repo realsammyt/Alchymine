@@ -1,5 +1,6 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import BrandPage from "../page";
+import { ArtUnavailableError, generateBrandLogo } from "@/lib/artApi";
 
 jest.mock("next/link", () => {
   return function MockLink({
@@ -49,16 +50,29 @@ jest.mock("@/lib/api", () => ({
   }),
 }));
 
-jest.mock("@/lib/artApi", () => ({
-  getBrandPalette: jest.fn().mockResolvedValue({
-    primary: { hex: "#C4503A", name: "Ember Red" },
-    secondary: { hex: "#E8A33A", name: "Flame Gold" },
-    accent: { hex: "#E07A5F", name: "Creator Coral" },
-    neutral: { hex: "#2B1D1D", name: "Charcoal" },
-  }),
-  generateBrandLogo: jest.fn(),
-  fetchImageBlobUrl: jest.fn(),
-}));
+jest.mock("@/lib/artApi", () => {
+  class MockArtUnavailableError extends Error {
+    code: string;
+    retryAt: Date | null;
+    constructor(code: string, message: string, retryAt: Date | null) {
+      super(message);
+      this.name = "ArtUnavailableError";
+      this.code = code;
+      this.retryAt = retryAt;
+    }
+  }
+  return {
+    ArtUnavailableError: MockArtUnavailableError,
+    getBrandPalette: jest.fn().mockResolvedValue({
+      primary: { hex: "#C4503A", name: "Ember Red" },
+      secondary: { hex: "#E8A33A", name: "Flame Gold" },
+      accent: { hex: "#E07A5F", name: "Creator Coral" },
+      neutral: { hex: "#2B1D1D", name: "Charcoal" },
+    }),
+    generateBrandLogo: jest.fn(),
+    fetchImageBlobUrl: jest.fn(),
+  };
+});
 
 describe("BrandPage", () => {
   it("renders the page heading", async () => {
@@ -117,6 +131,86 @@ describe("BrandPage", () => {
     await waitFor(() => {
       expect(screen.getByText("#C4503A")).toBeInTheDocument();
       expect(screen.getByText("#E8A33A")).toBeInTheDocument();
+    });
+  });
+});
+
+describe("BrandPage cost states", () => {
+  async function generateLogo(): Promise<void> {
+    const button = await screen.findByRole("button", { name: /logo/i });
+    fireEvent.click(button);
+  }
+
+  const CAP_MESSAGE =
+    "That's all of today's image generations. Your next one unlocks at midnight UTC.";
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it("renders a spent allowance as a wait, not a failure", async () => {
+    (generateBrandLogo as jest.Mock).mockRejectedValue(
+      new ArtUnavailableError(
+        "daily_art_cap_reached",
+        CAP_MESSAGE,
+        new Date("2099-01-01T00:00:00Z"),
+      ),
+    );
+
+    render(<BrandPage />);
+    await generateLogo();
+
+    await waitFor(() => {
+      expect(screen.getByText(new RegExp(CAP_MESSAGE, "i"))).toBeInTheDocument();
+    });
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
+  it("renders a tripped spend breaker the same way", async () => {
+    (generateBrandLogo as jest.Mock).mockRejectedValue(
+      new ArtUnavailableError(
+        "llm_temporarily_unavailable",
+        "This feature is taking a short break while we catch up on demand. Please try again later.",
+        new Date("2099-01-01T00:00:00Z"),
+      ),
+    );
+
+    render(<BrandPage />);
+    await generateLogo();
+
+    await waitFor(() => {
+      expect(screen.getByText(/short break/i)).toBeInTheDocument();
+    });
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
+  it("never shows a raw status code to the user", async () => {
+    (generateBrandLogo as jest.Mock).mockRejectedValue(
+      new ArtUnavailableError(
+        "daily_art_cap_reached",
+        CAP_MESSAGE,
+        new Date("2099-01-01T00:00:00Z"),
+      ),
+    );
+
+    render(<BrandPage />);
+    await generateLogo();
+
+    // Scoped to the banner: the palette swatches render hex codes that
+    // happen to contain digit runs like "503".
+    const banner = await screen.findByText(new RegExp(CAP_MESSAGE, "i"));
+    expect(banner.textContent).not.toMatch(/\b(429|503)\b/);
+    expect(banner.textContent).not.toMatch(/error|failed/i);
+  });
+
+  it("still shows a real error banner for genuine failures", async () => {
+    (generateBrandLogo as jest.Mock).mockRejectedValue(new Error("network down"));
+
+    render(<BrandPage />);
+    await generateLogo();
+
+    await waitFor(() => {
+      expect(screen.getByRole("alert")).toHaveTextContent(/network down/i);
     });
   });
 });

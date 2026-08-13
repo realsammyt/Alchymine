@@ -29,7 +29,7 @@ from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime, timedelta
 
-from sqlalchemy import select
+from sqlalchemy import case, select, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -140,6 +140,44 @@ async def increment_and_get(
         new_count = result.scalar_one()
         await session.commit()
         return int(new_count)
+
+
+async def refund(
+    *,
+    scope: str,
+    meter: str,
+    period_key: str | None = None,
+    amount: int = 1,
+) -> None:
+    """Give back usage that was charged but delivered nothing.
+
+    Pairs with :func:`consume` on paths that must reserve the budget
+    *before* spending it: charge first so an exhausted ceiling blocks the
+    call, then hand the unit back if the call produced nothing.
+
+    Clamps at zero rather than going negative, so a double refund cannot
+    mint free allowance. A counter that does not exist yet is left alone.
+    """
+    key = period_key or current_period_key()
+
+    async with _counter_session() as session:
+        stmt = (
+            update(UsageCounter)
+            .where(
+                UsageCounter.scope == scope,
+                UsageCounter.meter == meter,
+                UsageCounter.period_key == key,
+            )
+            .values(
+                count=case(
+                    (UsageCounter.count >= amount, UsageCounter.count - amount),
+                    else_=0,
+                ),
+                updated_at=datetime.now(UTC),
+            )
+        )
+        await session.execute(stmt)
+        await session.commit()
 
 
 async def get_count(*, scope: str, meter: str, period_key: str | None = None) -> int:

@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import asyncio
 from collections.abc import AsyncGenerator
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -26,7 +26,11 @@ from alchymine.api.routers.generative_art import _gemini_dependency
 from alchymine.config import get_settings
 from alchymine.db.base import Base
 from alchymine.db.models import User
-from alchymine.db.usage_counters import METER_ART_GENERATIONS, get_count
+from alchymine.db.usage_counters import (
+    METER_ART_GENERATIONS,
+    CostCeilingExceeded,
+    get_count,
+)
 from alchymine.llm.gemini import GeminiImageResult
 
 TEST_USER_ID = "user-1"
@@ -179,3 +183,166 @@ class TestDailyCap:
 
         counted = asyncio.run(get_count(scope=TEST_USER_ID, meter=METER_ART_GENERATIONS))
         assert counted == 0
+
+
+class TestBrandLogoDailyCap:
+    """POST /art/brand/logo spends the same per-user allowance.
+
+    A sibling endpoint on the same paid generator would otherwise be a
+    way around the cap the studio route enforces.
+    """
+
+    def test_allows_logos_up_to_the_cap(self, client: TestClient) -> None:
+        cap = get_settings().daily_art_generations_per_user
+        for _ in range(cap):
+            assert client.post("/api/v1/art/brand/logo").status_code == 201
+
+    def test_blocks_the_logo_past_the_cap(self, client: TestClient) -> None:
+        for _ in range(get_settings().daily_art_generations_per_user):
+            client.post("/api/v1/art/brand/logo")
+
+        response = client.post("/api/v1/art/brand/logo")
+        assert response.status_code == 429
+        assert response.json()["detail"]["code"] == "daily_art_cap_reached"
+
+    def test_capped_request_never_reaches_gemini(self, client: TestClient) -> None:
+        for _ in range(get_settings().daily_art_generations_per_user):
+            client.post("/api/v1/art/brand/logo")
+        calls_before = client.gemini.generate_image.call_count  # type: ignore[attr-defined]
+
+        client.post("/api/v1/art/brand/logo")
+
+        assert client.gemini.generate_image.call_count == calls_before  # type: ignore[attr-defined]
+
+    def test_cap_is_per_user(self, client: TestClient) -> None:
+        for _ in range(get_settings().daily_art_generations_per_user):
+            client.post("/api/v1/art/brand/logo")
+        assert client.post("/api/v1/art/brand/logo").status_code == 429
+
+        _as_user(OTHER_USER_ID)
+        try:
+            assert client.post("/api/v1/art/brand/logo").status_code == 201
+        finally:
+            app.dependency_overrides.pop(get_current_user, None)
+
+    def test_logos_and_studio_images_share_one_allowance(self, client: TestClient) -> None:
+        """Three total across both routes, not three each."""
+        cap = get_settings().daily_art_generations_per_user
+        assert cap == 3, "test assumes the default cap"
+
+        assert client.post("/api/v1/art/generate", json={}).status_code == 201
+        assert client.post("/api/v1/art/brand/logo").status_code == 201
+        assert client.post("/api/v1/art/generate", json={}).status_code == 201
+
+        assert client.post("/api/v1/art/brand/logo").status_code == 429
+
+
+class TestAllowanceRefund:
+    """A generation that delivers nothing must not cost the user a slot."""
+
+    def test_a_204_does_not_spend_the_allowance(self, client: TestClient) -> None:
+        client.gemini.generate_image = AsyncMock(return_value=None)  # type: ignore[attr-defined]
+
+        assert client.post("/api/v1/art/generate", json={}).status_code == 204
+
+        counted = asyncio.run(get_count(scope=TEST_USER_ID, meter=METER_ART_GENERATIONS))
+        assert counted == 0
+
+    def test_repeated_failures_leave_the_day_intact(self, client: TestClient) -> None:
+        """A bad night for the generator must not burn the whole quota."""
+        client.gemini.generate_image = AsyncMock(return_value=None)  # type: ignore[attr-defined]
+        for _ in range(10):
+            assert client.post("/api/v1/art/generate", json={}).status_code == 204
+
+        # The generator recovers; the user still has their full allowance.
+        client.gemini.generate_image = AsyncMock(side_effect=lambda _p: _image())  # type: ignore[attr-defined]
+        cap = get_settings().daily_art_generations_per_user
+        for _ in range(cap):
+            assert client.post("/api/v1/art/generate", json={}).status_code == 201
+
+    def test_a_failing_generator_does_not_spend_the_allowance(self, client: TestClient) -> None:
+        """An exception on the way out is also 'delivered nothing'."""
+        client.gemini.generate_image = AsyncMock(  # type: ignore[attr-defined]
+            side_effect=RuntimeError("gemini exploded")
+        )
+
+        client.post("/api/v1/art/generate", json={})
+
+        counted = asyncio.run(get_count(scope=TEST_USER_ID, meter=METER_ART_GENERATIONS))
+        assert counted == 0
+
+    def test_a_tripped_global_breaker_does_not_spend_the_allowance(
+        self, client: TestClient
+    ) -> None:
+        """A system-wide pause is not the user's fault, so it is not their quota."""
+        client.gemini.generate_image = AsyncMock(  # type: ignore[attr-defined]
+            side_effect=CostCeilingExceeded(
+                meter="llm_calls",
+                scope="global",
+                retry_at=datetime.now(UTC) + timedelta(hours=1),
+            )
+        )
+
+        assert client.post("/api/v1/art/generate", json={}).status_code == 503
+
+        counted = asyncio.run(get_count(scope=TEST_USER_ID, meter=METER_ART_GENERATIONS))
+        assert counted == 0
+
+    def test_a_delivered_image_does_spend_the_allowance(self, client: TestClient) -> None:
+        """The refund must not undo a real generation."""
+        assert client.post("/api/v1/art/generate", json={}).status_code == 201
+
+        counted = asyncio.run(get_count(scope=TEST_USER_ID, meter=METER_ART_GENERATIONS))
+        assert counted == 1
+
+    def test_brand_logo_refunds_too(self, client: TestClient) -> None:
+        client.gemini.generate_image = AsyncMock(return_value=None)  # type: ignore[attr-defined]
+
+        assert client.post("/api/v1/art/brand/logo").status_code == 204
+
+        counted = asyncio.run(get_count(scope=TEST_USER_ID, meter=METER_ART_GENERATIONS))
+        assert counted == 0
+
+
+class TestMeterDownIsNotACap:
+    """429 means 'you spent your allowance'. 503 means 'our meter is down'."""
+
+    def test_unreachable_meter_returns_503_not_429(self, client: TestClient) -> None:
+        with patch(
+            "alchymine.api.routers.generative_art.consume",
+            AsyncMock(
+                side_effect=CostCeilingExceeded(
+                    meter=METER_ART_GENERATIONS,
+                    scope=TEST_USER_ID,
+                    retry_at=datetime.now(UTC) + timedelta(hours=1),
+                    reason="meter_unavailable",
+                )
+            ),
+        ):
+            response = client.post("/api/v1/art/generate", json={})
+
+        assert response.status_code == 503
+        assert response.json()["detail"]["code"] == "llm_temporarily_unavailable"
+
+    def test_unreachable_meter_does_not_claim_the_cap_is_spent(self, client: TestClient) -> None:
+        """Telling users their quota is gone when it isn't would be a lie."""
+        with patch(
+            "alchymine.api.routers.generative_art.consume",
+            AsyncMock(
+                side_effect=CostCeilingExceeded(
+                    meter=METER_ART_GENERATIONS,
+                    scope=TEST_USER_ID,
+                    retry_at=datetime.now(UTC) + timedelta(hours=1),
+                    reason="meter_unavailable",
+                )
+            ),
+        ):
+            body = client.post("/api/v1/art/generate", json={}).text
+
+        assert "daily_art_cap_reached" not in body
+
+    def test_spent_cap_still_returns_429(self, client: TestClient) -> None:
+        for _ in range(get_settings().daily_art_generations_per_user):
+            client.post("/api/v1/art/generate", json={})
+
+        assert client.post("/api/v1/art/generate", json={}).status_code == 429

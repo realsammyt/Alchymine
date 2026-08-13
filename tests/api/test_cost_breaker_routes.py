@@ -107,7 +107,10 @@ class TestArtRouteSurface:
 
         detail = response.json()["detail"]
         assert detail["code"] == "llm_temporarily_unavailable"
-        assert "retry_at" in detail
+        # Shape, not just presence: the client parses this to show a countdown.
+        retry_at = datetime.fromisoformat(detail["retry_at"])
+        assert retry_at.tzinfo is not None
+        assert retry_at > datetime.now(UTC)
         # The message is shown to a person, so it must read like one wrote it.
         assert "—" not in detail["message"]
         assert "try again later" in detail["message"].lower()

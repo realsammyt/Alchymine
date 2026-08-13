@@ -37,6 +37,7 @@ from alchymine.db.usage_counters import (
     METER_ART_GENERATIONS,
     CostCeilingExceeded,
     consume,
+    refund,
 )
 from alchymine.llm.art_prompts import (
     STYLE_PRESETS,
@@ -213,6 +214,22 @@ async def _charge_daily_allowance(user_id: str) -> None:
         ) from exc
 
 
+async def _refund_daily_allowance(user_id: str) -> None:
+    """Give back an allowance slot that produced no image.
+
+    The charge happens before the Gemini call so an exhausted cap blocks
+    before we spend anything. That ordering means a generator that fails,
+    is filtered, or returns an undecodable payload would otherwise cost
+    the user one of their three for nothing.
+    """
+    try:
+        await refund(scope=user_id, meter=METER_ART_GENERATIONS)
+    except Exception as exc:
+        # Failing to refund costs the user one generation, which is the
+        # safe direction to fail. It must never turn a 204 into a 500.
+        logger.warning("Could not refund the art allowance for user %s: %s", user_id, exc)
+
+
 # ── Routes ────────────────────────────────────────────────────────────
 
 
@@ -252,16 +269,25 @@ async def generate_art(
 
     await _charge_daily_allowance(user_id)
 
-    # Build the personalized prompt from the user's identity layer.
-    identity_dict = await _load_identity_dict(session, user_id)
-    prompt = build_studio_prompt(
-        identity_dict,
-        user_extension=cleaned_extension,
-        style_preset=request.style_preset,
-    )
+    # Everything from here can end without an image reaching the user: a
+    # filtered prompt, an SDK hiccup, an undecodable payload, or the
+    # global breaker tripping mid-flight. Each of those hands the slot
+    # back, so only a delivered image actually costs the user one.
+    try:
+        # Build the personalized prompt from the user's identity layer.
+        identity_dict = await _load_identity_dict(session, user_id)
+        prompt = build_studio_prompt(
+            identity_dict,
+            user_extension=cleaned_extension,
+            style_preset=request.style_preset,
+        )
+        result = await gemini.generate_image(prompt)
+    except Exception:
+        await _refund_daily_allowance(user_id)
+        raise
 
-    result = await gemini.generate_image(prompt)
     if result is None:
+        await _refund_daily_allowance(user_id)
         return Response(status_code=status.HTTP_204_NO_CONTENT)
 
     # Persist bytes to disk + metadata row to DB.
@@ -496,8 +522,10 @@ async def get_brand_palette(
     status_code=status.HTTP_201_CREATED,
     responses={
         201: {"description": "Logo generated and stored"},
-        204: {"description": "Generative art is disabled"},
+        204: {"description": "Generative art is disabled or generation returned no image"},
         401: {"description": "Authentication required"},
+        429: {"description": "Daily per-user image allowance spent (code: daily_art_cap_reached)"},
+        503: {"description": "Generation is paused by the global spend breaker"},
     },
 )
 async def generate_brand_logo(
@@ -518,11 +546,21 @@ async def generate_brand_logo(
     if not gemini.is_available:
         return Response(status_code=status.HTTP_204_NO_CONTENT)
 
-    identity_dict = await _load_identity_dict(session, user_id)
-    prompt = build_brand_logo_prompt(identity_dict)
+    # Same allowance as the studio route, deliberately: this endpoint hits
+    # the same paid generator, so counting it separately would just be a
+    # second door to the same bill.
+    await _charge_daily_allowance(user_id)
 
-    result = await gemini.generate_image(prompt)
+    try:
+        identity_dict = await _load_identity_dict(session, user_id)
+        prompt = build_brand_logo_prompt(identity_dict)
+        result = await gemini.generate_image(prompt)
+    except Exception:
+        await _refund_daily_allowance(user_id)
+        raise
+
     if result is None:
+        await _refund_daily_allowance(user_id)
         return Response(status_code=status.HTTP_204_NO_CONTENT)
 
     image_row = await repository.create_generated_image(
