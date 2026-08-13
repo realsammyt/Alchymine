@@ -9,12 +9,15 @@ import StylePresetPicker, {
 import ArtGallery, { GalleryImage } from "@/components/creative/ArtGallery";
 import {
   ArtUnavailableError,
+  asPlanGate,
   generateArt,
   listGeneratedImages,
   deleteGeneratedImage,
 } from "@/lib/artApi";
 import { getProfile, ProfileResponse } from "@/lib/api";
 import { useAuth } from "@/lib/AuthContext";
+import UpsellNotice from "@/components/shared/UpsellNotice";
+import type { PlanGateError } from "@/lib/planGate";
 
 const PROMPT_MAX_LENGTH = 500;
 
@@ -25,7 +28,9 @@ type StudioStatus =
   | { kind: "offline" }
   // Daily allowance spent, or the global spend breaker is holding calls
   // back. Nothing is broken, so it reads as a wait, not an error.
-  | { kind: "unavailable"; message: string }
+  // ``upsell`` is set only when the refusal is answered by upgrading;
+  // the daily cap and the global breaker clear on their own.
+  | { kind: "unavailable"; message: string; upsell: PlanGateError | null }
   | { kind: "error"; message: string };
 
 function toGalleryImage(meta: {
@@ -144,7 +149,11 @@ function StudioBody() {
       if (err instanceof ArtUnavailableError) {
         // The server already worded this for a person. Pass it through
         // rather than inventing a second phrasing for the same state.
-        setStatus({ kind: "unavailable", message: err.message });
+        setStatus({
+          kind: "unavailable",
+          message: err.message,
+          upsell: asPlanGate(err),
+        });
         return;
       }
       const message = err instanceof Error ? err.message : "Generation failed";
@@ -200,14 +209,17 @@ function StudioBody() {
           </div>
         )}
 
-        {status.kind === "unavailable" && (
-          <div
-            role="status"
-            className="mb-6 px-4 py-3 rounded-lg bg-yellow-900/20 border border-yellow-700/30 text-yellow-200 text-sm font-body"
-          >
-            {status.message}
-          </div>
-        )}
+        {status.kind === "unavailable" &&
+          (status.upsell ? (
+            <UpsellNotice error={status.upsell} className="mb-6" />
+          ) : (
+            <div
+              role="status"
+              className="mb-6 px-4 py-3 rounded-lg bg-yellow-900/20 border border-yellow-700/30 text-yellow-200 text-sm font-body"
+            >
+              {status.message}
+            </div>
+          ))}
 
         {status.kind === "error" && (
           <div

@@ -4,9 +4,12 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import ProtectedRoute from "@/components/shared/ProtectedRoute";
 import { useAuth } from "@/lib/AuthContext";
+import UpsellNotice from "@/components/shared/UpsellNotice";
+import type { PlanGateError } from "@/lib/planGate";
 import { getProfile, ProfileResponse } from "@/lib/api";
 import {
   ArtUnavailableError,
+  asPlanGate,
   getBrandPalette,
   generateBrandLogo,
   fetchImageBlobUrl,
@@ -160,7 +163,9 @@ type PageStatus =
   | { kind: "generating-logo" }
   | { kind: "offline" }
   // Daily allowance spent or spend breaker tripped: a wait, not a fault.
-  | { kind: "unavailable"; message: string }
+  // ``upsell`` is set only when the refusal is answered by upgrading;
+  // the daily cap and the global breaker clear on their own.
+  | { kind: "unavailable"; message: string; upsell: PlanGateError | null }
   | { kind: "error"; message: string };
 
 // ── Component ───────────────────────────────────────────────────────
@@ -217,7 +222,11 @@ function BrandBody() {
       setStatus({ kind: "idle" });
     } catch (err: unknown) {
       if (err instanceof ArtUnavailableError) {
-        setStatus({ kind: "unavailable", message: err.message });
+        setStatus({
+          kind: "unavailable",
+          message: err.message,
+          upsell: asPlanGate(err),
+        });
         return;
       }
       const message =
@@ -274,14 +283,17 @@ function BrandBody() {
           </div>
         )}
 
-        {status.kind === "unavailable" && (
-          <div
-            role="status"
-            className="mb-6 px-4 py-3 rounded-lg bg-yellow-900/20 border border-yellow-700/30 text-yellow-200 text-sm font-body"
-          >
-            {status.message}
-          </div>
-        )}
+        {status.kind === "unavailable" &&
+          (status.upsell ? (
+            <UpsellNotice error={status.upsell} className="mb-6" />
+          ) : (
+            <div
+              role="status"
+              className="mb-6 px-4 py-3 rounded-lg bg-yellow-900/20 border border-yellow-700/30 text-yellow-200 text-sm font-body"
+            >
+              {status.message}
+            </div>
+          ))}
 
         {status.kind === "error" && (
           <div

@@ -21,6 +21,8 @@
  * with a mocked ``fetch``.
  */
 
+import { PlanGateError, readPlanGate } from "@/lib/planGate";
+
 // ─── Types ──────────────────────────────────────────────────────────
 
 /** A single chat message displayed in the UI. */
@@ -44,6 +46,25 @@ export class ChatError extends Error {
     super(message);
     this.name = "ChatError";
     this.status = status;
+  }
+}
+
+/**
+ * Thrown when the caller's plan cannot pay for the turn they asked for.
+ *
+ * The gate runs as a route dependency, so this arrives as a real 402 or
+ * 429 *before* the event stream opens. That matters: once the stream is
+ * open the status line is already sent, and a quota state buried in an
+ * ``event: error`` frame looks like success to everything above the SSE
+ * parser.
+ */
+export class ChatUpsellError extends ChatError {
+  readonly gate: PlanGateError;
+
+  constructor(gate: PlanGateError, status: number) {
+    super(gate.message, status);
+    this.name = "ChatUpsellError";
+    this.gate = gate;
   }
 }
 
@@ -102,6 +123,12 @@ export async function* streamChat(
   });
 
   if (!response.ok) {
+    // A plan refusal is structured and renders as an upsell rather than
+    // an error, so it is separated out before the generic path flattens
+    // the body to a string.
+    const gate = await readPlanGate(response);
+    if (gate) throw new ChatUpsellError(gate, response.status);
+
     // Try to surface the FastAPI ``detail`` message when present so the
     // UI can show the safety-filter reason on 400s, etc.
     let detail = `HTTP ${response.status}`;

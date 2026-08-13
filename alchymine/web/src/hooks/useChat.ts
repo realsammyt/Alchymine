@@ -28,10 +28,12 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import {
   ChatError,
+  ChatUpsellError,
   fetchChatHistory,
   streamChat,
   type ChatMessage,
 } from "@/lib/chat";
+import type { PlanGateError } from "@/lib/planGate";
 
 interface UseChatOptions {
   /** System key to load history for on mount.  Pass `undefined` to skip. */
@@ -43,6 +45,13 @@ interface UseChatResult {
   isStreaming: boolean;
   isLoadingHistory: boolean;
   error: string | null;
+  /**
+   * Non-null when the last send was refused because of the caller's
+   * plan.  Kept apart from ``error`` because the two render
+   * differently: this one is a yellow upsell with somewhere to go,
+   * ``error`` is a red fault.
+   */
+  upsell: PlanGateError | null;
   sendMessage: (content: string, systemKey?: string | null) => Promise<void>;
   cancelStream: () => void;
   resetConversation: () => void;
@@ -63,6 +72,7 @@ export function useChat(options?: UseChatOptions): UseChatResult {
   const [isStreaming, setIsStreaming] = useState(false);
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [upsell, setUpsell] = useState<PlanGateError | null>(null);
   const abortRef = useRef<AbortController | null>(null);
   const historyLoadedRef = useRef(false);
 
@@ -121,6 +131,7 @@ export function useChat(options?: UseChatOptions): UseChatResult {
     abortRef.current = null;
     setMessages([]);
     setError(null);
+    setUpsell(null);
     setIsStreaming(false);
     // Do NOT reset historyLoadedRef — a reset starts a fresh
     // conversation, not a fresh session.  The user clicked "New
@@ -132,8 +143,9 @@ export function useChat(options?: UseChatOptions): UseChatResult {
       const trimmed = content.trim();
       if (!trimmed || isStreaming) return;
 
-      // Fresh send → clear any previous error banner.
+      // Fresh send → clear any previous error or upsell banner.
       setError(null);
+      setUpsell(null);
 
       const userMessage: ChatMessage = {
         id: makeId(),
@@ -181,6 +193,11 @@ export function useChat(options?: UseChatOptions): UseChatResult {
           (err instanceof Error && err.name === "AbortError")
         ) {
           aborted = true;
+        } else if (err instanceof ChatUpsellError) {
+          // Their plan, not a fault. Rendered as an upsell, and the
+          // empty assistant bubble goes away the same as on an error.
+          setUpsell(err.gate);
+          setMessages((prev) => prev.filter((m) => m.id !== assistantId));
         } else {
           let message = "Something went wrong. Please try again.";
           if (err instanceof ChatError) {
@@ -220,6 +237,7 @@ export function useChat(options?: UseChatOptions): UseChatResult {
     isStreaming,
     isLoadingHistory,
     error,
+    upsell,
     sendMessage,
     cancelStream,
     resetConversation,
