@@ -107,6 +107,38 @@ class TestDataMigration:
         # is_admin / is_active columns have used since 0003.
         assert row[2] in (0, False, "false")
 
+    def test_a_re_run_leaves_a_moved_account_alone(self, db_at_0016):
+        """Re-running the upgrade must not re-grant beta to an upgraded account.
+
+        The data migration is gated on having just created the ``plan``
+        column. Without that gate, a partially-applied migration replayed
+        after a deploy (or an ``alembic stamp`` back to 0016) would rewrite
+        every deliberate plan change in the table.
+        """
+        from alembic import command
+
+        engine, cfg = db_at_0016
+
+        with engine.begin() as conn:
+            conn.execute(text("INSERT INTO users (id) VALUES ('legacy-1')"))
+
+        command.upgrade(cfg, "0017")
+
+        with engine.begin() as conn:
+            conn.execute(text("UPDATE users SET plan = 'pro' WHERE id = 'legacy-1'"))
+            conn.execute(text("INSERT INTO users (id) VALUES ('new-signup')"))
+
+        # Stamp back and replay: the schema is already at 0017, only the
+        # version marker moves.
+        command.stamp(cfg, "0016")
+        command.upgrade(cfg, "0017")
+
+        with engine.connect() as conn:
+            plans = dict(conn.execute(text("SELECT id, plan FROM users")).all())
+
+        assert plans["legacy-1"] == "pro", "a re-run must not drag an upgraded account back to beta"
+        assert plans["new-signup"] == "free", "a post-migration signup must not be granted beta"
+
     def test_migration_is_safe_on_an_empty_table(self, db_at_0016):
         """No rows is not an error; the upgrade still completes."""
         from alembic import command

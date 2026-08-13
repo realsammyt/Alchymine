@@ -124,8 +124,8 @@ class User(Base):
     # resolves the user from metadata.user_id (which we set ourselves at
     # checkout-session creation) and never issues a
     # WHERE stripe_customer_id = ... . Reads are always keyed by users.id.
-    stripe_customer_id: Mapped[str | None] = mapped_column(EncryptedString, nullable=True)
-    stripe_subscription_id: Mapped[str | None] = mapped_column(EncryptedString, nullable=True)
+    stripe_customer_id: Mapped[str | None] = mapped_column(EncryptedString(), nullable=True)
+    stripe_subscription_id: Mapped[str | None] = mapped_column(EncryptedString(), nullable=True)
     plan_period_end: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     cancel_at_period_end: Mapped[bool] = mapped_column(
         Boolean, nullable=False, default=False, server_default="false"
