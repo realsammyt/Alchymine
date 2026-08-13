@@ -61,6 +61,18 @@ def set_attribution(
     _request_id.set(request_id)
 
 
+def set_surface(surface: str | None) -> None:
+    """Name the surface this context is about to spend on.
+
+    Split from :func:`set_attribution` because the user id and the
+    surface are learned in two different places: the auth dependency
+    knows who is calling, and only the route knows what they are calling
+    it for. Setting both at once from the route would mean re-reading
+    the request id just to avoid clearing it.
+    """
+    _surface.set(surface)
+
+
 def current_attribution() -> tuple[str | None, str | None, str | None]:
     """Return ``(user_id, surface, request_id)`` for the current context.
 
