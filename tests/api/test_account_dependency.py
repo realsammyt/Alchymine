@@ -196,6 +196,8 @@ class TestEffectivePlan:
 
     def test_account_is_immutable(self):
         """The snapshot must not drift mid-request."""
+        from dataclasses import FrozenInstanceError
+
         account = _account()
-        with pytest.raises(Exception):
+        with pytest.raises(FrozenInstanceError):
             account.plan = "founding"  # type: ignore[misc]
