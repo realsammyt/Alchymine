@@ -30,8 +30,15 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from alchymine.api.auth import get_current_user
 from alchymine.api.deps import get_db_session
-from alchymine.db import repository
+from alchymine.config import get_settings
+from alchymine.db import repository, usage_counters
 from alchymine.db.models import User
+from alchymine.db.usage_counters import (
+    METER_ART_GENERATIONS,
+    CostCeilingExceeded,
+    consume,
+    refund,
+)
 from alchymine.llm.art_prompts import (
     STYLE_PRESETS,
     build_brand_logo_prompt,
@@ -175,6 +182,66 @@ def _sanitize_extension(extension: str | None) -> str | None:
     return result.filtered_text
 
 
+async def _charge_daily_allowance(user_id: str) -> str:
+    """Spend one of the user's daily image generations, or say when to return.
+
+    Charged just before the Gemini call, so a capped request never
+    reaches the generator. The global breaker in ``llm/cost_guard`` still
+    applies underneath: this one only bounds what a single account can do
+    to the bill on its own.
+
+    Returns the period key the charge landed on, which the caller hands to
+    :func:`_refund_daily_allowance`. A request charged at 23:59 whose
+    refund fires after midnight has to credit the day it charged, not the
+    day it finished.
+    """
+    period_key = usage_counters.current_period_key()
+    try:
+        await consume(
+            scope=user_id,
+            meter=METER_ART_GENERATIONS,
+            ceiling=get_settings().daily_art_generations_per_user,
+            period_key=period_key,
+        )
+    except CostCeilingExceeded as exc:
+        if exc.reason != "ceiling_reached":
+            # The meter itself is down. That is our problem, not the
+            # user's allowance, and the app handler renders it as a 503.
+            raise
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail={
+                "code": "daily_art_cap_reached",
+                "message": (
+                    "That's all of today's image generations. "
+                    "Your next one unlocks at midnight UTC."
+                ),
+                "retry_at": exc.retry_at.isoformat(),
+            },
+        ) from exc
+    return period_key
+
+
+async def _refund_daily_allowance(user_id: str, period_key: str) -> None:
+    """Give back an allowance slot that produced no image.
+
+    The charge happens before the Gemini call so an exhausted cap blocks
+    before we spend anything. That ordering means a generator that fails,
+    is filtered, or returns an undecodable payload would otherwise cost
+    the user one of their three for nothing.
+
+    *period_key* is the one the charge used. Reading the clock here
+    instead would send a post-midnight refund at a counter row that does
+    not exist yet, where the clamp turns it into a silent no-op.
+    """
+    try:
+        await refund(scope=user_id, meter=METER_ART_GENERATIONS, period_key=period_key)
+    except Exception as exc:
+        # Failing to refund costs the user one generation, which is the
+        # safe direction to fail. It must never turn a 204 into a 500.
+        logger.warning("Could not refund the art allowance for user %s: %s", user_id, exc)
+
+
 # ── Routes ────────────────────────────────────────────────────────────
 
 
@@ -187,6 +254,8 @@ def _sanitize_extension(extension: str | None) -> str | None:
         204: {"description": "Generative art is disabled or generation returned no image"},
         400: {"description": "Invalid style preset or blocked user prompt"},
         401: {"description": "Authentication required"},
+        429: {"description": "Daily per-user image allowance spent (code: daily_art_cap_reached)"},
+        503: {"description": "Generation is paused by the global spend breaker"},
     },
 )
 async def generate_art(
@@ -206,18 +275,31 @@ async def generate_art(
 
     if not gemini.is_available:
         # The frontend treats 204 as a signal to render its placeholder.
+        # Checked before the cap so an unavailable generator, which costs
+        # nothing, never spends one of the user's daily allowance.
         return Response(status_code=status.HTTP_204_NO_CONTENT)
 
-    # Build the personalized prompt from the user's identity layer.
-    identity_dict = await _load_identity_dict(session, user_id)
-    prompt = build_studio_prompt(
-        identity_dict,
-        user_extension=cleaned_extension,
-        style_preset=request.style_preset,
-    )
+    charged_period = await _charge_daily_allowance(user_id)
 
-    result = await gemini.generate_image(prompt)
+    # Everything from here can end without an image reaching the user: a
+    # filtered prompt, an SDK hiccup, an undecodable payload, or the
+    # global breaker tripping mid-flight. Each of those hands the slot
+    # back, so only a delivered image actually costs the user one.
+    try:
+        # Build the personalized prompt from the user's identity layer.
+        identity_dict = await _load_identity_dict(session, user_id)
+        prompt = build_studio_prompt(
+            identity_dict,
+            user_extension=cleaned_extension,
+            style_preset=request.style_preset,
+        )
+        result = await gemini.generate_image(prompt)
+    except Exception:
+        await _refund_daily_allowance(user_id, charged_period)
+        raise
+
     if result is None:
+        await _refund_daily_allowance(user_id, charged_period)
         return Response(status_code=status.HTTP_204_NO_CONTENT)
 
     # Persist bytes to disk + metadata row to DB.
@@ -452,8 +534,10 @@ async def get_brand_palette(
     status_code=status.HTTP_201_CREATED,
     responses={
         201: {"description": "Logo generated and stored"},
-        204: {"description": "Generative art is disabled"},
+        204: {"description": "Generative art is disabled or generation returned no image"},
         401: {"description": "Authentication required"},
+        429: {"description": "Daily per-user image allowance spent (code: daily_art_cap_reached)"},
+        503: {"description": "Generation is paused by the global spend breaker"},
     },
 )
 async def generate_brand_logo(
@@ -474,11 +558,21 @@ async def generate_brand_logo(
     if not gemini.is_available:
         return Response(status_code=status.HTTP_204_NO_CONTENT)
 
-    identity_dict = await _load_identity_dict(session, user_id)
-    prompt = build_brand_logo_prompt(identity_dict)
+    # Same allowance as the studio route, deliberately: this endpoint hits
+    # the same paid generator, so counting it separately would just be a
+    # second door to the same bill.
+    charged_period = await _charge_daily_allowance(user_id)
 
-    result = await gemini.generate_image(prompt)
+    try:
+        identity_dict = await _load_identity_dict(session, user_id)
+        prompt = build_brand_logo_prompt(identity_dict)
+        result = await gemini.generate_image(prompt)
+    except Exception:
+        await _refund_daily_allowance(user_id, charged_period)
+        raise
+
     if result is None:
+        await _refund_daily_allowance(user_id, charged_period)
         return Response(status_code=status.HTTP_204_NO_CONTENT)
 
     image_row = await repository.create_generated_image(

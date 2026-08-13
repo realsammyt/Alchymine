@@ -37,6 +37,7 @@ from sqlalchemy import (
     String,
     Text,
     Time,
+    UniqueConstraint,
     func,
 )
 from sqlalchemy.dialects.postgresql import JSON as PG_JSON
@@ -754,3 +755,46 @@ class GeneratedImage(Base):
 
     def __repr__(self) -> str:
         return f"<GeneratedImage id={self.id!r} user_id={self.user_id!r}>"
+
+
+# ─── Usage Counters ─────────────────────────────────────────────────────
+
+
+class UsageCounter(Base):
+    """One rolling count of metered usage, keyed by scope, meter, and period.
+
+    Backs every cost ceiling in the app (the global LLM spend breaker and
+    the per-user art cap). Rows are written only through
+    ``alchymine.db.usage_counters`` so the atomic upsert stays the single
+    way a count can change.
+
+    ``scope`` is ``"global"`` for system-wide breakers or a user id for
+    per-user caps; ``period_key`` is the UTC calendar date the count
+    belongs to, which is what makes ceilings reset at UTC midnight.
+
+    There is no FK from ``scope`` to ``users.id`` on purpose: the column
+    holds both user ids and the ``"global"`` sentinel, and a deleted user
+    should not take their spend history with them.
+    """
+
+    __tablename__ = "usage_counters"
+    __table_args__ = (
+        UniqueConstraint("scope", "meter", "period_key", name="uq_usage_counters_key"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    scope: Mapped[str] = mapped_column(String(64), nullable=False)
+    meter: Mapped[str] = mapped_column(String(64), nullable=False)
+    period_key: Mapped[str] = mapped_column(
+        String(16), nullable=False, comment="UTC calendar date, YYYY-MM-DD"
+    )
+    count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+    def __repr__(self) -> str:
+        return (
+            f"<UsageCounter scope={self.scope!r} meter={self.meter!r} "
+            f"period={self.period_key!r} count={self.count!r}>"
+        )

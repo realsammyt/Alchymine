@@ -6,6 +6,7 @@ import ProtectedRoute from "@/components/shared/ProtectedRoute";
 import { useAuth } from "@/lib/AuthContext";
 import { getProfile, ProfileResponse, listUserReports, ReportListItem } from "@/lib/api";
 import {
+  ArtUnavailableError,
   generateArt,
   listGeneratedImages,
   fetchImageBlobUrl,
@@ -73,6 +74,8 @@ type PageStatus =
   | { kind: "loading" }
   | { kind: "idle" }
   | { kind: "generating"; milestoneId: string }
+  // Daily allowance spent or spend breaker tripped: a wait, not a fault.
+  | { kind: "unavailable"; message: string }
   | { kind: "error"; message: string };
 
 interface MilestoneImage {
@@ -180,6 +183,10 @@ function JourneyBody() {
         }
         setStatus({ kind: "idle" });
       } catch (err: unknown) {
+        if (err instanceof ArtUnavailableError) {
+          setStatus({ kind: "unavailable", message: err.message });
+          return;
+        }
         const message =
           err instanceof Error ? err.message : "Generation failed";
         setStatus({ kind: "error", message });
@@ -241,6 +248,15 @@ function JourneyBody() {
             />
           </div>
         </section>
+
+        {status.kind === "unavailable" && (
+          <div
+            role="status"
+            className="mb-6 px-4 py-3 rounded-lg bg-yellow-900/20 border border-yellow-700/30 text-yellow-200 text-sm font-body"
+          >
+            {status.message}
+          </div>
+        )}
 
         {status.kind === "error" && (
           <div

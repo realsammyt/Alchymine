@@ -21,6 +21,8 @@ from dataclasses import dataclass, field
 from enum import StrEnum
 
 from alchymine.config import get_settings
+from alchymine.db.usage_counters import CostCeilingExceeded
+from alchymine.llm.cost_guard import charge_paid_call
 
 logger = logging.getLogger(__name__)
 
@@ -385,6 +387,11 @@ class LLMClient:
                     result.output_tokens,
                 )
                 return result
+            except CostCeilingExceeded:
+                # Not a backend failure. Falling through to Ollama (or to
+                # the canned fallback text) would hand the user a made-up
+                # answer while the real state is "spending is capped".
+                raise
             except Exception as exc:
                 logger.warning("[LLM] Claude API failed: %s — trying Ollama fallback", exc)
 
@@ -454,6 +461,9 @@ class LLMClient:
                 ):
                     yield chunk
                 return
+            except CostCeilingExceeded:
+                # See generate(): a tripped breaker is not a backend outage.
+                raise
             except Exception as exc:
                 logger.warning("Claude streaming failed, trying Ollama fallback: %s", exc)
 
@@ -479,11 +489,16 @@ class LLMClient:
         for word in fallback_text.split():
             yield word + " "
 
-    # Model fallback chain: Sonnet (fast/cheap) → Haiku (backup) → Opus (last resort)
+    # Model fallback chain, walked on 529 (overloaded): Sonnet, then Haiku.
+    # Both hops go down in price. Opus used to sit on the end as a "last
+    # resort", which meant a provider-side overload silently upgraded every
+    # request to the most expensive model available — the opposite of what a
+    # fallback should do. It could come back as a plan-gated option once
+    # there is an entitlement to gate on; User has no plan field today, so
+    # there is nothing to check.
     CLAUDE_MODELS = [
         "claude-sonnet-4-6",
         "claude-haiku-4-5-20251001",
-        "claude-opus-4-6",
     ]
 
     async def _stream_claude(
@@ -498,6 +513,11 @@ class LLMClient:
         Tries each model in CLAUDE_MODELS until one succeeds.
         """
         import anthropic
+
+        # Charged once per request, not once per fallback attempt: the
+        # retries below exist because a model was overloaded, and the user
+        # asked for one answer.
+        await charge_paid_call()
 
         client = anthropic.AsyncAnthropic(api_key=self._anthropic_key, timeout=90.0)
         last_exc: Exception | None = None
@@ -540,6 +560,9 @@ class LLMClient:
         Tries each model in CLAUDE_MODELS until one succeeds.
         """
         import anthropic
+
+        # See _stream_claude: one charge per request, not per fallback hop.
+        await charge_paid_call()
 
         client = anthropic.AsyncAnthropic(api_key=self._anthropic_key, timeout=90.0)
         last_exc: Exception | None = None

@@ -20,7 +20,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 
 import alchymine.db.models  # noqa: F401 — register models with metadata
 from alchymine.api.auth import get_current_user
-from alchymine.api.deps import get_db_session
+from alchymine.api.deps import get_db_session, set_db_engine
 from alchymine.api.main import app
 from alchymine.api.routers.generative_art import _gemini_dependency
 from alchymine.db.base import Base
@@ -86,7 +86,12 @@ def _db_factory():
     loop.close()
     factory = _make_session_factory(engine)
     _seed_users(factory)
-    return factory
+    # The brand logo route charges the per-user daily art allowance, and
+    # that meter opens its own session from the deps singleton. It has to
+    # land in the same database as the route's session or it fails closed.
+    set_db_engine(engine)
+    yield factory
+    set_db_engine(None)
 
 
 # ── Fake GeminiClient ────────────────────────────────────────────────

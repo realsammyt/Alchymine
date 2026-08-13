@@ -8,6 +8,7 @@ import StylePresetPicker, {
 } from "@/components/creative/StylePresetPicker";
 import ArtGallery, { GalleryImage } from "@/components/creative/ArtGallery";
 import {
+  ArtUnavailableError,
   generateArt,
   listGeneratedImages,
   deleteGeneratedImage,
@@ -22,6 +23,9 @@ type StudioStatus =
   | { kind: "loading-gallery" }
   | { kind: "generating" }
   | { kind: "offline" }
+  // Daily allowance spent, or the global spend breaker is holding calls
+  // back. Nothing is broken, so it reads as a wait, not an error.
+  | { kind: "unavailable"; message: string }
   | { kind: "error"; message: string };
 
 function toGalleryImage(meta: {
@@ -137,6 +141,12 @@ function StudioBody() {
       setGallery((prev) => [newImage, ...prev]);
       setStatus({ kind: "idle" });
     } catch (err: unknown) {
+      if (err instanceof ArtUnavailableError) {
+        // The server already worded this for a person. Pass it through
+        // rather than inventing a second phrasing for the same state.
+        setStatus({ kind: "unavailable", message: err.message });
+        return;
+      }
       const message = err instanceof Error ? err.message : "Generation failed";
       setStatus({ kind: "error", message });
     }
@@ -187,6 +197,15 @@ function StudioBody() {
             className="mb-6 px-4 py-3 rounded-lg bg-yellow-900/20 border border-yellow-700/30 text-yellow-200 text-sm font-body"
           >
             Image generation is offline. Try later.
+          </div>
+        )}
+
+        {status.kind === "unavailable" && (
+          <div
+            role="status"
+            className="mb-6 px-4 py-3 rounded-lg bg-yellow-900/20 border border-yellow-700/30 text-yellow-200 text-sm font-body"
+          >
+            {status.message}
           </div>
         )}
 

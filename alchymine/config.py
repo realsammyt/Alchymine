@@ -76,6 +76,25 @@ class Settings(BaseSettings):
     # are resolved against the project root at runtime).
     art_cache_dir: str = "data/generated_images"
 
+    # ── Cost ceilings ────────────────────────────────────────────────────
+    # Sized for the invite beta (2026-08). The global ceiling bounds a
+    # runaway loop or scraped key at roughly $100-200/day worst case at
+    # Sonnet pricing, while sitting well above a legitimate beta day
+    # (a full report burns ~5-10 calls, a long chat session ~50-100).
+    # The art cap is the per-account bound on the one endpoint where a
+    # single user can run up Gemini spend alone; 3/day also serves the
+    # wait/upsell state in the monetization roadmap. Tune via env as
+    # traffic grows; a tripped breaker takes every paid surface down
+    # until UTC midnight, so raise it before it pinches real users.
+    #
+    # The breaker counts *calls*, not tokens or dollars. A call count is
+    # enough to stop a runaway loop or a scraped key from billing all night.
+    # NOTE: per-token dollar accounting is a separate roadmap item. Swap the
+    # count for a token/dollar ledger once per-call cost varies enough that a
+    # flat call count stops approximating spend.
+    global_daily_llm_call_ceiling: int = 2000
+    daily_art_generations_per_user: int = 3
+
     # ── Celery ───────────────────────────────────────────────────────────
     celery_broker_url: str = "redis://localhost:6379/1"
     celery_result_backend: str = "redis://localhost:6379/2"

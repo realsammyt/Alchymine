@@ -20,8 +20,11 @@ Notes
 - The SDK is imported lazily at module load time. If the import fails,
   ``_genai`` is set to ``None`` and every client instance reports
   ``is_available == False``.
-- All network errors are caught, logged, and converted to ``None`` —
-  this client never raises from ``generate_image``.
+- All network errors are caught, logged, and converted to ``None``. The
+  single exception is ``CostCeilingExceeded`` from the global spend
+  breaker, which ``generate_image`` deliberately lets through: it means
+  "we stopped spending", which a placeholder image would misreport as
+  "generation didn't work out".
 """
 
 from __future__ import annotations
@@ -33,6 +36,7 @@ from functools import lru_cache
 from typing import Any
 
 from alchymine.config import get_settings
+from alchymine.llm.cost_guard import charge_paid_call
 
 logger = logging.getLogger(__name__)
 
@@ -138,7 +142,13 @@ class GeminiClient:
         GeminiImageResult | None
             The result on success, or ``None`` if the client is unavailable,
             the API call failed, or the response contained no image data.
-            **Never raises.**
+
+        Raises
+        ------
+        CostCeilingExceeded
+            When the global daily spend breaker is tripped. This is the one
+            failure that does *not* collapse into ``None``: a placeholder
+            image would tell the user nothing about why art stopped working.
         """
         if not self._available or self._client is None or _genai is None:
             return None
@@ -175,6 +185,10 @@ class GeminiClient:
                 threshold=types.HarmBlockThreshold.BLOCK_LOW_AND_ABOVE,
             ),
         ]
+
+        # Outside the try below on purpose — a tripped breaker must reach the
+        # caller, not be logged as a generation failure and returned as None.
+        await charge_paid_call()
 
         try:
             response = await self._client.aio.models.generate_content(
