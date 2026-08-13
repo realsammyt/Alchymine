@@ -86,9 +86,12 @@ describe("UpsellNotice", () => {
   });
 
   it("follows the house copy rules", () => {
+    // Same list the backend's copy test uses (tests/api/test_plan_gate.py).
+    // The two halves of this envelope get checked against one vocabulary.
     const banned = [
       "delve",
       "leverage",
+      "navigate",
       "robust",
       "comprehensive",
       "seamless",

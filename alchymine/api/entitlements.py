@@ -218,6 +218,14 @@ class PlanGate:
 
 # The five gated surfaces. Module-level singletons so routes share one
 # instance per surface and tests have something to override.
+#
+# Note on the two "report" gates: their surface is route-layer bookkeeping
+# only and will never appear in usage_records. Neither route makes a paid
+# call. POST /reports queues a Celery task, and the narrative generation
+# that actually spends money runs in the worker under its own
+# attributed(surface="report_narrative") block (workers/tasks.py:496), in
+# a different context entirely. GET /reports/{id}/pdf just serves stored
+# bytes. Do not go looking for surface='report' rows in the ledger.
 require_report = PlanGate(
     "report",
     upgrade_message="Full reports are part of a paid plan. Upgrade to generate yours.",
