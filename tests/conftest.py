@@ -130,13 +130,15 @@ def sample_personality(sample_big_five: BigFiveScores) -> PersonalityProfile:
 
 @pytest.fixture
 async def cost_meter_db():
-    """Point the cost meters at a fresh, empty in-memory usage-counter table.
+    """Point the cost meters and the ledger at fresh, empty in-memory tables.
 
     The LLM and Gemini chokepoints charge every paid call against the
     global breaker, and that meter FAILS CLOSED — an unreachable counter
-    blocks the call. Any test that reaches a real egress path therefore
-    needs a working counter table, or it will see CostCeilingExceeded
-    instead of the behaviour it meant to exercise.
+    blocks the call. They also write one ``usage_records`` row per
+    delivered call, and a failed insert marks the ledger degraded, which
+    blocks the *next* call. Any test that reaches a real egress path
+    therefore needs both tables present, or it will see
+    CostCeilingExceeded instead of the behaviour it meant to exercise.
 
     Tests that mock ``_generate_claude`` / ``_stream_claude`` / the whole
     ``GeminiClient`` never reach the meter and do not need this fixture.
@@ -145,7 +147,8 @@ async def cost_meter_db():
 
     import alchymine.db.models  # noqa: F401 — register models with metadata
     from alchymine.api.deps import set_db_engine
-    from alchymine.db.models import UsageCounter
+    from alchymine.db.models import UsageCounter, UsageRecord
+    from alchymine.db.usage_counters import clear_ledger_degraded
 
     engine = create_async_engine(
         "sqlite+aiosqlite:///:memory:",
@@ -153,12 +156,17 @@ async def cost_meter_db():
     )
     async with engine.begin() as conn:
         await conn.run_sync(UsageCounter.__table__.create)
+        await conn.run_sync(UsageRecord.__table__.create)
 
+    clear_ledger_degraded()
     set_db_engine(engine)
     try:
         yield engine
     finally:
         # None resets the singleton, matching how the other DB-backed
-        # test modules tear their engines down.
+        # test modules tear their engines down. The degraded flag is
+        # process-local, so it has to be reset by hand or it leaks into
+        # every later test in the session.
+        clear_ledger_degraded()
         set_db_engine(None)
         await engine.dispose()

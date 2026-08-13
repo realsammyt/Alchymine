@@ -48,6 +48,7 @@ from alchymine.api.routers import (
 )
 from alchymine.config import get_settings
 from alchymine.db.usage_counters import CostCeilingExceeded
+from alchymine.llm.ledger import flush_pending_writes, log_ledger_status
 from alchymine.mcp.transport import mount_all_mcp_routers
 
 
@@ -83,7 +84,12 @@ _configure_logging()
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """Application lifecycle: startup and shutdown."""
     await create_tables_if_enabled()
+    log_ledger_status("api")
     yield
+    # Ledger writes are detached tasks so a disconnected client cannot take
+    # one down with it. Draining them here keeps a shutdown from dropping
+    # spend that was already delivered and billed.
+    await flush_pending_writes()
     await dispose_engine()
 
 

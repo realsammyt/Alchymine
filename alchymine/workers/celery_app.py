@@ -11,6 +11,7 @@ Configuration is loaded from environment variables:
 from __future__ import annotations
 
 from celery import Celery
+from celery.signals import worker_ready
 
 from alchymine.config import get_settings
 
@@ -57,3 +58,19 @@ if _settings.celery_always_eager:
 # ── Auto-discover tasks ─────────────────────────────────────────────────
 
 celery_app.autodiscover_tasks(["alchymine.workers"])
+
+
+# ── Startup announcements ───────────────────────────────────────────────
+
+
+@worker_ready.connect
+def _announce_ledger_status(**_kwargs: object) -> None:
+    """Say on the worker log whether paid calls are being recorded.
+
+    Report generation is the biggest single spender in the app, and a
+    worker running with the ledger switched off would otherwise burn
+    through it leaving no trace at all.
+    """
+    from alchymine.llm.ledger import log_ledger_status
+
+    log_ledger_status("celery-worker")

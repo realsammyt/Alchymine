@@ -25,7 +25,9 @@ from alchymine.db.usage_counters import (
     GLOBAL_SCOPE,
     METER_LLM_CALLS,
     CostCeilingExceeded,
+    claim_ledger_admission,
     consume,
+    next_period_start,
 )
 
 logger = logging.getLogger(__name__)
@@ -40,14 +42,42 @@ async def charge_paid_call() -> None:
     Raises
     ------
     CostCeilingExceeded
-        When the day's ceiling is spent, or when the meter itself is
-        unreachable (fail closed).
+        When the day's ceiling is spent, when the meter itself is
+        unreachable, or when the last ledger write failed (all fail closed).
     """
+    settings = get_settings()
+
+    # A ledger that could not record the previous call cannot account for
+    # this one either, and spending money we cannot account for is the thing
+    # this whole mechanism exists to prevent. This is the only place that
+    # claims the half-open probe, which is why the ledger check sits here
+    # rather than in check_ceiling: one gate, one claim per call.
+    #
+    # The block is skipped when the ledger is switched off: an operator who
+    # disables it has decided to fly without spend accounting for a while,
+    # and a flag that a disabled ledger can no longer clear would turn that
+    # switch into an outage.
+    if settings.usage_ledger_enabled and not claim_ledger_admission():
+        logger.error(
+            "COST_BREAKER_TRIPPED reason=ledger_degraded — the last usage record could "
+            "not be written, so paid model calls are blocked until a probe call's "
+            "write succeeds"
+        )
+        raise CostCeilingExceeded(
+            meter=METER_LLM_CALLS,
+            scope=GLOBAL_SCOPE,
+            # A "check back then" hint rather than a promise: recovery
+            # actually happens on the next successful write, which is
+            # usually much sooner than the period rollover.
+            retry_at=next_period_start(),
+            reason="meter_unavailable",
+        )
+
     try:
         await consume(
             scope=GLOBAL_SCOPE,
             meter=METER_LLM_CALLS,
-            ceiling=get_settings().global_daily_llm_call_ceiling,
+            ceiling=settings.global_daily_llm_call_ceiling,
         )
     except CostCeilingExceeded as exc:
         # Logged at ERROR with an explicit marker: this is a business

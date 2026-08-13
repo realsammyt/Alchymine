@@ -11,8 +11,9 @@ from __future__ import annotations
 
 import asyncio
 import os
-from collections.abc import AsyncGenerator
+from collections.abc import AsyncGenerator, Iterator
 from datetime import UTC, datetime
+from unittest.mock import patch
 
 import pytest
 import pytest_asyncio
@@ -24,13 +25,28 @@ from alchymine.db.base import Base
 from alchymine.db.usage_counters import (
     GLOBAL_SCOPE,
     CostCeilingExceeded,
+    check_ceiling,
+    claim_ledger_admission,
+    clear_ledger_degraded,
     consume,
+    current_month_key,
     current_period_key,
     get_count,
     increment_and_get,
+    ledger_is_degraded,
+    mark_ledger_degraded,
+    next_month_start,
     next_period_start,
     refund,
 )
+
+
+@pytest.fixture(autouse=True)
+def _clean_ledger_flag() -> Iterator[None]:
+    """The degraded flag is process-local; never carry it between tests."""
+    clear_ledger_degraded()
+    yield
+    clear_ledger_degraded()
 
 
 @pytest_asyncio.fixture
@@ -222,3 +238,176 @@ class TestRefund:
         await refund(scope="user-a", meter="art_generations")
 
         assert await get_count(scope="user-b", meter="art_generations") == 1
+
+
+class TestMonthKeys:
+    """Monthly meters key on ``YYYY-MM``; the ledger denormalizes the same key."""
+
+    def test_month_key_is_the_utc_month(self) -> None:
+        moment = datetime(2026, 8, 13, 14, 22, 5, tzinfo=UTC)
+        assert current_month_key(moment) == "2026-08"
+
+    def test_month_key_rolls_over_at_the_utc_month_boundary(self) -> None:
+        before = datetime(2026, 8, 31, 23, 59, 59, tzinfo=UTC)
+        after = datetime(2026, 9, 1, 0, 0, 0, tzinfo=UTC)
+        assert current_month_key(before) == "2026-08"
+        assert current_month_key(after) == "2026-09"
+
+    def test_next_month_start_is_the_first_of_next_month(self) -> None:
+        moment = datetime(2026, 8, 13, 14, 30, tzinfo=UTC)
+        assert next_month_start(moment) == datetime(2026, 9, 1, 0, 0, tzinfo=UTC)
+
+    def test_next_month_start_rolls_the_year_over(self) -> None:
+        moment = datetime(2026, 12, 31, 23, 59, tzinfo=UTC)
+        assert next_month_start(moment) == datetime(2027, 1, 1, 0, 0, tzinfo=UTC)
+
+
+@pytest.mark.asyncio
+class TestCheckCeiling:
+    """Read-only gate for spend meters: check, call, then record what it cost."""
+
+    async def test_returns_the_current_count(self, counter_engine: AsyncEngine) -> None:
+        await increment_and_get(scope=GLOBAL_SCOPE, meter="spend_micros_daily", amount=4200)
+        count = await check_ceiling(
+            scope=GLOBAL_SCOPE, meter="spend_micros_daily", ceiling=15_000_000
+        )
+        assert count == 4200
+
+    async def test_never_increments(self, counter_engine: AsyncEngine) -> None:
+        """A ledger that counts money we did not spend is simply wrong."""
+        await increment_and_get(scope=GLOBAL_SCOPE, meter="spend_micros_daily", amount=100)
+        for _ in range(3):
+            await check_ceiling(scope=GLOBAL_SCOPE, meter="spend_micros_daily", ceiling=10_000)
+        assert await get_count(scope=GLOBAL_SCOPE, meter="spend_micros_daily") == 100
+
+    async def test_raises_at_the_ceiling(self, counter_engine: AsyncEngine) -> None:
+        await increment_and_get(scope=GLOBAL_SCOPE, meter="spend_micros_daily", amount=500)
+        with pytest.raises(CostCeilingExceeded) as excinfo:
+            await check_ceiling(scope=GLOBAL_SCOPE, meter="spend_micros_daily", ceiling=500)
+        assert excinfo.value.reason == "ceiling_reached"
+        assert excinfo.value.meter == "spend_micros_daily"
+
+    async def test_raises_past_the_ceiling(self, counter_engine: AsyncEngine) -> None:
+        await increment_and_get(scope=GLOBAL_SCOPE, meter="spend_micros_daily", amount=501)
+        with pytest.raises(CostCeilingExceeded):
+            await check_ceiling(scope=GLOBAL_SCOPE, meter="spend_micros_daily", ceiling=500)
+
+    async def test_an_empty_counter_passes(self, counter_engine: AsyncEngine) -> None:
+        assert await check_ceiling(scope="user-a", meter="spend_micros_monthly", ceiling=1) == 0
+
+    async def test_retry_at_is_next_utc_midnight_for_a_daily_key(
+        self, counter_engine: AsyncEngine
+    ) -> None:
+        with pytest.raises(CostCeilingExceeded) as excinfo:
+            await check_ceiling(
+                scope=GLOBAL_SCOPE,
+                meter="spend_micros_daily",
+                ceiling=0,
+                period_key=current_period_key(),
+            )
+        assert excinfo.value.retry_at == next_period_start()
+
+    async def test_retry_at_is_the_next_month_for_a_month_key(
+        self, counter_engine: AsyncEngine
+    ) -> None:
+        """A monthly meter that says "try again tomorrow" is a lie."""
+        with pytest.raises(CostCeilingExceeded) as excinfo:
+            await check_ceiling(
+                scope="user-a",
+                meter="spend_micros_monthly",
+                ceiling=0,
+                period_key=current_month_key(),
+            )
+        assert excinfo.value.retry_at == next_month_start()
+
+    async def test_fails_closed_when_the_counter_cannot_be_read(
+        self, counter_engine: AsyncEngine
+    ) -> None:
+        from alchymine.api.deps import set_db_engine
+
+        broken = create_async_engine("postgresql+asyncpg://nobody@127.0.0.1:1/nothing")
+        set_db_engine(broken)
+        try:
+            with pytest.raises(CostCeilingExceeded) as excinfo:
+                await check_ceiling(
+                    scope=GLOBAL_SCOPE, meter="spend_micros_daily", ceiling=1_000_000
+                )
+            assert excinfo.value.reason == "meter_unavailable"
+        finally:
+            set_db_engine(counter_engine)
+            await broken.dispose()
+
+
+class TestLedgerHealth:
+    """The state behind "a failed write blocks the next paid call".
+
+    The block itself lives in ``charge_paid_call`` — one gate, at the one
+    function every egress site already calls — and is tested in
+    ``tests/llm/test_ledger_fail_closed.py``. What lives here is the state
+    machine it reads: a degraded episode, a cooldown, and a single probe.
+    """
+
+    def test_starts_healthy(self) -> None:
+        assert ledger_is_degraded() is False
+        assert claim_ledger_admission() is True
+
+    def test_a_failed_write_opens_a_degraded_episode(self) -> None:
+        mark_ledger_degraded("insert failed")
+        assert ledger_is_degraded() is True
+        assert claim_ledger_admission() is False
+
+    def test_a_successful_write_ends_the_episode(self) -> None:
+        mark_ledger_degraded("insert failed")
+        clear_ledger_degraded()
+        assert ledger_is_degraded() is False
+        assert claim_ledger_admission() is True
+
+    def test_the_episode_survives_the_cooldown_lapsing(self) -> None:
+        """The cooldown governs admission, not health.
+
+        Only a successful write makes the ledger healthy again; the lapse
+        just buys one call the right to try.
+        """
+        mark_ledger_degraded("insert failed")
+        with patch("alchymine.db.usage_counters._degraded_retry_seconds", return_value=0.0):
+            assert claim_ledger_admission() is True
+            assert ledger_is_degraded() is True
+
+    def test_only_one_probe_is_admitted_per_cooldown(self) -> None:
+        mark_ledger_degraded("insert failed")
+        with patch("alchymine.db.usage_counters._degraded_retry_seconds", return_value=0.0):
+            assert [claim_ledger_admission() for _ in range(4)] == [True, False, False, False]
+
+
+@pytest.mark.asyncio
+class TestCheckCeilingIgnoresLedgerHealth:
+    """check_ceiling is a meter read, not the ledger's gate.
+
+    Slice 3 calls it at the route layer to price a user's allowance, where a
+    degraded ledger is not that user's problem and would render an upsell
+    for an internal fault. The 503 belongs at the chokepoint, which is where
+    charge_paid_call puts it — and having only one gate is also what keeps
+    the half-open probe from being claimed twice for a single call.
+    """
+
+    async def test_a_degraded_ledger_does_not_block_a_ceiling_read(
+        self, counter_engine: AsyncEngine
+    ) -> None:
+        mark_ledger_degraded("insert failed")
+        assert await check_ceiling(scope=GLOBAL_SCOPE, meter="spend_micros_daily", ceiling=10) == 0
+
+    async def test_an_unreadable_counter_still_fails_closed(
+        self, counter_engine: AsyncEngine
+    ) -> None:
+        """Its own fail-closed rule is untouched."""
+        from alchymine.api.deps import set_db_engine
+
+        broken = create_async_engine("postgresql+asyncpg://nobody@127.0.0.1:1/nothing")
+        set_db_engine(broken)
+        try:
+            with pytest.raises(CostCeilingExceeded) as excinfo:
+                await check_ceiling(scope=GLOBAL_SCOPE, meter="spend_micros_daily", ceiling=10)
+            assert excinfo.value.reason == "meter_unavailable"
+        finally:
+            set_db_engine(counter_engine)
+            await broken.dispose()

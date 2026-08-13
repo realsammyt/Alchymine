@@ -113,6 +113,39 @@ class Settings(BaseSettings):
     # comma-separated value that comes out of a docker-compose env file.
     plan_allowance_cents: str = "free:0,beta:555,blueprint:99,pro:275,founding:333"
 
+    # ── Cost ledger ──────────────────────────────────────────────────────
+    # Per-model prices in MICRO-DOLLARS PER TOKEN, as
+    # ``model:input_micros:output_micros`` entries. $3/MTok is 3 micros per
+    # token, which is why the numbers look small. A ``str`` rather than a
+    # dict for the same pydantic-settings reason as plan_allowance_cents.
+    #
+    # Prices live here and are never written at a call site. Changing the
+    # published API price list means changing LLM_PRICE_TABLE, nothing else.
+    llm_price_table: str = "claude-sonnet-4-6:3:15,claude-haiku-4-5-20251001:1:5"
+
+    # Gemini image generation has no per-token accounting — generate_image
+    # returns bytes — so the ledger pins a flat per-image figure. This is the
+    # published price for gemini-3.1-flash-image-preview at 1K resolution as
+    # of August 2026, and the one number in the ledger that cannot be
+    # corrected by measurement from inside the app: it has to be reconciled
+    # against a real Google Cloud invoice.
+    gemini_image_cost_micros: int = 67000
+
+    # Kill switch for the ledger. False stops all usage_records writes and
+    # all spend-meter increments; it does not touch the call-count breaker,
+    # which is a separate, older mechanism.
+    usage_ledger_enabled: bool = True
+
+    # How long a failed ledger write blocks paid calls before one of them may
+    # probe to see whether the ledger is writable again. Tuning this trades
+    # two costs against each other: too short and a database that is properly
+    # down gets probed by a paid call every few seconds, too long and a
+    # transient failure keeps every paid surface dark for no reason. 60s is a
+    # guess like everything else in this design, which is why it is an env
+    # var — a wrong number under real beta traffic should be a restart, not a
+    # code change.
+    ledger_degraded_retry_seconds: float = 60.0
+
     # ── Celery ───────────────────────────────────────────────────────────
     celery_broker_url: str = "redis://localhost:6379/1"
     celery_result_backend: str = "redis://localhost:6379/2"
@@ -199,6 +232,67 @@ class Settings(BaseSettings):
             free,
         )
         return free
+
+    def get_llm_prices(self) -> dict[str, tuple[int, int]]:
+        """Return *llm_price_table* parsed into ``{model: (in, out)}`` micros.
+
+        Malformed entries are skipped with an ERROR log rather than raised,
+        for the same reason ``get_plan_allowance_cents`` does it: a typo in
+        an env var should not take the app down at import time. A model that
+        drops out of the mapping is then priced at the most expensive rate in
+        the table (see :meth:`llm_price_for`), which is the safe direction —
+        it over-counts rather than hiding spend.
+        """
+        prices: dict[str, tuple[int, int]] = {}
+        for entry in self.llm_price_table.split(","):
+            entry = entry.strip()
+            if not entry:
+                continue
+            parts = [p.strip() for p in entry.split(":")]
+            if len(parts) != 3 or not parts[0]:
+                logger.error("LLM_PRICE_TABLE: skipping malformed entry %r", entry)
+                continue
+            try:
+                prices[parts[0]] = (int(parts[1]), int(parts[2]))
+            except ValueError:
+                logger.error("LLM_PRICE_TABLE: %r has non-integer micro-dollar prices", entry)
+        return prices
+
+    def llm_price_for(self, model: str) -> tuple[int, int]:
+        """Return ``(input_micros, output_micros)`` per token for *model*.
+
+        An unknown model is priced at the most expensive rate in the table
+        and logged at ERROR. Never at zero: a model we forgot to add must
+        show up as expensive spend rather than as free, or the first thing a
+        pricing mistake does is hide itself.
+
+        The maximum is taken per field, so a table whose priciest input and
+        priciest output belong to different models still yields the
+        conservative pair.
+        """
+        prices = self.get_llm_prices()
+        if model in prices:
+            return prices[model]
+
+        if prices:
+            fallback = (
+                max(p[0] for p in prices.values()),
+                max(p[1] for p in prices.values()),
+            )
+        else:
+            # An empty or entirely malformed table. Sonnet's published price
+            # is the most expensive model this app has ever called; anything
+            # is better than pricing at zero.
+            fallback = (3, 15)
+
+        logger.error(
+            "Unknown model %r is not in LLM_PRICE_TABLE; pricing it at the most "
+            "expensive rate in the table (%d/%d micros per token). Add it.",
+            model,
+            fallback[0],
+            fallback[1],
+        )
+        return fallback
 
     # ── Validators ───────────────────────────────────────────────────────
 
