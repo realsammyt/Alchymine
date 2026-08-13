@@ -95,6 +95,24 @@ class Settings(BaseSettings):
     global_daily_llm_call_ceiling: int = 2000
     daily_art_generations_per_user: int = 3
 
+    # ── Plans and monthly spend allowances ───────────────────────────────
+    # Sized by ``price x (1 - margin target)``: pro is 11 x 0.25 = 275 cents,
+    # blueprint is 33 x 0.03 = 99 cents per 33-day window. free is 0 on
+    # purpose, which makes "give away artifact-shaped things, never
+    # recurring-cost things" structural rather than a policy someone has to
+    # remember. beta sits deliberately above the expected p95 so the cap does
+    # not truncate the distribution it exists to measure.
+    #
+    # Every one of these is PROVISIONAL. They are modelled, not measured, and
+    # should be revisited as a set once the ledger has 2 to 4 weeks of real
+    # beta data.
+    #
+    # A ``str`` rather than a ``dict`` for the same reason allowed_origins is:
+    # pydantic-settings v2 JSON-parses structured field types at source level,
+    # before any validator runs, so a dict field blows up on the plain
+    # comma-separated value that comes out of a docker-compose env file.
+    plan_allowance_cents: str = "free:0,beta:555,blueprint:99,pro:275,founding:333"
+
     # ── Celery ───────────────────────────────────────────────────────────
     celery_broker_url: str = "redis://localhost:6379/1"
     celery_result_backend: str = "redis://localhost:6379/2"
@@ -133,6 +151,54 @@ class Settings(BaseSettings):
             except (json.JSONDecodeError, ValueError):
                 pass
         return [origin.strip() for origin in v.split(",") if origin.strip()]
+
+    def get_plan_allowance_cents(self) -> dict[str, int]:
+        """Return *plan_allowance_cents* parsed into ``{plan: cents}``.
+
+        Malformed entries are skipped with an ERROR log rather than raised.
+        A typo in an env var should not take the app down at import time, and
+        a plan that drops out of the mapping resolves to the free allowance
+        (see :meth:`allowance_cents_for`), which is the closed direction.
+        """
+        allowances: dict[str, int] = {}
+        for entry in self.plan_allowance_cents.split(","):
+            entry = entry.strip()
+            if not entry:
+                continue
+            name, sep, raw = entry.partition(":")
+            if not sep or not name.strip():
+                logger.error("PLAN_ALLOWANCE_CENTS: skipping malformed entry %r", entry)
+                continue
+            try:
+                allowances[name.strip()] = int(raw.strip())
+            except ValueError:
+                logger.error(
+                    "PLAN_ALLOWANCE_CENTS: %r is not an integer number of cents (entry %r)",
+                    raw.strip(),
+                    entry,
+                )
+        return allowances
+
+    def allowance_cents_for(self, plan: str) -> int:
+        """Return the monthly allowance in cents for *plan*.
+
+        An unknown plan name falls back to the free allowance and logs at
+        ERROR: a plan we cannot price is a plan we should not be funding, and
+        the error is the signal that the config and the code have drifted. If
+        the mapping has no ``free`` key either, the answer is 0.
+        """
+        allowances = self.get_plan_allowance_cents()
+        if plan in allowances:
+            return allowances[plan]
+
+        free = allowances.get("free", 0)
+        logger.error(
+            "Unknown plan %r has no configured allowance; falling back to the "
+            "free allowance of %d cents. Add it to PLAN_ALLOWANCE_CENTS.",
+            plan,
+            free,
+        )
+        return free
 
     # ── Validators ───────────────────────────────────────────────────────
 
