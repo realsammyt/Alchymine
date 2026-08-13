@@ -34,7 +34,7 @@ from alchymine.api.entitlements import (
     require_report,
     require_report_download,
 )
-from alchymine.db.models import UsageCounter
+from alchymine.db.models import UsageCounter, UsageRecord
 from alchymine.db.usage_counters import (
     METER_SPEND_MICROS_MONTHLY,
     CostCeilingExceeded,
@@ -99,6 +99,10 @@ class _Env:
             )
         )
 
+    def run(self, coro):
+        """Drive a coroutine on the loop that owns this engine."""
+        return self._loop.run_until_complete(coro)
+
     def client(self, gate, account: Account) -> TestClient:
         """A minimal app with one gated route, called as *account*."""
         api = FastAPI()
@@ -128,6 +132,10 @@ def env():
     async def _setup() -> None:
         async with engine.begin() as conn:
             await conn.run_sync(UsageCounter.__table__.create)
+            # The ledger writes a row per delivered call as well as
+            # charging the meter, and a failed insert would mark it
+            # degraded rather than record the spend.
+            await conn.run_sync(UsageRecord.__table__.create)
 
     loop.run_until_complete(_setup())
     set_db_engine(engine)
@@ -295,6 +303,62 @@ class TestAllowance:
         assert kwargs["period_key"] == current_month_key()
         assert kwargs["scope"] == USER_ID
         assert kwargs["ceiling"] == PLAN_ALLOWANCE_CENTS["pro"] * 10_000
+
+
+class TestTheLedgerAndTheGateAgree:
+    """The one integration this slice actually rests on.
+
+    Slice 2 writes the meter and slice 3 reads it. They meet on a
+    ``(scope, meter, period_key)`` tuple that nothing else checks: if the
+    two ever disagreed on the month key or the scope, the gate would read
+    an empty counter forever and no allowance would ever bind, silently
+    and in production only. Seeding the meter by hand (as the tests above
+    do, for speed) would not catch that, so this one spends through the
+    real ledger path.
+    """
+
+    def test_spend_recorded_by_the_ledger_closes_the_allowance(self, env) -> None:
+        from alchymine.llm.attribution import attributed
+        from alchymine.llm.ledger import record_usage
+
+        async def _spend_through_the_ledger() -> None:
+            with attributed(user_id=USER_ID, surface="chat"):
+                task = await record_usage(
+                    meter="art_generations",
+                    provider="google",
+                    model="gemini-test",
+                    images=1,
+                    cost_micros_override=PLAN_ALLOWANCE_CENTS["pro"] * 10_000,
+                )
+                if task is not None:
+                    await task
+
+        env.run(_spend_through_the_ledger())
+
+        response = env.client(require_chat, _account(plan="pro")).get("/gated")
+
+        assert response.status_code == 429
+        assert response.json()["detail"]["code"] == "plan_allowance_reached"
+
+    def test_another_user_s_ledger_spend_does_not_close_this_one(self, env) -> None:
+        from alchymine.llm.attribution import attributed
+        from alchymine.llm.ledger import record_usage
+
+        async def _spend_as_someone_else() -> None:
+            with attributed(user_id="u-somebody-else", surface="chat"):
+                task = await record_usage(
+                    meter="art_generations",
+                    provider="google",
+                    model="gemini-test",
+                    images=1,
+                    cost_micros_override=PLAN_ALLOWANCE_CENTS["pro"] * 10_000,
+                )
+                if task is not None:
+                    await task
+
+        env.run(_spend_as_someone_else())
+
+        assert env.client(require_chat, _account(plan="pro")).get("/gated").status_code == 200
 
 
 # ─── The download gate has no spend meter ────────────────────────────────
