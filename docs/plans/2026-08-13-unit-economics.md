@@ -414,13 +414,13 @@ The precise rule:
 
 > **A ledger-write failure must be loud and must fail the *next* call, not the current one.**
 
-Mechanically:
-1. On ledger `INSERT` failure, log at ERROR with the full row as structured JSON, so the spend is reconstructible from logs.
-2. Set a process-local `_ledger_degraded` flag.
-3. `check_ceiling` treats a degraded ledger as an unreachable meter and raises `CostCeilingExceeded(reason="meter_unavailable")` on the next cost-bearing call, which the existing handler at `main.py:125-144` renders as a structured 503.
-4. The flag clears on the next successful write.
+Mechanically (as built in slice 2 — amended from the original design during review, sign-off recorded on PR #232):
+1. On ledger write failure (`INSERT` or spend-meter increment), log at ERROR with the full row as structured JSON, so the spend is reconstructible from logs, and mark the ledger degraded.
+2. The block lives at `charge_paid_call` as a **single admission gate**, `claim_ledger_admission()`: healthy admits everyone; degraded blocks every cost-bearing call as `CostCeilingExceeded(reason="meter_unavailable")` (the existing structured 503) until a cooldown lapses (`LEDGER_DEGRADED_RETRY_SECONDS`, env, default 60), then **exactly one** probe call is admitted under a lock; its successful write ends the episode, a failed one re-arms the cooldown. An abandoned probe is replaceable after a probe timeout sized above the LLM client timeout, so the gate can never wedge shut. A pure latch was rejected because blocked calls never attempt writes, so nothing could ever clear the flag.
+3. `check_ceiling` is a **pure counter read** and never consults ledger health. Two reasons: slice 3 calls it at the route layer to price a user's allowance, where a degraded ledger is an internal fault that must render as a global 503, never as a 402/429 that blames the user; and a second gate would double-claim the probe for a single call.
+4. Ledger writes are detached from the caller's cancel scope (`asyncio.shield` over a strong-referenced task), so a client disconnect cannot silently drop a record; a write cancelled before it starts is reported by the task's done callback.
 
-In the common case (Postgres unreachable) this is belt and braces, because the counter read in `check_ceiling` hits the same database and fails closed on its own. The flag covers the case the natural path misses: an `INSERT` that fails for a non-connectivity reason, such as a constraint violation or an oversized field, while reads still succeed.
+In the common case (Postgres unreachable) this is belt and braces, because the counter read in the existing `consume()` hits the same database and fails closed on its own. The gate covers the case the natural path misses: a write that fails for a non-connectivity reason, such as a constraint violation, while reads still succeed. Known bounded exposures (loud, at most 2 admitted calls in rare interleavings): issue #235.
 
 ---
 
@@ -574,7 +574,7 @@ Report narratives are out of scope for caching. Their system prompts are per-sys
 | **1** | Migration 0017, `Account`, `get_current_account()` | The migration itself. Every column is nullable or defaulted, so no rewrite and no lock that matters. The `UPDATE users SET plan='beta'` is the risky line: if it does not run, every beta account lands on the free allowance and slice 3 locks them all out. | Alembic up and down against a copy of production. Assert every pre-existing row is `plan='beta'`, a fresh insert is `plan='free'`, and `get_current_account` matches `get_current_admin`'s 401/403 behaviour on a disabled account. |
 | **2** | `usage_records`, `ledger.record_usage()`, contextvars, `_run_async` context fix, SSE `get_final_message()` | One extra DB write per paid call on the same pool (single-digit ms). A bug in the `finally` could break narrative generation or truncate a chat stream. | Ledger row written for stream, non-stream and Gemini paths; five rows with one `user_id` after the `narrative.py:348` gather; a row with `estimated=True` on simulated disconnect; attribution survives eager-mode Celery. |
 | **3** | Per-plan allowances, `require_allowance()`, 402/429 upsell responses, frontend states | **First slice that can tell a user no.** Beta at 555 cents should never bind. Free at 0 binds immediately, by design. A wrong plan value from slice 1 locks out the beta. | Each plan against each of the four chokepoints; assert `beta` passes at realistic volume; assert the 429 body carries `code`, `message`, `retry_at`, `upgrade_url`; assert the SSE path returns a real 429 before the stream opens rather than an error frame. |
-| **4** | Spend meters, `check_ceiling` in `charge_paid_call`, `GET /admin/usage` | A mis-set budget takes every paid surface down until UTC midnight. Default is generous ($15/day against measured beta usage nearer $1-2/day). | Ceiling arithmetic; a tripped spend breaker renders the existing 503 shape; `/admin/usage` totals reconcile against a hand-summed `usage_records` fixture. |
+| **4** | Spend meters, `check_ceiling` in `charge_paid_call`, `GET /admin/usage` | A mis-set budget takes every paid surface down until UTC midnight. Default is generous ($15/day against measured beta usage nearer $1-2/day). | Ceiling arithmetic; a tripped spend breaker renders the existing 503 shape; `/admin/usage` totals reconcile against a hand-summed `usage_records` fixture. **Wire the spend ceiling into `charge_paid_call`; do NOT re-add a ledger-health check inside `check_ceiling`** (single admission gate, section 6.3 as amended). |
 | **5** | Haiku chat routing, prompt cache breakpoint | Reply quality on the most-touched surface. Reversible by env plus restart. | Model id recorded in `usage_records` equals `llm_chat_model`; report narratives still record Sonnet; cache tokens appear or the criterion in 8.2 fails and the flag goes off. |
 
 ### The four product chokepoints and how each is gated
@@ -623,6 +623,7 @@ Every figure below is an env default chosen from the roadmap's model, not from m
 | `LLM_CHAT_MODEL` | `claude-haiku-4-5-20251001` | section 8.1 |
 | `LLM_PROMPT_CACHE_ENABLED` | `true` | no-op until the prefix clears 4,096 tokens, section 8.2 |
 | `USAGE_LEDGER_ENABLED` | `true` | kill switch for slice 2 |
+| `LEDGER_DEGRADED_RETRY_SECONDS` | `60.0` | circuit-breaker cooldown before a single probe is admitted, section 6.3 as amended (added in slice 2 review) |
 
 The two figures the ledger will settle first: cost per full report (roadmap models $0.07-0.18, gate is $0.30 all-in) and p95 cost per active user per month (gate is $2.75). Neither is knowable today, because nothing in the codebase has ever recorded a token.
 
