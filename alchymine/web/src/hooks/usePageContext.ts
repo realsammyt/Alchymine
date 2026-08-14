@@ -5,10 +5,10 @@
  * Next.js App Router pathname.
  *
  * Maps top-level route segments (`/healing`, `/wealth`, `/intelligence`,
- * `/creative`, `/perspective`) to the corresponding system key that the
- * backend chat endpoint accepts.  Pages that don't belong to a specific
- * pillar (e.g. `/chat`, `/dashboard`) return `null`, which means the
- * Growth Assistant operates in its general coaching mode.
+ * `/creative`, `/perspective`, `/practice`) to the corresponding system
+ * key that the backend chat endpoint accepts.  Pages that don't belong
+ * to a specific scope (e.g. `/chat`, `/dashboard`) return `null`, which
+ * means the Growth Assistant operates in its general coaching mode.
  *
  * Usage:
  * ```tsx
@@ -20,13 +20,20 @@
 import { usePathname } from "next/navigation";
 import { useMemo } from "react";
 
-/** Valid system keys accepted by `POST /api/v1/chat`. */
+/**
+ * Valid system keys accepted by `POST /api/v1/chat`.
+ *
+ * Must match `_VALID_SYSTEM_KEYS` in `alchymine/api/routers/chat.py`.
+ * Every map below is a `Record<SystemKey, ...>`, so adding a key here
+ * without filling them in is a type error rather than a runtime gap.
+ */
 export type SystemKey =
   | "intelligence"
   | "healing"
   | "wealth"
   | "creative"
-  | "perspective";
+  | "perspective"
+  | "practice";
 
 /** Human-readable labels keyed by system. */
 const SYSTEM_LABELS: Record<SystemKey, string> = {
@@ -35,6 +42,7 @@ const SYSTEM_LABELS: Record<SystemKey, string> = {
   wealth: "Generational Wealth",
   creative: "Creative Development",
   perspective: "Perspective Enhancement",
+  practice: "Practice Integration",
 };
 
 /** Top-level route segments that map 1-to-1 to system keys. */
@@ -44,6 +52,7 @@ const ROUTE_TO_SYSTEM: Record<string, SystemKey> = {
   wealth: "wealth",
   creative: "creative",
   perspective: "perspective",
+  practice: "practice",
 };
 
 export interface PageContext {

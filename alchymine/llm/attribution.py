@@ -73,6 +73,20 @@ def set_surface(surface: str | None) -> None:
     _surface.set(surface)
 
 
+def set_request_id(request_id: str | None) -> None:
+    """Name the thing this context is about to spend on.
+
+    Split from :func:`set_attribution` for the same reason
+    :func:`set_surface` is: the id is learned in a third place. The chat
+    route writes the user's message before it calls the model, and that
+    row's id is a better handle on the spend than the HTTP request id
+    the middleware minted, because it joins straight back to the message
+    and its ``system_key``. The HTTP id survives on the response header
+    and in the access log either way.
+    """
+    _request_id.set(request_id)
+
+
 def current_attribution() -> tuple[str | None, str | None, str | None]:
     """Return ``(user_id, surface, request_id)`` for the current context.
 

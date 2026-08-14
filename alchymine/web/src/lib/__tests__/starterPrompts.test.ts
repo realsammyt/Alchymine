@@ -14,6 +14,7 @@ describe("getStarterPrompts", () => {
     "wealth",
     "creative",
     "perspective",
+    "practice",
   ];
 
   it.each(systems)("returns 3 prompts for %s", (key) => {
@@ -38,6 +39,24 @@ describe("getStarterPrompts", () => {
   it("returns general prompts for an unknown system key", () => {
     const prompts = getStarterPrompts("unknown-system");
     expect(prompts).toHaveLength(3);
+  });
+
+  it("the practice starters ask rather than tell", () => {
+    // The practice coach's whole shape is reflection questions, not
+    // verdicts. A starter that asks for a verdict invites one back.
+    for (const p of getStarterPrompts("practice")) {
+      expect(p.message).toContain("?");
+    }
+  });
+
+  it("the practice starters use no streak or shame language", () => {
+    const copy = getStarterPrompts("practice")
+      .map((p) => `${p.label} ${p.message}`)
+      .join(" ")
+      .toLowerCase();
+    for (const banned of ["streak", "don't break", "keep it up", "missed"]) {
+      expect(copy).not.toContain(banned);
+    }
   });
 
   it("each system has unique prompts", () => {

@@ -238,6 +238,18 @@ describe("ChatPanel", () => {
       expect(screen.queryByRole("link", { name: /see plans/i })).not.toBeInTheDocument();
     });
 
+    it("renders for the practice scope too", () => {
+      // The sixth scope goes through the same metered path, so a refusal
+      // has to read the same way there as everywhere else.
+      useChatMock.mockReturnValue(defaults({ upsell }));
+      render(<ChatPanel systemKey="practice" />);
+
+      expect(screen.getByRole("status")).toHaveTextContent(
+        /included coaching/i,
+      );
+      expect(screen.getByRole("link", { name: /see plans/i })).toBeInTheDocument();
+    });
+
     it("keeps the red error banner for actual faults", () => {
       useChatMock.mockReturnValue(defaults({ error: "Streaming failed" }));
       render(<ChatPanel systemKey={null} />);

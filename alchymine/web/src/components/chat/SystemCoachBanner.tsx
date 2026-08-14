@@ -2,8 +2,8 @@
 
 /**
  * SystemCoachBanner -- contextual coaching prompt banner rendered on
- * each system explore page (healing, wealth, creative, perspective,
- * intelligence).
+ * each scope's page (healing, wealth, creative, perspective,
+ * intelligence, practice).
  *
  * Shows 2-3 tailored prompt suggestions based on the current system.
  * Clicking a suggestion navigates to `/chat` with the prompt pre-filled
@@ -28,6 +28,7 @@ const SYSTEM_LABELS: Record<SystemKey, string> = {
   wealth: "Generational Wealth",
   creative: "Creative Development",
   perspective: "Perspective Enhancement",
+  practice: "Practice Integration",
 };
 
 const ACCENT_CLASSES: Record<SystemKey, { border: string; bg: string; text: string }> = {
@@ -55,6 +56,13 @@ const ACCENT_CLASSES: Record<SystemKey, { border: string; bg: string; text: stri
     border: "border-accent/20",
     bg: "bg-accent/5",
     text: "text-accent",
+  },
+  // Practice sits across all five purposes rather than inside one, so
+  // it borrows the neutral primary accent rather than a pillar's.
+  practice: {
+    border: "border-primary/20",
+    bg: "bg-primary/5",
+    text: "text-primary",
   },
 };
 

@@ -48,6 +48,26 @@ describe("SystemCoachBanner", () => {
     expect(link).toHaveAttribute("href", "/chat?system=creative");
   });
 
+  it("renders the practice coach banner with its own label and prompts", () => {
+    render(<SystemCoachBanner systemKey="practice" />);
+
+    expect(
+      screen.getByText(/talk to your practice integration coach/i),
+    ).toBeInTheDocument();
+    expect(screen.getByText("Where to start today")).toBeInTheDocument();
+    expect(screen.getByText("This one has gone flat")).toBeInTheDocument();
+    expect(screen.getByText("What am I avoiding")).toBeInTheDocument();
+  });
+
+  it("scopes the practice chat link to the practice system", () => {
+    render(<SystemCoachBanner systemKey="practice" />);
+
+    expect(screen.getByText("Open chat").closest("a")).toHaveAttribute(
+      "href",
+      "/chat?system=practice",
+    );
+  });
+
   it("has the correct data-testid for page-level testing", () => {
     render(<SystemCoachBanner systemKey="perspective" />);
 

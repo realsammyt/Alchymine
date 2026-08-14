@@ -15,6 +15,7 @@
 
 import { useEffect, useRef, useState } from "react";
 
+import type { SystemKey } from "@/hooks/usePageContext";
 import { useChat } from "@/hooks/useChat";
 import { getStarterPrompts } from "@/lib/starterPrompts";
 import UpsellNotice from "@/components/shared/UpsellNotice";
@@ -23,18 +24,22 @@ import ChatInput from "./ChatInput";
 import ChatMessageList from "./ChatMessageList";
 
 interface Props {
-  /** Optional pillar scope: intelligence | healing | wealth | creative | perspective */
+  /** Optional coach scope: intelligence | healing | wealth | creative | perspective | practice */
   systemKey?: string | null;
   /** If set, auto-send this message on first mount (from deep-link). */
   initialPrompt?: string;
 }
 
-const SYSTEM_LABELS: Record<string, string> = {
+// Typed by SystemKey so a seventh scope cannot skip this map silently.
+// The lookup below still takes an arbitrary string, because the prop
+// does, and an unknown key falls back to showing itself.
+const SYSTEM_LABELS: Record<SystemKey, string> = {
   intelligence: "Personal Intelligence",
   healing: "Ethical Healing",
   wealth: "Generational Wealth",
   creative: "Creative Development",
   perspective: "Perspective Enhancement",
+  practice: "Practice Integration",
 };
 
 export default function ChatPanel({
@@ -72,7 +77,9 @@ export default function ChatPanel({
 
   const starterPrompts = getStarterPrompts(systemKey);
   const showStarters = messages.length === 0 && !isLoadingHistory;
-  const systemLabel = systemKey ? SYSTEM_LABELS[systemKey] ?? systemKey : null;
+  const systemLabel = systemKey
+    ? SYSTEM_LABELS[systemKey as SystemKey] ?? systemKey
+    : null;
 
   return (
     <section

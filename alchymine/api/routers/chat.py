@@ -19,6 +19,26 @@ Guardrails added in Sprint 5 (#165):
   asking the user to start a fresh conversation.
 - **Per-user rate limit**: 10 messages per minute per user, enforced
   with a simple in-memory sliding-window counter (no Redis needed).
+
+The ``practice`` scope (epic #251, slice 5) adds three things nobody
+else on this endpoint has, and nothing anybody else on it loses:
+
+- ``detect_crisis`` on the way in, answering high and emergency
+  disclosures with resources instead of a coaching reply.
+- ``check_text`` on the way out, on a cadence inside the streaming loop.
+- A deterministic practice-context block appended to the *user message*,
+  never the system prompt.
+
+Removing ``"practice"`` from ``_VALID_SYSTEM_KEYS`` is the kill switch,
+and it is worth being exact about what it kills.  The scope 422s, so
+there is no LLM call, no ethics gate and no context builder, and the
+other five scopes are untouched.  The crisis gate is the deliberate
+exception: it reads ``PRACTICE_SYSTEM_KEY`` directly and runs *before*
+the validity check, so a crisis-severity message on a killed scope
+still receives resources rather than a 422.  That ordering is the point
+of the gate.  Answering somebody in crisis with a schema error because
+an operator disabled a feature would be the one failure mode this path
+exists to prevent, and the resource stream costs nothing to serve.
 """
 
 from __future__ import annotations
@@ -34,13 +54,21 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from alchymine.agents.growth.practice_context import build_practice_context
 from alchymine.agents.growth.system_prompts import build_system_prompt
+from alchymine.agents.quality.ethics_check import (
+    ViolationCategory,
+    ViolationSeverity,
+    check_text,
+)
 from alchymine.api.auth import Account, get_current_user
 from alchymine.api.deps import get_db_session
 from alchymine.api.entitlements import require_chat
 from alchymine.config import get_settings
 from alchymine.db import repository
 from alchymine.db.usage_counters import CostCeilingExceeded
+from alchymine.engine.healing.crisis import CrisisResponse, CrisisSeverity, detect_crisis
+from alchymine.llm.attribution import set_request_id
 from alchymine.llm.client import LLMClient
 
 logger = logging.getLogger(__name__)
@@ -156,9 +184,136 @@ def _check_on_topic(text: str) -> str | None:
     return None
 
 
-# Valid system keys — keep aligned with SYSTEM_PROMPTS in
-# alchymine/agents/growth/system_prompts.py.
-_VALID_SYSTEM_KEYS = {"intelligence", "healing", "wealth", "creative", "perspective"}
+# Valid system keys — must equal ``set(SYSTEM_PROMPTS)`` in
+# alchymine/agents/growth/system_prompts.py.  A literal rather than a
+# derived set, deliberately: removing a key here 422s that scope and
+# leaves every other one untouched, which is the kill switch for the
+# practice scope.  ``tests/api/test_chat_practice_scope.py`` pins the
+# equality so the two literals cannot drift apart in the meantime.
+#
+# The crisis gate survives the kill switch by design — see the module
+# docstring and ``TestKillSwitch``.  Everything else the scope has does
+# not.
+PRACTICE_SYSTEM_KEY = "practice"
+
+_VALID_SYSTEM_KEYS = {
+    "intelligence",
+    "healing",
+    "wealth",
+    "creative",
+    "perspective",
+    PRACTICE_SYSTEM_KEY,
+}
+
+
+# ─── Practice-scope safety gates ──────────────────────────────────────
+#
+# The practice scope is the first chat surface wired to the real ethics
+# and crisis gates.  The other five keep the local regex they have always
+# had; adopting these across five live surfaces changes behaviour on all
+# of them and deserves its own PR and regression pass (follow-up filed
+# with the epic close-out).
+
+# check_text over the whole accumulation is O(n²) across a reply, so it
+# runs on a cadence rather than per chunk, plus once when the stream ends.
+_ETHICS_CHECK_EVERY = 8
+
+# The categories a partial reply can be judged on.  MISSING_DISCLAIMER is
+# excluded on purpose: mid-stream, "no disclaimer yet" is a property of
+# every reply that has not finished, and truncating on it guarantees the
+# disclaimer never arrives.  It is excluded at the end-of-stream check too,
+# because blocking a whole practice answer for saying "meditation" without
+# the word "professional" would refuse more good replies than bad ones.
+# Appending a disclaimer instead of blocking is the right fix and is a
+# follow-up, not a gate this slice can safely widen.
+_BLOCKING_CATEGORIES = frozenset(
+    {
+        ViolationCategory.FATALISTIC_LANGUAGE.value,
+        ViolationCategory.DIAGNOSTIC_LANGUAGE.value,
+        ViolationCategory.DARK_PATTERNS.value,
+        ViolationCategory.CULTURAL_INSENSITIVITY.value,
+        ViolationCategory.FINANCIAL_ADVICE.value,
+    }
+)
+
+# Warnings do not truncate a live reply.  "will never" is a WARNING and
+# is ordinary English; error and critical are the tiers that describe
+# actual harm.
+_BLOCKING_SEVERITIES = frozenset({ViolationSeverity.ERROR.value, ViolationSeverity.CRITICAL.value})
+
+
+def run_safety_gates(
+    system_key: str | None,
+    text: str,
+    *,
+    check_ethics: bool = False,
+) -> str | None:
+    """Return a block reason for *text*, or ``None`` to let it through.
+
+    The blocked-pattern regex runs for every scope, exactly as it did
+    before this function existed.  ``check_text`` runs only for the
+    practice scope and only when *check_ethics* is set, which the
+    streaming loop does on its cadence.
+
+    ``context="healing"`` is reused rather than adding a ``"practice"``
+    context: it is the strictest existing coaching branch, and a
+    first-class context is deferred to the gate rollout across the other
+    scopes.
+    """
+    reason = _check_content_safety(text)
+    if reason is not None:
+        return reason
+
+    if not check_ethics or system_key != PRACTICE_SYSTEM_KEY:
+        return None
+
+    result = check_text(text, context="healing")
+    for violation in result.violations:
+        if (
+            violation.category in _BLOCKING_CATEGORIES
+            and violation.severity in _BLOCKING_SEVERITIES
+        ):
+            return "Content flagged by safety filter"
+    return None
+
+
+def crisis_for(system_key: str | None, message: str) -> CrisisResponse | None:
+    """Return the crisis response *message* warrants on this scope, if any.
+
+    Practice only, and only at high or emergency severity.  Medium
+    severity is ordinary coaching material ("I had a panic attack before
+    my morning practice"); handing that user a hotline list instead of a
+    conversation would be the wrong kind of careful.
+    """
+    if system_key != PRACTICE_SYSTEM_KEY:
+        return None
+    crisis = detect_crisis(message)
+    if crisis is None:
+        return None
+    if crisis.severity not in (CrisisSeverity.HIGH, CrisisSeverity.EMERGENCY):
+        return None
+    return crisis
+
+
+def _crisis_frames(crisis: CrisisResponse) -> list[str]:
+    """Render the crisis response as one line per SSE ``data:`` frame.
+
+    One line per frame because a ``data:`` field cannot carry a newline,
+    and the client concatenates the values it receives.  So the copy is
+    written to read as continuous prose rather than as a list.
+    """
+    parts = [
+        "Before anything about practice: what you have written matters more than "
+        "today's protocol, and there are people available right now who are "
+        "better placed than I am to sit with it.",
+    ]
+    parts.extend(
+        f"{resource.name}: {resource.contact}. {resource.description}"
+        for resource in crisis.resources
+    )
+    parts.extend(crisis.disclaimers)
+    parts.append("I'll be here when you want to come back to the practice side of things.")
+    return parts
 
 
 # ─── History cap ──────────────────────────────────────────────────────
@@ -231,7 +386,8 @@ class ChatRequest(BaseModel):
         None,
         description=(
             "Optional system scope: intelligence | healing | wealth | "
-            "creative | perspective.  None defaults to the general coach."
+            "creative | perspective | practice.  None defaults to the "
+            "general coach."
         ),
     )
 
@@ -247,6 +403,15 @@ class ChatHistoryItem(BaseModel):
 
 
 # ─── Streaming generator ───────────────────────────────────────────────
+
+
+# Both stream responses send these.  ``X-Accel-Buffering`` is what stops
+# nginx holding chunks back until the reply is complete.
+_SSE_HEADERS = {
+    "Cache-Control": "no-cache",
+    "Connection": "keep-alive",
+    "X-Accel-Buffering": "no",
+}
 
 
 async def _chat_event_stream(
@@ -270,15 +435,29 @@ async def _chat_event_stream(
     enforcement still run because they protect the LLM call, not the DB.
     """
     # Persist the user message before any LLM round-trip so it's never lost.
+    user_message_id: str | None = None
     if not ephemeral:
-        await repository.save_chat_message(
+        user_row = await repository.save_chat_message(
             session,
             user_id=user_id,
             role="user",
             content=message,
             system_key=system_key,
         )
+        user_message_id = user_row.id
         await session.commit()
+
+    # The ledger row for this turn names the message that caused it, so
+    # per-scope cost is an exact join against chat_messages.system_key
+    # rather than a correlation over timestamps.
+    #
+    # Only when there *is* a message to name.  An ephemeral turn persists
+    # nothing, so it has no id to point at and stays out of that join —
+    # but it keeps the HTTP request id ``get_current_account`` put there,
+    # which is the only handle anybody has on it in the logs.  Clearing
+    # it would trade one form of attribution for none.
+    if user_message_id is not None:
+        set_request_id(user_message_id)
 
     # We don't have a UserProfile loader hooked up here yet — the chat
     # endpoint accepts a system_key for now and the system prompt is
@@ -286,14 +465,25 @@ async def _chat_event_stream(
     # wire profile context end-to-end.
     system_prompt = build_system_prompt(system_key, None)
 
+    # The practice block rides on the user message, never the system
+    # prompt: the assembled system prompt is the cacheable stable prefix
+    # of every chat turn, and this block changes daily.  Only ``message``
+    # is persisted, so the assembly never enters the history either.
+    prompt = message
+    if system_key == PRACTICE_SYSTEM_KEY:
+        practice_block = await build_practice_context(session, user_id)
+        if practice_block:
+            prompt = f"{practice_block}\n\n{message}"
+
     client = LLMClient()
     full_reply: list[str] = []
     blocked = False
     unavailable = False
 
     try:
+        chunk_count = 0
         async for chunk in client.stream_generate(
-            prompt=message,
+            prompt=prompt,
             system_prompt=system_prompt,
             # Chat is the only surface that names its own model. It heads
             # the fallback chain rather than replacing it, so a 529 still
@@ -302,7 +492,13 @@ async def _chat_event_stream(
             model=get_settings().llm_chat_model,
         ):
             full_reply.append(chunk)
-            if _check_content_safety("".join(full_reply)) is not None:
+            chunk_count += 1
+            reason = run_safety_gates(
+                system_key,
+                "".join(full_reply),
+                check_ethics=chunk_count % _ETHICS_CHECK_EVERY == 0,
+            )
+            if reason is not None:
                 # The model produced something that trips the same safety
                 # filter we apply to user input.  Truncate the stream and
                 # emit an explicit error frame.
@@ -311,6 +507,15 @@ async def _chat_event_stream(
                 yield "event: error\ndata: Response blocked by safety filter\n\n"
                 break
             yield f"data: {chunk}\n\n"
+
+        # Once at the end, so a violation inside the last few chunks is
+        # not missed by the cadence.  It cannot unsend what already
+        # streamed, but it still keeps the violation out of the history.
+        if not blocked and system_key == PRACTICE_SYSTEM_KEY:
+            if run_safety_gates(system_key, "".join(full_reply), check_ethics=True) is not None:
+                logger.warning("Chat output blocked by safety filter for user %s", user_id)
+                blocked = True
+                yield "event: error\ndata: Response blocked by safety filter\n\n"
     except CostCeilingExceeded:
         # The response already started, so there is no status code left to
         # set — the state ships as an error frame the client renders. Text
@@ -339,6 +544,65 @@ async def _chat_event_stream(
             user_id=user_id,
             role="assistant",
             content=assistant_text,
+            system_key=system_key,
+        )
+        await session.commit()
+
+    yield "event: done\ndata: \n\n"
+
+
+async def _crisis_event_stream(
+    *,
+    user_id: str,
+    message: str,
+    system_key: str | None,
+    crisis: CrisisResponse,
+    session: AsyncSession,
+    ephemeral: bool = False,
+) -> AsyncGenerator[str, None]:
+    """Stream crisis resources instead of a coaching reply.
+
+    No LLM client is constructed, so this path makes no model call and
+    writes no ledger row.  It is a 200 with a normal stream rather than
+    a 400: a refusal status at that moment reads as "you did something
+    wrong", and the client would render it as an error banner instead of
+    a message.
+
+    The turn is still persisted, respecting *ephemeral*.  A conversation
+    that silently drops the hardest thing a user has typed is worse than
+    one that keeps it, and the user message is committed *before* the
+    first frame goes out for exactly that reason: a client that closes
+    the tab mid-stream would otherwise roll the whole turn back, which
+    is the case where keeping it matters most.
+    """
+    logger.info("Crisis gate engaged on the practice scope (severity=%s)", crisis.severity)
+
+    frames = _crisis_frames(crisis)
+    reply = " ".join(frames)
+
+    # Committed up front, matching _chat_event_stream, so a disconnect
+    # cannot take it with it.
+    if not ephemeral:
+        await repository.save_chat_message(
+            session,
+            user_id=user_id,
+            role="user",
+            content=message,
+            system_key=system_key,
+        )
+        await session.commit()
+
+    for part in frames:
+        # Trailing space: the client concatenates data values without a
+        # separator, and a data field cannot carry a newline.
+        yield f"data: {part} \n\n"
+
+    if not ephemeral:
+        await repository.save_chat_message(
+            session,
+            user_id=user_id,
+            role="assistant",
+            content=reply,
             system_key=system_key,
         )
         await session.commit()
@@ -376,6 +640,37 @@ async def chat(
     ``?ephemeral=true`` to skip persistence entirely (useful for
     one-off queries that should not appear in history).
     """
+    user_id = account.user_id
+
+    # Before every other check, because most of them would answer a
+    # crisis disclosure with a refusal.  "kill" and "hurt" are in the
+    # blocked-pattern list, so "I want to kill myself" would otherwise
+    # return HTTP 400 "content flagged by safety filter" to somebody who
+    # has just said the hardest thing they can say.
+    #
+    # This also skips the rate limit and the history cap, deliberately.
+    # Both of them refuse, and neither has a refusal worth sending at
+    # this moment.  The path makes no LLM call and writes no ledger row,
+    # so there is no spend to cap; the request-level RateLimitMiddleware
+    # still bounds the volume.  The plan gate above is the exception it
+    # cannot escape: it is a dependency, so a free account is refused
+    # before the handler runs at all.
+    crisis = crisis_for(request.system_key, request.message)
+    if crisis is not None:
+        await _ensure_user_exists(session, user_id)
+        return StreamingResponse(
+            _crisis_event_stream(
+                user_id=user_id,
+                message=request.message,
+                system_key=request.system_key,
+                crisis=crisis,
+                session=session,
+                ephemeral=ephemeral,
+            ),
+            media_type="text/event-stream",
+            headers=_SSE_HEADERS,
+        )
+
     safety_message = _check_content_safety(request.message)
     if safety_message:
         raise HTTPException(status_code=400, detail=safety_message)
@@ -391,8 +686,6 @@ async def chat(
                 f"Unknown system_key {request.system_key!r}. Valid: {sorted(_VALID_SYSTEM_KEYS)}"
             ),
         )
-
-    user_id = account.user_id
 
     # ── Per-user rate limit (in-memory, 10 msg/min) ──────────────────
     rate_limit_msg = _check_rate_limit(user_id)
@@ -425,11 +718,7 @@ async def chat(
             ephemeral=ephemeral,
         ),
         media_type="text/event-stream",
-        headers={
-            "Cache-Control": "no-cache",
-            "Connection": "keep-alive",
-            "X-Accel-Buffering": "no",
-        },
+        headers=_SSE_HEADERS,
     )
 
 
@@ -439,7 +728,7 @@ async def chat_history(
         None,
         description=(
             "Filter by system scope. Pass one of: intelligence, healing, "
-            "wealth, creative, perspective. Omit for all messages."
+            "wealth, creative, perspective, practice. Omit for all messages."
         ),
     ),
     limit: int = Query(50, ge=1, le=200, description="Maximum messages to return"),

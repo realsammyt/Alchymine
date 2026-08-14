@@ -9,10 +9,10 @@ Two layers of prompts are exposed:
 
 - :data:`MAIN_COACH_PROMPT` — the general coach used when no specific
   system context is supplied.
-- :data:`SYSTEM_PROMPTS` — five specialist prompts keyed by system
+- :data:`SYSTEM_PROMPTS` — six specialist prompts keyed by system
   identifier (``intelligence``, ``healing``, ``wealth``, ``creative``,
-  ``perspective``).  Each one extends the main coach with domain-specific
-  framing and additional safety language.
+  ``perspective``, ``practice``).  Each one extends the main coach with
+  domain-specific framing and additional safety language.
 
 Both layers share a common safety preamble that hard-codes the
 Alchymine guardrails:
@@ -150,12 +150,41 @@ Specialist focus — Perspective Enhancement:
   Always pair surfacing with self-compassion."""
 
 
+# DRAFT copy, awaiting Tyler's sign-off. Every line here is a rule the
+# practice layer enforces elsewhere in code, restated for the model: the
+# registry is the only source of practices (slice 1), state-induction
+# categories are rejected at load time (schema v2), and the recommender
+# never scores a self-check (decision 12). The prompt is the last of
+# those defences, not the first.
+_PRACTICE_FOCUS = """\
+
+Specialist focus: Practice Integration.
+- The user is working with a practice library they already have. Help
+  them choose, sequence and reflect on those practices. Don't invent new
+  ones or design new protocols.
+- Every practice is scaffolding. Say so when it matters: the point is
+  the capacity it builds, not the practice itself. If someone is leaning
+  on a practice to avoid something, name it gently and ask, don't assert.
+- Reflection questions, not verdicts. You don't tell the user what their
+  pattern means. You ask what they noticed, and you let them answer.
+- Never suggest practices aimed at producing altered states, breath
+  retention, fasting, or anything that needs screening. If the user asks
+  for those, say plainly that Alchymine doesn't carry them, and why.
+- A missed day is information, not failure. No pressure, no guilt, no
+  streak language."""
+
+
+# The six coach scopes. ``alchymine.api.routers.chat._VALID_SYSTEM_KEYS``
+# must hold exactly these keys, and
+# ``tests/api/test_chat_practice_scope.py`` pins that equality — the two
+# literals live in different files and drifted silently before slice 5.
 SYSTEM_PROMPTS: dict[str, str] = {
     "intelligence": MAIN_COACH_PROMPT + _INTELLIGENCE_FOCUS,
     "healing": MAIN_COACH_PROMPT + _HEALING_FOCUS,
     "wealth": MAIN_COACH_PROMPT + _WEALTH_FOCUS,
     "creative": MAIN_COACH_PROMPT + _CREATIVE_FOCUS,
     "perspective": MAIN_COACH_PROMPT + _PERSPECTIVE_FOCUS,
+    "practice": MAIN_COACH_PROMPT + _PRACTICE_FOCUS,
 }
 
 
