@@ -197,6 +197,16 @@ class TestToday:
             assert item["reason"]
             assert item["reason_template"]
 
+    def test_every_item_carries_its_summary(self, client: TestClient) -> None:
+        """The protocol card shows what a practice *is*, not just its name.
+
+        Without this the card is a title and a prompt, and a user who has
+        not opened the library cannot tell what "Borrowed Eyes" asks of
+        them.
+        """
+        for item in get_today(client).json()["items"]:
+            assert item["summary"]
+
     def test_slots_mirror_the_items_with_that_slot_prompt(self, client: TestClient) -> None:
         body = get_today(client).json()
         keys = [(item["pack_id"], item["slug"]) for item in body["items"]]

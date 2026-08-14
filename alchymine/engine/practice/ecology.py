@@ -767,6 +767,7 @@ def _build_payload(
             "pack_id": scored.pack_id,
             "slug": scored.practice.slug,
             "title": scored.practice.title,
+            "summary": scored.practice.summary,
             "purpose": scored.purpose,
             "purposes": list(scored.practice.purposes),
             "category": scored.practice.category,

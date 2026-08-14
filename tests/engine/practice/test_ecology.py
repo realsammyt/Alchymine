@@ -1021,6 +1021,7 @@ class TestPayload:
             "pack_id",
             "slug",
             "title",
+            "summary",
             "purpose",
             "purposes",
             "category",

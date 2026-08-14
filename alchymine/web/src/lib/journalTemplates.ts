@@ -3,7 +3,11 @@ export type AlchymineSystem =
   | "healing"
   | "wealth"
   | "creative"
-  | "perspective";
+  | "perspective"
+  // Practice is not a sixth pillar. It is the layer that runs across all
+  // five, so its journal entries get their own bucket rather than being
+  // filed under whichever pillar happened to seem closest.
+  | "practice";
 
 export interface JournalTemplate {
   id: string;
@@ -393,6 +397,42 @@ export const JOURNAL_TEMPLATES: JournalTemplate[] = [
     tags: ["collaboration", "teamwork", "creative"],
     label: "Collaboration Reflection",
     description: "Reflect on creative collaboration dynamics and discoveries.",
+  },
+
+  // ── Practice ───────────────────────────────────────────────────────
+  // The two ends of the integration loop. The intention is written
+  // before a practice, the integration afterwards, and the practice
+  // surface links to both by id.
+  {
+    id: "practice-intention",
+    system: "practice",
+    entryType: "intention",
+    title: "Before the Practice",
+    promptQuestions: [
+      "Which practice are you about to do, and what pulled you toward it?",
+      "What's going on right now that this might meet?",
+      "What would you like to be able to do afterwards that you can't quite do yet?",
+      "What would tell you this was worth the time?",
+    ],
+    tags: ["practice", "intention"],
+    label: "Before the Practice",
+    description: "Set down what you're bringing to a practice before you start.",
+  },
+  {
+    id: "practice-integration",
+    system: "practice",
+    entryType: "integration",
+    title: "After the Practice",
+    promptQuestions: [
+      "What actually happened while you practiced? Not what should have.",
+      "Did anything shift, or was it a flat one? Both are ordinary.",
+      "Where did your attention go when it wandered off?",
+      "What does this change about the next few hours, if anything?",
+    ],
+    tags: ["practice", "integration"],
+    label: "After the Practice",
+    description:
+      "Write down what the practice was actually like, while it's still close.",
   },
 ];
 

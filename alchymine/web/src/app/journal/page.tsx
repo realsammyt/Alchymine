@@ -31,6 +31,7 @@ const SYSTEMS = [
   "wealth",
   "creative",
   "perspective",
+  "practice",
 ];
 
 const ENTRY_TYPES = [
@@ -40,6 +41,7 @@ const ENTRY_TYPES = [
   "intention",
   "freeform",
   "practice-log",
+  "integration",
   "decision",
   "assessment",
   "progress",
@@ -51,7 +53,8 @@ type SystemColorKey =
   | "healing"
   | "wealth"
   | "creative"
-  | "perspective";
+  | "perspective"
+  | "practice";
 
 const SYSTEM_COLORS: Record<
   SystemColorKey,
@@ -91,6 +94,12 @@ const SYSTEM_COLORS: Record<
     badge: "bg-accent/10 text-accent-light",
     text: "text-accent-light",
     dot: "bg-accent-light",
+  },
+  practice: {
+    border: "border-l-primary-light",
+    badge: "bg-primary/10 text-primary-light",
+    text: "text-primary-light",
+    dot: "bg-primary-light",
   },
 };
 
@@ -949,6 +958,7 @@ function JournalPageInner() {
                   <div className="space-y-8">
                     {(
                       [
+                        "practice",
                         "perspective",
                         "wealth",
                         "healing",

@@ -1517,4 +1517,210 @@ export async function patchFeedback(
   });
 }
 
+// ─── Practice ────────────────────────────────────────────────────────
+//
+// Every route here is auth-only. Nothing on this path is metered and
+// nothing calls an LLM, so none of it can return a plan gate.
+//
+// `today` is required on the two read routes and is the user's *local*
+// day. Build it with `localDayKey()` from `@/lib/localDay`, never from
+// `toISOString()`, which is UTC.
+
+export interface PracticeSelfCheck {
+  failure_mode: string;
+  question: string;
+}
+
+export interface PracticeDefinition {
+  slug: string;
+  title: string;
+  order: number;
+  summary: string;
+  purposes: string[];
+  category: string;
+  builds_on: string[];
+  related: string[];
+  use_when: string[];
+  description: string;
+  expected_shift: string;
+  applications: string[];
+  daily_prompts: string[];
+  self_check: PracticeSelfCheck;
+  scaffold_note: string;
+  duration_minutes: number;
+  evidence_rating: string;
+  contraindications: string[];
+  tags: string[];
+  featured: boolean;
+}
+
+export interface PracticeResponse {
+  pack_id: string;
+  progression_depth: number;
+  practice: PracticeDefinition;
+}
+
+export interface PackManifest {
+  schema_version: string;
+  pack_id: string;
+  title: string;
+  summary: string;
+  version: string;
+  license: string;
+  attribution: string;
+  source_url: string | null;
+  bundled: boolean;
+}
+
+export interface PackResponse {
+  manifest: PackManifest;
+  practice_count: number;
+}
+
+export interface ProtocolItem {
+  pack_id: string;
+  slug: string;
+  title: string;
+  /** One line saying what the practice is, so the card reads on its own. */
+  summary: string;
+  purpose: string;
+  purposes: string[];
+  category: string;
+  duration_minutes: number;
+  reason: string;
+  reason_template: string;
+}
+
+export interface ProtocolSlotEntry {
+  pack_id: string;
+  slug: string;
+  prompt: string;
+}
+
+export interface TodayResponse {
+  day_key: string;
+  generated_at: string;
+  protocol_size: number;
+  items: ProtocolItem[];
+  slots: Record<string, ProtocolSlotEntry[]>;
+}
+
+export interface PracticeSummaryResponse {
+  day_key: string;
+  days_practiced_last_7: number;
+  /** Oldest first: index 0 is six days before `day_key`, index 6 is it. */
+  last_7: boolean[];
+  by_purpose: Record<string, number>;
+  total_completed: number;
+}
+
+export interface PracticeLogEntry {
+  id: string;
+  user_id: string;
+  pack_id: string;
+  practice_slug: string;
+  primary_purpose: string;
+  purposes: string[];
+  category: string;
+  status: string;
+  protocol_slot: string | null;
+  duration_minutes: number | null;
+  occurred_at: string;
+  day_key: string;
+  created_at: string | null;
+  reflection: string | null;
+  self_check_response: string | null;
+}
+
+export interface PracticeLogCreate {
+  pack_id: string;
+  practice_slug: string;
+  day_key: string;
+  status?: "completed" | "skipped" | "started";
+  protocol_slot?: "morning" | "day" | "evening" | "unscheduled" | null;
+  duration_minutes?: number | null;
+  reflection?: string | null;
+  self_check_response?: string | null;
+}
+
+export interface IntegrationEntry {
+  id: string;
+  user_id: string;
+  practice_log_id: string | null;
+  intention_entry_id: string | null;
+  reflection_entry_id: string | null;
+  purpose: string;
+  capacity_delta: number | null;
+  note: string | null;
+  created_at: string | null;
+}
+
+export interface IntegrationCreate {
+  practice_log_id: string;
+  intention_entry_id?: string | null;
+  reflection_entry_id?: string | null;
+  capacity_delta?: number | null;
+  note?: string | null;
+}
+
+/** Today's protocol. `today` is the caller's local day, and is required. */
+export async function getPracticeToday(
+  today: string,
+  opts?: { refresh?: boolean; signal?: AbortSignal },
+): Promise<TodayResponse> {
+  const params = new URLSearchParams({ today });
+  if (opts?.refresh) params.set("refresh", "true");
+  return request<TodayResponse>(`${BASE}/practice/today?${params.toString()}`, {
+    signal: opts?.signal,
+  });
+}
+
+/** The rhythm figures for the seven days ending on `today`. */
+export async function getPracticeSummary(
+  today: string,
+  signal?: AbortSignal,
+): Promise<PracticeSummaryResponse> {
+  return request<PracticeSummaryResponse>(
+    `${BASE}/practice/summary?today=${encodeURIComponent(today)}`,
+    { signal },
+  );
+}
+
+export async function logPractice(
+  entry: PracticeLogCreate,
+): Promise<PracticeLogEntry> {
+  return request<PracticeLogEntry>(`${BASE}/practice/log`, {
+    method: "POST",
+    body: JSON.stringify(entry),
+  });
+}
+
+export async function createIntegration(
+  entry: IntegrationCreate,
+): Promise<IntegrationEntry> {
+  return request<IntegrationEntry>(`${BASE}/practice/integration`, {
+    method: "POST",
+    body: JSON.stringify(entry),
+  });
+}
+
+export async function listPractices(
+  opts?: { packId?: string; purpose?: string; signal?: AbortSignal },
+): Promise<PracticeResponse[]> {
+  const params = new URLSearchParams();
+  if (opts?.packId) params.set("pack_id", opts.packId);
+  if (opts?.purpose) params.set("purpose", opts.purpose);
+  const query = params.toString();
+  return request<PracticeResponse[]>(
+    `${BASE}/practices${query ? `?${query}` : ""}`,
+    { signal: opts?.signal },
+  );
+}
+
+export async function listPracticePacks(
+  signal?: AbortSignal,
+): Promise<PackResponse[]> {
+  return request<PackResponse[]>(`${BASE}/practices/packs`, { signal });
+}
+
 export { ApiError };
