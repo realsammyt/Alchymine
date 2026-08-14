@@ -14,6 +14,7 @@ day rather than the server's.
 from __future__ import annotations
 
 import asyncio
+import re
 from collections.abc import AsyncGenerator, Iterator
 
 import pytest
@@ -262,7 +263,46 @@ class TestToday:
         assert completed in {item["slug"] for item in theirs["items"]}
 
     def test_no_score_reaches_the_client(self, client: TestClient) -> None:
-        assert "score" not in get_today(client).text
+        response = get_today(client)
+
+        # The status assertion is load-bearing: a 404 body contains no
+        # "score" either, so without it this passes against no route.
+        assert response.status_code == 200
+        assert "score" not in response.text
+
+    def test_three_skips_retire_a_practice_at_the_route(self, client: TestClient) -> None:
+        """The decline rule, end to end through Postgres-shaped storage.
+
+        The engine tests pin the rule against in-memory rows. This one
+        pins the path that feeds them: a recommender query that loaded
+        only ``completed`` rows would drop every skip on the floor, the
+        rule would never fire, and every engine test would still pass.
+        """
+        for day_key in ("2026-08-11", "2026-08-12", "2026-08-13"):
+            response = log_practice(client, "find-the-floor", status="skipped", day_key=day_key)
+            assert response.status_code == 201
+
+        body = get_today(client)
+        assert body.status_code == 200
+        slugs = {item["slug"] for item in body.json()["items"]}
+
+        assert "find-the-floor" not in slugs
+        assert "name-the-pattern" in slugs
+        # Steadiness is left with nothing offerable: its only other
+        # practice builds on the retired one, so the protocol is four.
+        assert "steadiness" not in {item["purpose"] for item in body.json()["items"]}
+
+    def test_a_completion_dated_after_today_does_not_produce_a_negative_reason(
+        self, client: TestClient
+    ) -> None:
+        """A user who crosses a date line logs a day ahead of this request."""
+        assert log_practice(client, "find-the-floor", day_key="2026-08-16").status_code == 201
+
+        response = get_today(client)
+
+        assert response.status_code == 200
+        for item in response.json()["items"]:
+            assert not re.search(r"-\d", item["reason"]), item["reason"]
 
 
 # ─── ecology_state writes ───────────────────────────────────────────────
@@ -311,8 +351,11 @@ class TestEcologyState:
         self, client: TestClient, session_factory: async_sessionmaker[AsyncSession]
     ) -> None:
         """The summary is a read. It has no business writing recommender state."""
-        client.get("/api/v1/practice/summary", params={"today": TODAY})
+        response = client.get("/api/v1/practice/summary", params={"today": TODAY})
 
+        # Without the status assertion a 404 satisfies this test, since a
+        # route that does not exist also writes no state.
+        assert response.status_code == 200
         assert read_state(session_factory) is None
 
     def test_an_unreadable_stored_payload_recomputes_rather_than_500s(

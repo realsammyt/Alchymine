@@ -85,6 +85,27 @@ def bundled() -> PracticeRegistry:
 
 
 @pytest.fixture
+def crowded(tmp_path: Path) -> PracticeRegistry:
+    """One purpose holding the three highest scorers, four holding one each.
+
+    Built so that a plain top-N *fails* the balance invariant rather than
+    passing it by luck. The three self-knowledge practices are featured,
+    which puts them 0.1 above every other root from cold, so ranking by
+    score alone returns three of them and never reaches two of the five
+    purposes at all.
+    """
+    practices = [
+        practice_dict(f"sk-{n}", order=n, purposes=["self-knowledge"], featured=True)
+        for n in range(3)
+    ]
+    practices += [
+        practice_dict(f"{purpose}-only", order=10 + index, purposes=[purpose])
+        for index, purpose in enumerate(PURPOSE_ORDER[1:])
+    ]
+    return make_registry(tmp_path, practices, "crowded-pack")
+
+
+@pytest.fixture
 def wide(tmp_path: Path) -> PracticeRegistry:
     """Five purposes, three deep: root -> child -> grandchild.
 
@@ -167,22 +188,26 @@ def keys_of(payload: dict[str, Any]) -> list[tuple[str, str]]:
 
 class TestInvariants:
     def test_invariant_1_balance_every_eligible_purpose_appears(
-        self, wide: PracticeRegistry
+        self, crowded: PracticeRegistry
     ) -> None:
         """For N >= eligible purposes, every eligible purpose appears at least once.
 
-        The failure this prevents is a plain top-N returning five
+        The failure this prevents is a plain top-N returning several
         practices of one purpose, which is the whole reason selection is
-        a round-robin rather than a sort.
+        a round-robin rather than a sort. The ``crowded`` registry is
+        built so top-N genuinely would: its three self-knowledge
+        practices are the three highest scorers from cold.
         """
-        # A log that heavily favours one purpose is the case where a
-        # score-only ranking would collapse onto its neighbours.
-        log = [row("p0-root", purpose="self-knowledge", day_key=day(d)) for d in range(1, 20)]
+        ranked = rank_practices(crowded, [], state(), today=TODAY, settings=SETTINGS)
+        assert [s.purpose for s in ranked[:3]] == ["self-knowledge"] * 3, (
+            "fixture no longer sets the trap this invariant is meant to catch"
+        )
 
-        result = recommend(wide, log, state=state(protocol_size=5))
+        result = recommend(crowded, [], state=state(protocol_size=5))
 
         assert len(result.payload["items"]) == 5
         assert set(purposes_of(result.payload)) == set(PURPOSE_ORDER)
+        assert purposes_of(result.payload).count("self-knowledge") == 1
 
     def test_invariant_2_staleness_the_staler_practice_ranks_higher(
         self, tmp_path: Path
@@ -208,6 +233,10 @@ class TestInvariants:
         ranked = rank_practices(registry, log, state(), today=TODAY, settings=SETTINGS)
 
         assert [scored.practice.slug for scored in ranked] == ["stale", "fresh"]
+        # Pinned as a *score* difference, not merely an ordering one: the
+        # days-since tie-break would produce the same sequence on its own,
+        # so without this the staleness term could go to zero unnoticed.
+        assert ranked[0].score > ranked[1].score
 
     @pytest.mark.parametrize("seed", range(20))
     def test_invariant_3_prerequisites_are_never_unmet(
@@ -364,6 +393,49 @@ class TestEligibility:
 
         assert "p0-child" in slugs
 
+    def test_a_prerequisite_is_pack_scoped(self, tmp_path: Path) -> None:
+        """Completing one pack's root must not unlock another pack's child.
+
+        Slugs are namespaced by pack, so two packs sharing a slug is
+        normal rather than an error. A prerequisite check that compared
+        slugs without their pack would unlock practices the user has done
+        nothing towards, which is invariant 3 failing in the one shape
+        its randomized fixtures cannot reach: they are single-pack.
+        """
+        chain = [
+            practice_dict("shared", order=0, purposes=["steadiness"]),
+            practice_dict("follows", order=1, purposes=["steadiness"], builds_on=["shared"]),
+        ]
+        write_pack(tmp_path, "aaa-pack", chain)
+        write_pack(tmp_path, "bbb-pack", chain)
+        registry = build_practice_registry([tmp_path])
+        log = [row("shared", purpose="steadiness", day_key=day(3), pack_id="aaa-pack")]
+
+        eligible = {
+            (s.pack_id, s.practice.slug)
+            for s in rank_practices(registry, log, state(), today=TODAY, settings=SETTINGS)
+        }
+
+        assert ("aaa-pack", "follows") in eligible
+        assert ("bbb-pack", "follows") not in eligible
+        # The untouched pack's own root is still offerable; only its
+        # child is gated.
+        assert ("bbb-pack", "shared") in eligible
+
+    def test_two_skips_do_not_decline(self, wide: PracticeRegistry) -> None:
+        """The threshold is three. Two is not "stop asking"."""
+        log = [
+            row("p0-root", purpose="self-knowledge", day_key=day(d), status="skipped")
+            for d in (2, 5)
+        ]
+
+        slugs = {
+            scored.practice.slug
+            for scored in rank_practices(wide, log, state(), today=TODAY, settings=SETTINGS)
+        }
+
+        assert "p0-root" in slugs
+
     def test_three_skips_with_one_completion_in_the_window_is_not_declined(
         self, wide: PracticeRegistry
     ) -> None:
@@ -444,6 +516,34 @@ class TestScoring:
 
         assert crowded.balance_term == pytest.approx(1 - 3 / 4)
         assert neglected.balance_term == 1.0
+
+    def test_the_window_edge_is_exactly_28_days(self, wide: PracticeRegistry) -> None:
+        """28 calendar days ending today, inclusive: day 27 is in, day 28 is out.
+
+        Pins the off-by-one directly. ``window_start`` is
+        ``today - (28 - 1)``, so a completion 27 days ago still counts
+        towards its purpose's share and one 28 days ago does not.
+        """
+        inside = rank_practices(
+            wide,
+            [row("p0-root", purpose="self-knowledge", day_key=day(27))],
+            state(),
+            today=TODAY,
+            settings=SETTINGS,
+        )
+        outside = rank_practices(
+            wide,
+            [row("p0-root", purpose="self-knowledge", day_key=day(28))],
+            state(),
+            today=TODAY,
+            settings=SETTINGS,
+        )
+
+        # The only completion in the window is self-knowledge, so its
+        # share is 1.0 and the balance term for that purpose collapses.
+        assert next(s for s in inside if s.practice.slug == "p0-child").balance_term == 0.0
+        # One day further back and the window holds nothing at all.
+        assert next(s for s in outside if s.practice.slug == "p0-child").balance_term == 1.0
 
     def test_completions_outside_the_window_do_not_move_the_balance_term(
         self, wide: PracticeRegistry
@@ -594,6 +694,96 @@ class TestTieBreaking:
         ranked = rank_practices(registry, [], state(), today=TODAY, settings=SETTINGS)
 
         assert [s.practice.slug for s in ranked] == ["earlier", "later"]
+
+    def test_days_since_completion_breaks_a_tie_before_order_does(
+        self, tmp_path: Path
+    ) -> None:
+        """Tie-break key 3, isolated.
+
+        Staleness is weighted to zero so the two scores tie exactly, and
+        the fresher practice carries the better ``order``. Only key 3
+        (days since last completion, descending) can produce the asserted
+        result; drop it and ``order`` hands the win to the fresher one.
+        """
+        no_staleness = EcologySettings(
+            weight_balance=0.5,
+            weight_staleness=0.0,
+            weight_progression=0.4,
+            weight_featured=0.1,
+            staleness_full_days=14,
+            balance_window_days=28,
+            decline_threshold=3,
+            protocol_default_size=5,
+        )
+        registry = make_registry(
+            tmp_path,
+            [
+                practice_dict("fresher", order=0, purposes=["steadiness"]),
+                practice_dict("older", order=1, purposes=["steadiness"]),
+            ],
+            "days-key-pack",
+        )
+        log = [
+            row("fresher", purpose="steadiness", day_key=day(5), pack_id="days-key-pack"),
+            row("older", purpose="steadiness", day_key=day(10), pack_id="days-key-pack"),
+        ]
+
+        ranked = rank_practices(registry, log, state(), today=TODAY, settings=no_staleness)
+
+        assert ranked[0].score == ranked[1].score
+        assert [s.practice.slug for s in ranked] == ["older", "fresher"]
+
+    def test_purpose_share_breaks_a_tie_before_days_since_does(
+        self, tmp_path: Path
+    ) -> None:
+        """Tie-break key 2, isolated.
+
+        Two practices in different purposes are made to score identically
+        while their purpose shares differ, and the *never-completed* one
+        holds the better days-since key. Only key 2 (share ascending) can
+        produce the asserted result; drop it and key 3 reverses the pair.
+
+        The steadiness practice carries a completion dated tomorrow. That
+        is not a contrivance: every ``day_key`` is client-supplied, so a
+        user crossing a date line leaves exactly this row. It reads as
+        zero days since, and it falls outside the window, so it moves the
+        staleness term without touching any share.
+        """
+        even_split = EcologySettings(
+            weight_balance=0.4,
+            weight_staleness=0.4,
+            weight_progression=0.1,
+            weight_featured=0.1,
+            staleness_full_days=14,
+            balance_window_days=28,
+            decline_threshold=3,
+            protocol_default_size=5,
+        )
+        registry = make_registry(
+            tmp_path,
+            [
+                practice_dict("sk-one", order=0, purposes=["self-knowledge"]),
+                practice_dict("st-one", order=1, purposes=["steadiness"]),
+                practice_dict("sk-source", order=2, purposes=["self-knowledge"]),
+            ],
+            "share-key-pack",
+        )
+        log = [
+            # Completed today: gives self-knowledge the whole window share
+            # and removes itself from the pool.
+            row("sk-source", purpose="self-knowledge", day_key=TODAY, pack_id="share-key-pack"),
+            row("st-one", purpose="steadiness", day_key=day(-1), pack_id="share-key-pack"),
+        ]
+
+        ranked = rank_practices(registry, log, state(), today=TODAY, settings=even_split)
+
+        assert [s.practice.slug for s in ranked] == ["st-one", "sk-one"]
+        assert ranked[0].score == ranked[1].score
+        assert ranked[0].purpose_share < ranked[1].purpose_share
+        # Key 3 would have reversed them: sk-one has never been completed
+        # and therefore sorts as the stalest thing there is.
+        assert ranked[1].days_since_last_completion is None
+        assert ranked[0].days_since_last_completion == 0
 
     def test_pack_id_and_slug_break_a_full_tie(self, tmp_path: Path) -> None:
         """The last key is total, so the ordering is a pure function of inputs."""

@@ -366,3 +366,65 @@ async def test_get_practice_log_entry_hides_another_users_row(session: AsyncSess
     assert await repository.get_practice_log_entry(session, row.id, owner.id) is not None
     # Another user's id yields None, indistinguishable from a missing row.
     assert await repository.get_practice_log_entry(session, row.id, other.id) is None
+
+
+# ─── Ecology state ──────────────────────────────────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_get_or_create_ecology_state_creates_with_defaults(
+    session: AsyncSession,
+) -> None:
+    user = await _user(session)
+
+    state = await repository.get_or_create_ecology_state(session, user.id)
+
+    assert state.user_id == user.id
+    assert state.protocol_size == 5
+    assert state.rotation_cursor == 0
+    assert state.active_pack_ids is None
+    assert state.last_recommendation is None
+
+
+@pytest.mark.asyncio
+async def test_get_or_create_ecology_state_preserves_an_existing_row(
+    session: AsyncSession,
+) -> None:
+    """The "create" half must never clobber a row that already exists.
+
+    A second call that re-wrote the defaults would silently reset a
+    user's protocol size and their rotation position on every request,
+    which is the kind of bug that looks like the recommender being
+    random rather than like a repository bug.
+    """
+    user = await _user(session)
+    session.add(EcologyState(user_id=user.id, protocol_size=7, rotation_cursor=3))
+    await session.flush()
+
+    state = await repository.get_or_create_ecology_state(session, user.id)
+
+    assert state.protocol_size == 7
+    assert state.rotation_cursor == 3
+
+
+@pytest.mark.asyncio
+async def test_update_ecology_recommendation_writes_all_three_fields(
+    session: AsyncSession,
+) -> None:
+    user = await _user(session)
+    envelope = {"envelope_version": 1, "day_key": "2026-08-14", "payload": {"items": []}}
+
+    state = await repository.update_ecology_recommendation(
+        session,
+        user.id,
+        rotation_cursor=2,
+        last_recommendation=envelope,
+        last_recommended_at=_at(14),
+    )
+
+    assert state.rotation_cursor == 2
+    assert state.last_recommendation == envelope
+    assert state.last_recommended_at is not None
+    # It creates the row when there is none, so a first-ever request does
+    # not need a separate write.
+    assert state.protocol_size == 5
