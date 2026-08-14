@@ -55,16 +55,12 @@ class TestPurposes:
 
     def test_duplicate_purposes_rejected(self) -> None:
         with pytest.raises(ValidationError, match="duplicate"):
-            PracticeDefinition.model_validate(
-                practice_dict(purposes=["steadiness", "steadiness"])
-            )
+            PracticeDefinition.model_validate(practice_dict(purposes=["steadiness", "steadiness"]))
 
     def test_more_than_three_purposes_rejected(self) -> None:
         with pytest.raises(ValidationError):
             PracticeDefinition.model_validate(
-                practice_dict(
-                    purposes=["steadiness", "expression", "reframing", "stewardship"]
-                )
+                practice_dict(purposes=["steadiness", "expression", "reframing", "stewardship"])
             )
 
     def test_zero_purposes_rejected(self) -> None:
@@ -194,3 +190,16 @@ class TestPackManifest:
     def test_bad_pack_id_rejected(self, pack_id: str) -> None:
         with pytest.raises(ValidationError):
             PackManifest.model_validate(manifest_dict(pack_id=pack_id))
+
+    @pytest.mark.parametrize(
+        "url",
+        ["javascript:alert(1)", "data:text/html,x", "ftp://example.com", "file:///etc/passwd"],
+    )
+    def test_non_http_source_url_rejected(self, url: str) -> None:
+        with pytest.raises(ValidationError, match="http"):
+            PackManifest.model_validate(manifest_dict(source_url=url))
+
+    @pytest.mark.parametrize("url", ["https://example.com/pack", "http://example.com", None])
+    def test_http_and_absent_source_url_accepted(self, url: str | None) -> None:
+        manifest = PackManifest.model_validate(manifest_dict(source_url=url))
+        assert manifest.source_url == url

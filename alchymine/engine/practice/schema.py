@@ -98,6 +98,15 @@ class PackManifest(BaseModel):
     def _validate_pack_id(cls, v: str) -> str:
         return _validate_slug(v, "pack_id")
 
+    @field_validator("source_url")
+    @classmethod
+    def _validate_source_url_scheme(cls, v: str | None) -> str | None:
+        # The UI will render this as a link; anything but http(s) is a
+        # click-to-XSS vector from a third-party pack (javascript: etc.).
+        if v is not None and not v.startswith(("https://", "http://")):
+            raise ValueError("source_url must use http:// or https://")
+        return v
+
 
 class SelfCheck(BaseModel):
     """The reflective question that closes a practice.
