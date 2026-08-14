@@ -41,6 +41,7 @@ import alchymine.db.models  # noqa: F401 — register models with metadata
 from alchymine.api.auth import get_current_user
 from alchymine.api.deps import get_db_session
 from alchymine.api.main import app
+from alchymine.db import repository
 from alchymine.db.base import Base
 
 from .conftest import TEST_USER_ID
@@ -72,6 +73,17 @@ class Env:
     client: TestClient
     _loop: asyncio.AbstractEventLoop
     _factory: async_sessionmaker[AsyncSession]
+
+    def run(self, fn: Any) -> Any:
+        """Run an async callable against a fresh session, then commit."""
+
+        async def _run() -> Any:
+            async with self._factory() as session:
+                result = await fn(session)
+                await session.commit()
+                return result
+
+        return self._loop.run_until_complete(_run())
 
     def query(self, sql: str, **params: Any) -> list[tuple]:
         async def _run() -> list[tuple]:
@@ -221,9 +233,7 @@ class TestOwnership:
         with as_other_user():
             foreign_entry = _journal(env.client)
 
-        response = _integrate(
-            env.client, practice_log_id=log_id, reflection_entry_id=foreign_entry
-        )
+        response = _integrate(env.client, practice_log_id=log_id, reflection_entry_id=foreign_entry)
         assert response.status_code == 404
 
     def test_unknown_journal_entry_id_is_404(self, client: TestClient) -> None:
@@ -334,6 +344,59 @@ class TestDerivedOutcome:
         _integrate(env.client, practice_log_id=log_id)
 
         assert env.query("SELECT user_id FROM outcome_metrics")[0][0] == TEST_USER_ID
+
+
+# ─── Atomicity ──────────────────────────────────────────────────────────
+
+
+class TestAtomicity:
+    def test_a_failed_outcome_write_leaves_no_orphan_integration_row(
+        self, env: Env, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """The link row and the derived row land together or not at all.
+
+        The two writes share one session and one transaction, so a
+        failure on the second discards the first. Without that an
+        integration entry could exist with nothing on the dashboard to
+        show for it, and no way to tell from the data that anything was
+        lost.
+
+        The rollback is the session dependency's, not the route's:
+        ``get_db_session`` rolls back on any exception, in the app and in
+        the fixture alike. The caller sees a 500 because the error
+        middleware converts it, and no traceback reaches the user.
+        """
+        log_id = _log_practice(env.client)
+
+        async def _boom(*args: Any, **kwargs: Any) -> None:
+            raise RuntimeError("outcome store is down")
+
+        monkeypatch.setattr(repository, "record_outcome_metric", _boom)
+
+        response = _integrate(env.client, practice_log_id=log_id, capacity_delta=1)
+
+        assert response.status_code == 500
+        assert "outcome store is down" not in response.text
+        assert env.query("SELECT count(*) FROM integration_entries")[0][0] == 0
+        assert env.query("SELECT count(*) FROM outcome_metrics")[0][0] == 0
+
+    def test_the_practice_log_row_itself_survives(
+        self, env: Env, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """A failed integration must not undo the practice that happened.
+
+        It was committed by its own request, so it is outside this
+        transaction entirely.
+        """
+        log_id = _log_practice(env.client)
+
+        async def _boom(*args: Any, **kwargs: Any) -> None:
+            raise RuntimeError("outcome store is down")
+
+        monkeypatch.setattr(repository, "record_outcome_metric", _boom)
+        assert _integrate(env.client, practice_log_id=log_id).status_code == 500
+
+        assert env.query("SELECT count(*) FROM practice_log")[0][0] == 1
 
 
 # ─── Encryption ─────────────────────────────────────────────────────────

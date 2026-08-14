@@ -30,10 +30,13 @@ const SLOTS: { key: Slot; heading: string }[] = [
 /** Everything one card is currently doing, keyed by slot and practice. */
 interface CardStatus {
   state: PracticeCardState;
+  /** True between the optimistic flip and the write landing. */
+  pending: boolean;
   error: string | null;
   logId: string | null;
   selfCheckDismissed: boolean;
   selfCheckSaving: boolean;
+  selfCheckSaved: boolean;
   selfCheckError: string | null;
   integration: IntegrationState;
   integrationError: string | null;
@@ -42,10 +45,12 @@ interface CardStatus {
 
 const FRESH: CardStatus = {
   state: "idle",
+  pending: false,
   error: null,
   logId: null,
   selfCheckDismissed: false,
   selfCheckSaving: false,
+  selfCheckSaved: false,
   selfCheckError: null,
   integration: "idle",
   integrationError: null,
@@ -108,8 +113,9 @@ export default function DailyProtocol({
       status: "completed" | "skipped",
     ) => {
       // Optimistic: show the outcome first, undo it only if the write
-      // is refused.
-      patch(key, { state: status, error: null });
+      // is refused. `pending` marks the window in between, which is what
+      // the card reports as aria-busy.
+      patch(key, { state: status, pending: true, error: null });
       try {
         const created = await onLog({
           pack_id: item.pack_id,
@@ -118,11 +124,12 @@ export default function DailyProtocol({
           status,
           protocol_slot: slot,
         });
-        patch(key, { logId: created.id });
+        patch(key, { logId: created.id, pending: false });
         onLogged?.();
       } catch {
         patch(key, {
           state: "idle",
+          pending: false,
           error: "That didn't save. Have another go in a moment.",
         });
       }
@@ -135,7 +142,9 @@ export default function DailyProtocol({
       patch(key, { selfCheckSaving: true, selfCheckError: null });
       try {
         await onIntegrate({ practice_log_id: logId, note: response });
-        patch(key, { selfCheckSaving: false, selfCheckDismissed: true });
+        // Confirmed rather than unmounted. A control that vanishes on
+        // success takes the user's focus with it and says nothing.
+        patch(key, { selfCheckSaving: false, selfCheckSaved: true });
       } catch {
         patch(key, {
           selfCheckSaving: false,
@@ -215,6 +224,7 @@ export default function DailyProtocol({
                     item={item}
                     prompt={entry.prompt}
                     state={status.state}
+                    pending={status.pending}
                     error={status.error}
                     onComplete={() => void write(key, item, slot, "completed")}
                     onSkip={() => void write(key, item, slot, "skipped")}
@@ -223,6 +233,7 @@ export default function DailyProtocol({
                       <SelfCheckPrompt
                         question={question}
                         saving={status.selfCheckSaving}
+                        saved={status.selfCheckSaved}
                         error={status.selfCheckError}
                         onSave={(response) => {
                           if (status.logId) {

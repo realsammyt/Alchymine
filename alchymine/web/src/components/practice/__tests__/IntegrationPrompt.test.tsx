@@ -53,9 +53,41 @@ describe("IntegrationPrompt", () => {
   });
 
   it("groups the capacity choices under one accessible name", () => {
+    // A fieldset with a legend is already a named group. No explicit
+    // role=radiogroup, which only duplicated what the markup said.
     renderPrompt();
-    expect(screen.getByRole("radiogroup")).toBeInTheDocument();
-    expect(screen.getAllByRole("radio")).toHaveLength(5);
+
+    expect(
+      screen.getByRole("group", { name: /how much of that capacity/i }),
+    ).toBeInTheDocument();
+    // Five readings plus the way back to no answer.
+    expect(screen.getAllByRole("radio")).toHaveLength(6);
+  });
+
+  it("starts with nothing selected", () => {
+    // "Rather not say" submits null and so does an untouched group, but
+    // they are different states on screen. Keying the option off null
+    // drew it pre-selected before the user had answered anything.
+    renderPrompt();
+
+    for (const radio of screen.getAllByRole("radio")) {
+      expect(radio).not.toBeChecked();
+    }
+  });
+
+  it("lets the user return to no answer after choosing one", () => {
+    // The copy calls this optional, and a radio group cannot otherwise
+    // be cleared once anything is picked.
+    const { props } = renderPrompt();
+
+    fireEvent.click(screen.getByRole("radio", { name: /a bit more/i }));
+    fireEvent.click(screen.getByRole("radio", { name: /rather not say/i }));
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+
+    expect(props.onSubmit).toHaveBeenCalledWith({
+      capacityDelta: null,
+      note: "",
+    });
   });
 
   it("lets the user dismiss it entirely", async () => {
@@ -67,14 +99,37 @@ describe("IntegrationPrompt", () => {
     expect(props.onSubmit).not.toHaveBeenCalled();
   });
 
-  it("disables the save control while saving", () => {
+  it("blocks saving while a write is in flight without blurring the control", () => {
     renderPrompt({ state: "saving" });
-    expect(screen.getByRole("button", { name: /sav/i })).toBeDisabled();
+
+    const save = screen.getByRole("button", { name: "Save" });
+    expect(save).toHaveAttribute("aria-disabled", "true");
+    expect(save).toHaveAttribute("aria-busy", "true");
+    expect(save).not.toBeDisabled();
+    save.focus();
+    expect(save).toHaveFocus();
   });
 
-  it("confirms once saved", () => {
-    renderPrompt({ state: "saved" });
-    expect(screen.getByText(/logged/i)).toBeInTheDocument();
+  it("does not submit again while a write is in flight", () => {
+    const { props } = renderPrompt({ state: "saving" });
+
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+
+    expect(props.onSubmit).not.toHaveBeenCalled();
+  });
+
+  it("keeps a stable accessible name while saving", () => {
+    renderPrompt({ state: "saving" });
+    expect(screen.queryByRole("button", { name: /saving/i })).toBeNull();
+  });
+
+  it("confirms once saved, in a status region that takes focus", () => {
+    const { rerender, props } = renderPrompt();
+    rerender(<IntegrationPrompt {...props} state="saved" />);
+
+    const status = screen.getByRole("status");
+    expect(status).toHaveTextContent(/logged/i);
+    expect(status).toHaveFocus();
   });
 
   it("shows an error and keeps the save control usable", () => {

@@ -182,6 +182,47 @@ describe("PracticeLibrary", () => {
     expect(screen.getByText(/no practices match/i)).toBeInTheDocument();
   });
 
+  it("puts each practice title in an h3, so the outline does not skip", () => {
+    // WCAG 1.3.1: the pack heading is an h2 and the contraindications
+    // heading is an h4, so without this the practice names were absent
+    // from the outline entirely.
+    render(<PracticeLibrary packs={PACKS} practices={PRACTICES} />);
+
+    expect(
+      screen.getByRole("heading", { level: 3, name: /find the floor/i }),
+    ).toBeInTheDocument();
+  });
+
+  it("announces how many practices a filter left", () => {
+    render(<PracticeLibrary packs={PACKS} practices={PRACTICES} />);
+
+    expect(screen.getByRole("status")).toHaveTextContent(
+      "Showing 3 practices.",
+    );
+
+    fireEvent.change(screen.getByLabelText(/capacity/i), {
+      target: { value: "self-knowledge" },
+    });
+
+    expect(screen.getByRole("status")).toHaveTextContent(
+      "Showing 1 practices.",
+    );
+  });
+
+  it("keeps the same live region node across filter changes", () => {
+    // A region that mounts at the same moment as its text is announced
+    // unreliably, so the node has to outlive the change.
+    render(<PracticeLibrary packs={PACKS} practices={PRACTICES} />);
+    const before = screen.getByRole("status");
+
+    fireEvent.change(screen.getByLabelText(/capacity/i), {
+      target: { value: "expression" },
+    });
+
+    expect(screen.getByRole("status")).toBe(before);
+    expect(before).toHaveTextContent("No practices match that capacity yet.");
+  });
+
   it("shows an empty state when nothing is mounted", () => {
     render(<PracticeLibrary packs={[]} practices={[]} />);
 

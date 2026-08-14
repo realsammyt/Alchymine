@@ -21,7 +21,7 @@ interface PackAttributionProps {
  */
 export default function PackAttribution({ manifest }: PackAttributionProps) {
   return (
-    <p className="text-xs font-body text-text/35 leading-relaxed">
+    <p className="text-xs font-body text-text/60 leading-relaxed">
       <span>{manifest.attribution}</span>
       <span aria-hidden="true"> · </span>
       <span>{manifest.license}</span>
@@ -32,9 +32,13 @@ export default function PackAttribution({ manifest }: PackAttributionProps) {
             href={manifest.source_url}
             target="_blank"
             rel="noopener noreferrer"
-            className="underline underline-offset-2 transition-colors duration-200 hover:text-text/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 rounded"
+            className="touch-target inline-flex items-center underline underline-offset-2 transition-colors duration-200 hover:text-text/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 rounded"
           >
             Source
+            {/* Says where the link goes before it is followed. A new tab
+                that arrives unannounced leaves a screen-reader user in a
+                document they did not ask for, with no back button. */}
+            <span className="sr-only"> (opens in a new tab)</span>
           </a>
         </>
       )}

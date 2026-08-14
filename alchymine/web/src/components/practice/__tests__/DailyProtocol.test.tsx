@@ -167,7 +167,7 @@ describe("DailyProtocol completion", () => {
     );
     renderProtocol({ onLog });
 
-    const card = within(morningSection()).getAllByRole("group")[0];
+    const card = within(morningSection()).getAllByRole("article")[0];
     fireEvent.click(within(card).getByRole("button", { name: /done/i }));
 
     expect(within(card).getByText("Done today.")).toBeInTheDocument();
@@ -179,7 +179,7 @@ describe("DailyProtocol completion", () => {
   it("posts the slot and the local day with the completion", async () => {
     const { props } = renderProtocol();
 
-    const card = within(morningSection()).getAllByRole("group")[0];
+    const card = within(morningSection()).getAllByRole("article")[0];
     fireEvent.click(within(card).getByRole("button", { name: /done/i }));
 
     await waitFor(() => expect(props.onLog).toHaveBeenCalled());
@@ -198,7 +198,7 @@ describe("DailyProtocol completion", () => {
     const onLog = jest.fn().mockRejectedValue(new Error("HTTP 500"));
     renderProtocol({ onLog });
 
-    const card = within(morningSection()).getAllByRole("group")[0];
+    const card = within(morningSection()).getAllByRole("article")[0];
     fireEvent.click(within(card).getByRole("button", { name: /done/i }));
 
     await waitFor(() =>
@@ -213,7 +213,7 @@ describe("DailyProtocol completion", () => {
   it("tells the page a write landed so the rhythm can refresh", async () => {
     const { props } = renderProtocol();
 
-    const card = within(morningSection()).getAllByRole("group")[0];
+    const card = within(morningSection()).getAllByRole("article")[0];
     fireEvent.click(within(card).getByRole("button", { name: /done/i }));
 
     await waitFor(() => expect(props.onLogged).toHaveBeenCalled());
@@ -223,7 +223,7 @@ describe("DailyProtocol completion", () => {
     const onLog = jest.fn().mockRejectedValue(new Error("HTTP 500"));
     const { props } = renderProtocol({ onLog });
 
-    const card = within(morningSection()).getAllByRole("group")[0];
+    const card = within(morningSection()).getAllByRole("article")[0];
     fireEvent.click(within(card).getByRole("button", { name: /done/i }));
 
     await waitFor(() => expect(onLog).toHaveBeenCalled());
@@ -233,14 +233,14 @@ describe("DailyProtocol completion", () => {
   it("completes one slot without touching the same practice elsewhere", async () => {
     renderProtocol();
 
-    const morningCard = within(morningSection()).getAllByRole("group")[0];
+    const morningCard = within(morningSection()).getAllByRole("article")[0];
     fireEvent.click(
       within(morningCard).getByRole("button", { name: /done/i }),
     );
 
     const eveningCard = within(
       screen.getByRole("region", { name: /evening/i }),
-    ).getAllByRole("group")[0];
+    ).getAllByRole("article")[0];
     expect(
       within(eveningCard).queryByText("Done today."),
     ).not.toBeInTheDocument();
@@ -251,7 +251,7 @@ describe("DailyProtocol skipping", () => {
   it("writes a skipped row with no penalty copy", async () => {
     const { props, container } = renderProtocol();
 
-    const card = within(morningSection()).getAllByRole("group")[0];
+    const card = within(morningSection()).getAllByRole("article")[0];
     fireEvent.click(within(card).getByRole("button", { name: /not today/i }));
 
     await waitFor(() =>
@@ -271,7 +271,7 @@ describe("DailyProtocol follow-ups", () => {
       screen.queryByText(FLOOR_DEFINITION.self_check.question),
     ).not.toBeInTheDocument();
 
-    const card = within(morningSection()).getAllByRole("group")[0];
+    const card = within(morningSection()).getAllByRole("article")[0];
     fireEvent.click(within(card).getByRole("button", { name: /done/i }));
 
     await waitFor(() =>
@@ -284,7 +284,7 @@ describe("DailyProtocol follow-ups", () => {
   it("offers the integration prompt after a completion", async () => {
     renderProtocol();
 
-    const card = within(morningSection()).getAllByRole("group")[0];
+    const card = within(morningSection()).getAllByRole("article")[0];
     fireEvent.click(within(card).getByRole("button", { name: /done/i }));
 
     await waitFor(() =>
@@ -294,12 +294,53 @@ describe("DailyProtocol follow-ups", () => {
     );
   });
 
+  it("keeps focus inside the card when a practice is completed", async () => {
+    renderProtocol();
+
+    const card = within(morningSection()).getAllByRole("article")[0];
+    const done = within(card).getByRole("button", { name: /done/i });
+    done.focus();
+    fireEvent.click(done);
+
+    // The card's own status region is first in document order; the
+    // follow-up prompts each add their own further down.
+    await waitFor(() =>
+      expect(within(card).getAllByRole("status")[0]).toHaveFocus(),
+    );
+    expect(within(card).getAllByRole("status")[0]).toHaveTextContent(
+      "Done today.",
+    );
+  });
+
+  it("confirms the self-check instead of unmounting it", async () => {
+    renderProtocol();
+
+    const card = within(morningSection()).getAllByRole("article")[0];
+    fireEvent.click(within(card).getByRole("button", { name: /done/i }));
+    await waitFor(() =>
+      expect(
+        within(card).getByRole("button", { name: "Save this" }),
+      ).toBeInTheDocument(),
+    );
+
+    fireEvent.change(within(card).getByLabelText(FLOOR_DEFINITION.self_check.question), {
+      target: { value: "Settling, mostly." },
+    });
+    fireEvent.click(within(card).getByRole("button", { name: "Save this" }));
+
+    await waitFor(() =>
+      expect(
+        within(card).getByText("Saved. Only you see this."),
+      ).toBeInTheDocument(),
+    );
+  });
+
   it("posts the integration against the practice log row that was created", async () => {
     const { props } = renderProtocol({
       onLog: jest.fn().mockResolvedValue(logEntry({ id: "log-99" })),
     });
 
-    const card = within(morningSection()).getAllByRole("group")[0];
+    const card = within(morningSection()).getAllByRole("article")[0];
     fireEvent.click(within(card).getByRole("button", { name: /done/i }));
     // "Save" exactly: the self-check's control is "Save this", and this
     // assertion is about the integration write, not that one.
@@ -318,7 +359,7 @@ describe("DailyProtocol follow-ups", () => {
   it("shows no self-check when the definition is not loaded", async () => {
     renderProtocol({ lookup: () => undefined });
 
-    const card = within(morningSection()).getAllByRole("group")[0];
+    const card = within(morningSection()).getAllByRole("article")[0];
     fireEvent.click(within(card).getByRole("button", { name: /done/i }));
 
     await waitFor(() =>

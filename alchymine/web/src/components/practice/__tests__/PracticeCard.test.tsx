@@ -114,11 +114,74 @@ describe("PracticeCard", () => {
     }
   });
 
-  it("disables both controls while a write is in flight", () => {
-    renderCard({ state: "saving" });
+  it("marks the optimistic outcome busy until the write lands", () => {
+    // The card flips to the outcome immediately, so the honest signal is
+    // not a disabled button (there is none any more) but a status region
+    // that admits the write has not confirmed yet.
+    renderCard({ state: "completed", pending: true });
 
-    expect(screen.getByRole("button", { name: /done/i })).toBeDisabled();
-    expect(screen.getByRole("button", { name: /not today/i })).toBeDisabled();
+    expect(screen.getByRole("status")).toHaveAttribute("aria-busy", "true");
+  });
+
+  it("drops aria-busy once the write has landed", () => {
+    renderCard({ state: "completed", pending: false });
+
+    expect(screen.getByRole("status")).toHaveAttribute("aria-busy", "false");
+  });
+
+  it("announces the outcome through the status region", () => {
+    // WCAG 4.1.3: the completion has to reach a screen reader, and a
+    // plain <p> swapped in silently does not.
+    renderCard({ state: "completed" });
+
+    expect(screen.getByRole("status")).toHaveTextContent("Done today.");
+  });
+
+  it("announces a skip through the same region", () => {
+    renderCard({ state: "skipped" });
+
+    expect(screen.getByRole("status")).toHaveTextContent(
+      "Not today. That's fine.",
+    );
+  });
+
+  it("moves focus onto the outcome when the card settles", () => {
+    // WCAG 2.4.3: the button the user was standing on is gone, so focus
+    // would otherwise fall to <body>.
+    const { rerender, props } = renderCard();
+    screen.getByRole("button", { name: /done/i }).focus();
+
+    rerender(<PracticeCard {...props} state="completed" />);
+
+    expect(screen.getByRole("status")).toHaveFocus();
+  });
+
+  it("returns focus to the complete control when a write rolls back", () => {
+    const { rerender, props } = renderCard({ state: "completed" });
+
+    rerender(
+      <PracticeCard
+        {...props}
+        state="idle"
+        error="That didn't save. Have another go in a moment."
+      />,
+    );
+
+    expect(screen.getByRole("button", { name: /done/i })).toHaveFocus();
+  });
+
+  it("does not steal focus on first render", () => {
+    renderCard({ state: "completed" });
+
+    expect(document.body).toHaveFocus();
+  });
+
+  it("names the card through its heading rather than a duplicate label", () => {
+    renderCard();
+
+    const card = screen.getByRole("article", { name: "Find the Floor" });
+    expect(card).toBeInTheDocument();
+    expect(card).not.toHaveAttribute("aria-label");
   });
 
   it("shows an inline error and keeps the controls usable", () => {

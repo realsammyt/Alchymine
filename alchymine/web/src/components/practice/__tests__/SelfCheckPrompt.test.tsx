@@ -11,6 +11,7 @@ function renderPrompt(
     onSave: jest.fn().mockResolvedValue(undefined),
     onDismiss: jest.fn(),
     saving: false,
+    saved: false,
     error: null,
     ...overrides,
   };
@@ -88,9 +89,41 @@ describe("SelfCheckPrompt", () => {
     expect(props.onSave).toHaveBeenCalledWith("Something true.");
   });
 
-  it("disables saving while a write is in flight", () => {
+  it("blocks saving while a write is in flight without blurring the control", () => {
+    // aria-disabled, not disabled: the real attribute drops the button
+    // out of the tab order and blurs whoever is standing on it.
     renderPrompt({ saving: true });
-    expect(screen.getByRole("button", { name: /sav/i })).toBeDisabled();
+
+    const save = screen.getByRole("button", { name: "Save this" });
+    expect(save).toHaveAttribute("aria-disabled", "true");
+    expect(save).toHaveAttribute("aria-busy", "true");
+    expect(save).not.toBeDisabled();
+    save.focus();
+    expect(save).toHaveFocus();
+  });
+
+  it("keeps a stable accessible name while saving", () => {
+    renderPrompt({ saving: true });
+    expect(screen.queryByRole("button", { name: /saving/i })).toBeNull();
+  });
+
+  it("keeps the save control reachable before anything is typed", () => {
+    // Disabled would hide the affordance: a keyboard user would tab from
+    // the textarea straight to "Skip this" and never learn Save exists.
+    renderPrompt();
+
+    const save = screen.getByRole("button", { name: "Save this" });
+    expect(save).not.toBeDisabled();
+    expect(save).toHaveAttribute("aria-disabled", "true");
+  });
+
+  it("confirms the save in a status region and takes focus", () => {
+    const { rerender, props } = renderPrompt();
+    rerender(<SelfCheckPrompt {...props} saved />);
+
+    const status = screen.getByRole("status");
+    expect(status).toHaveTextContent("Saved. Only you see this.");
+    expect(status).toHaveFocus();
   });
 
   it("surfaces a save error without losing what was typed", async () => {

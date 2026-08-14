@@ -30,28 +30,35 @@ function PracticeRow({ entry }: PracticeRowProps) {
 
   return (
     <li className="border-b border-white/[0.05] last:border-b-0">
-      <button
-        type="button"
-        aria-expanded={open}
-        aria-controls={bodyId}
-        onClick={() => setOpen((current) => !current)}
-        className="touch-target w-full text-left py-3 px-1 flex flex-wrap items-baseline gap-x-3 gap-y-1 transition-colors duration-200 hover:bg-white/[0.02] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 rounded"
-      >
-        <span className="font-display text-sm font-medium text-text">
-          {practice.title}
-        </span>
-        <span className="text-[11px] font-body px-2 py-0.5 rounded-full bg-white/[0.06] text-text/50">
-          {practice.duration_minutes} min
-        </span>
-        {practice.purposes.map((purpose) => (
-          <span
-            key={purpose}
-            className="text-[11px] font-body px-2 py-0.5 rounded-full bg-primary/10 text-primary"
-          >
-            {purposeLabel(purpose)}
+      {/* The standard disclosure pattern: an h3 wrapping the button, so
+          the practice title sits in the outline between the pack's h2
+          and the h4 inside the body. Without it the hierarchy skips a
+          level and a screen-reader user browsing by heading loses the
+          practice names entirely. */}
+      <h3>
+        <button
+          type="button"
+          aria-expanded={open}
+          aria-controls={bodyId}
+          onClick={() => setOpen((current) => !current)}
+          className="touch-target w-full text-left py-3 px-1 flex flex-wrap items-baseline gap-x-3 gap-y-1 transition-colors duration-200 hover:bg-white/[0.02] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 rounded"
+        >
+          <span className="font-display text-sm font-medium text-text">
+            {practice.title}
           </span>
-        ))}
-      </button>
+          <span className="text-[11px] font-body px-2 py-0.5 rounded-full bg-white/[0.06] text-text/60">
+            {practice.duration_minutes} min
+          </span>
+          {practice.purposes.map((purpose) => (
+            <span
+              key={purpose}
+              className="text-[11px] font-body px-2 py-0.5 rounded-full bg-primary/10 text-primary"
+            >
+              {purposeLabel(purpose)}
+            </span>
+          ))}
+        </button>
+      </h3>
       {/* The `hidden` attribute rather than a display class, so collapsed
           content is out of the accessibility tree and not merely off the
           screen. The element carrying `hidden` deliberately has no
@@ -73,10 +80,10 @@ function PracticeRow({ entry }: PracticeRowProps) {
           </p>
           {practice.contraindications.length > 0 && (
             <div>
-              <h4 className="font-body text-xs text-text/40 mb-1">
+              <h4 className="font-body text-xs text-text/60 mb-1">
                 Before you try this
               </h4>
-              <ul className="list-disc pl-5 text-xs font-body text-text/45 space-y-1">
+              <ul className="list-disc pl-5 text-xs font-body text-text/60 space-y-1">
                 {practice.contraindications.map((note) => (
                   <li key={note}>{note}</li>
                 ))}
@@ -114,7 +121,7 @@ export default function PracticeLibrary({
   if (packs.length === 0) {
     return (
       <div className="card-surface p-8 text-center">
-        <p className="text-sm font-body text-text/50 max-w-md mx-auto">
+        <p className="text-sm font-body text-text/60 max-w-md mx-auto">
           No practice packs are mounted right now.
         </p>
       </div>
@@ -124,7 +131,7 @@ export default function PracticeLibrary({
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-wrap items-center gap-2">
-        <label htmlFor={filterId} className="text-sm font-body text-text/50">
+        <label htmlFor={filterId} className="text-sm font-body text-text/60">
           Capacity
         </label>
         <select
@@ -142,13 +149,26 @@ export default function PracticeLibrary({
         </select>
       </div>
 
-      {visible.length === 0 ? (
-        <div className="card-surface p-8 text-center">
-          <p className="text-sm font-body text-text/50">
-            No practices match that capacity yet.
-          </p>
-        </div>
-      ) : (
+      {/* One persistent live region rather than a message that mounts
+          and unmounts: a region introduced at the same moment as its
+          text is unreliably announced. When there are results it carries
+          a count and is visually hidden; when there are none it becomes
+          the visible empty state. */}
+      <p
+        role="status"
+        aria-live="polite"
+        className={
+          visible.length === 0
+            ? "card-surface p-8 text-center text-sm font-body text-text/60"
+            : "sr-only"
+        }
+      >
+        {visible.length === 0
+          ? "No practices match that capacity yet."
+          : `Showing ${visible.length} practices.`}
+      </p>
+
+      {visible.length > 0 &&
         packs.map((pack) => {
           const entries = visible.filter(
             (entry) => entry.pack_id === pack.manifest.pack_id,
@@ -168,7 +188,7 @@ export default function PracticeLibrary({
               >
                 {pack.manifest.title}
               </h2>
-              <p className="text-sm font-body text-text/50 mb-2">
+              <p className="text-sm font-body text-text/60 mb-2">
                 {pack.manifest.summary}
               </p>
               <PackAttribution manifest={pack.manifest} />
@@ -182,8 +202,7 @@ export default function PracticeLibrary({
               </ul>
             </section>
           );
-        })
-      )}
+        })}
     </div>
   );
 }

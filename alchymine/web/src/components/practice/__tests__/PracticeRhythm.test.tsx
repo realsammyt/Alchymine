@@ -51,7 +51,7 @@ describe("PracticeRhythm", () => {
     expect(screen.getAllByRole("listitem")).toHaveLength(7);
   });
 
-  it("gives every marker a per-day accessible name", () => {
+  it("gives every marker a per-day label in its own contents", () => {
     render(
       <PracticeRhythm
         dayKey="2026-08-14"
@@ -60,16 +60,59 @@ describe("PracticeRhythm", () => {
       />,
     );
 
-    // last_7 is oldest first, so index 6 is dayKey itself.
+    // last_7 is oldest first, so index 6 is dayKey itself. The label
+    // lives in a visually-hidden span inside the <li>, not in an
+    // aria-label on it: browse-mode readers commonly read the contents.
     expect(
-      screen.getByLabelText("Friday 14 August: practiced"),
+      screen.getByText("Friday 14 August: practiced"),
     ).toBeInTheDocument();
     expect(
-      screen.getByLabelText("Saturday 8 August: practiced"),
+      screen.getByText("Saturday 8 August: practiced"),
     ).toBeInTheDocument();
     expect(
-      screen.getByLabelText("Sunday 9 August: no practice logged"),
+      screen.getByText("Sunday 9 August: no practice logged"),
     ).toBeInTheDocument();
+  });
+
+  it("puts the label in the list item rather than on it", () => {
+    const { container } = render(
+      <PracticeRhythm
+        dayKey="2026-08-14"
+        last7={FOUR_OF_SEVEN}
+        daysPracticed={4}
+      />,
+    );
+
+    for (const item of Array.from(container.querySelectorAll("li"))) {
+      expect(item).not.toHaveAttribute("aria-label");
+      expect(item.textContent).not.toBe("");
+    }
+  });
+
+  it("separates practiced from unpractised by more than colour", () => {
+    // WCAG 1.4.11: fill alone left the two states at 1.68:1 against each
+    // other. Border style is the signal that survives both low contrast
+    // and colour vision differences.
+    const { container } = render(
+      <PracticeRhythm
+        dayKey="2026-08-14"
+        last7={FOUR_OF_SEVEN}
+        daysPracticed={4}
+      />,
+    );
+
+    const markers = Array.from(
+      container.querySelectorAll('[aria-hidden="true"]'),
+    );
+    const practiced = markers.filter((m) =>
+      m.className.includes("border-primary"),
+    );
+    const unpractised = markers.filter((m) =>
+      m.className.includes("border-dashed"),
+    );
+
+    expect(practiced).toHaveLength(4);
+    expect(unpractised).toHaveLength(3);
   });
 
   it("hides the visual markers from assistive tech", () => {

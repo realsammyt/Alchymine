@@ -1,5 +1,6 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import PracticePage from "@/app/practice/page";
+import { LOSS_AVERSION_BANNED } from "@/components/practice/PracticeRhythm";
 import type { PracticeSummaryResponse, TodayResponse } from "@/lib/api";
 
 jest.mock("next/link", () => {
@@ -183,14 +184,11 @@ describe("PracticePage", () => {
     const { container } = render(<PracticePage />);
 
     await screen.findAllByText("Find the Floor");
+    // The canonical list, not a copy of part of it. A local subset drifts
+    // from the export the moment anything is added to it, which defeats
+    // the point of having one list.
     const rendered = container.innerHTML.toLowerCase();
-    for (const banned of [
-      "streak",
-      "don't break",
-      "you're about to lose",
-      "keep it going",
-      "resets in",
-    ]) {
+    for (const banned of LOSS_AVERSION_BANNED) {
       expect(rendered).not.toContain(banned);
     }
   });

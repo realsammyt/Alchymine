@@ -78,21 +78,31 @@ export default function PracticeRhythm({
       >
         Your last seven days
       </h2>
+      {/* The day and its state live in a visually-hidden span inside each
+          item rather than in an aria-label on the item. Browse-mode
+          screen readers commonly read a listitem's contents rather than
+          an author-supplied name, and the contents here are otherwise
+          empty, so seven labelled markers could read as seven silent
+          bullets.
+
+          The markers themselves differ by fill, by border colour and by
+          border style. Colour alone would not be enough: someone who
+          cannot separate the two hues still needs to see which days are
+          which. */}
       <ul className="flex items-center gap-2 sm:gap-3 mb-3 list-none p-0">
         {days.map((day) => (
-          <li
-            key={day.label}
-            aria-label={`${day.label}: ${
-              day.practiced ? "practiced" : "no practice logged"
-            }`}
-            className="flex-1 min-w-0"
-          >
+          <li key={day.label} className="flex-1 min-w-0">
+            <span className="sr-only">
+              {`${day.label}: ${
+                day.practiced ? "practiced" : "no practice logged"
+              }`}
+            </span>
             <span
               aria-hidden="true"
-              className={`block h-8 rounded-md border ${
+              className={`block h-8 rounded-md border-2 ${
                 day.practiced
-                  ? "bg-primary/30 border-primary/40"
-                  : "bg-white/[0.03] border-white/10"
+                  ? "bg-primary/60 border-primary"
+                  : "bg-transparent border-dashed border-white/40"
               }`}
             />
           </li>
