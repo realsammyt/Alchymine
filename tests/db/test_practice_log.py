@@ -343,4 +343,26 @@ async def test_list_practice_log_entries_paginates(session: AsyncSession) -> Non
 
 @pytest.mark.asyncio
 async def test_get_practice_log_entry_returns_none_when_absent(session: AsyncSession) -> None:
-    assert await repository.get_practice_log_entry(session, "no-such-id") is None
+    user = await _user(session)
+    assert await repository.get_practice_log_entry(session, "no-such-id", user.id) is None
+
+
+@pytest.mark.asyncio
+async def test_get_practice_log_entry_hides_another_users_row(session: AsyncSession) -> None:
+    owner = await _user(session)
+    other = await _user(session)
+    row = await repository.create_practice_log_entry(
+        session,
+        user_id=owner.id,
+        pack_id="alchymine-foundations",
+        practice_slug="name-the-pattern",
+        primary_purpose="self-knowledge",
+        purposes=["self-knowledge"],
+        category="reflection",
+        day_key="2026-08-14",
+        occurred_at=_at(14),
+    )
+
+    assert await repository.get_practice_log_entry(session, row.id, owner.id) is not None
+    # Another user's id yields None, indistinguishable from a missing row.
+    assert await repository.get_practice_log_entry(session, row.id, other.id) is None

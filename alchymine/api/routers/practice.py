@@ -42,6 +42,12 @@ def _validate_day_key(value: str) -> str:
     ``date.fromisoformat`` alone would accept ISO week dates like
     ``2026-W33-5``, which are the same length. Both together pin the one
     shape the column is documented to hold.
+
+    The pairing is also load-bearing in a less obvious way: pydantic v2
+    compiles the pattern with a Unicode-aware regex engine, so ``\\d``
+    matches Arabic-Indic and fullwidth digits; ``fromisoformat`` is
+    ASCII-only and is what rejects them. Do not collapse this to one
+    check.
     """
     try:
         date.fromisoformat(value)

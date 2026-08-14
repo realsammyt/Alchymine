@@ -797,12 +797,21 @@ async def create_practice_log_entry(
     return entry
 
 
-async def get_practice_log_entry(session: AsyncSession, entry_id: str) -> PracticeLogEntry | None:
-    """Fetch one practice-log row by id, or ``None`` if it does not exist.
+async def get_practice_log_entry(
+    session: AsyncSession, entry_id: str, user_id: str
+) -> PracticeLogEntry | None:
+    """Fetch one of the owner's practice-log rows by id, or ``None``.
 
-    Ownership is the caller's check, matching ``get_journal_entry``.
+    Ownership is filtered in SQL, not left to the caller: a row that
+    exists but belongs to another user is indistinguishable from one
+    that does not exist, so a future by-id route cannot become an
+    existence oracle.
     """
-    result = await session.execute(select(PracticeLogEntry).where(PracticeLogEntry.id == entry_id))
+    result = await session.execute(
+        select(PracticeLogEntry).where(
+            PracticeLogEntry.id == entry_id, PracticeLogEntry.user_id == user_id
+        )
+    )
     return result.scalar_one_or_none()
 
 
