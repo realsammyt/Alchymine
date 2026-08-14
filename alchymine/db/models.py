@@ -971,3 +971,187 @@ class BillingEvent(Base):
 
     def __repr__(self) -> str:
         return f"<BillingEvent id={self.id!r} type={self.event_type!r} status={self.status!r}>"
+
+
+# ─── Practice Layer ─────────────────────────────────────────────────────
+#
+# What is encrypted here, and what is not, is a decision worth stating
+# where somebody editing these classes will read it. ``reflection``,
+# ``self_check_response`` and ``IntegrationEntry.note`` hold what the
+# user wrote and are Fernet-encrypted. Everything else stays plaintext
+# because the ecology recommender groups by it in SQL, and Fernet is
+# non-deterministic: an encrypted ``primary_purpose`` or ``day_key``
+# cannot be grouped or compared, so encrypting them would move the whole
+# recommender into Python over a full table scan. Identifiers and
+# timestamps are not content.
+
+
+class PracticeLogEntry(Base):
+    """One logged practice event. The recommender's only input.
+
+    ``purposes`` and ``category`` are denormalized off the registry
+    definition at write time rather than joined back to it, so a row
+    stays interpretable after its pack is unmounted or revised.
+
+    ``day_key`` is the user's *local* calendar day and arrives from the
+    client. It is stored exactly as sent: deriving it server-side from
+    ``occurred_at`` in UTC would file an evening practice in Auckland
+    under the wrong day, every day.
+
+    There is deliberately no boolean or score on the self-check.
+    ``self_check_response`` is free text the recommender never reads;
+    scoring a reflective question would make it a diagnosis by another
+    name.
+    """
+
+    __tablename__ = "practice_log"
+    __table_args__ = (
+        Index("ix_practice_log_user_day", "user_id", "day_key"),
+        Index("ix_practice_log_user_purpose_time", "user_id", "primary_purpose", "occurred_at"),
+        Index(
+            "ix_practice_log_user_practice_time",
+            "user_id",
+            "pack_id",
+            "practice_slug",
+            "occurred_at",
+        ),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    user_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    pack_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    practice_slug: Mapped[str] = mapped_column(String(64), nullable=False)
+    primary_purpose: Mapped[str] = mapped_column(
+        String(32), nullable=False, comment="first declared purpose, denormalized at write"
+    )
+    purposes: Mapped[list] = mapped_column(JSONColumn, nullable=False, default=list)
+    category: Mapped[str] = mapped_column(String(32), nullable=False)
+    status: Mapped[str] = mapped_column(
+        String(16),
+        nullable=False,
+        default="completed",
+        server_default="completed",
+        comment="completed | skipped | started",
+    )
+    protocol_slot: Mapped[str | None] = mapped_column(
+        String(16), nullable=True, comment="morning | day | evening | unscheduled"
+    )
+    duration_minutes: Mapped[int | None] = mapped_column(
+        Integer, nullable=True, comment="actual, if the user reports it"
+    )
+    occurred_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, index=True
+    )
+    day_key: Mapped[str] = mapped_column(
+        String(10), nullable=False, comment="YYYY-MM-DD in the user's local day, client-supplied"
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    reflection: Mapped[str | None] = mapped_column(EncryptedString(), nullable=True)
+    self_check_response: Mapped[str | None] = mapped_column(EncryptedString(), nullable=True)
+
+    def __repr__(self) -> str:
+        return (
+            f"<PracticeLogEntry id={self.id!r} practice={self.pack_id!r}/"
+            f"{self.practice_slug!r} status={self.status!r} day={self.day_key!r}>"
+        )
+
+
+class EcologyState(Base):
+    """Per-user recommender state. No writers until slice 3.
+
+    ``user_id`` is both the primary key and the foreign key, so
+    one-row-per-user is a schema fact rather than an application rule.
+
+    Practice-scoped only: this models nothing about the alchemical
+    spiral. ``route_user`` stays pure and unpersisted, and persisted
+    spiral state would be its own table and its own decision.
+    """
+
+    __tablename__ = "ecology_state"
+
+    user_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("users.id", ondelete="CASCADE"), primary_key=True
+    )
+    protocol_size: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        default=5,
+        server_default="5",
+        comment="clamped 3-7 at the API layer",
+    )
+    active_pack_ids: Mapped[list | None] = mapped_column(
+        JSONColumn, nullable=True, comment="user opt-in subset; NULL means all mounted packs"
+    )
+    last_recommended_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    last_recommendation: Mapped[dict | None] = mapped_column(
+        JSONColumn, nullable=True, comment="the emitted set, for the stable-day rule"
+    )
+    rotation_cursor: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        default=0,
+        server_default="0",
+        comment="round-robin start offset",
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
+    )
+
+    def __repr__(self) -> str:
+        return f"<EcologyState user_id={self.user_id!r} protocol_size={self.protocol_size!r}>"
+
+
+class IntegrationEntry(Base):
+    """Links an intention, an experience and a reflection. Writers in slice 4.
+
+    The cascade rules are asymmetric on purpose. Deleting the
+    ``practice_log`` row destroys the link, because the link means
+    nothing without the experience. Deleting a journal entry is
+    something a user does deliberately and must not take the integration
+    record with it, so both journal references SET NULL.
+    """
+
+    __tablename__ = "integration_entries"
+    __table_args__ = (
+        Index("ix_integration_entries_user_created", "user_id", "created_at"),
+        Index("ix_integration_entries_user_purpose_created", "user_id", "purpose", "created_at"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    user_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    practice_log_id: Mapped[str | None] = mapped_column(
+        String(36),
+        ForeignKey("practice_log.id", ondelete="CASCADE"),
+        nullable=True,
+        comment="the experience",
+    )
+    intention_entry_id: Mapped[str | None] = mapped_column(
+        String(36), ForeignKey("journal_entries.id", ondelete="SET NULL"), nullable=True
+    )
+    reflection_entry_id: Mapped[str | None] = mapped_column(
+        String(36), ForeignKey("journal_entries.id", ondelete="SET NULL"), nullable=True
+    )
+    purpose: Mapped[str] = mapped_column(String(32), nullable=False)
+    capacity_delta: Mapped[int | None] = mapped_column(
+        Integer, nullable=True, comment="user self-report, -2..+2, optional"
+    )
+    note: Mapped[str | None] = mapped_column(EncryptedString(), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    def __repr__(self) -> str:
+        return (
+            f"<IntegrationEntry id={self.id!r} user_id={self.user_id!r} purpose={self.purpose!r}>"
+        )

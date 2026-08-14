@@ -54,6 +54,7 @@ from alchymine.db.models import (
     MilestoneDBRecord,
     OutcomeMetricRecord,
     PerspectiveProfile,
+    PracticeLogEntry,
     Report,
     User,
     WealthProfile,
@@ -727,6 +728,138 @@ async def get_outcome_metrics(
     stmt = stmt.order_by(OutcomeMetricRecord.recorded_at.desc()).limit(limit)
     result = await session.execute(stmt)
     return list(result.scalars().all())
+
+
+# ── Practice Log ──────────────────────────────────────────────────────────
+
+
+async def create_practice_log_entry(
+    session: AsyncSession,
+    *,
+    user_id: str,
+    pack_id: str,
+    practice_slug: str,
+    primary_purpose: str,
+    purposes: list[str],
+    category: str,
+    day_key: str,
+    occurred_at: datetime | None = None,
+    status: str = "completed",
+    protocol_slot: str | None = None,
+    duration_minutes: int | None = None,
+    reflection: str | None = None,
+    self_check_response: str | None = None,
+) -> PracticeLogEntry:
+    """Insert one practice-log row and return it.
+
+    Every caller resolves *primary_purpose*, *purposes* and *category*
+    from the practice registry before calling. They are denormalized
+    here so a row stays readable after its pack is unmounted, and they
+    are never taken from a client, because the recommender reads them.
+
+    Parameters
+    ----------
+    user_id:
+        The owner. Callers take this from the authenticated subject.
+    pack_id, practice_slug:
+        The qualified practice id, already checked against the registry.
+    primary_purpose, purposes, category:
+        Read off the registry definition, not the request.
+    day_key:
+        ``YYYY-MM-DD`` in the user's local day, stored exactly as given.
+    occurred_at:
+        When it happened. Defaults to now in UTC.
+    status:
+        ``completed`` | ``skipped`` | ``started``.
+    protocol_slot:
+        ``morning`` | ``day`` | ``evening`` | ``unscheduled``, or None.
+    reflection, self_check_response:
+        Free text, encrypted at rest.
+    """
+    entry = PracticeLogEntry(
+        user_id=user_id,
+        pack_id=pack_id,
+        practice_slug=practice_slug,
+        primary_purpose=primary_purpose,
+        purposes=list(purposes),
+        category=category,
+        status=status,
+        protocol_slot=protocol_slot,
+        duration_minutes=duration_minutes,
+        occurred_at=occurred_at or datetime.now(UTC),
+        day_key=day_key,
+        reflection=reflection,
+        self_check_response=self_check_response,
+    )
+    session.add(entry)
+    await session.flush()
+    await session.refresh(entry)
+    return entry
+
+
+async def get_practice_log_entry(
+    session: AsyncSession, entry_id: str, user_id: str
+) -> PracticeLogEntry | None:
+    """Fetch one of the owner's practice-log rows by id, or ``None``.
+
+    Ownership is filtered in SQL, not left to the caller: a row that
+    exists but belongs to another user is indistinguishable from one
+    that does not exist, so a future by-id route cannot become an
+    existence oracle.
+    """
+    result = await session.execute(
+        select(PracticeLogEntry).where(
+            PracticeLogEntry.id == entry_id, PracticeLogEntry.user_id == user_id
+        )
+    )
+    return result.scalar_one_or_none()
+
+
+async def list_practice_log_entries(
+    session: AsyncSession,
+    user_id: str,
+    *,
+    from_day: str | None = None,
+    to_day: str | None = None,
+    status: str | None = None,
+    offset: int = 0,
+    limit: int = 20,
+) -> tuple[list[PracticeLogEntry], int]:
+    """Return one page of *user_id*'s practice log, newest first.
+
+    The date range filters on ``day_key`` rather than ``occurred_at``.
+    ``day_key`` is the user's local calendar day, so a range expressed
+    in local days is what a caller asking for "this week" means, and the
+    ``(user_id, day_key)`` index serves it directly. Both bounds are
+    inclusive; either may be omitted for an open-ended range.
+
+    Returns ``(entries, total)`` where *total* counts every row matching
+    the filters before pagination.
+    """
+    filters = [PracticeLogEntry.user_id == user_id]
+    if from_day is not None:
+        filters.append(PracticeLogEntry.day_key >= from_day)
+    if to_day is not None:
+        filters.append(PracticeLogEntry.day_key <= to_day)
+    if status is not None:
+        filters.append(PracticeLogEntry.status == status)
+
+    count_result = await session.execute(
+        select(func.count()).select_from(PracticeLogEntry).where(*filters)
+    )
+    total = count_result.scalar_one()
+
+    rows_result = await session.execute(
+        select(PracticeLogEntry)
+        .where(*filters)
+        # occurred_at is the event time; id breaks ties so a page
+        # boundary cannot drop or repeat a row when two events share a
+        # timestamp, which same-second logging makes routine.
+        .order_by(PracticeLogEntry.occurred_at.desc(), PracticeLogEntry.id.desc())
+        .offset(offset)
+        .limit(limit)
+    )
+    return list(rows_result.scalars().all()), total
 
 
 # ── Milestones ────────────────────────────────────────────────────────────
