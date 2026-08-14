@@ -13,6 +13,25 @@ import pytest
 from sqlalchemy import create_engine, inspect, text
 
 
+def _script_head() -> str:
+    """Return the single head revision declared by the migration chain.
+
+    Reading it here keeps the head assertions below from needing an edit
+    every time a migration lands, and turns a second head into a clear
+    failure rather than a mismatch against a stale literal.
+    """
+    from alembic.config import Config
+    from alembic.script import ScriptDirectory
+
+    import alchymine
+
+    pkg_root = os.path.dirname(os.path.dirname(alchymine.__file__))
+    cfg = Config(os.path.join(pkg_root, "alembic.ini"))
+    heads = list(ScriptDirectory.from_config(cfg).get_heads())
+    assert len(heads) == 1, f"the migration chain has {len(heads)} heads: {heads}"
+    return heads[0]
+
+
 @pytest.fixture
 def fresh_migration_engine(tmp_path, monkeypatch):
     """Create a fresh SQLite DB, run all Alembic migrations, and return the engine."""
@@ -95,13 +114,21 @@ class TestMigrationCompleteness:
         assert not missing_columns, f"Columns missing from migrations: {missing_columns}"
 
     def test_migration_revision_chain_is_linear(self, fresh_migration_engine):
-        """The alembic_version table should have exactly one head revision."""
+        """The alembic_version table should have exactly one head revision.
+
+        The expected value is read from the script directory rather than
+        written here, so adding a migration does not mean editing this
+        test. What is being checked is that the chain has one head and
+        that a fresh upgrade lands on it, which is what would break if
+        two branches both added a revision on top of the same parent.
+        """
         with fresh_migration_engine.connect() as conn:
             result = conn.execute(text("SELECT version_num FROM alembic_version"))
             rows = result.fetchall()
 
+        expected = _script_head()
         assert len(rows) == 1, f"Expected 1 head revision, got {len(rows)}: {rows}"
-        assert rows[0][0] == "0017", f"Expected head at 0017, got {rows[0][0]}"
+        assert rows[0][0] == expected, f"Expected head at {expected}, got {rows[0][0]}"
 
     def test_reports_table_has_all_columns(self, fresh_migration_engine):
         """Reports table (added in migration 0006) has all expected columns."""
@@ -201,8 +228,9 @@ class TestStampAndUpgrade:
 
         # Drop tables that later migrations will CREATE (0011 creates feedback_entries,
         # 0012 creates chat_messages, 0013 creates generated_images, 0016 creates
-        # usage_counters, 0017 creates usage_records and billing_events — all
-        # already made by create_all() from ORM models)
+        # usage_counters, 0017 creates usage_records and billing_events, 0018 creates
+        # the three practice-layer tables — all already made by create_all() from
+        # ORM models)
         with engine.begin() as conn:
             conn.execute(text("DROP TABLE IF EXISTS feedback_entries"))
             conn.execute(text("DROP TABLE IF EXISTS chat_messages"))
@@ -210,6 +238,10 @@ class TestStampAndUpgrade:
             conn.execute(text("DROP TABLE IF EXISTS usage_counters"))
             conn.execute(text("DROP TABLE IF EXISTS usage_records"))
             conn.execute(text("DROP TABLE IF EXISTS billing_events"))
+            # integration_entries first: it holds the FK into practice_log.
+            conn.execute(text("DROP TABLE IF EXISTS integration_entries"))
+            conn.execute(text("DROP TABLE IF EXISTS ecology_state"))
+            conn.execute(text("DROP TABLE IF EXISTS practice_log"))
 
         # Manually drop pdf_data to simulate the missing column
         with engine.begin() as conn:
@@ -244,6 +276,7 @@ class TestStampAndUpgrade:
         with engine.connect() as conn:
             result = conn.execute(text("SELECT version_num FROM alembic_version"))
             version = result.scalar_one()
-        assert version == "0017", f"Expected 0017, got {version}"
+        expected = _script_head()
+        assert version == expected, f"Expected {expected}, got {version}"
 
         engine.dispose()
