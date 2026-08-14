@@ -14,8 +14,10 @@ day rather than the server's.
 from __future__ import annotations
 
 import asyncio
+import copy
 import re
 from collections.abc import AsyncGenerator, Iterator
+from typing import Any
 
 import pytest
 from cryptography.fernet import Fernet
@@ -141,6 +143,38 @@ def read_state(
         loop.close()
 
 
+def rewrite_state(
+    factory: async_sessionmaker[AsyncSession],
+    mutate: Any,
+    user_id: str = TEST_USER_ID,
+) -> None:
+    """Apply *mutate* to the stored ``last_recommendation`` and save it.
+
+    Used to plant an envelope written by an older build, which is the
+    only way to exercise the stale-payload path without shipping two
+    builds.
+    """
+
+    async def _rewrite() -> None:
+        async with factory() as session:
+            result = await session.execute(
+                select(EcologyState).where(EcologyState.user_id == user_id)
+            )
+            state = result.scalar_one()
+            stored = copy.deepcopy(state.last_recommendation)
+            mutate(stored)
+            # Reassigned rather than mutated in place: SQLAlchemy does not
+            # track mutation inside a JSON column.
+            state.last_recommendation = stored
+            await session.commit()
+
+    loop = asyncio.new_event_loop()
+    try:
+        loop.run_until_complete(_rewrite())
+    finally:
+        loop.close()
+
+
 # ─── Auth ───────────────────────────────────────────────────────────────
 
 
@@ -169,13 +203,9 @@ class TestTodayParameter:
     )
     def test_an_unusable_today_is_rejected(self, client: TestClient, value: str) -> None:
         assert get_today(client, today=value).status_code == 422
-        assert (
-            client.get("/api/v1/practice/summary", params={"today": value}).status_code == 422
-        )
+        assert client.get("/api/v1/practice/summary", params={"today": value}).status_code == 422
 
-    def test_the_response_echoes_the_day_it_was_computed_for(
-        self, client: TestClient
-    ) -> None:
+    def test_the_response_echoes_the_day_it_was_computed_for(self, client: TestClient) -> None:
         assert get_today(client, today="2027-01-31").json()["day_key"] == "2027-01-31"
 
 
@@ -190,12 +220,20 @@ class TestToday:
         assert len(body["items"]) == 5
         assert len({item["purpose"] for item in body["items"]}) == 5
 
-    def test_every_item_carries_a_reason_and_its_template_id(
-        self, client: TestClient
-    ) -> None:
+    def test_every_item_carries_a_reason_and_its_template_id(self, client: TestClient) -> None:
         for item in get_today(client).json()["items"]:
             assert item["reason"]
             assert item["reason_template"]
+
+    def test_every_item_carries_its_summary(self, client: TestClient) -> None:
+        """The protocol card shows what a practice *is*, not just its name.
+
+        Without this the card is a title and a prompt, and a user who has
+        not opened the library cannot tell what "Borrowed Eyes" asks of
+        them.
+        """
+        for item in get_today(client).json()["items"]:
+            assert item["summary"]
 
     def test_slots_mirror_the_items_with_that_slot_prompt(self, client: TestClient) -> None:
         body = get_today(client).json()
@@ -206,9 +244,7 @@ class TestToday:
             assert [(e["pack_id"], e["slug"]) for e in entries] == keys
             assert all(e["prompt"] for e in entries)
 
-    def test_a_completed_practice_leaves_the_protocol_on_refresh(
-        self, client: TestClient
-    ) -> None:
+    def test_a_completed_practice_leaves_the_protocol_on_refresh(self, client: TestClient) -> None:
         first = get_today(client).json()
         completed = first["items"][0]
 
@@ -308,6 +344,69 @@ class TestToday:
 # ─── ecology_state writes ───────────────────────────────────────────────
 
 
+class TestStoredPayloadShape:
+    """What happens when a deploy moves underneath a stored envelope.
+
+    ``last_recommendation`` is written by one build and replayed by the
+    next. When slice 4 added ``summary`` to every protocol item, every
+    envelope already in Postgres became unreadable by the new response
+    model. The user wants a protocol, not an incident, so the route
+    recomputes instead of raising.
+    """
+
+    def test_an_envelope_missing_summary_recomputes_rather_than_500s(
+        self, client: TestClient, session_factory: async_sessionmaker[AsyncSession]
+    ) -> None:
+        first = get_today(client).json()
+        assert first["items"], "the fixture needs a non-empty protocol to be meaningful"
+
+        def _strip_summary(envelope: dict) -> None:
+            for item in envelope["payload"]["items"]:
+                del item["summary"]
+
+        rewrite_state(session_factory, _strip_summary)
+
+        response = get_today(client)
+
+        assert response.status_code == 200
+        body = response.json()
+        assert all(item["summary"] for item in body["items"])
+
+    def test_the_repaired_envelope_is_written_back(
+        self, client: TestClient, session_factory: async_sessionmaker[AsyncSession]
+    ) -> None:
+        """The next request must not have to repair it again."""
+        get_today(client)
+
+        def _strip_summary(envelope: dict) -> None:
+            for item in envelope["payload"]["items"]:
+                del item["summary"]
+
+        rewrite_state(session_factory, _strip_summary)
+        get_today(client)
+
+        state = read_state(session_factory)
+        assert state is not None
+        stored = state.last_recommendation
+        assert stored is not None
+        assert all(item.get("summary") for item in stored["payload"]["items"])
+
+    def test_an_unreadable_envelope_still_answers_a_full_protocol(
+        self, client: TestClient, session_factory: async_sessionmaker[AsyncSession]
+    ) -> None:
+        expected = len(get_today(client).json()["items"])
+
+        def _corrupt(envelope: dict) -> None:
+            for item in envelope["payload"]["items"]:
+                del item["summary"]
+                del item["reason"]
+
+        rewrite_state(session_factory, _corrupt)
+
+        body = get_today(client).json()
+        assert len(body["items"]) == expected
+
+
 class TestEcologyState:
     def test_the_row_is_created_with_defaults_on_first_use(
         self, client: TestClient, session_factory: async_sessionmaker[AsyncSession]
@@ -392,9 +491,7 @@ class TestEcologyState:
 
 
 class TestSummary:
-    def test_an_empty_log_is_all_zeroes_and_still_the_full_shape(
-        self, client: TestClient
-    ) -> None:
+    def test_an_empty_log_is_all_zeroes_and_still_the_full_shape(self, client: TestClient) -> None:
         body = client.get("/api/v1/practice/summary", params={"today": TODAY}).json()
 
         assert body == {
@@ -486,6 +583,4 @@ class TestRouteResolution:
 
     def test_the_new_literal_routes_are_not_shadowed(self, client: TestClient) -> None:
         assert get_today(client).status_code == 200
-        assert (
-            client.get("/api/v1/practice/summary", params={"today": TODAY}).status_code == 200
-        )
+        assert client.get("/api/v1/practice/summary", params={"today": TODAY}).status_code == 200

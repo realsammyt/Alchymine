@@ -48,6 +48,7 @@ from alchymine.engine.practice.ecology import (
     recommend_today,
     summarize_practice,
 )
+from alchymine.engine.practice.purposes import system_for_purpose
 
 logger = logging.getLogger(__name__)
 
@@ -187,6 +188,55 @@ class PracticeLogListResponse(BaseModel):
     per_page: int
 
 
+class IntegrationCreate(BaseModel):
+    """A request to close the loop on one logged practice.
+
+    Note what is absent, again. There is no ``user_id`` and no
+    ``purpose``: the owner is the authenticated subject and the purpose
+    is read off the practice_log row. A client that could name the
+    purpose could credit its practice to whichever pillar it liked, and
+    the dashboard would show that instead of what happened.
+
+    Everything except ``practice_log_id`` is optional, so a user who
+    logs a practice and writes nothing still has a valid loop.
+    """
+
+    model_config = ConfigDict(extra="ignore")
+
+    practice_log_id: str = Field(..., min_length=1, max_length=36)
+    intention_entry_id: str | None = Field(None, max_length=36)
+    reflection_entry_id: str | None = Field(None, max_length=36)
+    capacity_delta: int | None = Field(
+        None,
+        ge=-2,
+        le=2,
+        description=(
+            "The user's own read on whether the capacity moved, -2 to +2. "
+            "A self-report, not a measurement, and never required."
+        ),
+    )
+    note: str | None = Field(None, max_length=5000)
+
+
+class IntegrationResponse(BaseModel):
+    """One integration entry, returned to its owner.
+
+    ``note`` is encrypted at rest and echoed in plaintext here, which is
+    safe because the only route that builds this model has already
+    scoped every id in the request to the caller.
+    """
+
+    id: str
+    user_id: str
+    practice_log_id: str | None
+    intention_entry_id: str | None
+    reflection_entry_id: str | None
+    purpose: str
+    capacity_delta: int | None
+    note: str | None
+    created_at: datetime | None
+
+
 class ProtocolItem(BaseModel):
     """One practice in today's protocol, with the line that explains it."""
 
@@ -195,6 +245,11 @@ class ProtocolItem(BaseModel):
     pack_id: str
     slug: str
     title: str
+    summary: str = Field(
+        ...,
+        description="One line saying what the practice is, so the card is readable "
+        "without opening the library",
+    )
     purpose: str = Field(..., description="The capacity this develops, for the chip")
     purposes: list[str]
     category: str
@@ -617,6 +672,75 @@ async def practice_summary(
         last_7=summary.last_7,
         by_purpose=summary.by_purpose,
         total_completed=summary.total_completed,
+    )
+
+
+@router.post("/practice/integration", status_code=201, response_model=IntegrationResponse)
+async def create_integration(
+    entry: IntegrationCreate,
+    current_user: dict = Depends(get_current_user),
+    session: AsyncSession = Depends(get_db_session),
+) -> IntegrationResponse:
+    """Link an intention, an experience and a reflection, and record the shift.
+
+    Two writes, both scoped to the caller: the link row, and exactly one
+    derived ``outcome_metrics`` row so the change lands on the dashboard
+    the user already reads.
+
+    Every id in the body is checked against the caller first, and a row
+    belonging to somebody else answers 404 rather than 403. A 403 would
+    confirm the row exists, which turns this endpoint into an existence
+    oracle over another user's practice log and journal.
+
+    The derived row goes through the repository rather than
+    ``POST /outcomes/activity``: that path drops its metadata, writes
+    process-global dicts, and takes a client-supplied ``user_id``.
+    """
+    user_id = current_user["sub"]
+
+    log_entry = await repository.get_practice_log_entry(session, entry.practice_log_id, user_id)
+    if log_entry is None:
+        raise HTTPException(status_code=404, detail="Practice log entry not found")
+
+    for entry_id in (entry.intention_entry_id, entry.reflection_entry_id):
+        if entry_id is None:
+            continue
+        if await repository.get_journal_entry_for_user(session, entry_id, user_id) is None:
+            raise HTTPException(status_code=404, detail="Journal entry not found")
+
+    created = await repository.create_integration_entry(
+        session,
+        user_id=user_id,
+        practice_log_id=log_entry.id,
+        purpose=log_entry.primary_purpose,
+        intention_entry_id=entry.intention_entry_id,
+        reflection_entry_id=entry.reflection_entry_id,
+        capacity_delta=entry.capacity_delta,
+        note=entry.note,
+    )
+
+    # One row, not one per anything else. ``capacity_delta`` is the
+    # user's own read when they gave one; when they did not, the
+    # practice still happened, and that is worth 1.0 rather than 0.0.
+    await repository.record_outcome_metric(
+        session,
+        user_id=user_id,
+        system=system_for_purpose(log_entry.primary_purpose),
+        metric_name="practice_integration",
+        value=float(entry.capacity_delta) if entry.capacity_delta is not None else 1.0,
+        period="daily",
+    )
+
+    return IntegrationResponse(
+        id=created.id,
+        user_id=created.user_id,
+        practice_log_id=created.practice_log_id,
+        intention_entry_id=created.intention_entry_id,
+        reflection_entry_id=created.reflection_entry_id,
+        purpose=created.purpose,
+        capacity_delta=created.capacity_delta,
+        note=created.note,
+        created_at=created.created_at,
     )
 
 

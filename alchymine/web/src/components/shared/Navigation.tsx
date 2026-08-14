@@ -70,6 +70,12 @@ const NAV_ITEMS: NavItem[] = [
     label: "Perspective Enhancement system",
   },
   {
+    name: "Practice",
+    href: "/practice",
+    icon: "leaf",
+    label: "Today's practice protocol",
+  },
+  {
     name: "Journey",
     href: "/journey",
     icon: "spiral",

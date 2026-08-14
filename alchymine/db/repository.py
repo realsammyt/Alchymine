@@ -51,6 +51,7 @@ from alchymine.db.models import (
     HealingProfile,
     IdentityProfile,
     IntakeData,
+    IntegrationEntry,
     JournalEntry,
     MilestoneDBRecord,
     OutcomeMetricRecord,
@@ -509,6 +510,25 @@ async def get_journal_entry(session: AsyncSession, entry_id: str) -> JournalEntr
     return result.scalar_one_or_none()
 
 
+async def get_journal_entry_for_user(
+    session: AsyncSession, entry_id: str, user_id: str
+) -> JournalEntry | None:
+    """Fetch one of *user_id*'s journal entries by id, or ``None``.
+
+    Ownership is filtered in SQL rather than compared by the caller, so
+    another user's entry is indistinguishable from one that does not
+    exist. Callers that need to distinguish the two (the journal router
+    returns 404 then 403) still use :func:`get_journal_entry`; callers
+    that only need "is this mine" should use this one and 404 either
+    way, which is what keeps a link endpoint from becoming an existence
+    oracle over somebody else's journal.
+    """
+    result = await session.execute(
+        select(JournalEntry).where(JournalEntry.id == entry_id, JournalEntry.user_id == user_id)
+    )
+    return result.scalar_one_or_none()
+
+
 async def list_journal_entries(
     session: AsyncSession,
     user_id: str,
@@ -959,6 +979,47 @@ async def update_ecology_recommendation(
     await session.flush()
     await session.refresh(state)
     return state
+
+
+# ── Integration entries ───────────────────────────────────────────────────
+
+
+async def create_integration_entry(
+    session: AsyncSession,
+    *,
+    user_id: str,
+    practice_log_id: str,
+    purpose: str,
+    intention_entry_id: str | None = None,
+    reflection_entry_id: str | None = None,
+    capacity_delta: int | None = None,
+    note: str | None = None,
+) -> IntegrationEntry:
+    """Insert one integration entry linking an intention, an experience
+    and a reflection.
+
+    *purpose* is the practice's, read off the ``practice_log`` row by the
+    caller. It is a parameter rather than a lookup here so this module
+    keeps having no opinion about the practice registry.
+
+    This writes the link row only. The single derived ``outcome_metrics``
+    row is a separate :func:`record_outcome_metric` call, so the two
+    writes are visible as two calls at the call site rather than hidden
+    inside one.
+    """
+    entry = IntegrationEntry(
+        user_id=user_id,
+        practice_log_id=practice_log_id,
+        intention_entry_id=intention_entry_id,
+        reflection_entry_id=reflection_entry_id,
+        purpose=purpose,
+        capacity_delta=capacity_delta,
+        note=note,
+    )
+    session.add(entry)
+    await session.flush()
+    await session.refresh(entry)
+    return entry
 
 
 # ── Milestones ────────────────────────────────────────────────────────────
