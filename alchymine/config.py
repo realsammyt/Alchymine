@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import logging
 from functools import lru_cache
+from pathlib import Path
 
 from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -216,6 +217,16 @@ class Settings(BaseSettings):
     # ``alchymine/engine/healing/skills/yaml/`` AND this directory.
     healing_skills_external_dir: str | None = None
 
+    # ── Practice packs ───────────────────────────────────────────────────
+    # Comma-delimited absolute paths, each holding one subdirectory per
+    # pack. Declared as ``str`` with an accessor rather than
+    # ``list[str]``: pydantic-settings v2 JSON-parses structured field
+    # types at source level before validators run, which is the same
+    # reason ``plan_allowance_cents`` is a string. Comma rather than
+    # ``os.pathsep`` for consistency with that precedent, and because a
+    # Windows path contains ':' but not ','.
+    practice_pack_dirs: str = ""
+
     # ── Misc ──────────────────────────────────────────────────────────────
     auto_create_tables: bool = False
 
@@ -237,6 +248,19 @@ class Settings(BaseSettings):
             except (json.JSONDecodeError, ValueError):
                 pass
         return [origin.strip() for origin in v.split(",") if origin.strip()]
+
+    def get_practice_pack_dirs(self) -> list[Path]:
+        """Return *practice_pack_dirs* as a list of paths, empty when unset.
+
+        Unlike the allowance and price accessors, a malformed entry here
+        is not skipped with a log: the loader hard-fails on a directory
+        it cannot read, because configuring a mount asserts its content
+        is required. Skipping one quietly is the healing loader's failure
+        mode, where a typo'd path ships a smaller product and no signal.
+        """
+        return [
+            Path(entry.strip()) for entry in self.practice_pack_dirs.split(",") if entry.strip()
+        ]
 
     def get_plan_allowance_cents(self) -> dict[str, int]:
         """Return *plan_allowance_cents* parsed into ``{plan: cents}``.

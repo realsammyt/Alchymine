@@ -6,6 +6,8 @@ validation, and CORS origins parsing.
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import pytest
 
 # ─── Default Settings ──────────────────────────────────────────────────────
@@ -329,3 +331,45 @@ class TestPlanAllowances:
 
         s = _make_settings()
         assert s.allowance_cents_for("anything") == 0
+
+
+class TestPracticePackDirs:
+    """PRACTICE_PACK_DIRS is a comma-delimited string, per the
+    plan_allowance_cents precedent: pydantic-settings v2 JSON-parses a
+    ``list[str]`` field at source level before any validator runs.
+    """
+
+    def test_unset_means_bundled_only(self, monkeypatch):
+        monkeypatch.setenv("JWT_SECRET_KEY", _SAFE_JWT_KEY)
+
+        s = _make_settings()
+        assert s.get_practice_pack_dirs() == []
+
+    def test_single_dir(self, monkeypatch):
+        monkeypatch.setenv("JWT_SECRET_KEY", _SAFE_JWT_KEY)
+        monkeypatch.setenv("PRACTICE_PACK_DIRS", "/mnt/packs")
+
+        s = _make_settings()
+        assert [str(p) for p in s.get_practice_pack_dirs()] == [str(Path("/mnt/packs"))]
+
+    def test_multiple_dirs_keep_declared_order(self, monkeypatch):
+        monkeypatch.setenv("JWT_SECRET_KEY", _SAFE_JWT_KEY)
+        monkeypatch.setenv("PRACTICE_PACK_DIRS", "/mnt/a, /mnt/b ,/mnt/c")
+
+        s = _make_settings()
+        assert [p.name for p in s.get_practice_pack_dirs()] == ["a", "b", "c"]
+
+    def test_blank_entries_are_dropped(self, monkeypatch):
+        monkeypatch.setenv("JWT_SECRET_KEY", _SAFE_JWT_KEY)
+        monkeypatch.setenv("PRACTICE_PACK_DIRS", " , /mnt/a ,, ")
+
+        s = _make_settings()
+        assert [p.name for p in s.get_practice_pack_dirs()] == ["a"]
+
+    def test_windows_path_with_a_drive_letter_survives(self, monkeypatch):
+        """Comma rather than os.pathsep: a Windows path contains ':'."""
+        monkeypatch.setenv("JWT_SECRET_KEY", _SAFE_JWT_KEY)
+        monkeypatch.setenv("PRACTICE_PACK_DIRS", r"C:\packs,D:\more-packs")
+
+        s = _make_settings()
+        assert len(s.get_practice_pack_dirs()) == 2

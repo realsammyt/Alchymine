@@ -1,0 +1,41 @@
+slug: catch-it-live
+title: "Catch It Live"
+order: 2
+summary: "Notice the named loop while it is still running, and do nothing about it."
+purposes: [self-knowledge]
+category: attention
+builds_on: [name-the-pattern]
+related: []
+use_when:
+  - "You can name a pattern but you only ever spot it afterwards."
+  - "You want to interrupt something without forcing it."
+description: |
+  You already have a name for the loop. This is the next bit: catching it in
+  motion.
+
+  Pick one loop and carry it with you for the day. When it starts, say the name
+  to yourself. That is the whole move. Do not fix it, do not stop it, do not add
+  a note about what it means. Just mark it, the way you would mark a bird you
+  recognise.
+
+  Marking without acting is the difficult half. The pull to do something about
+  it straight away is strong, and giving in to that turns noticing into one more
+  thing to get right. Let the loop run. You can decide what to do about it
+  later, from outside the moment.
+expected_shift: "You catch the loop while it is live, which is the only place anything can be done about it."
+applications:
+  - "During a meeting where you usually go quiet."
+  - "In the first ten minutes after you get home."
+daily_prompts:
+  - "Which one loop are you carrying today?"
+  - "Has it started? Say its name and carry on."
+  - "How many times did you catch it live?"
+self_check:
+  failure_mode: "Catching it turns into a scoreboard, and a day with no catches starts to feel like a failure."
+  question: "When you caught it, did you mark it or did you start managing it?"
+scaffold_note: "Once the catching happens without being set up in advance, this one has done its job."
+duration_minutes: 5
+evidence_rating: D
+contraindications: []
+tags: [attention, in-the-moment]
+featured: false
