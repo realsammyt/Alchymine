@@ -80,7 +80,7 @@ Purposes are capacities a practice develops. They map one-to-one onto the five p
 
 The mapping lives in `engine/practice/purposes.py` as a frozen dict, with a `VALID_PURPOSES: frozenset[str]` checked by the schema validator (not only by tests, which is where the bridges registry left it, `engine/bridges/registry.py:25`).
 
-The upstream corpus whose structure informed this schema carried a fifth slot for daily-protocol composition. That is not a capacity, so it is not a purpose here. It is the protocol surface (§6).
+The upstream corpus whose structure informed this schema carried a fifth slot for daily-protocol composition. That is not a capacity, so it is not a purpose here. It is the protocol surface (§7).
 
 ### 2.2 Category enum and the state-induction exclusion
 
@@ -162,7 +162,7 @@ Constraints and validators:
 
 - `model_config = ConfigDict(frozen=True, extra="forbid")`, matching `SkillDefinition`.
 - `slug` validator mirrors `SkillDefinition._validate_name_slug`: lowercase, `[a-z0-9-]`, no spaces or underscores.
-- `daily_prompts` must be exactly 3. The three positions are the protocol's three slots (§6), so every practice is renderable in any slot without a per-practice decision.
+- `daily_prompts` must be exactly 3. The three positions are the protocol's three slots (§7), so every practice is renderable in any slot without a per-practice decision.
 - `self_check.question` must end with `?`. A self-check is a reflective question, never a verdict.
 - `duration_minutes <= 120`: anything longer is not a daily practice, and the cap is a soft safety bound.
 - `evidence_rating` reuses the healing A-D scale verbatim, including its docstring, so one rating vocabulary covers both loaders.
@@ -613,7 +613,7 @@ Only `request.message` is persisted to `chat_messages`, matching current behavio
 ### 9.3 The system prompt block (DRAFT for Tyler)
 
 ```
-Specialist focus — Practice Integration:
+Specialist focus: Practice Integration.
 - The user is working with a practice library they already have. Help
   them choose, sequence and reflect on those practices. Don't invent new
   ones or design new protocols.
@@ -635,7 +635,7 @@ The chat path does not use `check_text` or `detect_crisis` today. It has a local
 
 **Inbound.** In the `/chat` handler, when `system_key == "practice"`, run `detect_crisis(request.message)` (`engine/healing/crisis.py:158`) before anything else. On a `CrisisResponse` at high or emergency severity, short-circuit: open the SSE stream, emit the crisis resources and disclaimers as `data:` frames, emit `event: done`, and make **no LLM call**. Not an HTTP 400, which would read as "you did something wrong" at exactly the wrong moment. Side benefit: the crisis path costs nothing and writes no ledger row.
 
-**Outbound.** `check_text(accumulated, context="healing")` (`ethics_check.py:355`) runs inside the existing streaming loop at the same point `_check_content_safety` runs, tripping the same truncate-and-error path. Running it on the accumulation every chunk is O(n²) over a reply, so it runs every 8 chunks plus once at the end. Checking after the stream finished would be honest-but-useless: it cannot unsend what already streamed.
+**Outbound.** `check_text(accumulated, context="healing")` (`ethics_check.py:355`) runs inside the existing streaming loop at the same point `_check_content_safety` runs, tripping the same truncate-and-error path. `context="healing"` is reused because it is the strictest existing coaching-content branch (`ethics_check.py:319`); a first-class `"practice"` context is deferred until the gate rollout across the other scopes (follow-up 1 in §12). Running it on the accumulation every chunk is O(n²) over a reply, so it runs every 8 chunks plus once at the end. Checking after the stream finished would be honest-but-useless: it cannot unsend what already streamed.
 
 **Scope of the change.** A helper `run_safety_gates(system_key, text)` in the chat router, applied to `practice` only. Adopting it across the other five scopes changes behavior on five live surfaces and deserves its own PR and regression pass. **Follow-up issue**, recommended next, called out in the epic close-out.
 
