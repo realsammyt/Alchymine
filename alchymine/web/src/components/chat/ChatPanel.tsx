@@ -23,7 +23,7 @@ import ChatInput from "./ChatInput";
 import ChatMessageList from "./ChatMessageList";
 
 interface Props {
-  /** Optional pillar scope: intelligence | healing | wealth | creative | perspective */
+  /** Optional coach scope: intelligence | healing | wealth | creative | perspective | practice */
   systemKey?: string | null;
   /** If set, auto-send this message on first mount (from deep-link). */
   initialPrompt?: string;
@@ -35,6 +35,7 @@ const SYSTEM_LABELS: Record<string, string> = {
   wealth: "Generational Wealth",
   creative: "Creative Development",
   perspective: "Perspective Enhancement",
+  practice: "Practice Integration",
 };
 
 export default function ChatPanel({

@@ -180,6 +180,17 @@ describe("PracticePage", () => {
     ).toHaveAttribute("href", "/practice/library");
   });
 
+  it("offers the practice coach", async () => {
+    render(<PracticePage />);
+
+    await screen.findAllByText("Find the Floor");
+    const banner = screen.getByTestId("system-coach-banner");
+    expect(banner).toHaveTextContent(/practice integration coach/i);
+    expect(
+      screen.getByRole("link", { name: /open chat/i }),
+    ).toHaveAttribute("href", "/chat?system=practice");
+  });
+
   it("contains no loss-aversion language", async () => {
     const { container } = render(<PracticePage />);
 

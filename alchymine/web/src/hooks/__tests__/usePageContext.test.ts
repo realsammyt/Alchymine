@@ -27,6 +27,8 @@ describe("usePageContext", () => {
     ["/intelligence", "intelligence", "Personal Intelligence"],
     ["/creative", "creative", "Creative Development"],
     ["/perspective", "perspective", "Perspective Enhancement"],
+    ["/practice", "practice", "Practice Integration"],
+    ["/practice/library", "practice", "Practice Integration"],
   ])(
     "maps %s to systemKey=%s, label=%s",
     (pathname, expectedKey, expectedLabel) => {

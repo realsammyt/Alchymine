@@ -4,6 +4,7 @@ import { useCallback, useMemo, useState } from "react";
 import Link from "next/link";
 import ProtectedRoute from "@/components/shared/ProtectedRoute";
 import ApiStateView from "@/components/shared/ApiStateView";
+import SystemCoachBanner from "@/components/chat/SystemCoachBanner";
 import DailyProtocol from "@/components/practice/DailyProtocol";
 import PracticeRhythm from "@/components/practice/PracticeRhythm";
 import { useApi } from "@/lib/useApi";
@@ -106,6 +107,8 @@ function PracticeInner() {
             </button>
           </div>
         </header>
+
+        <SystemCoachBanner systemKey="practice" />
 
         <ApiStateView
           loading={summary.loading}

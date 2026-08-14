@@ -927,7 +927,55 @@ async def list_recommender_log_rows(
     return list(result.all())
 
 
+async def list_practice_context_rows(
+    session: AsyncSession, user_id: str, *, from_day: str
+) -> list[Any]:
+    """Return the plaintext columns the coach context block is built from.
+
+    Four columns, none of them user-authored text. Same rail as
+    :func:`list_recommender_log_rows` and for a sharper reason: this is
+    the one practice query whose output reaches an LLM. ``reflection``
+    and ``self_check_response`` are encrypted at rest and are not
+    selected here, so a reflection cannot leak into a prompt however the
+    renderer above changes.
+
+    Bounded to ``day_key >= from_day``. The coach block summarises a
+    week, and loading a user's whole history to describe seven days of
+    it would grow without limit.
+    """
+    result = await session.execute(
+        select(
+            PracticeLogEntry.pack_id,
+            PracticeLogEntry.practice_slug,
+            PracticeLogEntry.primary_purpose,
+            PracticeLogEntry.status,
+            PracticeLogEntry.day_key,
+        )
+        .where(
+            PracticeLogEntry.user_id == user_id,
+            PracticeLogEntry.day_key >= from_day,
+        )
+        .order_by(PracticeLogEntry.day_key.desc(), PracticeLogEntry.id.desc())
+    )
+    return list(result.all())
+
+
 # ── Ecology state ─────────────────────────────────────────────────────────
+
+
+async def get_stored_recommendation(session: AsyncSession, user_id: str) -> dict[str, Any] | None:
+    """Return *user_id*'s stored protocol envelope, or ``None``.
+
+    A read that cannot write, unlike :func:`get_or_create_ecology_state`.
+    The chat path calls this: asking the coach a question is not a reason
+    to create recommender state for a user who has never opened the
+    practice surface.
+    """
+    result = await session.execute(
+        select(EcologyState.last_recommendation).where(EcologyState.user_id == user_id)
+    )
+    stored = result.scalar_one_or_none()
+    return stored if isinstance(stored, dict) else None
 
 
 async def get_or_create_ecology_state(session: AsyncSession, user_id: str) -> EcologyState:

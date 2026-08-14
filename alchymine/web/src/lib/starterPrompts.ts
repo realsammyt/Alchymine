@@ -2,7 +2,7 @@
  * Starter prompts — contextual conversation starters shown as chips
  * when the chat panel is empty (no history).
  *
- * Each system has 3 prompts tailored to its coaching domain.  The
+ * Each scope has 3 prompts tailored to its coaching domain.  The
  * general mode (no system key) has prompts that span all pillars.
  */
 
@@ -15,7 +15,9 @@ export interface StarterPrompt {
   message: string;
 }
 
-const STARTER_PROMPTS: Record<string, StarterPrompt[]> = {
+// Typed by SystemKey rather than string, so a new scope cannot ship
+// without its starters: the missing key is a build error.
+const STARTER_PROMPTS: Record<SystemKey, StarterPrompt[]> = {
   intelligence: [
     {
       label: "Explain my profile",
@@ -86,6 +88,26 @@ const STARTER_PROMPTS: Record<string, StarterPrompt[]> = {
       message: "What's a good mindfulness practice for someone at my stage?",
     },
   ],
+  // DRAFT copy, awaiting Tyler's sign-off. Written as questions rather
+  // than requests, because the practice coach asks rather than tells,
+  // and a starter that asks for a verdict invites one back.
+  practice: [
+    {
+      label: "Where to start today",
+      message:
+        "Of the practices in today's protocol, which one would you start with, and what should I be looking for while I do it?",
+    },
+    {
+      label: "This one has gone flat",
+      message:
+        "One of my practices has stopped doing much for me. Can you help me work out what changed?",
+    },
+    {
+      label: "What am I avoiding",
+      message:
+        "I think I might be using a practice to avoid something. What questions should I be asking myself about that?",
+    },
+  ],
 };
 
 /** General prompts when no system is active. */
@@ -110,5 +132,5 @@ const GENERAL_PROMPTS: StarterPrompt[] = [
  */
 export function getStarterPrompts(systemKey: SystemKey | string | null): StarterPrompt[] {
   if (!systemKey) return GENERAL_PROMPTS;
-  return STARTER_PROMPTS[systemKey] ?? GENERAL_PROMPTS;
+  return STARTER_PROMPTS[systemKey as SystemKey] ?? GENERAL_PROMPTS;
 }
