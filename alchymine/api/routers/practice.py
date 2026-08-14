@@ -12,17 +12,25 @@ what capacity it develops.
 
 from __future__ import annotations
 
-from datetime import UTC, date, datetime
+import logging
+from datetime import UTC, date, datetime, timedelta
 from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from pydantic import AfterValidator, BaseModel, ConfigDict, Field, StringConstraints
+from pydantic import (
+    AfterValidator,
+    BaseModel,
+    ConfigDict,
+    Field,
+    StringConstraints,
+    ValidationError,
+)
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from alchymine.api.auth import get_current_user
 from alchymine.api.deps import get_db_session
 from alchymine.db import repository
-from alchymine.db.models import PracticeLogEntry
+from alchymine.db.models import EcologyState, PracticeLogEntry
 from alchymine.engine.practice import (
     PackManifest,
     PackNotFoundError,
@@ -31,6 +39,17 @@ from alchymine.engine.practice import (
     PracticeRegistry,
     get_practice_registry,
 )
+from alchymine.engine.practice.ecology import (
+    EcologySettings,
+    EcologyStateInput,
+    PracticeLogRow,
+    Recommendation,
+    default_ecology_settings,
+    recommend_today,
+    summarize_practice,
+)
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -168,6 +187,71 @@ class PracticeLogListResponse(BaseModel):
     per_page: int
 
 
+class ProtocolItem(BaseModel):
+    """One practice in today's protocol, with the line that explains it."""
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    pack_id: str
+    slug: str
+    title: str
+    purpose: str = Field(..., description="The capacity this develops, for the chip")
+    purposes: list[str]
+    category: str
+    duration_minutes: int
+    reason: str = Field(..., description="Why this practice, in one deterministic sentence")
+    reason_template: str = Field(
+        ...,
+        description="The template the reason came from, so the client styles on an id "
+        "rather than parsing the prose",
+    )
+
+
+class ProtocolSlotEntry(BaseModel):
+    """One practice as it appears in one slot, carrying that slot's prompt."""
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    pack_id: str
+    slug: str
+    prompt: str
+
+
+class TodayResponse(BaseModel):
+    """Today's protocol.
+
+    ``slots`` holds the same practices three times over, once per slot,
+    each with that slot's prompt. It is one protocol rendered three
+    times, not three protocols, which is why every practice carries
+    exactly three ``daily_prompts``.
+    """
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    day_key: str
+    generated_at: str
+    protocol_size: int
+    items: list[ProtocolItem]
+    slots: dict[str, list[ProtocolSlotEntry]]
+
+
+class PracticeSummaryResponse(BaseModel):
+    """The rhythm figures, with no counter that resets to zero.
+
+    ``last_7`` is oldest first: index 0 is six days before ``day_key``
+    and index 6 is ``day_key`` itself, so a client renders it left to
+    right without reversing anything.
+    """
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    day_key: str
+    days_practiced_last_7: int
+    last_7: list[bool]
+    by_purpose: dict[str, int]
+    total_completed: int
+
+
 # ─────────────────────────────────────────────────────────────────────
 # Dependency
 # ─────────────────────────────────────────────────────────────────────
@@ -176,6 +260,93 @@ class PracticeLogListResponse(BaseModel):
 def registry_dependency() -> PracticeRegistry:
     """FastAPI dependency returning the process-global registry."""
     return get_practice_registry()
+
+
+def ecology_settings_dependency() -> EcologySettings:
+    """FastAPI dependency returning the recommender's weights and windows.
+
+    A dependency rather than a direct read so a test can pin the
+    weighting for one route without reaching into the environment.
+    """
+    return default_ecology_settings()
+
+
+def _state_input(state: EcologyState) -> EcologyStateInput:
+    """Adapt the stored row to what the engine reads.
+
+    ``active_pack_ids`` is a JSON column, so a value that is not a list
+    of strings is treated as "no opt-in subset" rather than trusted. The
+    closed direction here is *wider*: an unreadable subset should show
+    the user their whole library, not an empty protocol.
+    """
+    active = state.active_pack_ids
+    packs = tuple(str(entry) for entry in active) if isinstance(active, list) and active else None
+    stored = state.last_recommendation if isinstance(state.last_recommendation, dict) else None
+    return EcologyStateInput(
+        protocol_size=state.protocol_size,
+        active_pack_ids=packs,
+        rotation_cursor=state.rotation_cursor,
+        last_recommendation=stored,
+    )
+
+
+async def _load_recommender_log(
+    session: AsyncSession, user_id: str, *, today: str, settings: EcologySettings
+) -> list[PracticeLogRow]:
+    """Read the plaintext log columns and adapt them to the engine's row type.
+
+    The mapping lives here rather than in the repository so the ``db``
+    package keeps having no dependency on ``engine``.
+    """
+    window_start = date.fromisoformat(today) - timedelta(
+        days=max(settings.balance_window_days, 1) - 1
+    )
+    rows = await repository.list_recommender_log_rows(
+        session, user_id, window_start_day=window_start.isoformat()
+    )
+    return [
+        PracticeLogRow(
+            pack_id=row.pack_id,
+            practice_slug=row.practice_slug,
+            primary_purpose=row.primary_purpose,
+            status=row.status,
+            day_key=row.day_key,
+        )
+        for row in rows
+    ]
+
+
+def _recommend(
+    registry: PracticeRegistry,
+    log: list[PracticeLogRow],
+    state: EcologyState,
+    *,
+    now: datetime,
+    today: str,
+    refresh: bool,
+    settings: EcologySettings,
+) -> Recommendation:
+    return recommend_today(
+        registry,
+        log,
+        state=_state_input(state),
+        now=now,
+        day_key=today,
+        refresh=refresh,
+        settings=settings,
+    )
+
+
+TodayQuery = Annotated[
+    DayKey,
+    Query(
+        description=(
+            "The caller's local calendar day, YYYY-MM-DD. Required, and not "
+            "derived server-side: the server is in UTC and the user is not, so "
+            "an evening practice in Auckland would land on the wrong day."
+        )
+    ),
+]
 
 
 def _to_response(
@@ -365,6 +536,87 @@ async def list_practice_log(
         total=total,
         page=page,
         per_page=per_page,
+    )
+
+
+@router.get("/practice/today", response_model=TodayResponse)
+async def practice_today(
+    today: TodayQuery,
+    refresh: bool = Query(
+        False, description="Recompute even when the stable-day rule would replay"
+    ),
+    registry: PracticeRegistry = Depends(registry_dependency),
+    settings: EcologySettings = Depends(ecology_settings_dependency),
+    current_user: dict = Depends(get_current_user),
+    session: AsyncSession = Depends(get_db_session),
+) -> TodayResponse:
+    """Return today's protocol: N practices, each rendered in three slots.
+
+    Deterministic. There is no LLM on this path and no randomness, so the
+    same log on the same day produces the same protocol, and ``reason``
+    is answerable from what the user can already see.
+
+    The result is stable within a day: completing one practice at 9am
+    does not reshuffle the other four at 9:05. Pass ``refresh=true`` to
+    recompute anyway. A new day or a change to the mounted packs
+    recomputes on its own.
+    """
+    user_id = current_user["sub"]
+    state = await repository.get_or_create_ecology_state(session, user_id)
+    log = await _load_recommender_log(session, user_id, today=today, settings=settings)
+    now = datetime.now(UTC)
+
+    result = _recommend(
+        registry, log, state, now=now, today=today, refresh=refresh, settings=settings
+    )
+    try:
+        response = TodayResponse.model_validate(result.payload)
+    except ValidationError:
+        # A stored payload this build cannot read means a deploy moved
+        # underneath it. Recompute rather than 500: the user wants a
+        # protocol, not an incident.
+        logger.warning(
+            "Stored practice recommendation for a user did not match the current "
+            "payload shape. Recomputing.",
+        )
+        result = _recommend(
+            registry, log, state, now=now, today=today, refresh=True, settings=settings
+        )
+        response = TodayResponse.model_validate(result.payload)
+
+    if result.recomputed:
+        await repository.update_ecology_recommendation(
+            session,
+            user_id,
+            rotation_cursor=result.rotation_cursor,
+            last_recommendation=result.envelope,
+            last_recommended_at=now,
+        )
+    return response
+
+
+@router.get("/practice/summary", response_model=PracticeSummaryResponse)
+async def practice_summary(
+    today: TodayQuery,
+    current_user: dict = Depends(get_current_user),
+    settings: EcologySettings = Depends(ecology_settings_dependency),
+    session: AsyncSession = Depends(get_db_session),
+) -> PracticeSummaryResponse:
+    """Return the rhythm figures for the seven days ending *today*.
+
+    A day counts when at least one practice was completed on it, so two
+    completions on one day count once, and a skip counts as neither. No
+    number here resets to zero and nothing compares the caller to anyone
+    else: the display this feeds is a record, not a scoreboard.
+    """
+    log = await _load_recommender_log(session, current_user["sub"], today=today, settings=settings)
+    summary = summarize_practice(log, today=today)
+    return PracticeSummaryResponse(
+        day_key=today,
+        days_practiced_last_7=summary.days_practiced_last_7,
+        last_7=summary.last_7,
+        by_purpose=summary.by_purpose,
+        total_completed=summary.total_completed,
     )
 
 

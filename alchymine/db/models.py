@@ -1081,7 +1081,7 @@ class EcologyState(Base):
         nullable=False,
         default=5,
         server_default="5",
-        comment="clamped 3-7 at the API layer",
+        comment="clamped 3-7 by the recommender",
     )
     active_pack_ids: Mapped[list | None] = mapped_column(
         JSONColumn, nullable=True, comment="user opt-in subset; NULL means all mounted packs"
