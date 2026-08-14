@@ -227,6 +227,34 @@ class Settings(BaseSettings):
     # Windows path contains ':' but not ','.
     practice_pack_dirs: str = ""
 
+    # ── Ecology recommender ──────────────────────────────────────────────
+    # The four scoring weights, which are expected to sum to 1.0. They are
+    # plain floats rather than a parsed string because pydantic-settings
+    # handles scalars natively; only structured types need the accessor
+    # treatment that ``practice_pack_dirs`` gets.
+    #
+    # Drift is tolerated rather than fatal: if they do not sum to 1.0 the
+    # recommender normalizes by their sum and logs an ERROR once, because
+    # a typo in an env var should not take the app down.
+    practice_weight_balance: float = 0.40
+    practice_weight_staleness: float = 0.30
+    practice_weight_progression: float = 0.20
+    practice_weight_featured: float = 0.10
+
+    # Days without a completion at which the staleness term reaches 1.0.
+    practice_staleness_full_days: int = 14
+    # The trailing window, in the user's local days, that purpose shares
+    # and the decline rule are measured over.
+    practice_balance_window_days: int = 28
+    # Skips inside that window, with zero completions, that retire a
+    # practice. The recommender has to tell "never offered" from "offered
+    # and declined" without a practice nagging forever.
+    practice_decline_threshold: int = 3
+    # Protocol size for a user with no stored preference. Clamped to 3-7
+    # by the engine: fewer than 3 is not a protocol, more than 7 is a
+    # to-do list.
+    practice_protocol_default_size: int = 5
+
     # ── Misc ──────────────────────────────────────────────────────────────
     auto_create_tables: bool = False
 

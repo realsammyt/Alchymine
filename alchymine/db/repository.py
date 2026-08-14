@@ -45,6 +45,7 @@ from sqlalchemy.orm import selectinload
 from alchymine.db.models import (
     ChatMessage,
     CreativeProfile,
+    EcologyState,
     FeedbackEntry,
     GeneratedImage,
     HealingProfile,
@@ -860,6 +861,104 @@ async def list_practice_log_entries(
         .limit(limit)
     )
     return list(rows_result.scalars().all()), total
+
+
+async def list_recommender_log_rows(
+    session: AsyncSession, user_id: str, *, window_start_day: str
+) -> list[Any]:
+    """Return the plaintext practice-log columns the recommender reads.
+
+    Five columns, none of them user-authored text. ``reflection`` and
+    ``self_check_response`` are encrypted at rest and are never selected
+    here, so nothing the user wrote is decrypted to build a protocol.
+    That is a rail, not an optimization: the recommender has no business
+    reading a reflection, and the cheapest way to guarantee it is to
+    never load one.
+
+    Two row sets in one query, because the recommender needs both:
+
+    - every ``completed`` row *ever*, since a prerequisite is satisfied
+      by a completion at any point in the past and staleness counts days
+      since the last one however long ago that was;
+    - every row inside the balance window whatever its status, since
+      purpose shares and the decline rule are window-scoped and the
+      decline rule counts skips.
+
+    Rows are returned newest-day first purely so a truncated debug dump
+    shows recent activity; the recommender itself is order-independent.
+    """
+    result = await session.execute(
+        select(
+            PracticeLogEntry.pack_id,
+            PracticeLogEntry.practice_slug,
+            PracticeLogEntry.primary_purpose,
+            PracticeLogEntry.status,
+            PracticeLogEntry.day_key,
+        )
+        .where(
+            PracticeLogEntry.user_id == user_id,
+            or_(
+                PracticeLogEntry.status == "completed",
+                PracticeLogEntry.day_key >= window_start_day,
+            ),
+        )
+        .order_by(PracticeLogEntry.day_key.desc(), PracticeLogEntry.id.desc())
+    )
+    return list(result.all())
+
+
+# ── Ecology state ─────────────────────────────────────────────────────────
+
+
+async def get_or_create_ecology_state(session: AsyncSession, user_id: str) -> EcologyState:
+    """Return *user_id*'s recommender state, creating it with defaults if absent.
+
+    The insert is an upsert rather than a plain INSERT so two concurrent
+    first requests from the same user cannot collide on the primary key.
+    ``DO NOTHING`` is the right conflict action here: the row that won
+    the race already holds exactly the defaults this one would have
+    written, so there is nothing to reconcile.
+    """
+    existing = await session.execute(select(EcologyState).where(EcologyState.user_id == user_id))
+    state = existing.scalar_one_or_none()
+    if state is not None:
+        return state
+
+    dialect_name = session.bind.dialect.name  # type: ignore[union-attr]
+    insert = pg_insert if dialect_name == "postgresql" else sqlite_insert
+    await session.execute(
+        insert(EcologyState)
+        .values(user_id=user_id)
+        .on_conflict_do_nothing(index_elements=["user_id"])
+    )
+    await session.flush()
+
+    created = await session.execute(select(EcologyState).where(EcologyState.user_id == user_id))
+    return created.scalar_one()
+
+
+async def update_ecology_recommendation(
+    session: AsyncSession,
+    user_id: str,
+    *,
+    rotation_cursor: int,
+    last_recommendation: dict[str, Any],
+    last_recommended_at: datetime,
+) -> EcologyState:
+    """Persist the outcome of one recomputation.
+
+    ``last_recommended_at`` is written for operators reading the table.
+    The stable-day comparison does *not* use it: it is a UTC instant and
+    the rule compares the user's local day, which travels inside
+    *last_recommendation* instead.
+    """
+    state = await get_or_create_ecology_state(session, user_id)
+    state.rotation_cursor = rotation_cursor
+    state.last_recommendation = last_recommendation
+    state.last_recommended_at = last_recommended_at
+    await session.flush()
+    await session.refresh(state)
+    return state
 
 
 # ── Milestones ────────────────────────────────────────────────────────────
