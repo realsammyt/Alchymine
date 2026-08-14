@@ -932,7 +932,11 @@ async def list_practice_context_rows(
 ) -> list[Any]:
     """Return the plaintext columns the coach context block is built from.
 
-    Four columns, none of them user-authored text. Same rail as
+    Five columns, none of them user-authored text: ``pack_id``,
+    ``practice_slug``, ``primary_purpose``, ``status``, ``day_key``. The
+    list is written out because this docstring is the data rail's stated
+    contract, and a count that drifts from the SELECT below is worse
+    than no count at all. Same rail as
     :func:`list_recommender_log_rows` and for a sharper reason: this is
     the one practice query whose output reaches an LLM. ``reflection``
     and ``self_check_response`` are encrypted at rest and are not

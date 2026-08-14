@@ -45,13 +45,14 @@ from alchymine.api.main import app
 from alchymine.api.routers import chat as chat_router
 from alchymine.db.base import Base
 from alchymine.db.models import ChatMessage, UsageRecord, User
+from alchymine.engine.healing.crisis import detect_crisis
 from alchymine.db.usage_counters import (
     METER_LLM_CALLS,
     METER_SPEND_MICROS_MONTHLY,
     current_month_key,
     increment_and_get,
 )
-from alchymine.llm.attribution import current_attribution
+from alchymine.llm.attribution import current_attribution, set_attribution
 from alchymine.llm.ledger import record_usage
 
 # Aliased on import: pytest collects any module-level ``test_*`` name as
@@ -260,6 +261,88 @@ class TestCrisisGate:
         _post(env, EMERGENCY_MESSAGE, ephemeral=True)
 
         assert env.chat_messages() == []
+
+    def test_the_user_message_survives_a_disconnect(self, env: _Env) -> None:
+        """The turn is committed before the first frame, not after the last.
+
+        Somebody who closes the tab a second after typing this is the
+        likeliest reader of all, and deferring the commit to the end of
+        the stream would roll their message back precisely then.
+        """
+
+        async def _abandon_after_first_frame() -> None:
+            async with env.factory() as session:
+                session.add(User(id=TEST_USER_ID))
+                await session.flush()
+                await session.commit()
+
+                crisis = detect_crisis(EMERGENCY_MESSAGE)
+                assert crisis is not None
+                stream = chat_router._crisis_event_stream(
+                    user_id=TEST_USER_ID,
+                    message=EMERGENCY_MESSAGE,
+                    system_key="practice",
+                    crisis=crisis,
+                    session=session,
+                )
+                first = await stream.__anext__()
+                assert first.startswith("data: ")
+                # The client goes away. GeneratorExit, nothing after this
+                # point in the generator runs.
+                await stream.aclose()
+
+        env.run(_abandon_after_first_frame())
+
+        messages = env.chat_messages()
+        assert [m.role for m in messages] == ["user"]
+        assert messages[0].content == EMERGENCY_MESSAGE
+
+
+class TestKillSwitch:
+    """What removing ``"practice"`` from ``_VALID_SYSTEM_KEYS`` actually kills.
+
+    The design's rollback note said "the scope 422s". That is true of
+    the LLM call, the ethics gate and the context builder, and it is
+    deliberately not true of the crisis gate: ``crisis_for`` reads
+    ``PRACTICE_SYSTEM_KEY`` directly and runs before the validity check.
+
+    An operator disabling a feature must not turn a crisis disclosure
+    into a schema error, and the resource stream costs nothing to serve.
+    This is the test that keeps the exception honest, in both directions.
+    """
+
+    @pytest.fixture
+    def killed(self) -> Iterator[None]:
+        original = set(chat_router._VALID_SYSTEM_KEYS)
+        chat_router._VALID_SYSTEM_KEYS.discard("practice")
+        try:
+            yield
+        finally:
+            chat_router._VALID_SYSTEM_KEYS.clear()
+            chat_router._VALID_SYSTEM_KEYS.update(original)
+
+    def test_an_ordinary_practice_message_422s(self, env: _Env, killed: None) -> None:
+        response = env.client.post(
+            "/api/v1/chat",
+            json={"message": "What should I practice today?", "system_key": "practice"},
+        )
+
+        assert response.status_code == 422
+        assert _RecordingClient.calls == []
+
+    def test_a_crisis_message_still_gets_resources(self, env: _Env, killed: None) -> None:
+        response = _post(env, EMERGENCY_MESSAGE)
+
+        assert response.status_code == 200
+        assert "988" in response.text
+        assert "event: done" in response.text
+        assert _RecordingClient.calls == []
+
+    def test_the_other_five_scopes_are_untouched(self, env: _Env, killed: None) -> None:
+        response = _post(env, "How do I ground myself?", system_key="healing")
+
+        assert response.status_code == 200
+        assert len(_RecordingClient.calls) == 1
 
 
 class TestCrisisGateIsPracticeOnly:
@@ -481,12 +564,67 @@ class TestAttribution:
         user_rows = [m for m in env.chat_messages() if m.role == "user"]
         assert request_id == user_rows[0].id
 
-    def test_ephemeral_turns_carry_no_request_id(self, env: _Env) -> None:
-        """Nothing was persisted, so there is no row to point at."""
-        _post(env, "What should I practice?", ephemeral=True)
+    def test_ephemeral_turns_keep_the_http_request_id(self, env: _Env) -> None:
+        """Nothing was persisted, so there is no message row to point at.
+
+        The HTTP request id ``RequestIdMiddleware`` minted stays where it
+        is rather than being cleared: it is the only handle anybody has
+        on an ephemeral turn in the logs, and trading it for ``None``
+        would swap one form of attribution for none at all.
+
+        Driven at the generator rather than through the route, because
+        the shared ``get_current_account`` override in ``conftest`` sets
+        ``request_id=None`` and there is no HTTP id to preserve behind
+        it. The generator is where the decision actually lives.
+        """
+
+        async def _drive_ephemeral() -> None:
+            async with env.factory() as session:
+                set_attribution(
+                    user_id=TEST_USER_ID, surface="chat", request_id="http-request-id"
+                )
+                stream = chat_router._chat_event_stream(
+                    user_id=TEST_USER_ID,
+                    message="What should I practice?",
+                    system_key="practice",
+                    session=session,
+                    ephemeral=True,
+                )
+                async for _frame in stream:
+                    pass
+
+        env.run(_drive_ephemeral())
 
         _user_id, _surface, request_id = _RecordingClient.calls[0]["attribution"]
-        assert request_id is None
+        assert request_id == "http-request-id"
+
+    def test_a_persisted_turn_replaces_the_http_request_id(self, env: _Env) -> None:
+        """The other half: when there is a row, it wins."""
+
+        async def _drive_persisted() -> None:
+            async with env.factory() as session:
+                session.add(User(id=TEST_USER_ID))
+                await session.flush()
+                await session.commit()
+                set_attribution(
+                    user_id=TEST_USER_ID, surface="chat", request_id="http-request-id"
+                )
+                stream = chat_router._chat_event_stream(
+                    user_id=TEST_USER_ID,
+                    message="What should I practice?",
+                    system_key="practice",
+                    session=session,
+                    ephemeral=False,
+                )
+                async for _frame in stream:
+                    pass
+
+        env.run(_drive_persisted())
+
+        _user_id, _surface, request_id = _RecordingClient.calls[0]["attribution"]
+        user_rows = [m for m in env.chat_messages() if m.role == "user"]
+        assert request_id != "http-request-id"
+        assert request_id == user_rows[0].id
 
     def test_the_user_id_still_names_the_caller(self, env: _Env) -> None:
         _post(env, "What should I practice?")

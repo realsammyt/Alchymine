@@ -8,7 +8,7 @@ private stays out of its reach.
 **The data rail.** ``practice_log.reflection``,
 ``practice_log.self_check_response`` and ``integration_entries.note``
 are encrypted at rest and are never selected here. The query that feeds
-this module (``repository.list_practice_context_rows``) names its four
+this module (``repository.list_practice_context_rows``) names its five
 columns explicitly for that reason. So a reflection can only reach an
 LLM if the user types it into the chat box themselves, which is their
 call to make rather than ours.

@@ -29,8 +29,16 @@ else on this endpoint has, and nothing anybody else on it loses:
 - A deterministic practice-context block appended to the *user message*,
   never the system prompt.
 
-Removing ``"practice"`` from ``_VALID_SYSTEM_KEYS`` turns all three off
-and 422s the scope, leaving the other five exactly as they were.
+Removing ``"practice"`` from ``_VALID_SYSTEM_KEYS`` is the kill switch,
+and it is worth being exact about what it kills.  The scope 422s, so
+there is no LLM call, no ethics gate and no context builder, and the
+other five scopes are untouched.  The crisis gate is the deliberate
+exception: it reads ``PRACTICE_SYSTEM_KEY`` directly and runs *before*
+the validity check, so a crisis-severity message on a killed scope
+still receives resources rather than a 422.  That ordering is the point
+of the gate.  Answering somebody in crisis with a schema error because
+an operator disabled a feature would be the one failure mode this path
+exists to prevent, and the resource stream costs nothing to serve.
 """
 
 from __future__ import annotations
@@ -182,6 +190,10 @@ def _check_on_topic(text: str) -> str | None:
 # leaves every other one untouched, which is the kill switch for the
 # practice scope.  ``tests/api/test_chat_practice_scope.py`` pins the
 # equality so the two literals cannot drift apart in the meantime.
+#
+# The crisis gate survives the kill switch by design — see the module
+# docstring and ``TestKillSwitch``.  Everything else the scope has does
+# not.
 PRACTICE_SYSTEM_KEY = "practice"
 
 _VALID_SYSTEM_KEYS = {
@@ -437,9 +449,15 @@ async def _chat_event_stream(
 
     # The ledger row for this turn names the message that caused it, so
     # per-scope cost is an exact join against chat_messages.system_key
-    # rather than a correlation over timestamps.  Ephemeral turns persist
-    # nothing, so they leave the id unset and stay out of that join.
-    set_request_id(user_message_id)
+    # rather than a correlation over timestamps.
+    #
+    # Only when there *is* a message to name.  An ephemeral turn persists
+    # nothing, so it has no id to point at and stays out of that join —
+    # but it keeps the HTTP request id ``get_current_account`` put there,
+    # which is the only handle anybody has on it in the logs.  Clearing
+    # it would trade one form of attribution for none.
+    if user_message_id is not None:
+        set_request_id(user_message_id)
 
     # We don't have a UserProfile loader hooked up here yet — the chat
     # endpoint accepts a system_key for now and the system prompt is
@@ -552,13 +570,18 @@ async def _crisis_event_stream(
 
     The turn is still persisted, respecting *ephemeral*.  A conversation
     that silently drops the hardest thing a user has typed is worse than
-    one that keeps it.
+    one that keeps it, and the user message is committed *before* the
+    first frame goes out for exactly that reason: a client that closes
+    the tab mid-stream would otherwise roll the whole turn back, which
+    is the case where keeping it matters most.
     """
     logger.info("Crisis gate engaged on the practice scope (severity=%s)", crisis.severity)
 
     frames = _crisis_frames(crisis)
     reply = " ".join(frames)
 
+    # Committed up front, matching _chat_event_stream, so a disconnect
+    # cannot take it with it.
     if not ephemeral:
         await repository.save_chat_message(
             session,
@@ -567,6 +590,7 @@ async def _crisis_event_stream(
             content=message,
             system_key=system_key,
         )
+        await session.commit()
 
     for part in frames:
         # Trailing space: the client concatenates data values without a
