@@ -489,7 +489,12 @@ def _rank(
         share = facts.window_completions_by_purpose.get(purpose, 0) / denominator
 
         last = facts.last_completion.get((pack_id, practice.slug))
-        days_since = (today_date - last).days if last is not None else None
+        # Floored at zero. Every day_key is client-supplied, so a user who
+        # crosses a date line or whose clock runs fast can leave a row
+        # dated after the day being computed. Zero is the honest reading
+        # of "you did this already"; a negative count would render as
+        # "-1 days" and subtract from the staleness term.
+        days_since = max(0, (today_date - last).days) if last is not None else None
 
         balance_term = 1.0 - share
         staleness_term = 1.0 if days_since is None else min(1.0, days_since / full_days)

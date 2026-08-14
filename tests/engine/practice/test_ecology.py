@@ -475,6 +475,26 @@ class TestScoring:
 
         assert child.staleness_term == pytest.approx(expected)
 
+    def test_a_completion_dated_after_today_reads_as_zero_days_ago(
+        self, tmp_path: Path
+    ) -> None:
+        """Every day_key is client-supplied, so one can arrive dated ahead.
+
+        A user crossing a date line leaves a row dated after the day being
+        computed. Zero is the honest reading; a negative count would
+        subtract from the staleness term and render as "-1 days".
+        """
+        registry = make_registry(
+            tmp_path, [practice_dict("solo", purposes=["steadiness"])], "future-pack"
+        )
+        log = [row("solo", purpose="steadiness", day_key=day(-2), pack_id="future-pack")]
+
+        scored = rank_practices(registry, log, state(), today=TODAY, settings=SETTINGS)[0]
+
+        assert scored.days_since_last_completion == 0
+        assert scored.staleness_term == 0.0
+        assert "-" not in scored.reason
+
     def test_progression_beats_restarting(self, wide: PracticeRegistry) -> None:
         """An unlocked child outscores an untouched root of the same purpose."""
         log = [row("p0-root", purpose="self-knowledge", day_key=day(30))]
