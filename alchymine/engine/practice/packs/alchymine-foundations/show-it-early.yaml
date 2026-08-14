@@ -1,0 +1,40 @@
+slug: show-it-early
+title: "Show It Early"
+order: 8
+summary: "Show the unfinished thing to one person and ask a specific question."
+purposes: [expression]
+category: relational
+builds_on: [small-true-thing]
+related: []
+use_when:
+  - "You only show work when it is safe, which means almost never."
+  - "You want a real response and you keep getting 'that's nice'."
+description: |
+  Take something you have made that is not finished. Pick one person you trust
+  to be honest without being unkind. Send it to them.
+
+  Ask one specific question with it. Not "what do you think", which gets you
+  "that's nice". Ask whether the middle drags. Ask if it is clear who is
+  talking. Ask what they think it is about. A specific question gives them
+  permission to answer honestly, and it tells you what you actually want to
+  know.
+
+  Then sit with the answer for a day before you change anything. The first
+  reaction to a response is rarely the useful one.
+expected_shift: "Work leaves your hands earlier, and what comes back is about the work rather than about your feelings."
+applications:
+  - "Halfway through anything that has stalled."
+  - "Before you spend another week polishing in private."
+daily_prompts:
+  - "What could you show someone today, before it is ready?"
+  - "Sent it yet? What is the one question?"
+  - "What came back, and what will you do with it?"
+self_check:
+  failure_mode: "You show it to the people who always say it is good."
+  question: "Did you ask someone who might say something you would rather not hear?"
+scaffold_note: "When showing early is simply how you work, this stops being a practice and becomes a habit."
+duration_minutes: 10
+evidence_rating: D
+contraindications: []
+tags: [feedback, sharing]
+featured: false

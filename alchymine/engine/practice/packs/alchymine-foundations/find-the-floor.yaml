@@ -1,0 +1,45 @@
+slug: find-the-floor
+title: "Find the Floor"
+order: 3
+summary: "Find the parts of you that are already being held up, and let them be held."
+purposes: [steadiness]
+category: somatic
+builds_on: []
+related: []
+use_when:
+  - "You are wound up and thinking about it harder is not helping."
+  - "You have to walk into something in five minutes."
+description: |
+  Sit or stand however you already are. Nothing to arrange.
+
+  Now find where you are being supported. Feet on the floor, back against the
+  chair, forearms on the desk. Go one at a time and stay with each for a few
+  seconds. Not picturing it. Feeling for the actual contact.
+
+  Then let a little of your weight go into whichever one is holding you best.
+  That is it. If your attention wanders off to the thing you are wound up about,
+  come back to the contact. Wandering off is not a mistake. Coming back is the
+  practice.
+
+  Keep breathing the way you already breathe. There is nothing to count and
+  nothing to hold.
+expected_shift: "A little less wound up, and back in the room. Not calm on demand, just closer to a baseline you can work from."
+applications:
+  - "Five minutes before something you are nervous about."
+  - "When you have read the same paragraph three times."
+daily_prompts:
+  - "Where are you being held up right now?"
+  - "Take thirty seconds. What is in contact with what?"
+  - "Did you come back to the floor at any point today?"
+self_check:
+  failure_mode: "It turns into a way to get rid of a feeling rather than a way to stand next to one."
+  question: "Were you settling, or were you trying to make something go away?"
+scaffold_note: "Keep this one as long as it earns its place. Some people use it for years, and that is a fine outcome rather than a stalled one."
+duration_minutes: 5
+evidence_rating: D
+contraindications:
+  - "If sitting still makes things feel worse right now, do this standing or while walking slowly."
+  - "If you have a recent injury or pain that shifting your weight would aggravate, skip the weight part and stay with light contact only."
+  - "This is not a substitute for care from a qualified professional. If you are in crisis, contact a crisis line or your local emergency services."
+tags: [grounding, before-something-hard]
+featured: true

@@ -41,6 +41,7 @@ from alchymine.api.routers import (
     outcomes,
     personality,
     perspective,
+    practice,
     profile,
     reports,
     spiral,
@@ -48,6 +49,7 @@ from alchymine.api.routers import (
 )
 from alchymine.config import get_settings
 from alchymine.db.usage_counters import CostCeilingExceeded
+from alchymine.engine.practice import install_practice_registry
 from alchymine.llm.ledger import flush_pending_writes, log_ledger_status
 from alchymine.mcp.transport import mount_all_mcp_routers
 
@@ -84,6 +86,11 @@ _configure_logging()
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """Application lifecycle: startup and shutdown."""
     await create_tables_if_enabled()
+    # Deliberately unguarded. A bad pack or a mistyped PRACTICE_PACK_DIRS
+    # stops the container here, where the deploy's own health machinery
+    # sees it, rather than becoming a 500 for whichever user reaches
+    # /practices first.
+    install_practice_registry()
     log_ledger_status("api")
     yield
     # Ledger writes are detached tasks so a disconnected client cannot take
@@ -166,6 +173,7 @@ app.include_router(bridges.router, prefix="/api/v1", tags=["bridges"])
 app.include_router(creative.router, prefix="/api/v1", tags=["creative"])
 app.include_router(perspective.router, prefix="/api/v1", tags=["perspective"])
 app.include_router(personality.router, prefix="/api/v1", tags=["personality"])
+app.include_router(practice.router, prefix="/api/v1", tags=["practice"])
 app.include_router(journal.router, prefix="/api/v1", tags=["journal"])
 app.include_router(outcomes.router, prefix="/api/v1", tags=["outcomes"])
 app.include_router(chat.router, prefix="/api/v1", tags=["chat"])

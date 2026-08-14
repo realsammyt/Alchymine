@@ -1,0 +1,39 @@
+slug: follow-it-through
+title: "Follow It Through"
+order: 6
+summary: "Take the choice you named and do the smallest thing that really moves it."
+purposes: [stewardship]
+category: enactment
+builds_on: [one-clear-choice]
+related: []
+use_when:
+  - "You know which decision matters and it has not moved in a fortnight."
+  - "You are reading about it instead of doing it."
+description: |
+  You have named the choice. Now find the smallest thing that would count as
+  actually moving it, and do that thing today.
+
+  Smallest means smallest. Send one message. Open the account. Ask one person
+  what they did. Write the first paragraph. If the step would take more than
+  twenty minutes then it is not the smallest one, so go smaller.
+
+  Afterwards, write down what the next smallest thing would be, and stop.
+  Two in a day is fine if it happens on its own. Planning six is how this turns
+  back into reading about it.
+expected_shift: "The choice moves from something you think about to something with a first step behind it."
+applications:
+  - "Any day the named choice has been sitting still."
+  - "When you notice you have opened three tabs and taken no step."
+daily_prompts:
+  - "What is today's smallest real step?"
+  - "Taken it yet? If not, make it smaller."
+  - "What moved, and what is the next smallest thing?"
+self_check:
+  failure_mode: "The steps stay tiny forever and nothing adds up."
+  question: "Are the steps taking you somewhere, or keeping you comfortable?"
+scaffold_note: "When the step follows the decision without a prompt, you are done with this one."
+duration_minutes: 15
+evidence_rating: D
+contraindications: []
+tags: [action, small-steps]
+featured: false

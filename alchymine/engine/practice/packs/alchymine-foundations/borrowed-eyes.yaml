@@ -1,0 +1,40 @@
+slug: borrowed-eyes
+title: "Borrowed Eyes"
+order: 10
+summary: "Ask someone who sees it differently to describe what they see, and do not correct them."
+purposes: [reframing]
+category: relational
+builds_on: [second-account]
+related: []
+use_when:
+  - "Everyone you have talked to already agrees with you."
+  - "You want to test an account rather than defend one."
+description: |
+  Find someone whose read on a situation is different from yours. Not an
+  opponent. Someone who is looking at it from somewhere else.
+
+  Ask them to describe what they see, and then correct nothing for the whole
+  answer. Not the small factual slips, not the bit where they have misread you.
+  Let the whole account arrive intact. Correcting is how you turn their view
+  back into your own.
+
+  Afterwards, write down the one thing in their account you had not seen. There
+  is usually exactly one, and it is usually not the thing you were arguing with
+  in your head while they were talking.
+expected_shift: "You are holding an account you could not have produced yourself, which is the only kind that adds anything."
+applications:
+  - "A decision where everyone you have asked has agreed with you."
+  - "A disagreement you have replayed more than twice."
+daily_prompts:
+  - "Whose read on this is different from yours?"
+  - "Are you listening, or waiting to correct?"
+  - "What did you see today that you could not have seen on your own?"
+self_check:
+  failure_mode: "You ask, and then spend their answer preparing your reply."
+  question: "Could you repeat their account back in a way they would recognise?"
+scaffold_note: "Keep this one. Nobody outgrows needing a view they cannot produce on their own."
+duration_minutes: 15
+evidence_rating: D
+contraindications: []
+tags: [listening, other-views]
+featured: false

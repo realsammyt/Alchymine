@@ -1,0 +1,39 @@
+slug: small-true-thing
+title: "Small True Thing"
+order: 7
+summary: "Make one small thing today and let it be finished rather than good."
+purposes: [expression]
+category: enactment
+builds_on: []
+related: []
+use_when:
+  - "You have ideas and nothing made."
+  - "Everything you start gets rewritten until it disappears."
+description: |
+  Make something small enough to finish in one sitting. A paragraph, a sketch,
+  eight bars, a photograph you actually keep. One sitting, and then it is done.
+
+  The rule is that it has to be true rather than good. True means it came from
+  something you noticed or felt, not from what you think would land well. Good
+  is a judgement for later, made by someone with more distance than you have
+  right now.
+
+  Finish it. Even if the last third is worse than the first. Finishing is the
+  muscle this builds, and starting does not build it.
+expected_shift: "There is a finished small thing that did not exist this morning, and finishing is slightly less frightening than it was."
+applications:
+  - "The first thirty minutes of the day, before anything else arrives."
+  - "When an idea has been circling for a week without landing."
+daily_prompts:
+  - "What small thing could you finish today?"
+  - "Is it small enough to finish in one sitting?"
+  - "What did you finish, and did you let it be finished?"
+self_check:
+  failure_mode: "Small becomes the excuse, and nothing ever gets the time it actually needs."
+  question: "Did you finish it, or did you stop and call that finishing?"
+scaffold_note: "Once finishing is ordinary, make bigger things. The size limit is a training wheel, not a rule about how to work."
+duration_minutes: 15
+evidence_rating: D
+contraindications: []
+tags: [making, finishing]
+featured: true

@@ -1,0 +1,39 @@
+slug: second-account
+title: "Second Account"
+order: 9
+summary: "Write a second true account of the same events, without deleting the first."
+purposes: [reframing]
+category: reflection
+builds_on: []
+related: [name-the-pattern]
+use_when:
+  - "You are certain about why someone did what they did."
+  - "One story about a situation has hardened and stopped moving."
+description: |
+  Take a situation you hold one firm account of. Write that account down in
+  three or four lines, honestly, including the part where you come off well.
+
+  Now write a second account of the same events. Not a nicer one, and not the
+  opposite one. A different one that also fits everything you actually observed.
+  If the second account cannot fit the facts then it is not a second account, it
+  is a consolation, so try again.
+
+  Keep both. The aim is not to work out which one is right. It is to notice that
+  you were holding one of them as though it were the situation itself.
+expected_shift: "The first account loosens from being the truth into being an account, and you can act with the other one in view."
+applications:
+  - "After a conversation that left you certain someone was being unfair."
+  - "When a story about your own past has stopped changing."
+daily_prompts:
+  - "What are you most certain about today?"
+  - "What is a second account that also fits?"
+  - "Did holding two accounts change how you acted?"
+self_check:
+  failure_mode: "The second account is always the kinder one, which makes this a habit of being generous rather than a habit of looking."
+  question: "Did the second account fit the facts, or did it just feel kinder?"
+scaffold_note: "Once a second account turns up on its own, this one is finished."
+duration_minutes: 10
+evidence_rating: D
+contraindications: []
+tags: [perspective, stories]
+featured: false

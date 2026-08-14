@@ -1,0 +1,40 @@
+slug: name-the-pattern
+title: "Name the Pattern"
+order: 1
+summary: "Write down the loop you keep running, in words you would actually say."
+purposes: [self-knowledge]
+category: reflection
+builds_on: []
+related: [second-account]
+use_when:
+  - "You keep having the same argument with yourself."
+  - "Something went the way it usually goes and you only noticed afterwards."
+description: |
+  Take a loop you recognise. Not the big one. Pick a small one that turns up
+  most weeks.
+
+  Write three lines about it. What sets it off, what you do next, and what you
+  tell yourself while you are doing it. Plain words, the ones you would use out
+  loud. If a line sounds like it came out of a book, rewrite it.
+
+  Then give the loop a short name. Two or three words, and slightly
+  unflattering is fine. The name is a handle, not a verdict. You are not
+  deciding what kind of person this makes you. You are making the loop easier
+  to point at the next time it turns up.
+expected_shift: "The loop has a name you can say in under a second, so you can point at it while it is happening instead of an hour later."
+applications:
+  - "Before a conversation you have been putting off."
+  - "After an evening that went sideways in a way you recognise."
+daily_prompts:
+  - "Which loop are you most likely to run today?"
+  - "Is one running right now? What would you call it?"
+  - "Which loop turned up today, and what set it off?"
+self_check:
+  failure_mode: "It becomes a way to describe the problem instead of a way to touch it."
+  question: "Did naming it change what you did next, or only what you called it?"
+scaffold_note: "Let this one go once you catch the loop without the written version. The writing is the handle. The noticing is the point."
+duration_minutes: 10
+evidence_rating: C
+contraindications: []
+tags: [writing, patterns, noticing]
+featured: true

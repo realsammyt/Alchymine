@@ -1,0 +1,40 @@
+slug: one-clear-choice
+title: "One Clear Choice"
+order: 5
+summary: "Pick the one choice this week that a year from now you would want made well."
+purposes: [stewardship]
+category: reflection
+builds_on: []
+related: [second-account]
+use_when:
+  - "Everything on the list feels equally urgent."
+  - "You keep making the small decisions carefully and the big one by default."
+description: |
+  Look at the week ahead. Most of what is on it will not matter much by next
+  month, and you already know which parts those are.
+
+  Find the one choice that will still be showing its effects in a year. How you
+  spend one evening a week. Whether you say yes to the thing that would take six
+  months. What you do with money you did not expect to have. There is usually
+  one, and it is usually not the loudest item on the list.
+
+  Write it down in a sentence. Then write what a good version of that choice
+  would look like, in one more sentence. Do not decide yet. Working out which
+  choice deserves the thinking is the job here, and it is most of the job.
+expected_shift: "One choice moves out of the pile and into the light, so your attention stops spreading evenly across things that do not repay it evenly."
+applications:
+  - "Sunday evening, before the week starts."
+  - "When a decision has been sitting open for more than a week."
+daily_prompts:
+  - "Which choice today will still matter in a year?"
+  - "Is what you are doing right now the choice you named?"
+  - "Did the choice you named get any of your attention today?"
+self_check:
+  failure_mode: "Naming the choice becomes a substitute for making it."
+  question: "Is this the second week running that you have named the same choice without moving on it?"
+scaffold_note: "Once the long horizon is simply how you read a week, this one is spare."
+duration_minutes: 10
+evidence_rating: D
+contraindications: []
+tags: [decisions, horizon]
+featured: false

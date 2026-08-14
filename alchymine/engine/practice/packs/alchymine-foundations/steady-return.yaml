@@ -1,0 +1,41 @@
+slug: steady-return
+title: "Steady Return"
+order: 4
+summary: "Decide now what you will do when you get knocked off, so you do not have to decide then."
+purposes: [steadiness]
+category: enactment
+builds_on: [find-the-floor]
+related: []
+use_when:
+  - "You handle things well until you do not, and then it takes hours to come back."
+  - "You want a plan for the bad afternoon while you are still having a good morning."
+description: |
+  Pick a way you reliably get knocked off. A specific one. Not stress in
+  general, but the message that lands wrong, or the hour after a hard call.
+
+  Write down three things you would do in the twenty minutes afterwards. Small
+  and concrete beats large and impressive. Walk to the end of the road. Put the
+  kettle on and stay in the kitchen while it boils. Find the floor for two
+  minutes.
+
+  Then put the list where you will actually come across it. On your phone, in
+  your notes, on paper in a drawer you open. The quality of the list is not the
+  point. The point is that the version of you who has just been knocked off does
+  not have to invent one.
+expected_shift: "Coming back takes less time, because the route is already written and you are not choosing it while you are off balance."
+applications:
+  - "The twenty minutes after a hard call."
+  - "The first hour of a day that started badly."
+daily_prompts:
+  - "If today knocks you off, what is the first thing on your list?"
+  - "Off balance? Take the first thing on the list."
+  - "Did anything knock you off today, and did you use the route?"
+self_check:
+  failure_mode: "The list gets long and starts to read like homework."
+  question: "Was the list something you reached for, or something you avoided looking at?"
+scaffold_note: "When the route runs without being read, the written list is spare. Keep it anyway. A hard week will make you glad it is there."
+duration_minutes: 10
+evidence_rating: C
+contraindications: []
+tags: [planning, recovery]
+featured: false
