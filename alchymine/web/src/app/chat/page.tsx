@@ -19,15 +19,11 @@ import { Suspense } from "react";
 
 import ChatPanel from "@/components/chat/ChatPanel";
 import ProtectedRoute from "@/components/shared/ProtectedRoute";
-import type { SystemKey } from "@/hooks/usePageContext";
+import { SYSTEM_KEYS, type SystemKey } from "@/hooks/usePageContext";
 
-const VALID_SYSTEMS = new Set<string>([
-  "intelligence",
-  "healing",
-  "wealth",
-  "creative",
-  "perspective",
-]);
+// Built from the shared enumeration so a new scope reaches deep links
+// without a second edit here.
+const VALID_SYSTEMS = new Set<string>(SYSTEM_KEYS);
 
 function ChatPageInner() {
   const searchParams = useSearchParams();
