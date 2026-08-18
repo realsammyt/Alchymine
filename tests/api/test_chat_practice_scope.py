@@ -4,6 +4,12 @@ Slice 5 of epic #251. This is the live chat endpoint, so most of these
 tests are about the five other scopes *not* changing, and about the two
 new gates costing nothing when they fire.
 
+The two gates have since rolled out to every scope (#263), so the
+"practice only" half of that no longer holds and the tests that pinned
+it say so where they sit. What this file still owns is the practice
+scope itself: its context block, its kill switch, and its metering.
+``tests/api/test_chat_safety_gates_all_scopes.py`` owns the rest.
+
 The properties worth naming:
 
 - The router's key set and the prompt table cannot drift apart. They are
@@ -336,9 +342,9 @@ class TestKillSwitch:
     """What removing ``"practice"`` from ``_VALID_SYSTEM_KEYS`` actually kills.
 
     The design's rollback note said "the scope 422s". That is true of
-    the LLM call, the ethics gate and the context builder, and it is
-    deliberately not true of the crisis gate: ``crisis_for`` reads
-    ``PRACTICE_SYSTEM_KEY`` directly and runs before the validity check.
+    the LLM call and the context builder, and it is deliberately not
+    true of the crisis gate: ``crisis_for`` runs before the validity
+    check.
 
     An operator disabling a feature must not turn a crisis disclosure
     into a schema error, and the resource stream costs nothing to serve.
@@ -479,17 +485,32 @@ class TestCrisisEscapesThePlanGate:
         assert "988" in messages[1].content
 
 
-class TestCrisisGateIsPracticeOnly:
-    """The rollback property: the other five scopes are untouched."""
+class TestWhatIsStillPracticeOnly:
+    """What the gate rollout (#263) did and did not take with it.
+
+    Slice 5 shipped the crisis and ethics gates on the practice scope
+    alone, and this class used to pin that as a rollback property. The
+    rollout removed the scope guards on both gates deliberately, so the
+    crisis half of that property is gone on purpose: a high-severity
+    disclosure now receives resources on every scope, which is the whole
+    of issue #263. ``tests/api/test_chat_safety_gates_all_scopes.py``
+    owns the widened behaviour.
+
+    What is still practice-only is the practice-context block. It is a
+    feature of the scope rather than a safety gate, and nothing about the
+    rollout touched it.
+    """
 
     @pytest.mark.parametrize("system_key", ["healing", "wealth", None])
-    def test_other_scopes_have_no_crisis_gate(self, env: _Env, system_key: str | None) -> None:
-        # "abuse" is a high-severity keyword, so this would short-circuit
-        # if the gate were global. On healing it reaches the coach exactly
-        # as it did before slice 5.
+    def test_other_scopes_now_have_the_crisis_gate_too(
+        self, env: _Env, system_key: str | None
+    ) -> None:
+        # "abusing" is a high-severity keyword. Before the rollout this
+        # reached the coach on every scope but practice; now it reaches
+        # the coach on none of them.
         _post(env, HIGH_MESSAGE, system_key=system_key)
 
-        assert len(_RecordingClient.calls) == 1
+        assert _RecordingClient.calls == []
 
     def test_other_scopes_get_an_unchanged_system_prompt(self, env: _Env) -> None:
         _post(env, "How do I ground myself?", system_key="healing")
@@ -530,7 +551,12 @@ class TestEthicsGate:
 
     def test_a_missing_disclaimer_does_not_block_the_reply(self, env: _Env) -> None:
         """A partial reply has not reached its disclaimer yet, so blocking
-        on one guarantees it never arrives."""
+        on one guarantees it never arrives.
+
+        Since #279 the finished reply also collects the disclaimer it was
+        missing, appended after the last model chunk. That half is pinned
+        in ``test_chat_safety_gates_all_scopes.py``; what matters here is
+        that nothing was refused."""
         _RecordingClient.chunks = [
             "Your breathwork and meditation practice looks steady this week. ",
             "Two somatic sessions and one reflection, which is a real rhythm ",
@@ -542,13 +568,19 @@ class TestEthicsGate:
         assert "event: error" not in response.text
         assert "real rhythm" in response.text
 
-    def test_other_scopes_are_not_ethics_checked(self, env: _Env) -> None:
-        """The rollback property, outbound half."""
+    def test_other_scopes_are_ethics_checked_too(self, env: _Env) -> None:
+        """The outbound half of the rollout (#263).
+
+        This asserted the opposite while the gate was practice-only. The
+        five harm categories now block on every scope, and the widened
+        behaviour is pinned in full in
+        ``tests/api/test_chat_safety_gates_all_scopes.py``.
+        """
         _RecordingClient.chunks = ["You are destined to master this."]
 
         response = _post(env, "How am I doing?", system_key="healing")
 
-        assert "event: error" not in response.text
+        assert "event: error" in response.text
 
 
 # ─── The practice context block ─────────────────────────────────────────
@@ -590,9 +622,7 @@ class TestPracticeContext:
         assert "Find the Floor" in call["prompt"]
         assert call["prompt"].endswith("What should I notice today?")
 
-    def test_the_system_prompt_is_byte_identical_with_and_without_context(
-        self, env: _Env
-    ) -> None:
+    def test_the_system_prompt_is_byte_identical_with_and_without_context(self, env: _Env) -> None:
         """The system prompt is the cacheable prefix. Nothing per-user or
         per-day may enter it."""
         _post(env, "What should I notice today?")
@@ -637,9 +667,7 @@ class TestPracticeContext:
 
 class TestMetering:
     def test_free_plan_is_refused_with_402(self, env: _Env) -> None:
-        app.dependency_overrides[get_current_account] = lambda: build_account(
-            TEST_USER_ID, "free"
-        )
+        app.dependency_overrides[get_current_account] = lambda: build_account(TEST_USER_ID, "free")
         try:
             response = env.client.post(
                 "/api/v1/chat",
@@ -714,9 +742,7 @@ class TestAttribution:
 
         async def _drive_ephemeral() -> None:
             async with env.factory() as session:
-                set_attribution(
-                    user_id=TEST_USER_ID, surface="chat", request_id="http-request-id"
-                )
+                set_attribution(user_id=TEST_USER_ID, surface="chat", request_id="http-request-id")
                 stream = chat_router._chat_event_stream(
                     user_id=TEST_USER_ID,
                     message="What should I practice?",
@@ -740,9 +766,7 @@ class TestAttribution:
                 session.add(User(id=TEST_USER_ID))
                 await session.flush()
                 await session.commit()
-                set_attribution(
-                    user_id=TEST_USER_ID, surface="chat", request_id="http-request-id"
-                )
+                set_attribution(user_id=TEST_USER_ID, surface="chat", request_id="http-request-id")
                 stream = chat_router._chat_event_stream(
                     user_id=TEST_USER_ID,
                     message="What should I practice?",

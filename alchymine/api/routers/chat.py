@@ -20,23 +20,31 @@ Guardrails added in Sprint 5 (#165):
 - **Per-user rate limit**: 10 messages per minute per user, enforced
   with a simple in-memory sliding-window counter (no Redis needed).
 
-The ``practice`` scope (epic #251, slice 5) adds three things nobody
-else on this endpoint has, and nothing anybody else on it loses:
+Two of those gates now cover every scope (issues #263, #279).  The
+``practice`` scope had them first, alone, because adopting them across
+five live surfaces changes behaviour on all five and deserved its own
+regression pass.  This is that pass:
 
-- ``detect_crisis`` on the way in, answering high and emergency
-  disclosures with resources instead of a coaching reply.
-- ``check_text`` on the way out, on a cadence inside the streaming loop.
-- A deterministic practice-context block appended to the *user message*,
-  never the system prompt.
+- ``detect_crisis`` on the way in, on every scope and on the unscoped
+  default, answering high and emergency disclosures with resources
+  instead of a coaching reply.
+- ``check_text`` on the way out, on a cadence inside the streaming loop
+  and once at the end, under the context that matches the scope.
+- A missing disclaimer is *appended*, never blocked on.  The five harm
+  categories still truncate the stream; an incomplete reply is finished
+  and then completed (see ``_BLOCKING_CATEGORIES`` and
+  ``missing_disclaimers``).
+
+The practice-context block stays practice-only: it is a feature of that
+scope, not a safety gate.
 
 Removing ``"practice"`` from ``_VALID_SYSTEM_KEYS`` is the kill switch,
 and it is worth being exact about what it kills.  The scope 422s, so
-there is no LLM call, no ethics gate and no context builder, and the
-other five scopes are untouched.  The crisis gate is the deliberate
-exception: it reads ``PRACTICE_SYSTEM_KEY`` directly and runs *before*
-the validity check, so a crisis-severity message on a killed scope
-still receives resources rather than a 422.  That ordering is the point
-of the gate.  Answering somebody in crisis with a schema error because
+there is no LLM call and no practice context, and the other five scopes
+are untouched.  The crisis gate is the deliberate exception: it runs
+*before* the validity check, so a crisis-severity message on a killed
+scope still receives resources rather than a 422.  That ordering is the
+point of the gate.  Answering somebody in crisis with a schema error because
 an operator disabled a feature would be the one failure mode this path
 exists to prevent, and the resource stream costs nothing to serve.
 
@@ -212,26 +220,55 @@ _VALID_SYSTEM_KEYS = {
 }
 
 
-# ─── Practice-scope safety gates ──────────────────────────────────────
+# ─── Safety gates ─────────────────────────────────────────────────────
 #
-# The practice scope is the first chat surface wired to the real ethics
-# and crisis gates.  The other five keep the local regex they have always
-# had; adopting these across five live surfaces changes behaviour on all
-# of them and deserves its own PR and regression pass (follow-up filed
-# with the epic close-out).
+# Every scope, plus the unscoped default.  The practice scope had these
+# first and alone; issue #263 is the rollout to the rest.
 
 # check_text over the whole accumulation is O(n²) across a reply, so it
 # runs on a cadence rather than per chunk, plus once when the stream ends.
 _ETHICS_CHECK_EVERY = 8
 
-# The categories a partial reply can be judged on.  MISSING_DISCLAIMER is
-# excluded on purpose: mid-stream, "no disclaimer yet" is a property of
-# every reply that has not finished, and truncating on it guarantees the
-# disclaimer never arrives.  It is excluded at the end-of-stream check too,
-# because blocking a whole practice answer for saying "meditation" without
-# the word "professional" would refuse more good replies than bad ones.
-# Appending a disclaimer instead of blocking is the right fix and is a
-# follow-up, not a gate this slice can safely widen.
+# The context ``check_text`` is called under, per scope.  ``intelligence``
+# has no branch of its own in the checker, so it maps to "general", which
+# runs both the healing and the financial disclaimer rules — the widest
+# reading, which is the right default for the scope that ranges furthest.
+# ``practice`` keeps "healing": it is the strictest coaching branch and
+# the one the scope shipped under.  ``creative`` and ``perspective`` have
+# no disclaimer rule at all, which is why healing vocabulary on those
+# scopes collects nothing.
+_ETHICS_CONTEXTS = {
+    "intelligence": "general",
+    "healing": "healing",
+    "wealth": "wealth",
+    "creative": "creative",
+    "perspective": "perspective",
+    PRACTICE_SYSTEM_KEY: "healing",
+}
+
+
+def _ethics_context(system_key: str | None) -> str:
+    """Return the ``check_text`` context for *system_key*.
+
+    An unknown or absent key falls back to "general" rather than raising.
+    The unscoped default coach ranges across every system, so the widest
+    rule set is the honest one for it, and a key that somehow reached
+    here without being in the map should be checked more rather than less.
+    """
+    if system_key is None:
+        return "general"
+    return _ETHICS_CONTEXTS.get(system_key, "general")
+
+
+# The categories that truncate a stream.  MISSING_DISCLAIMER is excluded
+# on purpose: mid-stream, "no disclaimer yet" is a property of every reply
+# that has not finished, and truncating on it guarantees the disclaimer
+# never arrives.  It is excluded at the end-of-stream check too, because
+# cutting a whole answer for saying "meditation" without the word
+# "professional" would refuse more good replies than bad ones.  A missing
+# disclaimer is an omission, not harm, and the fix for an omission is to
+# supply what is missing — which is what ``missing_disclaimers`` and the
+# append at the end of ``_chat_event_stream`` do (issue #279).
 _BLOCKING_CATEGORIES = frozenset(
     {
         ViolationCategory.FATALISTIC_LANGUAGE.value,
@@ -256,24 +293,22 @@ def run_safety_gates(
 ) -> str | None:
     """Return a block reason for *text*, or ``None`` to let it through.
 
-    The blocked-pattern regex runs for every scope, exactly as it did
-    before this function existed.  ``check_text`` runs only for the
-    practice scope and only when *check_ethics* is set, which the
-    streaming loop does on its cadence.
+    The blocked-pattern regex runs unconditionally, exactly as it did
+    before this function existed.  ``check_text`` runs when *check_ethics*
+    is set, which the streaming loop does on its cadence and once at the
+    end, under the context ``_ethics_context`` picks for the scope.
 
-    ``context="healing"`` is reused rather than adding a ``"practice"``
-    context: it is the strictest existing coaching branch, and a
-    first-class context is deferred to the gate rollout across the other
-    scopes.
+    Only the five harm categories reach the return.  A missing disclaimer
+    is handled by ``missing_disclaimers`` instead, and never from here.
     """
     reason = _check_content_safety(text)
     if reason is not None:
         return reason
 
-    if not check_ethics or system_key != PRACTICE_SYSTEM_KEY:
+    if not check_ethics:
         return None
 
-    result = check_text(text, context="healing")
+    result = check_text(text, context=_ethics_context(system_key))
     for violation in result.violations:
         if (
             violation.category in _BLOCKING_CATEGORIES
@@ -283,16 +318,42 @@ def run_safety_gates(
     return None
 
 
+def missing_disclaimers(system_key: str | None, text: str) -> list[str]:
+    """Return the disclaimers *text* needs and does not have.
+
+    Called once, on the finished reply, so "the disclaimer has not
+    arrived yet" cannot be mistaken for "the disclaimer is missing".
+    The returned sentences are the checker's own canonical wording
+    (``HEALING_DISCLAIMER`` / ``FINANCIAL_DISCLAIMER``), which is what
+    makes the gate converge: appending them satisfies the same rule that
+    asked for them.
+
+    A reply can want both — a general-scope answer that ranges over
+    breathwork and income trips each rule — so the result is a list, in
+    the checker's order, with duplicates dropped.
+    """
+    result = check_text(text, context=_ethics_context(system_key))
+    wanted: list[str] = []
+    for violation in result.violations:
+        if violation.category != ViolationCategory.MISSING_DISCLAIMER.value:
+            continue
+        if violation.remedy and violation.remedy not in wanted:
+            wanted.append(violation.remedy)
+    return wanted
+
+
 def crisis_for(system_key: str | None, message: str) -> CrisisResponse | None:
     """Return the crisis response *message* warrants on this scope, if any.
 
-    Practice only, and only at high or emergency severity.  Medium
-    severity is ordinary coaching material ("I had a panic attack before
-    my morning practice"); handing that user a hotline list instead of a
-    conversation would be the wrong kind of careful.
+    Every scope, including the unscoped default, and only at high or
+    emergency severity.  Medium severity is ordinary coaching material
+    ("I had a panic attack before my morning practice"); handing that
+    user a hotline list instead of a conversation would be the wrong kind
+    of careful.
+
+    *system_key* is still taken because the frames differ by scope — see
+    ``_crisis_frames`` — not because any scope is exempt.
     """
-    if system_key != PRACTICE_SYSTEM_KEY:
-        return None
     crisis = detect_crisis(message)
     if crisis is None:
         return None
@@ -315,7 +376,30 @@ def _sse_data_frame(text: str) -> str:
     return f"{lines}\n"
 
 
-def _crisis_frames(crisis: CrisisResponse) -> list[str]:
+# The reviewed practice copy, unchanged, and a scope-neutral pair for
+# everybody else.  "Before anything about practice" is true on the
+# practice scope and false on wealth, and a crisis frame that opens by
+# naming the wrong thing reads as a form letter at the moment it can
+# least afford to.  The neutral pair says the same thing without the
+# noun.  DRAFT until Tyler signs off; the practice pair is not.
+_CRISIS_OPENING_PRACTICE = (
+    "Before anything about practice: what you have written matters more than "
+    "today's protocol, and there are people available right now who are "
+    "better placed than I am to sit with it."
+)
+
+_CRISIS_CLOSING_PRACTICE = "I'll be here when you want to come back to the practice side of things."
+
+_CRISIS_OPENING_GENERAL = (
+    "Before anything else: what you have written matters more than what we "
+    "were working on, and there are people available right now who are "
+    "better placed than I am to sit with it."
+)
+
+_CRISIS_CLOSING_GENERAL = "I'll be here when you want to come back to the rest of it."
+
+
+def _crisis_frames(crisis: CrisisResponse, system_key: str | None) -> list[str]:
     """Render the crisis response as one line per SSE ``data:`` frame.
 
     One line per frame, one frame per event, and the client concatenates
@@ -323,18 +407,19 @@ def _crisis_frames(crisis: CrisisResponse) -> list[str]:
     prose rather than as a list.  The model path frames differently
     because it has to carry whatever the model wrote (see
     ``_sse_data_frame``); this copy is ours and holds no newlines.
+
+    Only the opening and closing lines vary by scope.  The resources and
+    the disclaimer come from ``engine/healing/crisis`` and are the same
+    everywhere, which is the part that has to be.
     """
-    parts = [
-        "Before anything about practice: what you have written matters more than "
-        "today's protocol, and there are people available right now who are "
-        "better placed than I am to sit with it.",
-    ]
+    practice = system_key == PRACTICE_SYSTEM_KEY
+    parts = [_CRISIS_OPENING_PRACTICE if practice else _CRISIS_OPENING_GENERAL]
     parts.extend(
         f"{resource.name}: {resource.contact}. {resource.description}"
         for resource in crisis.resources
     )
     parts.extend(crisis.disclaimers)
-    parts.append("I'll be here when you want to come back to the practice side of things.")
+    parts.append(_CRISIS_CLOSING_PRACTICE if practice else _CRISIS_CLOSING_GENERAL)
     return parts
 
 
@@ -536,11 +621,22 @@ async def _chat_event_stream(
         # Once at the end, so a violation inside the last few chunks is
         # not missed by the cadence.  It cannot unsend what already
         # streamed, but it still keeps the violation out of the history.
-        if not blocked and system_key == PRACTICE_SYSTEM_KEY:
+        if not blocked:
             if run_safety_gates(system_key, "".join(full_reply), check_ethics=True) is not None:
                 logger.warning("Chat output blocked by safety filter for user %s", user_id)
                 blocked = True
                 yield "event: error\ndata: Response blocked by safety filter\n\n"
+            else:
+                # The reply is finished and clean, and may still be
+                # missing a disclaimer.  That is an omission rather than
+                # harm, so it is supplied instead of punished (#279): the
+                # sentences go out as ordinary data frames before the done
+                # sentinel, and join ``full_reply`` so the transcript
+                # matches what the reader saw.
+                for disclaimer in missing_disclaimers(system_key, "".join(full_reply)):
+                    addition = f"\n\n{disclaimer}"
+                    full_reply.append(addition)
+                    yield _sse_data_frame(addition)
     except CostCeilingExceeded:
         # The response already started, so there is no status code left to
         # set — the state ships as an error frame the client renders. Text
@@ -600,9 +696,9 @@ async def _crisis_event_stream(
     the tab mid-stream would otherwise roll the whole turn back, which
     is the case where keeping it matters most.
     """
-    logger.info("Crisis gate engaged on the practice scope (severity=%s)", crisis.severity)
+    logger.info("Crisis gate engaged (scope=%s, severity=%s)", system_key, crisis.severity)
 
-    frames = _crisis_frames(crisis)
+    frames = _crisis_frames(crisis, system_key)
     reply = " ".join(frames)
 
     # Committed up front, matching _chat_event_stream, so a disconnect
@@ -683,14 +779,13 @@ async def chat(
     # sending at this moment.  The path makes no LLM call and writes no
     # ledger row, so there is nothing to charge for and no spend to cap;
     # the request-level RateLimitMiddleware still bounds the volume.  The
-    # practice kill switch does not reach it either: ``crisis_for`` reads
-    # PRACTICE_SYSTEM_KEY directly and the validity check is below, so a
-    # crisis message on a disabled scope still receives resources.  The
-    # kill switch exists to stop LLM coaching, and these frames are not
-    # that.
+    # practice kill switch does not reach it either: the validity check is
+    # below, so a crisis message on a disabled scope still receives
+    # resources.  The kill switch exists to stop LLM coaching, and these
+    # frames are not that.
     #
-    # This ordering is the whole of issue #284, and it is written to hold
-    # unchanged when the gate widens past the practice scope: whatever
+    # This ordering is the whole of issue #284, and it held unchanged when
+    # the gate widened past the practice scope (#263): whatever
     # ``crisis_for`` decides to catch escapes everything below it.
     crisis = crisis_for(request.system_key, request.message)
     if crisis is not None:
