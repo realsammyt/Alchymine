@@ -1,0 +1,81 @@
+# Pack-boundary exceptions: the footprint that predates the rail
+#
+# One line per `<sha256> <path>` pair. The digest is a denylist entry; the path
+# is relative to the repository root, posix separators, a trailing slash making
+# it a directory prefix. `scripts/check_pack_boundary.py` skips exactly that
+# digest at exactly that path.
+#
+# Pairing is the whole point. A file listed here for one term is still checked
+# for every other term, and the term listed here is still caught in every other
+# file. So this list freezes the footprint rather than opening a hole: if the
+# same vocabulary spreads to a new file, CI fails.
+#
+# WHAT THIS RECORDS
+#
+# The rail was written for the practice layer, which is clean. Two systems that
+# predate it are not: the personality pillar and the healing modality library
+# name established third-party frameworks in code, tests, prompts, report
+# templates and web copy. That is a licensing and attribution question, not a
+# tooling question, and it is Tyler's call:
+#
+#   - keep the names and carry proper attribution and license terms, or
+#   - move that content to an external pack the way the practice layer does, or
+#   - rename to generic vocabulary and describe the method without the brand.
+#
+# Until that call is made, this file makes the footprint exact and countable
+# instead of invisible. Some paths below already name a term; those filenames
+# are existing repo content, not new exposure.
+#
+# HOW TO SHRINK IT
+#
+# Delete the line once the content it covers is gone. `pytest
+# tests/infrastructure/test_pack_boundary.py` fails on an entry that points at
+# a missing path or that nothing matches any more, so the list cannot go stale.
+#
+# HOW NOT TO GROW IT
+#
+# A new entry is a decision to ship third-party vocabulary, so it needs the
+# licensing answer first. `--freeze-exceptions` exists to record this original
+# footprint, not to clear a failing build.
+#
+# STATUS: DRAFT, generated 2026-08-18 from the seed denylist. Awaiting Tyler.
+2c1cf53acaa307f31e94ad74a00df125af4546489b1f76341e6e240ec3784169 alchymine/web/src/app/about/page.tsx
+7b25985c034d7be5ed384baa0ac0b4c1ba68343a96884ac018f8f5f52b3624bf alchymine/engine/healing/breathwork.py
+7c0264cfee1a290ea4fa9a311cc4b7a0a4acfc2fb13beb8e2591291921758a78 alchymine/engine/healing/breathwork.py
+7c0264cfee1a290ea4fa9a311cc4b7a0a4acfc2fb13beb8e2591291921758a78 alchymine/engine/healing/modalities.py
+7c0264cfee1a290ea4fa9a311cc4b7a0a4acfc2fb13beb8e2591291921758a78 alchymine/engine/healing/skills/yaml/coherence-heart-focused-breathing.yaml
+7c0264cfee1a290ea4fa9a311cc4b7a0a4acfc2fb13beb8e2591291921758a78 alchymine/web/src/app/healing/page.tsx
+7d5117b7a1dbaa3e0e9a0e0d525988622a9617b9f43b4617b32738e90cdb9a0c alchymine/agents/growth/system_prompts.py
+a1b6619460850a6e4145062fa245a22e0ab7a68473c69cc166e44b4ec8866082 alchymine/agents/orchestrator/graphs.py
+a1b6619460850a6e4145062fa245a22e0ab7a68473c69cc166e44b4ec8866082 alchymine/agents/orchestrator/intent.py
+a1b6619460850a6e4145062fa245a22e0ab7a68473c69cc166e44b4ec8866082 alchymine/api/routers/personality.py
+a1b6619460850a6e4145062fa245a22e0ab7a68473c69cc166e44b4ec8866082 alchymine/engine/personality/__init__.py
+a1b6619460850a6e4145062fa245a22e0ab7a68473c69cc166e44b4ec8866082 alchymine/engine/personality/enneagram.py
+a1b6619460850a6e4145062fa245a22e0ab7a68473c69cc166e44b4ec8866082 alchymine/engine/profile.py
+a1b6619460850a6e4145062fa245a22e0ab7a68473c69cc166e44b4ec8866082 alchymine/engine/reports/templates/report.html
+a1b6619460850a6e4145062fa245a22e0ab7a68473c69cc166e44b4ec8866082 alchymine/mcp/intelligence_server.py
+a1b6619460850a6e4145062fa245a22e0ab7a68473c69cc166e44b4ec8866082 alchymine/prompts/templates/intelligence_narrative.yaml
+a1b6619460850a6e4145062fa245a22e0ab7a68473c69cc166e44b4ec8866082 alchymine/web/src/app/discover/assessment/page.tsx
+a1b6619460850a6e4145062fa245a22e0ab7a68473c69cc166e44b4ec8866082 alchymine/web/src/app/discover/report/[id]/page.tsx
+a1b6619460850a6e4145062fa245a22e0ab7a68473c69cc166e44b4ec8866082 alchymine/web/src/app/profile/page.tsx
+a1b6619460850a6e4145062fa245a22e0ab7a68473c69cc166e44b4ec8866082 alchymine/web/src/lib/api.ts
+a1b6619460850a6e4145062fa245a22e0ab7a68473c69cc166e44b4ec8866082 alchymine/web/src/lib/questions.ts
+a1b6619460850a6e4145062fa245a22e0ab7a68473c69cc166e44b4ec8866082 scripts/create-phase-issues.sh
+a1b6619460850a6e4145062fa245a22e0ab7a68473c69cc166e44b4ec8866082 tests/agents/test_graphs.py
+a1b6619460850a6e4145062fa245a22e0ab7a68473c69cc166e44b4ec8866082 tests/agents/test_llm.py
+a1b6619460850a6e4145062fa245a22e0ab7a68473c69cc166e44b4ec8866082 tests/api/test_personality_router.py
+a1b6619460850a6e4145062fa245a22e0ab7a68473c69cc166e44b4ec8866082 tests/api/test_report_html_export.py
+a1b6619460850a6e4145062fa245a22e0ab7a68473c69cc166e44b4ec8866082 tests/api/test_report_pdf.py
+a1b6619460850a6e4145062fa245a22e0ab7a68473c69cc166e44b4ec8866082 tests/conftest.py
+a1b6619460850a6e4145062fa245a22e0ab7a68473c69cc166e44b4ec8866082 tests/db/test_models.py
+a1b6619460850a6e4145062fa245a22e0ab7a68473c69cc166e44b4ec8866082 tests/engine/test_personality.py
+a1b6619460850a6e4145062fa245a22e0ab7a68473c69cc166e44b4ec8866082 tests/integration/conftest.py
+a1b6619460850a6e4145062fa245a22e0ab7a68473c69cc166e44b4ec8866082 tests/mcp/test_intelligence_server.py
+aca3d16f6d863a057c587a8d68593299791dc8d424d89eb55afee81353879019 alchymine/agents/growth/system_prompts.py
+aca3d16f6d863a057c587a8d68593299791dc8d424d89eb55afee81353879019 alchymine/engine/healing/modalities.py
+bd701888085804f9eba5514fa59baf14016b99e0c4eef582afcd601e1ddb2188 alchymine/engine/healing/skills/yaml/expressive-morning-pages.yaml
+d6156693f595371f9d94af7e4e46031a7e23fb62ab63f8f5fb376b0aa2a1077c alchymine/engine/healing/breathwork.py
+d6156693f595371f9d94af7e4e46031a7e23fb62ab63f8f5fb376b0aa2a1077c tests/engine/test_healing.py
+d6156693f595371f9d94af7e4e46031a7e23fb62ab63f8f5fb376b0aa2a1077c tests/mcp/test_healing_server.py
+dc6d7d85ce7ad002235274a49c05c3087c8abfbef54f0e56058fef0a2b8b345b alchymine/engine/healing/breathwork.py
+e60a88e7e568a0bc1bb267dd9410f212f1f100d0f598ddf4b85d191ee0e06159 alchymine/engine/healing/modalities.py
