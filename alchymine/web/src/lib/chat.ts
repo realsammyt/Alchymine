@@ -2,9 +2,15 @@
  * Growth Assistant chat — types and low-level SSE streaming client.
  *
  * The backend endpoint (``POST /api/v1/chat``) responds with a
- * ``text/event-stream``.  Each LLM chunk is delivered as:
+ * ``text/event-stream``.  Each LLM chunk is delivered as one event:
  *
  *     data: <text chunk>\n\n
+ *
+ * A ``data:`` field ends at the first newline, so a chunk that carries
+ * newlines spans several ``data:`` lines inside that same event, which
+ * we rejoin with newlines at the blank line that closes it:
+ *
+ *     data: <first line>\ndata: <second line>\n\n
  *
  * and the stream terminates with a sentinel:
  *
@@ -52,8 +58,8 @@ export class ChatError extends Error {
 /**
  * Thrown when the caller's plan cannot pay for the turn they asked for.
  *
- * The gate runs as a route dependency, so this arrives as a real 402 or
- * 429 *before* the event stream opens. That matters: once the stream is
+ * The gate runs in the handler body, above the stream, so this arrives
+ * as a real 402 or 429 *before* it opens. That matters: once the stream is
  * open the status line is already sent, and a quota state buried in an
  * ``event: error`` frame looks like success to everything above the SSE
  * parser.
@@ -80,6 +86,33 @@ export interface ChatHistoryItem {
 // ─── Transport ──────────────────────────────────────────────────────
 
 const BASE = (process.env.NEXT_PUBLIC_API_URL ?? "") + "/api/v1";
+
+/** What one completed SSE event means to the caller. */
+type FrameOutcome =
+  | { kind: "chunk"; text: string }
+  | { kind: "done" }
+  | { kind: "error"; message: string }
+  | { kind: "empty" };
+
+/**
+ * Resolve one completed event from its name and its ``data:`` lines.
+ *
+ * The lines rejoin with newlines because that is what the server split
+ * them on: a ``data:`` field cannot carry a newline, so a chunk with
+ * paragraph breaks in it arrives as several lines of one event. An
+ * event with no data lines, or one whose data is empty, carries nothing
+ * to show.
+ */
+function resolveFrame(name: string | null, dataLines: string[]): FrameOutcome {
+  if (name === "done") return { kind: "done" };
+
+  const text = dataLines.join("\n");
+
+  if (name === "error") {
+    return { kind: "error", message: text || "Chat stream error" };
+  }
+  return text.length > 0 ? { kind: "chunk", text } : { kind: "empty" };
+}
 
 /**
  * Resolve any legacy localStorage token for the migration path.  New
@@ -150,7 +183,8 @@ export async function* streamChat(
   const reader = response.body.getReader();
   const decoder = new TextDecoder();
   let buffer = "";
-  let nextEvent: string | null = null;
+  let eventName: string | null = null;
+  let dataLines: string[] = [];
 
   try {
     while (true) {
@@ -158,40 +192,51 @@ export async function* streamChat(
       if (done) break;
       buffer += decoder.decode(value, { stream: true });
 
-      // SSE frames are separated by blank lines; individual fields by
-      // single newlines.  We parse line-by-line because our frames are
-      // small and we want early delivery of ``data:`` chunks.
+      // SSE fields are separated by single newlines and events by blank
+      // lines.  We read line-by-line but deliver per event, because the
+      // lines of one event are pieces of a single chunk of text.  Each
+      // model chunk is its own event, so delivery stays as early as it
+      // ever was.
       let newlineIdx: number;
       while ((newlineIdx = buffer.indexOf("\n")) !== -1) {
         const rawLine = buffer.slice(0, newlineIdx);
         buffer = buffer.slice(newlineIdx + 1);
         const line = rawLine.endsWith("\r") ? rawLine.slice(0, -1) : rawLine;
 
-        if (line === "") {
-          // Blank line → frame boundary; clear any pending event name.
-          nextEvent = null;
+        if (line !== "") {
+          if (line.startsWith("event:")) {
+            eventName = line.slice(6).trim();
+          } else if (line.startsWith("data:")) {
+            // Strip a single leading space per the SSE spec.
+            dataLines.push(line.slice(5).replace(/^ /, ""));
+          }
+          // Any other line is a comment or a field we don't use, and the
+          // spec says to ignore it.  Nothing the server sends takes this
+          // path: content travels in ``data:`` lines only.
           continue;
         }
 
-        if (line.startsWith("event:")) {
-          nextEvent = line.slice(6).trim();
-          continue;
-        }
+        // Blank line: the event is complete.
+        const outcome = resolveFrame(eventName, dataLines);
+        eventName = null;
+        dataLines = [];
 
-        if (line.startsWith("data:")) {
-          // Strip a single leading space per the SSE spec.
-          const data = line.slice(5).replace(/^ /, "");
-          if (nextEvent === "done") {
-            return;
-          }
-          if (nextEvent === "error") {
-            throw new ChatError(data || "Chat stream error");
-          }
-          if (data.length > 0) {
-            yield data;
-          }
-        }
+        if (outcome.kind === "done") return;
+        if (outcome.kind === "error") throw new ChatError(outcome.message);
+        if (outcome.kind === "chunk") yield outcome.text;
       }
+    }
+
+    // The reader is finished.  Data lines still pending here belong to an
+    // event whose terminating blank line never arrived, which means the
+    // connection closed mid-reply.  The text in them is real, so it goes
+    // to the caller rather than being discarded silently.  Any trailing
+    // partial line left in ``buffer`` stays unparsed: a half-written
+    // field cannot be told apart from a complete one.
+    if (dataLines.length > 0) {
+      const outcome = resolveFrame(eventName, dataLines);
+      if (outcome.kind === "error") throw new ChatError(outcome.message);
+      if (outcome.kind === "chunk") yield outcome.text;
     }
   } finally {
     try {
