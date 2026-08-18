@@ -399,6 +399,176 @@ class TestAtomicity:
         assert env.query("SELECT count(*) FROM practice_log")[0][0] == 1
 
 
+# ─── Idempotency ────────────────────────────────────────────────────────
+
+
+class TestIdempotency:
+    """One completion is one record, however many times it is saved.
+
+    The daily protocol renders the self-check and the integration prompt
+    side by side on a completed card. They are two controls over one
+    practice, and both post here with the same ``practice_log_id``. A
+    plain insert per call gave that completion two link rows and two
+    outcome rows, so every count downstream read double.
+
+    The key is ``(user_id, practice_log_id)``. The second call merges
+    into the row the first one wrote:
+
+    - a field the caller did not send never clears one already stored,
+      so a note-only save cannot erase a capacity reading;
+    - both notes survive, appended as separate paragraphs, because they
+      are two pieces of the user's own writing about the same practice
+      and neither is ours to discard;
+    - the same text saved twice is stored once, so a retry after a
+      timeout is not a second paragraph;
+    - the derived outcome row is recomputed from the merged row rather
+      than from the request body, so it does not matter which prompt the
+      user fills in first.
+    """
+
+    def test_two_posts_for_one_completion_write_one_row(self, env: Env) -> None:
+        log_id = _log_practice(env.client)
+        _integrate(env.client, practice_log_id=log_id, note="What I noticed.")
+        _integrate(env.client, practice_log_id=log_id, capacity_delta=1)
+
+        assert env.query("SELECT count(*) FROM integration_entries")[0][0] == 1
+
+    def test_two_posts_for_one_completion_write_one_outcome_row(self, env: Env) -> None:
+        log_id = _log_practice(env.client)
+        _integrate(env.client, practice_log_id=log_id, note="What I noticed.")
+        _integrate(env.client, practice_log_id=log_id, capacity_delta=1)
+
+        assert env.query("SELECT count(*) FROM outcome_metrics")[0][0] == 1
+
+    def test_the_second_post_returns_the_same_row(self, env: Env) -> None:
+        log_id = _log_practice(env.client)
+        first = _integrate(env.client, practice_log_id=log_id, note="First.")
+        second = _integrate(env.client, practice_log_id=log_id, capacity_delta=1)
+
+        assert second.json()["id"] == first.json()["id"]
+
+    def test_the_second_post_answers_200_not_201(self, env: Env) -> None:
+        """201 means a resource was created. The second save updates one."""
+        log_id = _log_practice(env.client)
+        assert _integrate(env.client, practice_log_id=log_id).status_code == 201
+        assert _integrate(env.client, practice_log_id=log_id).status_code == 200
+
+    def test_both_notes_survive_the_merge(self, env: Env) -> None:
+        """The self-check answer and the integration note are both the
+        user's writing about one practice. Losing either is data loss."""
+        log_id = _log_practice(env.client)
+        _integrate(env.client, practice_log_id=log_id, note="Settling, mostly.")
+        body = _integrate(
+            env.client,
+            practice_log_id=log_id,
+            capacity_delta=1,
+            note="It changed what I did next.",
+        ).json()
+
+        assert "Settling, mostly." in body["note"]
+        assert "It changed what I did next." in body["note"]
+
+    def test_a_replayed_identical_post_stores_the_note_once(self, env: Env) -> None:
+        """A retry after a timeout is not a second paragraph."""
+        log_id = _log_practice(env.client)
+        note = "Settling, mostly."
+        _integrate(env.client, practice_log_id=log_id, note=note)
+        body = _integrate(env.client, practice_log_id=log_id, note=note).json()
+
+        assert body["note"] == note
+
+    def test_a_later_save_does_not_clear_an_earlier_capacity_delta(self, env: Env) -> None:
+        log_id = _log_practice(env.client)
+        _integrate(env.client, practice_log_id=log_id, capacity_delta=2)
+        body = _integrate(env.client, practice_log_id=log_id, note="And a note.").json()
+
+        assert body["capacity_delta"] == 2
+
+    def test_a_later_save_does_not_clear_earlier_journal_links(self, env: Env) -> None:
+        log_id = _log_practice(env.client)
+        intention = _journal(env.client, "intention")
+        _integrate(env.client, practice_log_id=log_id, intention_entry_id=intention)
+        body = _integrate(env.client, practice_log_id=log_id, capacity_delta=1).json()
+
+        assert body["intention_entry_id"] == intention
+
+    def test_journal_links_from_both_saves_land_on_one_row(self, env: Env) -> None:
+        log_id = _log_practice(env.client)
+        intention = _journal(env.client, "intention")
+        reflection = _journal(env.client, "integration")
+        _integrate(env.client, practice_log_id=log_id, intention_entry_id=intention)
+        body = _integrate(
+            env.client, practice_log_id=log_id, reflection_entry_id=reflection
+        ).json()
+
+        assert body["intention_entry_id"] == intention
+        assert body["reflection_entry_id"] == reflection
+
+    def test_the_outcome_value_catches_up_with_a_later_capacity_delta(self, env: Env) -> None:
+        """Self-check first, reading second: the dashboard shows the reading."""
+        log_id = _log_practice(env.client)
+        _integrate(env.client, practice_log_id=log_id, note="What I noticed.")
+        _integrate(env.client, practice_log_id=log_id, capacity_delta=2)
+
+        assert env.query("SELECT value FROM outcome_metrics") == [(2.0,)]
+
+    def test_a_later_note_only_save_does_not_downgrade_the_outcome_value(self, env: Env) -> None:
+        """Reading first, self-check second: the reading still stands.
+
+        The value is recomputed from the merged row, not from the body
+        of whichever call happened to arrive last.
+        """
+        log_id = _log_practice(env.client)
+        _integrate(env.client, practice_log_id=log_id, capacity_delta=2)
+        _integrate(env.client, practice_log_id=log_id, note="What I noticed.")
+
+        assert env.query("SELECT value FROM outcome_metrics") == [(2.0,)]
+
+    def test_the_merged_note_is_still_ciphertext_at_rest(self, env: Env) -> None:
+        log_id = _log_practice(env.client)
+        first = "Settling, mostly."
+        second = "It changed what I did next."
+        _integrate(env.client, practice_log_id=log_id, note=first)
+        _integrate(env.client, practice_log_id=log_id, note=second)
+
+        raw = env.query("SELECT note FROM integration_entries")[0][0]
+        assert first not in raw
+        assert second not in raw
+
+    def test_two_completions_still_get_two_rows(self, env: Env) -> None:
+        """The key is the completion, not the user. Idempotency must not
+        collapse a week of practice into one row."""
+        first = _log_practice(env.client, STEADINESS_SLUG)
+        second = _log_practice(env.client, SELF_KNOWLEDGE_SLUG)
+        _integrate(env.client, practice_log_id=first)
+        _integrate(env.client, practice_log_id=second)
+
+        assert env.query("SELECT count(*) FROM integration_entries")[0][0] == 2
+        assert env.query("SELECT count(*) FROM outcome_metrics")[0][0] == 2
+
+    def test_the_same_practice_logged_twice_gets_two_rows(self, env: Env) -> None:
+        """Doing the same practice morning and evening is two completions."""
+        morning = _log_practice(env.client, STEADINESS_SLUG)
+        evening = _log_practice(env.client, STEADINESS_SLUG)
+        _integrate(env.client, practice_log_id=morning)
+        _integrate(env.client, practice_log_id=evening)
+
+        assert env.query("SELECT count(*) FROM integration_entries")[0][0] == 2
+
+    def test_another_users_completion_is_a_separate_row(self, env: Env) -> None:
+        """Cross-user isolation survives the merge key."""
+        mine = _log_practice(env.client)
+        _integrate(env.client, practice_log_id=mine)
+
+        with as_other_user():
+            theirs = _log_practice(env.client)
+            _integrate(env.client, practice_log_id=theirs)
+
+        owners = env.query("SELECT DISTINCT user_id FROM integration_entries ORDER BY user_id")
+        assert len(owners) == 2
+        assert env.query("SELECT count(*) FROM integration_entries")[0][0] == 2
+
+
 # ─── Encryption ─────────────────────────────────────────────────────────
 
 
