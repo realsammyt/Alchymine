@@ -85,16 +85,25 @@ def db_at_0018(db_at_0017):
 
 
 class TestRevisionChain:
-    """0018 has to be the single head, following 0017."""
+    """0018 follows 0017, on the one path the chain has."""
 
-    def test_0018_is_the_only_head(self):
-        """Two heads is a merge conflict that only shows up on deploy."""
+    def test_0018_sits_on_the_single_head_path(self):
+        """Two heads is a merge conflict that only shows up on deploy.
+
+        The head itself moves forward with every migration that lands,
+        so what is pinned here is that there is exactly one of them and
+        that 0018 is an ancestor of it, rather than a literal that needs
+        editing whenever somebody adds a revision.
+        """
         from alembic.script import ScriptDirectory
 
         script = ScriptDirectory.from_config(_alembic_config("sqlite://"))
 
         heads = list(script.get_heads())
-        assert heads == ["0018"], f"expected a single head 0018, got {heads}"
+        assert len(heads) == 1, f"expected a single head, got {heads}"
+
+        chain = {revision.revision for revision in script.walk_revisions("base", heads[0])}
+        assert "0018" in chain, f"0018 is not on the path to {heads[0]}"
         assert script.get_revision("0018").down_revision == "0017"
 
 

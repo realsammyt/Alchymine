@@ -1695,6 +1695,15 @@ export async function logPractice(
   });
 }
 
+/**
+ * Save the integration record for one completed practice.
+ *
+ * A save, not an insert: the record is keyed on the practice log row,
+ * so calling this twice for one completion returns the same entry with
+ * the second call's fields merged in rather than a second entry. Fields
+ * left out are kept, and notes accumulate instead of overwriting. The
+ * response carries the merged row, which is what to render.
+ */
 export async function createIntegration(
   entry: IntegrationCreate,
 ): Promise<IntegrationEntry> {

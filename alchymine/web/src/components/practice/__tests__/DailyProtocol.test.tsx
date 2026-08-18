@@ -356,6 +356,117 @@ describe("DailyProtocol follow-ups", () => {
     );
   });
 
+  it("saves both prompts against the one completion", async () => {
+    const { props } = renderProtocol({
+      onLog: jest.fn().mockResolvedValue(logEntry({ id: "log-99" })),
+    });
+
+    const card = within(morningSection()).getAllByRole("article")[0];
+    fireEvent.click(within(card).getByRole("button", { name: /done/i }));
+    await waitFor(() =>
+      expect(
+        within(card).getByRole("button", { name: "Save this" }),
+      ).toBeInTheDocument(),
+    );
+
+    fireEvent.change(
+      within(card).getByLabelText(FLOOR_DEFINITION.self_check.question),
+      { target: { value: "Settling, mostly." } },
+    );
+    fireEvent.click(within(card).getByRole("button", { name: "Save this" }));
+    fireEvent.click(within(card).getByRole("button", { name: "Save" }));
+
+    // Two writes, one completion. The server keys the record on the
+    // practice log row, so both land on the same one.
+    await waitFor(() => expect(props.onIntegrate).toHaveBeenCalledTimes(2));
+    expect(props.onIntegrate).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({ practice_log_id: "log-99" }),
+    );
+    expect(props.onIntegrate).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({ practice_log_id: "log-99" }),
+    );
+
+    expect(
+      within(card).getByText("Saved. Only you see this."),
+    ).toBeInTheDocument();
+    expect(
+      within(card).getByText("Logged. It'll show up on your dashboard."),
+    ).toBeInTheDocument();
+  });
+
+  it("does not let the two saves for one card overlap", async () => {
+    // Both prompts write to the same record, and the note on it is the
+    // merge of what each one sent. Overlapping writes would have the
+    // second read the record before the first had written to it, and
+    // one of the two notes would be lost.
+    let releaseFirst: (() => void) | undefined;
+    const onIntegrate = jest.fn().mockImplementation(
+      () =>
+        new Promise<void>((resolve) => {
+          if (!releaseFirst) releaseFirst = () => resolve();
+          else resolve();
+        }),
+    );
+    renderProtocol({
+      onLog: jest.fn().mockResolvedValue(logEntry({ id: "log-99" })),
+      onIntegrate,
+    });
+
+    const card = within(morningSection()).getAllByRole("article")[0];
+    fireEvent.click(within(card).getByRole("button", { name: /done/i }));
+    await waitFor(() =>
+      expect(
+        within(card).getByRole("button", { name: "Save this" }),
+      ).toBeInTheDocument(),
+    );
+
+    fireEvent.change(
+      within(card).getByLabelText(FLOOR_DEFINITION.self_check.question),
+      { target: { value: "Settling, mostly." } },
+    );
+    fireEvent.click(within(card).getByRole("button", { name: "Save this" }));
+    fireEvent.click(within(card).getByRole("button", { name: "Save" }));
+
+    await waitFor(() => expect(onIntegrate).toHaveBeenCalledTimes(1));
+    expect(onIntegrate).toHaveBeenCalledTimes(1);
+
+    releaseFirst?.();
+    await waitFor(() => expect(onIntegrate).toHaveBeenCalledTimes(2));
+  });
+
+  it("keeps the integration prompt usable after the self-check is saved", async () => {
+    const { props } = renderProtocol({
+      onLog: jest.fn().mockResolvedValue(logEntry({ id: "log-99" })),
+    });
+
+    const card = within(morningSection()).getAllByRole("article")[0];
+    fireEvent.click(within(card).getByRole("button", { name: /done/i }));
+    await waitFor(() =>
+      expect(
+        within(card).getByRole("button", { name: "Save this" }),
+      ).toBeInTheDocument(),
+    );
+
+    fireEvent.change(
+      within(card).getByLabelText(FLOOR_DEFINITION.self_check.question),
+      { target: { value: "Settling, mostly." } },
+    );
+    fireEvent.click(within(card).getByRole("button", { name: "Save this" }));
+    await waitFor(() =>
+      expect(
+        within(card).getByText("Saved. Only you see this."),
+      ).toBeInTheDocument(),
+    );
+
+    fireEvent.click(within(card).getByRole("button", { name: "Save" }));
+    await waitFor(() => expect(props.onIntegrate).toHaveBeenCalledTimes(2));
+    expect(props.onIntegrate).toHaveBeenLastCalledWith(
+      expect.objectContaining({ practice_log_id: "log-99" }),
+    );
+  });
+
   it("shows no self-check when the definition is not loaded", async () => {
     renderProtocol({ lookup: () => undefined });
 

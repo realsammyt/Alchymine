@@ -16,7 +16,7 @@ import logging
 from datetime import UTC, date, datetime, timedelta
 from typing import Annotated, Literal
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from pydantic import (
     AfterValidator,
     BaseModel,
@@ -675,9 +675,17 @@ async def practice_summary(
     )
 
 
-@router.post("/practice/integration", status_code=201, response_model=IntegrationResponse)
+@router.post(
+    "/practice/integration",
+    status_code=201,
+    response_model=IntegrationResponse,
+    responses={
+        200: {"description": "This completion already had an entry, and the save merged into it."}
+    },
+)
 async def create_integration(
     entry: IntegrationCreate,
+    response: Response,
     current_user: dict = Depends(get_current_user),
     session: AsyncSession = Depends(get_db_session),
 ) -> IntegrationResponse:
@@ -686,6 +694,15 @@ async def create_integration(
     Two writes, both scoped to the caller: the link row, and exactly one
     derived ``outcome_metrics`` row so the change lands on the dashboard
     the user already reads.
+
+    One completion is one record. The completed practice card offers the
+    self-check and the integration reading side by side and both save
+    here against the same ``practice_log_id``, so this route saves
+    rather than creates: a second call merges into the row the first one
+    wrote and answers 200 instead of 201. Merge semantics are the
+    repository's (:func:`~alchymine.db.repository.upsert_integration_entry`);
+    what matters here is that nothing the user wrote is dropped by
+    saving twice.
 
     Every id in the body is checked against the caller first, and a row
     belonging to somebody else answers 404 rather than 403. A 403 would
@@ -708,7 +725,7 @@ async def create_integration(
         if await repository.get_journal_entry_for_user(session, entry_id, user_id) is None:
             raise HTTPException(status_code=404, detail="Journal entry not found")
 
-    created = await repository.create_integration_entry(
+    stored, created = await repository.upsert_integration_entry(
         session,
         user_id=user_id,
         practice_log_id=log_entry.id,
@@ -719,28 +736,35 @@ async def create_integration(
         note=entry.note,
     )
 
-    # One row, not one per anything else. ``capacity_delta`` is the
-    # user's own read when they gave one; when they did not, the
-    # practice still happened, and that is worth 1.0 rather than 0.0.
+    # One row per completion, not one per save. The value is read off
+    # the stored row rather than off this request, so the reading stands
+    # whichever prompt the user filled in first and a later note-only
+    # save does not walk it back. ``capacity_delta`` is the user's own
+    # read when they gave one; when they did not, the practice still
+    # happened, and that is worth 1.0 rather than 0.0.
     await repository.record_outcome_metric(
         session,
         user_id=user_id,
         system=system_for_purpose(log_entry.primary_purpose),
         metric_name="practice_integration",
-        value=float(entry.capacity_delta) if entry.capacity_delta is not None else 1.0,
+        value=float(stored.capacity_delta) if stored.capacity_delta is not None else 1.0,
         period="daily",
+        metric_id=repository.derived_metric_id(stored.id, "practice_integration"),
     )
 
+    if not created:
+        response.status_code = 200
+
     return IntegrationResponse(
-        id=created.id,
-        user_id=created.user_id,
-        practice_log_id=created.practice_log_id,
-        intention_entry_id=created.intention_entry_id,
-        reflection_entry_id=created.reflection_entry_id,
-        purpose=created.purpose,
-        capacity_delta=created.capacity_delta,
-        note=created.note,
-        created_at=created.created_at,
+        id=stored.id,
+        user_id=stored.user_id,
+        practice_log_id=stored.practice_log_id,
+        intention_entry_id=stored.intention_entry_id,
+        reflection_entry_id=stored.reflection_entry_id,
+        purpose=stored.purpose,
+        capacity_delta=stored.capacity_delta,
+        note=stored.note,
+        created_at=stored.created_at,
     )
 
 

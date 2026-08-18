@@ -1111,19 +1111,34 @@ class EcologyState(Base):
 
 
 class IntegrationEntry(Base):
-    """Links an intention, an experience and a reflection. Writers in slice 4.
+    """Links an intention, an experience and a reflection.
 
     The cascade rules are asymmetric on purpose. Deleting the
     ``practice_log`` row destroys the link, because the link means
     nothing without the experience. Deleting a journal entry is
     something a user does deliberately and must not take the integration
     record with it, so both journal references SET NULL.
+
+    One row per completion, keyed on ``(user_id, practice_log_id)``. The
+    completed practice card offers two prompts, the self-check and the
+    integration reading, and both save against the same practice log
+    row; without the key that is two link rows and two derived outcome
+    rows for one practice. A unique index rather than a table
+    constraint, because SQLite cannot add a constraint to an existing
+    table without rebuilding it. Rows with a NULL ``practice_log_id``
+    are unaffected: NULLs do not compare equal on either dialect.
     """
 
     __tablename__ = "integration_entries"
     __table_args__ = (
         Index("ix_integration_entries_user_created", "user_id", "created_at"),
         Index("ix_integration_entries_user_purpose_created", "user_id", "purpose", "created_at"),
+        Index(
+            "uq_integration_entries_user_practice_log",
+            "user_id",
+            "practice_log_id",
+            unique=True,
+        ),
     )
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)

@@ -35,6 +35,7 @@ from __future__ import annotations
 
 from datetime import UTC, date, datetime, time
 from typing import Any
+from uuid import NAMESPACE_URL, uuid4, uuid5
 
 from sqlalchemy import and_, func, or_, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
@@ -715,6 +716,23 @@ async def get_journal_stats(session: AsyncSession, user_id: str) -> dict[str, An
 # ── Outcome Metrics ──────────────────────────────────────────────────────
 
 
+_DERIVED_METRIC_NAMESPACE = uuid5(NAMESPACE_URL, "https://alchymine.app/outcome-metrics/derived")
+
+
+def derived_metric_id(source_id: str, metric_name: str) -> str:
+    """The id of the one metric row derived from row *source_id*.
+
+    Derived rather than random, so the write that produces it can be
+    replayed. A metric that stands for one event has to be updatable in
+    place: without a stable id the second write mints a second
+    measurement of the same thing and every count over it reads double.
+
+    *metric_name* is part of the derivation, so one source row can carry
+    several distinct metrics without them colliding.
+    """
+    return str(uuid5(_DERIVED_METRIC_NAMESPACE, f"{metric_name}:{source_id}"))
+
+
 async def record_outcome_metric(
     session: AsyncSession,
     user_id: str,
@@ -722,18 +740,51 @@ async def record_outcome_metric(
     metric_name: str,
     value: float,
     period: str = "weekly",
+    metric_id: str | None = None,
 ) -> OutcomeMetricRecord:
-    """Persist an outcome metric measurement."""
-    record = OutcomeMetricRecord(
-        user_id=user_id,
-        system=system,
-        metric_name=metric_name,
-        value=value,
-        period=period,
+    """Persist an outcome metric measurement.
+
+    Pass *metric_id* (see :func:`derived_metric_id`) when the metric
+    stands for one event that can be written more than once. The write
+    then updates the row instead of adding another, so the event keeps
+    exactly one measurement.
+
+    ``recorded_at`` is not touched on that path. It is when the thing
+    happened, not when the last edit to it landed, and moving it would
+    walk a late correction into the following day's bucket.
+    """
+    if metric_id is None:
+        record = OutcomeMetricRecord(
+            user_id=user_id,
+            system=system,
+            metric_name=metric_name,
+            value=value,
+            period=period,
+        )
+        session.add(record)
+        await session.flush()
+        return record
+
+    dialect_name = session.bind.dialect.name  # type: ignore[union-attr]
+    insert = pg_insert if dialect_name == "postgresql" else sqlite_insert
+    await session.execute(
+        insert(OutcomeMetricRecord)
+        .values(
+            id=metric_id,
+            user_id=user_id,
+            system=system,
+            metric_name=metric_name,
+            value=value,
+            period=period,
+        )
+        .on_conflict_do_update(index_elements=["id"], set_={"value": value})
     )
-    session.add(record)
-    await session.flush()
-    return record
+    result = await session.execute(
+        select(OutcomeMetricRecord)
+        .where(OutcomeMetricRecord.id == metric_id)
+        .execution_options(populate_existing=True)
+    )
+    return result.scalar_one()
 
 
 async def get_outcome_metrics(
@@ -1036,7 +1087,56 @@ async def update_ecology_recommendation(
 # ── Integration entries ───────────────────────────────────────────────────
 
 
-async def create_integration_entry(
+NOTE_SEPARATOR = "\n\n"
+
+
+def merge_notes(existing: str | None, incoming: str | None) -> str | None:
+    """Fold *incoming* into *existing* without losing either.
+
+    A completed practice offers two prompts, and each can carry a note.
+    They are two pieces of the user's own writing about one practice,
+    arriving in separate saves, so they are kept as separate paragraphs
+    rather than one overwriting the other.
+
+    A note that is already one of those paragraphs is not appended
+    again, which is what makes a save replayed after a timeout read as
+    one note instead of two copies of it.
+    """
+    trimmed = incoming.strip() if incoming else ""
+    if not trimmed:
+        return existing
+    if not existing:
+        return trimmed
+    if trimmed in existing.split(NOTE_SEPARATOR):
+        return existing
+    return f"{existing}{NOTE_SEPARATOR}{trimmed}"
+
+
+async def _get_integration_entry(
+    session: AsyncSession, user_id: str, practice_log_id: str
+) -> IntegrationEntry | None:
+    """The caller's integration entry for one completion, or ``None``.
+
+    Ordered and limited rather than a bare fetch. The unique key makes
+    more than one row impossible going forward, but a database carrying
+    duplicates from before it landed would otherwise turn every save on
+    an affected practice into a 500. The earliest row wins, matching
+    what the cleanup script keeps.
+    """
+    result = await session.execute(
+        select(IntegrationEntry)
+        .where(
+            IntegrationEntry.user_id == user_id,
+            IntegrationEntry.practice_log_id == practice_log_id,
+        )
+        .order_by(IntegrationEntry.created_at.asc(), IntegrationEntry.id.asc())
+        .limit(1)
+        .execution_options(populate_existing=True)
+    )
+    return result.scalars().first()
+
+
+async def upsert_integration_entry(
     session: AsyncSession,
     *,
     user_id: str,
@@ -1046,32 +1146,77 @@ async def create_integration_entry(
     reflection_entry_id: str | None = None,
     capacity_delta: int | None = None,
     note: str | None = None,
-) -> IntegrationEntry:
-    """Insert one integration entry linking an intention, an experience
-    and a reflection.
+) -> tuple[IntegrationEntry, bool]:
+    """Write the integration entry for one completion. One row, always.
 
-    *purpose* is the practice's, read off the ``practice_log`` row by the
-    caller. It is a parameter rather than a lookup here so this module
-    keeps having no opinion about the practice registry.
+    Returns ``(entry, created)``, where *created* is false when the row
+    was already there and this call merged into it.
+
+    One completion is one record, keyed on ``(user_id,
+    practice_log_id)``. The completed practice card offers the
+    self-check and the integration reading side by side and both save
+    against the same practice log row, so a plain insert per call gave
+    one practice two records.
+
+    What a second call does, and why:
+
+    - a field it does not carry is left alone, so a save that only has
+      a note cannot erase a capacity reading the user already gave;
+    - notes accumulate (:func:`merge_notes`) rather than overwrite;
+    - the same save replayed changes nothing.
+
+    *purpose* is the practice's, read off the ``practice_log`` row by
+    the caller. It is a parameter rather than a lookup here so this
+    module keeps having no opinion about the practice registry, and it
+    is not merged: it belongs to the practice, not to the save.
 
     This writes the link row only. The single derived ``outcome_metrics``
     row is a separate :func:`record_outcome_metric` call, so the two
     writes are visible as two calls at the call site rather than hidden
     inside one.
     """
-    entry = IntegrationEntry(
-        user_id=user_id,
-        practice_log_id=practice_log_id,
-        intention_entry_id=intention_entry_id,
-        reflection_entry_id=reflection_entry_id,
-        purpose=purpose,
-        capacity_delta=capacity_delta,
-        note=note,
-    )
-    session.add(entry)
+    entry = await _get_integration_entry(session, user_id, practice_log_id)
+
+    if entry is None:
+        entry_id = str(uuid4())
+        dialect_name = session.bind.dialect.name  # type: ignore[union-attr]
+        insert = pg_insert if dialect_name == "postgresql" else sqlite_insert
+        await session.execute(
+            insert(IntegrationEntry)
+            .values(
+                id=entry_id,
+                user_id=user_id,
+                practice_log_id=practice_log_id,
+                intention_entry_id=intention_entry_id,
+                reflection_entry_id=reflection_entry_id,
+                purpose=purpose,
+                capacity_delta=capacity_delta,
+                note=merge_notes(None, note),
+            )
+            .on_conflict_do_nothing(index_elements=["user_id", "practice_log_id"])
+        )
+        # DO NOTHING rather than an error, so a concurrent first save
+        # from the same user is a merge instead of a 500. Whether this
+        # call was the one that inserted is read off the id that came
+        # back, which needs no RETURNING and no rowcount.
+        stored = await _get_integration_entry(session, user_id, practice_log_id)
+        if stored is None:  # pragma: no cover, the row was just written
+            raise RuntimeError("integration entry vanished between write and read")
+        if stored.id == entry_id:
+            return stored, True
+        entry = stored
+
+    if intention_entry_id is not None:
+        entry.intention_entry_id = intention_entry_id
+    if reflection_entry_id is not None:
+        entry.reflection_entry_id = reflection_entry_id
+    if capacity_delta is not None:
+        entry.capacity_delta = capacity_delta
+    entry.note = merge_notes(entry.note, note)
+
     await session.flush()
     await session.refresh(entry)
-    return entry
+    return entry, False
 
 
 # ── Milestones ────────────────────────────────────────────────────────────

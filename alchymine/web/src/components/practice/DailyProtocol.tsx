@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import PracticeCard, { type PracticeCardState } from "./PracticeCard";
 import SelfCheckPrompt from "./SelfCheckPrompt";
 import IntegrationPrompt, { type IntegrationState } from "./IntegrationPrompt";
@@ -71,6 +71,11 @@ interface DailyProtocolProps {
   /** The full definition, for the self-check question. May not be loaded yet. */
   lookup: (packId: string, slug: string) => PracticeDefinition | undefined;
   onLog: (entry: PracticeLogCreate) => Promise<PracticeLogEntry>;
+  /**
+   * Saves the integration record for one completion. Keyed on the
+   * practice log row, so the self-check and the integration prompt both
+   * write to the same record rather than one each.
+   */
   onIntegrate: (entry: IntegrationCreate) => Promise<unknown>;
   /** Fires after a write lands, so the page can refresh the rhythm. */
   onLogged?: () => void;
@@ -137,46 +142,74 @@ export default function DailyProtocol({
     [onLog, onLogged, patch, today.day_key],
   );
 
-  const saveSelfCheck = useCallback(
-    async (key: string, logId: string, response: string) => {
-      patch(key, { selfCheckSaving: true, selfCheckError: null });
-      try {
-        await onIntegrate({ practice_log_id: logId, note: response });
-        // Confirmed rather than unmounted. A control that vanishes on
-        // success takes the user's focus with it and says nothing.
-        patch(key, { selfCheckSaving: false, selfCheckSaved: true });
-      } catch {
-        patch(key, {
-          selfCheckSaving: false,
-          selfCheckError: "That didn't save. Have another go in a moment.",
-        });
-      }
+  // The self-check and the integration prompt are two controls over one
+  // completion, and they write to one record: the server keys it on the
+  // practice log row and merges each save into what is already there.
+  // The merge reads the stored note before adding to it, so two saves
+  // in flight at once could have the second read the record before the
+  // first had written to it, and one of the two notes would be lost.
+  // Saves for a card queue behind each other instead of racing.
+  const saves = useRef<Record<string, Promise<void>>>({});
+
+  const enqueue = useCallback(
+    (key: string, save: () => Promise<void>): Promise<void> => {
+      // Each save reports its own failure and resolves either way, so
+      // the chain needs no rejection path and one refused write does
+      // not strand the next one behind it.
+      const next = (saves.current[key] ?? Promise.resolve()).then(save);
+      saves.current[key] = next;
+      return next;
     },
-    [onIntegrate, patch],
+    [],
+  );
+
+  const saveSelfCheck = useCallback(
+    (key: string, logId: string, response: string) => {
+      // The busy state is set on the click rather than when the queued
+      // write starts, so a save waiting its turn still looks like a
+      // save in progress.
+      patch(key, { selfCheckSaving: true, selfCheckError: null });
+      return enqueue(key, async () => {
+        try {
+          await onIntegrate({ practice_log_id: logId, note: response });
+          // Confirmed rather than unmounted. A control that vanishes on
+          // success takes the user's focus with it and says nothing.
+          patch(key, { selfCheckSaving: false, selfCheckSaved: true });
+        } catch {
+          patch(key, {
+            selfCheckSaving: false,
+            selfCheckError: "That didn't save. Have another go in a moment.",
+          });
+        }
+      });
+    },
+    [enqueue, onIntegrate, patch],
   );
 
   const saveIntegration = useCallback(
-    async (
+    (
       key: string,
       logId: string,
       input: { capacityDelta: number | null; note: string },
     ) => {
       patch(key, { integration: "saving", integrationError: null });
-      try {
-        await onIntegrate({
-          practice_log_id: logId,
-          capacity_delta: input.capacityDelta,
-          note: input.note || null,
-        });
-        patch(key, { integration: "saved" });
-      } catch {
-        patch(key, {
-          integration: "error",
-          integrationError: "That didn't save. Have another go in a moment.",
-        });
-      }
+      return enqueue(key, async () => {
+        try {
+          await onIntegrate({
+            practice_log_id: logId,
+            capacity_delta: input.capacityDelta,
+            note: input.note || null,
+          });
+          patch(key, { integration: "saved" });
+        } catch {
+          patch(key, {
+            integration: "error",
+            integrationError: "That didn't save. Have another go in a moment.",
+          });
+        }
+      });
     },
-    [onIntegrate, patch],
+    [enqueue, onIntegrate, patch],
   );
 
   if (today.items.length === 0) {
