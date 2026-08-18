@@ -26,14 +26,22 @@ import { useMemo } from "react";
  * Must match `_VALID_SYSTEM_KEYS` in `alchymine/api/routers/chat.py`.
  * Every map below is a `Record<SystemKey, ...>`, so adding a key here
  * without filling them in is a type error rather than a runtime gap.
+ *
+ * This array is the single enumeration on the web side: code that needs
+ * the keys at runtime (query-param validation, test cases) imports it
+ * rather than retyping the list, and `SystemKey` is derived from it so
+ * the two can't drift.
  */
-export type SystemKey =
-  | "intelligence"
-  | "healing"
-  | "wealth"
-  | "creative"
-  | "perspective"
-  | "practice";
+export const SYSTEM_KEYS = [
+  "intelligence",
+  "healing",
+  "wealth",
+  "creative",
+  "perspective",
+  "practice",
+] as const;
+
+export type SystemKey = (typeof SYSTEM_KEYS)[number];
 
 /** Human-readable labels keyed by system. */
 const SYSTEM_LABELS: Record<SystemKey, string> = {
