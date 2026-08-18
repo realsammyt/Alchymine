@@ -82,8 +82,31 @@ def _title_for(pack_id: str, slug: str) -> str:
         return slug
 
 
+def _mounted_pack_ids() -> frozenset[str] | None:
+    """Return the mounted pack ids, or ``None`` when they cannot be read.
+
+    ``None`` means "unknown", and an unknown mount set filters nothing.
+    A registry this process cannot read is a deployment problem, not a
+    reason to hand the coach a protocol line with holes in it.
+    """
+    try:
+        return frozenset(manifest.pack_id for manifest in get_practice_registry().list_packs())
+    except Exception:  # pragma: no cover - a broken mount is not a chat failure
+        logger.exception("Practice registry unreadable while building coach context")
+        return None
+
+
 def _protocol_titles(stored: Mapping[str, Any] | None, *, anchor_day: str) -> list[str]:
     """Return today's protocol titles from the stored envelope, if current.
+
+    Entries naming a pack that is no longer mounted are dropped. The
+    envelope is a *copy* of pack content rather than a reference to it,
+    and unmounting a pack is how a license is revoked, so a title from a
+    pack this process does not have must not reach the model. Startup
+    clears those rows outright (``db.pack_envelopes``); this is the
+    second line of defense for the case where that purge could not run.
+    An entry naming no pack at all is kept: there is nothing to revoke it
+    against.
 
     Anything unreadable returns an empty list rather than raising. The
     envelope is written by the recommender and read here; a shape this
@@ -105,9 +128,13 @@ def _protocol_titles(stored: Mapping[str, Any] | None, *, anchor_day: str) -> li
     if not isinstance(items, list):
         return []
 
+    mounted = _mounted_pack_ids()
     titles: list[str] = []
     for item in items:
         if not isinstance(item, Mapping):
+            continue
+        pack_id = item.get("pack_id")
+        if mounted is not None and isinstance(pack_id, str) and pack_id not in mounted:
             continue
         title = item.get("title") or item.get("slug")
         if isinstance(title, str) and title:
