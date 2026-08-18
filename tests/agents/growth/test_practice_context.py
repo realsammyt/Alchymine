@@ -220,6 +220,44 @@ class TestStoredProtocol:
 
         assert await build_practice_context(session, USER_ID) is None
 
+    async def test_omits_a_protocol_entry_whose_pack_is_no_longer_mounted(
+        self, session: AsyncSession
+    ) -> None:
+        """The second line of defense behind the startup envelope purge.
+
+        The purge clears these rows at boot. If it could not run, the
+        content still must not reach the coach: unmounting a pack is how
+        a license is revoked.
+        """
+        day_key = _day(0)
+        session.add(
+            EcologyState(
+                user_id=USER_ID,
+                last_recommendation={
+                    "envelope_version": 1,
+                    "day_key": day_key,
+                    "pack_fingerprint": "abc",
+                    "payload": {
+                        "day_key": day_key,
+                        "items": [
+                            {"pack_id": BUNDLED_PACK_ID, "title": "Find the Floor"},
+                            {
+                                "pack_id": "a-pack-that-was-unmounted",
+                                "title": "Branded Practice Title",
+                            },
+                        ],
+                    },
+                },
+            )
+        )
+        await session.flush()
+
+        block = await build_practice_context(session, USER_ID)
+
+        assert block is not None
+        assert "Find the Floor" in block
+        assert "Branded Practice Title" not in block
+
 
 # ─── The data rail ──────────────────────────────────────────────────────
 
@@ -229,9 +267,7 @@ class TestEncryptedColumnsNeverAppear:
     thing the practice layer stores, and it must not reach an LLM because
     the user asked the coach an unrelated question."""
 
-    async def test_reflection_text_is_absent_from_the_block(
-        self, session: AsyncSession
-    ) -> None:
+    async def test_reflection_text_is_absent_from_the_block(self, session: AsyncSession) -> None:
         await _log(
             session,
             slug="find-the-floor",
@@ -246,9 +282,7 @@ class TestEncryptedColumnsNeverAppear:
         assert "cried" not in block
         assert "brother" not in block
 
-    async def test_self_check_text_is_absent_from_the_block(
-        self, session: AsyncSession
-    ) -> None:
+    async def test_self_check_text_is_absent_from_the_block(self, session: AsyncSession) -> None:
         await _log(
             session,
             slug="find-the-floor",
