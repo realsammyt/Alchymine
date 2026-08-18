@@ -1015,6 +1015,87 @@ async def list_practice_context_rows(
     return list(result.all())
 
 
+async def list_journey_rows(session: AsyncSession, user_id: str, *, from_day: str) -> list[Any]:
+    """Return the plaintext columns the journey chart is folded from.
+
+    Four columns, none of them user-authored text: ``day_key``,
+    ``primary_purpose``, ``status``, and the joined ``capacity_delta``.
+    ``reflection``, ``self_check_response`` and the integration ``note``
+    are encrypted at rest and are not selected here, so nothing the user
+    wrote is decrypted to draw a chart. Same rail as
+    :func:`list_recommender_log_rows`.
+
+    The integration row is joined in rather than read from
+    ``outcome_metrics``, and the reason is the day axis. The derived
+    metric row is stamped ``recorded_at`` in UTC; the practice it stands
+    for carries the user's *local* ``day_key``. Bucketing one series by
+    UTC and the other by local day would put an evening loop in Auckland
+    one column right of the practice it closed. The link row knows which
+    practice it belongs to, so the practice's own day is used for both.
+
+    The join is a LEFT OUTER: a practice without a closed loop still has
+    to appear, or the chart would only show the days the user wrote
+    about. At most one integration row exists per practice per user
+    (``uq_integration_entries_user_practice_log``), so the join cannot
+    duplicate a practice.
+
+    Bounded to ``day_key >= from_day``. The window is capped by the
+    caller; loading a user's whole history to draw ninety days of it
+    would grow without limit.
+    """
+    result = await session.execute(
+        select(
+            PracticeLogEntry.day_key,
+            PracticeLogEntry.primary_purpose,
+            PracticeLogEntry.status,
+            # Labelled, because ``row.id`` next to a practice row would
+            # read as the practice's id and is the integration's. It is
+            # NULL exactly when no loop was closed on that practice.
+            IntegrationEntry.id.label("integration_id"),
+            IntegrationEntry.capacity_delta,
+        )
+        .outerjoin(
+            IntegrationEntry,
+            and_(
+                IntegrationEntry.practice_log_id == PracticeLogEntry.id,
+                IntegrationEntry.user_id == PracticeLogEntry.user_id,
+            ),
+        )
+        .where(
+            PracticeLogEntry.user_id == user_id,
+            PracticeLogEntry.day_key >= from_day,
+        )
+        .order_by(PracticeLogEntry.day_key.desc(), PracticeLogEntry.id.desc())
+    )
+    return list(result.all())
+
+
+async def get_journey_anchors(session: AsyncSession, user_id: str) -> tuple[str | None, str | None]:
+    """Return the user's first practice day and first closed-loop day.
+
+    ``(first_practice_day, first_loop_day)``, each ``YYYY-MM-DD`` in the
+    user's local day, or ``None`` where there is nothing yet.
+
+    The one pair of facts a window cannot supply: "practicing since
+    March" is the line that makes a thirty-day chart mean something, and
+    it is unanswerable from thirty days of rows. Both are scalar
+    aggregates over an index (``ix_practice_log_user_day``), so reading
+    all of history costs one row of output each rather than all of it.
+    ``day_key`` is a zero-padded ``YYYY-MM-DD`` string, so the
+    lexicographic minimum is the chronological one.
+    """
+    earliest_practice = await session.execute(
+        select(func.min(PracticeLogEntry.day_key)).where(PracticeLogEntry.user_id == user_id)
+    )
+    earliest_loop = await session.execute(
+        select(func.min(PracticeLogEntry.day_key))
+        .select_from(IntegrationEntry)
+        .join(PracticeLogEntry, PracticeLogEntry.id == IntegrationEntry.practice_log_id)
+        .where(IntegrationEntry.user_id == user_id)
+    )
+    return earliest_practice.scalar_one(), earliest_loop.scalar_one()
+
+
 # ── Ecology state ─────────────────────────────────────────────────────────
 
 

@@ -1732,4 +1732,64 @@ export async function listPracticePacks(
   return request<PackResponse[]>(`${BASE}/practices/packs`, { signal });
 }
 
+// ─── Journey ─────────────────────────────────────────────────────────
+
+/** One column of the journey chart. */
+export interface JourneyDay {
+  day_key: string;
+  completed: number;
+  /** The distinct capacities practiced that day, in fixed display order. */
+  purposes: string[];
+  loops: number;
+  /**
+   * Mean recorded shift for that day's loops, or `null` when there were
+   * none. Null rather than 0: zero is a real self-report meaning nothing
+   * moved, and a day nobody wrote about is not that.
+   */
+  average_shift: number | null;
+}
+
+export interface JourneyTotals {
+  days_practiced: number;
+  completed: number;
+  loops_closed: number;
+  /** Reaches back past the window, so "practicing since" is answerable. */
+  first_practice_day: string | null;
+  first_loop_day: string | null;
+}
+
+export interface JourneyTimeseriesResponse {
+  /** The window's last day, as the caller sent it. */
+  day_key: string;
+  start_day: string;
+  window_days: number;
+  /** Always exactly `window_days` long, oldest first, zero-filled. */
+  days: JourneyDay[];
+  by_purpose: Record<string, number>;
+  totals: JourneyTotals;
+}
+
+/** The windows the server accepts. Anything else is a 422, not a clamp. */
+export const JOURNEY_WINDOWS = [7, 30, 90] as const;
+export type JourneyWindow = (typeof JOURNEY_WINDOWS)[number];
+
+/**
+ * The caller's practice and integration history as a day-by-day series.
+ *
+ * `today` is the caller's local day and is required, for the same reason
+ * every practice route takes one: the server is in UTC and the user is
+ * not.
+ */
+export async function getJourneyTimeseries(
+  today: string,
+  days: number,
+  signal?: AbortSignal,
+): Promise<JourneyTimeseriesResponse> {
+  const params = new URLSearchParams({ today, days: String(days) });
+  return request<JourneyTimeseriesResponse>(
+    `${BASE}/journey/timeseries?${params.toString()}`,
+    { signal },
+  );
+}
+
 export { ApiError };
