@@ -387,7 +387,15 @@ def scan_tree(
     violations: list[Violation] = []
     if not digests:
         return violations
-    for path in iter_scannable_files(root, denylist_path, exceptions_path):
+    # The conventional locations are skipped whether or not they were passed in,
+    # so a raw scan does not trip on the exception paths, which can name a term.
+    control = (
+        denylist_path,
+        exceptions_path,
+        root / DENYLIST_RELATIVE,
+        root / EXCEPTIONS_RELATIVE,
+    )
+    for path in iter_scannable_files(root, *control):
         text = read_text(path)
         if text is None:
             continue

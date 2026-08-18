@@ -235,6 +235,18 @@ class TestScanScope:
 
         assert checker.scan_tree(tmp_path, denylist, exceptions) == []
 
+    def test_skips_the_conventional_control_files_even_when_not_passed(
+        self, checker: ModuleType, tmp_path: Path
+    ) -> None:
+        """A scan with no exceptions argument still must not trip on the repo's own list."""
+        denylist = write_denylist(tmp_path / "denylist.txt", [SENTINEL])
+        (tmp_path / ".github").mkdir()
+        (tmp_path / ".github" / "pack-boundary-exceptions.txt").write_text(
+            f"{checker.hash_term(SENTINEL)} docs/zorbatic-sentinel-modality.md\n", encoding="utf-8"
+        )
+
+        assert checker.scan_tree(tmp_path, denylist) == []
+
 
 # ─── Exceptions ───────────────────────────────────────────────────────────────
 
