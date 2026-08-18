@@ -13,6 +13,7 @@ import asyncio
 
 import pytest
 
+from cryptography.fernet import Fernet
 from sqlalchemy.ext.asyncio import create_async_engine
 
 import alchymine.db.models  # noqa: F401 — register models with metadata
@@ -94,6 +95,23 @@ def _override_auth(request: pytest.FixtureRequest) -> None:
     # managed by their own fixtures.
     app.dependency_overrides.pop(get_current_user, None)
     app.dependency_overrides.pop(get_current_account, None)
+
+
+@pytest.fixture(autouse=True)
+def _encryption_key(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Give every API test a usable key at rest.
+
+    The app refuses to start without one, so any module that enters the
+    lifespan (``with TestClient(app)`` rather than a bare ``TestClient``)
+    needs a key or it fails on boot for a reason that has nothing to do
+    with what it was testing. Setting it here keeps the next such module
+    from tripping over that.
+
+    Modules that set their own key in a fixture still win: this one runs
+    first and theirs runs second. The startup gate's own tests clear it
+    deliberately, which works for the same reason.
+    """
+    monkeypatch.setenv("ALCHYMINE_ENCRYPTION_KEY", Fernet.generate_key().decode())
 
 
 @pytest.fixture(scope="session")
