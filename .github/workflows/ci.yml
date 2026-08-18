@@ -22,7 +22,7 @@ permissions:
 
 jobs:
   # ──────────────────────────────────────────────
-  # Lint: ruff check + ruff format --check
+  # Lint: ruff check + ruff format --check + pack boundary
   # ──────────────────────────────────────────────
   lint:
     name: "Lint (Python 3.12)"
@@ -41,10 +41,16 @@ jobs:
         run: pip install "ruff>=0.8.0"
 
       - name: Ruff lint check
-        run: ruff check alchymine/
+        run: ruff check alchymine/ scripts/
 
       - name: Ruff format check
-        run: ruff format --check alchymine/
+        run: ruff format --check alchymine/ scripts/
+
+      # The practice engine is generic: branded packs mount from outside the
+      # repo. This fails the build when third-party framework vocabulary lands
+      # in repo content. Reports file:line plus a digest, never the term.
+      - name: Pack-boundary check
+        run: python scripts/check_pack_boundary.py
 
   # ──────────────────────────────────────────────
   # Type check: mypy
@@ -72,7 +78,7 @@ jobs:
         id: mypy
         run: |
           set +e
-          mypy alchymine/ --show-error-codes 2>&1 | tee mypy-output.txt
+          mypy alchymine/ scripts/ --show-error-codes 2>&1 | tee mypy-output.txt
           MYPY_RC=${PIPESTATUS[0]}
           set -e
           echo "rc=$MYPY_RC" >> $GITHUB_OUTPUT
