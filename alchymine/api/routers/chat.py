@@ -301,12 +301,28 @@ def crisis_for(system_key: str | None, message: str) -> CrisisResponse | None:
     return crisis
 
 
+def _sse_data_frame(text: str) -> str:
+    """Frame *text* as one SSE event carrying it whole.
+
+    A ``data:`` field ends at the first newline, so a chunk with newlines
+    in it goes out as several ``data:`` lines inside a single event: the
+    client joins them back with a newline at the blank line that ends the
+    event.  Splitting on every newline means an empty segment becomes an
+    empty ``data:`` line, which is how a blank line between paragraphs and
+    a leading or trailing break survive the round trip (issue #278).
+    """
+    lines = "".join(f"data: {segment}\n" for segment in text.split("\n"))
+    return f"{lines}\n"
+
+
 def _crisis_frames(crisis: CrisisResponse) -> list[str]:
     """Render the crisis response as one line per SSE ``data:`` frame.
 
-    One line per frame because a ``data:`` field cannot carry a newline,
-    and the client concatenates the values it receives.  So the copy is
-    written to read as continuous prose rather than as a list.
+    One line per frame, one frame per event, and the client concatenates
+    the values it receives.  So the copy is written to read as continuous
+    prose rather than as a list.  The model path frames differently
+    because it has to carry whatever the model wrote (see
+    ``_sse_data_frame``); this copy is ours and holds no newlines.
     """
     parts = [
         "Before anything about practice: what you have written matters more than "
@@ -512,7 +528,10 @@ async def _chat_event_stream(
                 blocked = True
                 yield "event: error\ndata: Response blocked by safety filter\n\n"
                 break
-            yield f"data: {chunk}\n\n"
+            # Framed rather than interpolated: model chunks routinely
+            # carry newlines, and a raw one would end the data field and
+            # take the rest of the chunk with it.
+            yield _sse_data_frame(chunk)
 
         # Once at the end, so a violation inside the last few chunks is
         # not missed by the cadence.  It cannot unsend what already
@@ -600,7 +619,7 @@ async def _crisis_event_stream(
 
     for part in frames:
         # Trailing space: the client concatenates data values without a
-        # separator, and a data field cannot carry a newline.
+        # separator of its own, and this copy runs as continuous prose.
         yield f"data: {part} \n\n"
 
     if not ephemeral:
@@ -641,8 +660,10 @@ async def chat(
     before any LLM call.  Blocked input returns HTTP 400.
 
     The response is a ``text/event-stream`` where each LLM chunk is
-    delivered as a ``data:`` frame and the stream terminates with an
-    ``event: done`` sentinel.
+    delivered as one event and the stream terminates with an
+    ``event: done`` sentinel.  A chunk with newlines in it spans several
+    ``data:`` lines inside that one event, which the client rejoins with
+    newlines (see ``_sse_data_frame``).
 
     Both the user message and the full assistant reply are persisted to
     the ``chat_messages`` table for the authenticated user.  Pass

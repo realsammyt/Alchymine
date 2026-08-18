@@ -11,7 +11,7 @@ Configuration is loaded from environment variables:
 from __future__ import annotations
 
 from celery import Celery
-from celery.signals import worker_ready
+from celery.signals import worker_init, worker_ready
 
 from alchymine.config import get_settings
 
@@ -60,7 +60,29 @@ if _settings.celery_always_eager:
 celery_app.autodiscover_tasks(["alchymine.workers"])
 
 
-# ── Startup announcements ───────────────────────────────────────────────
+# ── Startup checks and announcements ────────────────────────────────────
+
+
+@worker_init.connect
+def _verify_encryption_key(**_kwargs: object) -> None:
+    """Stop the worker before it accepts a task it cannot decrypt.
+
+    Report generation reads the profile columns and writes the report body,
+    all of them encrypted, so a worker without a usable key fails every job
+    it picks up and marks each one failed after doing the paid LLM work.
+
+    ``SystemExit`` rather than a plain raise: Celery's ``Signal.send``
+    catches ``Exception`` from every receiver and only logs it (see
+    ``celery/utils/dispatch/signal.py``), which would leave the worker
+    running. ``SystemExit`` is a ``BaseException``, so it passes through and
+    aborts startup with a non-zero exit code.
+    """
+    from alchymine.db.encryption import EncryptionKeyError, verify_encryption_key
+
+    try:
+        verify_encryption_key()
+    except EncryptionKeyError as exc:
+        raise SystemExit(str(exc)) from exc
 
 
 @worker_ready.connect

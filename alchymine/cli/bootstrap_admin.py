@@ -14,10 +14,20 @@ import sys
 from sqlalchemy import select, update
 
 from alchymine.db.base import get_async_engine, get_async_session_factory
+from alchymine.db.encryption import EncryptionKeyError, verify_encryption_key
 from alchymine.db.models import User
 
 
 async def bootstrap() -> None:
+    # The User row this selects carries two encrypted columns, so a bad key
+    # would surface as a Fernet traceback halfway through instead of as a
+    # message the operator can act on.
+    try:
+        verify_encryption_key()
+    except EncryptionKeyError as exc:
+        print(f"ERROR: {exc}")
+        sys.exit(1)
+
     email = os.environ.get("ADMIN_EMAIL", "")
     if not email:
         print("ERROR: ADMIN_EMAIL environment variable is not set.")

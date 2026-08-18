@@ -48,6 +48,7 @@ from alchymine.api.routers import (
     wealth,
 )
 from alchymine.config import get_settings
+from alchymine.db.encryption import verify_encryption_key
 from alchymine.db.pack_envelopes import purge_unmounted_pack_envelopes_at_startup
 from alchymine.db.usage_counters import CostCeilingExceeded
 from alchymine.engine.practice import install_practice_registry
@@ -86,6 +87,12 @@ _configure_logging()
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """Application lifecycle: startup and shutdown."""
+    # First, and unguarded. Almost every table this app reads has at least
+    # one encrypted column, so a process that cannot build a working Fernet
+    # has nothing useful to serve. Raising here makes uvicorn log the
+    # operator message and exit non-zero instead of passing the health check
+    # and then 500ing on whichever request first reads a profile.
+    verify_encryption_key()
     await create_tables_if_enabled()
     # Deliberately unguarded. A bad pack or a mistyped PRACTICE_PACK_DIRS
     # stops the container here, where the deploy's own health machinery
