@@ -39,6 +39,12 @@ still receives resources rather than a 422.  That ordering is the point
 of the gate.  Answering somebody in crisis with a schema error because
 an operator disabled a feature would be the one failure mode this path
 exists to prevent, and the resource stream costs nothing to serve.
+
+The plan gate is the same exception (issue #284).  It runs inside the
+handler, below the crisis check, rather than as a route dependency,
+because FastAPI resolves dependencies before the body and a free
+account's disclosure would meet a 402 upsell instead of a hotline
+number.  Ordinary traffic is refused exactly as it was.
 """
 
 from __future__ import annotations
@@ -61,7 +67,7 @@ from alchymine.agents.quality.ethics_check import (
     ViolationSeverity,
     check_text,
 )
-from alchymine.api.auth import Account, get_current_user
+from alchymine.api.auth import Account, get_current_account, get_current_user
 from alchymine.api.deps import get_db_session
 from alchymine.api.entitlements import require_chat
 from alchymine.config import get_settings
@@ -617,16 +623,19 @@ async def _crisis_event_stream(
 async def chat(
     request: ChatRequest,
     ephemeral: bool = Query(False, description="Skip message persistence"),
-    account: Account = Depends(require_chat),
+    account: Account = Depends(get_current_account),
     session: AsyncSession = Depends(get_db_session),
 ) -> StreamingResponse:
     """Stream a Growth Assistant chat reply via Server-Sent Events.
 
-    The plan gate is a dependency, so it resolves before the
-    ``StreamingResponse`` is constructed and a refusal is still a real
-    402 or 429.  Once the stream opens there is no status code left to
-    set, and a quota state buried in an ``event: error`` frame reads as
-    a successful request to every layer above the parser.
+    The plan gate runs in the handler body rather than as a dependency,
+    because a dependency resolves before the body and would refuse a
+    crisis disclosure from a free account before the crisis check ever
+    saw it (issue #284).  It still runs before the
+    ``StreamingResponse`` is constructed, so a refusal is a real 402 or
+    429.  Once the stream opens there is no status code left to set, and
+    a quota state buried in an ``event: error`` frame reads as a
+    successful request to every layer above the parser.
 
     Safety: the user message is checked against the blocked-pattern list
     before any LLM call.  Blocked input returns HTTP 400.
@@ -642,19 +651,26 @@ async def chat(
     """
     user_id = account.user_id
 
-    # Before every other check, because most of them would answer a
+    # Before every other check, because every one of them would answer a
     # crisis disclosure with a refusal.  "kill" and "hurt" are in the
     # blocked-pattern list, so "I want to kill myself" would otherwise
     # return HTTP 400 "content flagged by safety filter" to somebody who
     # has just said the hardest thing they can say.
     #
-    # This also skips the rate limit and the history cap, deliberately.
-    # Both of them refuse, and neither has a refusal worth sending at
-    # this moment.  The path makes no LLM call and writes no ledger row,
-    # so there is no spend to cap; the request-level RateLimitMiddleware
-    # still bounds the volume.  The plan gate above is the exception it
-    # cannot escape: it is a dependency, so a free account is refused
-    # before the handler runs at all.
+    # This skips the plan gate, the rate limit and the history cap, all
+    # deliberately.  Each of them refuses, and none has a refusal worth
+    # sending at this moment.  The path makes no LLM call and writes no
+    # ledger row, so there is nothing to charge for and no spend to cap;
+    # the request-level RateLimitMiddleware still bounds the volume.  The
+    # practice kill switch does not reach it either: ``crisis_for`` reads
+    # PRACTICE_SYSTEM_KEY directly and the validity check is below, so a
+    # crisis message on a disabled scope still receives resources.  The
+    # kill switch exists to stop LLM coaching, and these frames are not
+    # that.
+    #
+    # This ordering is the whole of issue #284, and it is written to hold
+    # unchanged when the gate widens past the practice scope: whatever
+    # ``crisis_for`` decides to catch escapes everything below it.
     crisis = crisis_for(request.system_key, request.message)
     if crisis is not None:
         await _ensure_user_exists(session, user_id)
@@ -670,6 +686,12 @@ async def chat(
             media_type="text/event-stream",
             headers=_SSE_HEADERS,
         )
+
+    # Everything past here is ordinary coaching traffic, which costs
+    # money.  Same gate object the dependency used, so the 402 and 429
+    # bodies, the allowance read and the surface attribution are the ones
+    # this route has always sent.
+    await require_chat.enforce(account)
 
     safety_message = _check_content_safety(request.message)
     if safety_message:

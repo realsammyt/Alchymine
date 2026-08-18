@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import asyncio
 from collections.abc import AsyncGenerator, Iterator
+from contextlib import contextmanager
 from datetime import UTC, datetime
 
 import pytest
@@ -189,6 +190,39 @@ def _post(env: _Env, message: str, system_key: str | None = "practice", **params
     return response
 
 
+@contextmanager
+def _as_plan(plan: str) -> Iterator[None]:
+    """Call the endpoint as the test user on *plan*.
+
+    Restores whatever override was in place rather than popping, so the
+    conftest account override survives the block and the rest of the
+    test still runs as an entitled caller.
+    """
+    previous = app.dependency_overrides.get(get_current_account)
+    app.dependency_overrides[get_current_account] = lambda: build_account(TEST_USER_ID, plan)
+    try:
+        yield
+    finally:
+        if previous is None:
+            app.dependency_overrides.pop(get_current_account, None)
+        else:
+            app.dependency_overrides[get_current_account] = previous
+
+
+def _exhaust_allowance(env: _Env) -> None:
+    """Spend past any plan's monthly ceiling, so the meter refuses."""
+
+    async def _spend() -> None:
+        await increment_and_get(
+            scope=TEST_USER_ID,
+            meter=METER_SPEND_MICROS_MONTHLY,
+            period_key=current_month_key(),
+            amount=10_000_000_000,
+        )
+
+    env.run(_spend())
+
+
 # ─── The sync pin ───────────────────────────────────────────────────────
 
 
@@ -343,6 +377,106 @@ class TestKillSwitch:
 
         assert response.status_code == 200
         assert len(_RecordingClient.calls) == 1
+
+    def test_a_free_plan_crisis_message_survives_both(self, env: _Env, killed: None) -> None:
+        """Killed scope and unpaid plan at once, which is the worst case.
+
+        Neither refusal is one a person in crisis should meet, and the
+        two are enforced at different layers, so the ordering has to hold
+        against both together rather than each on its own.
+        """
+        with _as_plan("free"):
+            response = _post(env, EMERGENCY_MESSAGE)
+
+        assert response.status_code == 200
+        assert "988" in response.text
+        assert _RecordingClient.calls == []
+
+
+class TestCrisisEscapesThePlanGate:
+    """Issue #284. Crisis resources sit behind no paywall, anywhere.
+
+    The plan gate used to be a route dependency, and FastAPI resolves
+    dependencies before the handler body runs. So a free account writing
+    the hardest sentence it can write was answered with a 402 upsell
+    before ``crisis_for`` ever saw the message. The gate now runs inside
+    the handler, after the crisis check, and refuses exactly the same
+    ordinary traffic it always did.
+
+    These are ordering tests, not copy tests. When the crisis gate widens
+    beyond the practice scope, the property they pin is what has to hold.
+    """
+
+    @pytest.mark.parametrize("message", [EMERGENCY_MESSAGE, HIGH_MESSAGE])
+    def test_a_free_plan_crisis_message_gets_resources(self, env: _Env, message: str) -> None:
+        with _as_plan("free"):
+            response = _post(env, message)
+
+        assert response.status_code == 200
+        assert "988" in response.text
+        assert "event: done" in response.text
+
+    def test_a_free_plan_crisis_message_makes_no_llm_call(self, env: _Env) -> None:
+        """Ungated does not mean free inference. The path stays deterministic."""
+        with _as_plan("free"):
+            _post(env, EMERGENCY_MESSAGE)
+
+        assert _RecordingClient.calls == []
+
+    def test_a_free_plan_crisis_message_writes_no_ledger_row(self, env: _Env) -> None:
+        with _as_plan("free"):
+            _post(env, EMERGENCY_MESSAGE)
+
+        assert env.usage_records() == []
+
+    def test_an_ordinary_free_plan_message_is_still_refused(self, env: _Env) -> None:
+        """The exemption is crisis-shaped, not a hole in the gate."""
+        with _as_plan("free"):
+            response = env.client.post(
+                "/api/v1/chat",
+                json={"message": "What should I practice?", "system_key": "practice"},
+            )
+
+        assert response.status_code == 402
+        assert response.json()["detail"]["code"] == CODE_UPGRADE_REQUIRED
+        assert _RecordingClient.calls == []
+
+    def test_a_medium_severity_message_is_still_gated(self, env: _Env) -> None:
+        """Medium severity is coaching material, so it is ordinary traffic."""
+        with _as_plan("free"):
+            response = _post(env, MEDIUM_MESSAGE)
+
+        assert response.status_code == 402
+        assert _RecordingClient.calls == []
+
+    def test_an_exhausted_allowance_still_serves_crisis(self, env: _Env) -> None:
+        """The 429 half of the gate. A spent meter is not a reason either."""
+        _exhaust_allowance(env)
+
+        response = _post(env, EMERGENCY_MESSAGE)
+
+        assert response.status_code == 200
+        assert "988" in response.text
+        assert _RecordingClient.calls == []
+
+    def test_an_exhausted_allowance_still_refuses_ordinary_traffic(self, env: _Env) -> None:
+        _exhaust_allowance(env)
+
+        response = env.client.post(
+            "/api/v1/chat",
+            json={"message": "What should I practice?", "system_key": "practice"},
+        )
+
+        assert response.status_code == 429
+        assert response.json()["detail"]["code"] == CODE_ALLOWANCE_REACHED
+
+    def test_a_free_plan_crisis_turn_is_persisted(self, env: _Env) -> None:
+        with _as_plan("free"):
+            _post(env, EMERGENCY_MESSAGE)
+
+        messages = env.chat_messages()
+        assert [m.role for m in messages] == ["user", "assistant"]
+        assert "988" in messages[1].content
 
 
 class TestCrisisGateIsPracticeOnly:

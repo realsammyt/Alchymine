@@ -160,6 +160,22 @@ class PlanGate:
         self,
         account: Account = Depends(get_current_account),
     ) -> Account:
+        return await self.enforce(account)
+
+    async def enforce(self, account: Account) -> Account:
+        """Apply this gate to an account something else already resolved.
+
+        Split out of ``__call__`` so a route that has to run a check
+        *before* the gate can still apply this exact gate rather than a
+        second copy of its rules. ``POST /chat`` is the one such route
+        (issue #284): a crisis disclosure is answered with resources
+        whatever the plan says, and a dependency resolves before the
+        handler body, so the gate would refuse that message before the
+        crisis check ever saw it.
+
+        Everything the dependency form does happens here, in the same
+        order, so the two paths cannot drift.
+        """
         plan = account.effective_plan
 
         if plan == "free":
