@@ -107,6 +107,11 @@ class TestExternalDirFailsLoudly:
     """Issue #265, gap 2. The old wrapper logged a warning and served a
     quietly smaller catalogue, so a typo in the mount path shipped less
     product with no operator signal.
+
+    This covers the request path, reached by an entry point that never ran
+    the lifespan. In a real deploy the lifespan install fails first and the
+    container stops; that is
+    ``tests/api/test_startup_skill_registry.py``.
     """
 
     def test_unusable_external_dir_does_not_silently_shrink_the_catalogue(

@@ -51,6 +51,7 @@ from alchymine.config import get_settings
 from alchymine.db.encryption import verify_encryption_key
 from alchymine.db.pack_envelopes import purge_unmounted_pack_envelopes_at_startup
 from alchymine.db.usage_counters import CostCeilingExceeded
+from alchymine.engine.healing.skills import install_skill_registry
 from alchymine.engine.practice import install_practice_registry
 from alchymine.llm.ledger import flush_pending_writes, log_ledger_status
 from alchymine.mcp.transport import mount_all_mcp_routers
@@ -103,6 +104,12 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     # cached content with it. Guarded, unlike the install above: clearing
     # a cache is not a reason to stop a container from starting.
     await purge_unmounted_pack_envelopes_at_startup(registry)
+    # Deliberately unguarded, for the same reason as the practice install
+    # above. A mistyped HEALING_SKILLS_EXTERNAL_DIR stops the container
+    # here rather than quietly serving a shorter skill catalogue. Order
+    # relative to the practice install does not matter; the two share no
+    # state.
+    install_skill_registry()
     log_ledger_status("api")
     yield
     # Ledger writes are detached tasks so a disconnected client cannot take
