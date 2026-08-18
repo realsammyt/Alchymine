@@ -50,6 +50,13 @@ class EthicsViolation:
     severity: str  # "warning", "error", "critical"
     suggestion: str
     matched_text: str = ""
+    # The exact text that resolves this violation, when one exists.  Only
+    # MISSING_DISCLAIMER has one: every other category is resolved by
+    # rewriting what is there, not by adding something.  A caller that
+    # wants to fix the omission rather than refuse the text reads this
+    # instead of parsing ``suggestion`` (see ``missing_disclaimers`` in
+    # the chat router).
+    remedy: str = ""
 
 
 @dataclass
@@ -274,6 +281,21 @@ def _scan_patterns(
     return violations
 
 
+# ─── Canonical disclaimers ──────────────────────────────────────────
+#
+# The exact sentences the narrative templates already ship
+# (``prompts/templates/healing_narrative.yaml`` and
+# ``wealth_narrative.yaml``), named here so a caller that wants to add
+# the missing disclaimer rather than refuse the text uses the reviewed
+# wording instead of inventing its own.  Both satisfy the indicator list
+# below, so adding one converges: re-checking the amended text raises no
+# further violation.
+
+HEALING_DISCLAIMER = "This is not medical advice. Consult a qualified healthcare professional."
+
+FINANCIAL_DISCLAIMER = "This is not financial advice. Consult a qualified financial advisor."
+
+
 def _check_missing_disclaimer(
     text: str,
     context: str,
@@ -324,10 +346,8 @@ def _check_missing_disclaimer(
                     category=ViolationCategory.MISSING_DISCLAIMER.value,
                     description="Healing content without appropriate disclaimer",
                     severity=ViolationSeverity.ERROR.value,
-                    suggestion=(
-                        "Add disclaimer: 'This is not medical advice. "
-                        "Consult a qualified healthcare professional.'"
-                    ),
+                    suggestion=f"Add disclaimer: '{HEALING_DISCLAIMER}'",
+                    remedy=HEALING_DISCLAIMER,
                 )
             )
 
@@ -339,10 +359,8 @@ def _check_missing_disclaimer(
                     category=ViolationCategory.MISSING_DISCLAIMER.value,
                     description="Financial content without appropriate disclaimer",
                     severity=ViolationSeverity.ERROR.value,
-                    suggestion=(
-                        "Add disclaimer: 'This is not financial advice. "
-                        "Consult a qualified financial advisor.'"
-                    ),
+                    suggestion=f"Add disclaimer: '{FINANCIAL_DISCLAIMER}'",
+                    remedy=FINANCIAL_DISCLAIMER,
                 )
             )
 
