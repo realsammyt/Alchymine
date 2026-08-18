@@ -25,9 +25,9 @@ statement both dialects take, on a table already holding user writing.
 IT REFUSES TO RUN ON A DATABASE THAT ALREADY HAS DUPLICATES, and it
 deletes nothing. Merging historical rows would destroy user writing as a
 side effect of a deploy, with no record of what went. The pre-check
-raises with the counts and points at the cleanup script instead. For any
-database that has been serving this route, the deploy order is
-CLEANUP FIRST, THEN MIGRATE.
+raises with the counts and points at the cleanup script in issue #290
+instead. For any database that has been serving this route, the deploy
+order is CLEANUP FIRST, THEN MIGRATE.
 
 ``downgrade()`` drops the index and leaves every row where it is.
 """
@@ -76,10 +76,10 @@ def _refuse_on_duplicates(conn) -> None:
         f"for {len(duplicated)} {completions} ({extra_rows} {rows} above one). "
         "The unique key cannot be created until those are merged, and this "
         "migration will not merge them, because that means deleting rows "
-        "holding what users wrote. Run the reviewed cleanup script first "
-        "(see the cleanup issue referenced from #283), then run this "
-        "migration again. Deploy order on any database that has served "
-        "POST /practice/integration is cleanup first, then migrate."
+        "holding what users wrote. Run the reviewed cleanup script from "
+        "issue #290 first, then run this migration again. Deploy order on "
+        "any database that has served POST /practice/integration is "
+        "cleanup first, then migrate."
     )
 
 
