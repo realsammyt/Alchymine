@@ -311,12 +311,19 @@ async def get_breathwork(
 @router.post("/healing/crisis/detect")
 async def detect_crisis_endpoint(
     request: CrisisDetectRequest,
-    current_user: dict = Depends(get_current_user),
 ) -> CrisisDetectResponse:
     """Detect crisis indicators in free-text input.
 
     Scans the provided text for crisis-related keywords and returns
     severity, matched keywords, resources, and disclaimers.
+
+    Deliberately unauthenticated (issue #284).  The match is keyword
+    scanning over the request body: no LLM call, no stored data read,
+    nothing about the caller involved, so the login was protecting
+    nothing and stood between somebody in crisis and a phone number.
+    Volume is bounded by the request-level RateLimitMiddleware, which is
+    the right control for an anonymous deterministic route.  The rest of
+    this router still requires a session.
     """
     result = detect_crisis(request.text)
     return _crisis_to_response(result)

@@ -9,9 +9,12 @@ Covers:
 
 from __future__ import annotations
 
+from collections.abc import Iterator
+
 import pytest
 from fastapi.testclient import TestClient
 
+from alchymine.api.auth import get_current_user
 from alchymine.api.main import app
 
 
@@ -265,3 +268,50 @@ class TestCrisisDetect:
         assert data["crisis_detected"] is True
         resource_names = [r["name"] for r in data["resources"]]
         assert "988 Suicide & Crisis Lifeline" in resource_names
+
+
+class TestCrisisDetectIsUngated:
+    """Issue #284: a hotline number is reachable without signing in.
+
+    The route is keyword matching over the request body. No LLM call, no
+    stored data read, nothing about the caller involved, so the login was
+    protecting nothing and standing between somebody in crisis and a
+    phone number.
+    """
+
+    @pytest.fixture
+    def anonymous(self) -> Iterator[TestClient]:
+        """A client with no credentials and no auth override behind it."""
+        previous = app.dependency_overrides.pop(get_current_user, None)
+        try:
+            yield TestClient(app)
+        finally:
+            if previous is not None:
+                app.dependency_overrides[get_current_user] = previous
+
+    def test_unauthenticated_request_returns_resources(self, anonymous: TestClient) -> None:
+        response = anonymous.post(
+            "/api/v1/healing/crisis/detect",
+            json={"text": "I want to end my life and have been thinking about suicide."},
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["crisis_detected"] is True
+        assert "988 Suicide & Crisis Lifeline" in [r["name"] for r in data["resources"]]
+        assert len(data["disclaimers"]) > 0
+
+    def test_unauthenticated_neutral_text_is_answered_too(self, anonymous: TestClient) -> None:
+        response = anonymous.post(
+            "/api/v1/healing/crisis/detect",
+            json={"text": "I had a great day today and feel wonderful."},
+        )
+
+        assert response.status_code == 200
+        assert response.json()["crisis_detected"] is False
+
+    def test_a_neighbouring_healing_route_still_needs_auth(self, anonymous: TestClient) -> None:
+        """The exemption is one route wide, not a hole in the healing router."""
+        response = anonymous.get("/api/v1/healing/breathwork/calm")
+
+        assert response.status_code == 401
