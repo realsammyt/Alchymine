@@ -48,6 +48,7 @@ from alchymine.api.routers import (
     wealth,
 )
 from alchymine.config import get_settings
+from alchymine.db.pack_envelopes import purge_unmounted_pack_envelopes_at_startup
 from alchymine.db.usage_counters import CostCeilingExceeded
 from alchymine.engine.practice import install_practice_registry
 from alchymine.llm.ledger import flush_pending_writes, log_ledger_status
@@ -90,7 +91,11 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     # stops the container here, where the deploy's own health machinery
     # sees it, rather than becoming a 500 for whichever user reaches
     # /practices first.
-    install_practice_registry()
+    registry = install_practice_registry()
+    # A pack that left PRACTICE_PACK_DIRS between two starts takes its
+    # cached content with it. Guarded, unlike the install above: clearing
+    # a cache is not a reason to stop a container from starting.
+    await purge_unmounted_pack_envelopes_at_startup(registry)
     log_ledger_status("api")
     yield
     # Ledger writes are detached tasks so a disconnected client cannot take
