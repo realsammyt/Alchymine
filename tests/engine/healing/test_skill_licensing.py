@@ -219,6 +219,17 @@ class TestLoudExternalDirFailures:
         registry = build_skill_registry(None)
         assert len(registry) == BUNDLED_SKILL_COUNT
 
+    def test_whitespace_only_setting_counts_as_unset(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Otherwise a blank line in an env file becomes a path named ' '."""
+        monkeypatch.setenv(EXTERNAL_DIR_ENV_VAR, "   ")
+        get_settings.cache_clear()
+        try:
+            assert len(install_skill_registry()) == BUNDLED_SKILL_COUNT
+        finally:
+            get_settings.cache_clear()
+
     def test_install_reads_the_configured_dir(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:

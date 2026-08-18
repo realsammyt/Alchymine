@@ -277,7 +277,9 @@ def install_skill_registry() -> SkillRegistry:
 
     global _registry
     with _registry_lock:
-        configured = get_settings().healing_skills_external_dir
+        # Stripped for the same reason get_practice_pack_dirs strips: a
+        # variable set to whitespace is unset, not a path named " ".
+        configured = (get_settings().healing_skills_external_dir or "").strip()
         registry = build_skill_registry(Path(configured) if configured else None)
         _registry = registry
         return registry

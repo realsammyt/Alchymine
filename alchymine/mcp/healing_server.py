@@ -10,11 +10,7 @@ tool is the highest-priority tool in this server.
 from __future__ import annotations
 
 from alchymine.engine.healing import detect_crisis, get_breathwork_pattern, match_modalities
-from alchymine.engine.healing.skills import (
-    SkillNotFoundError,
-    SkillRegistry,
-    get_default_yaml_dir,
-)
+from alchymine.engine.healing.skills import SkillNotFoundError, get_skill_registry
 from alchymine.engine.profile import (
     ArchetypeType,
     BigFiveScores,
@@ -26,18 +22,10 @@ from .base import MCPServer
 
 server = MCPServer(name="alchymine-healing", version="1.0.0")
 
-# Module-level skill registry, loaded lazily on first tool call.
-_skill_registry: SkillRegistry | None = None
-
-
-def _get_skill_registry() -> SkillRegistry:
-    """Return the lazily-initialised skill registry."""
-    global _skill_registry
-    if _skill_registry is None:
-        reg = SkillRegistry()
-        reg.load_directory(get_default_yaml_dir())
-        _skill_registry = reg
-    return _skill_registry
+# Skills resolve through the engine's process-global registry, which
+# mounts the bundled directory plus HEALING_SKILLS_EXTERNAL_DIR. Building
+# a private bundled-only registry here is what made external skills
+# visible over REST and invisible over MCP (issue #265).
 
 
 # ─── Tool: detect_crisis ────────────────────────────────────────────────
@@ -213,7 +201,7 @@ def get_breathwork_tool(difficulty: str, intention: str | None = None) -> dict:
 )
 def list_skills_tool(modality: str | None = None) -> list[dict]:
     """List healing skills from the SkillRegistry."""
-    registry = _get_skill_registry()
+    registry = get_skill_registry()
     if modality is not None:
         skills = registry.list_by_modality(modality)
     else:
@@ -237,8 +225,10 @@ def list_skills_tool(modality: str | None = None) -> list[dict]:
     name="run_skill",
     description=(
         "Retrieve a healing skill by name and return its full practice card "
-        "including guided steps, contraindications, and evidence rating. "
-        "The caller should present the steps to the user sequentially."
+        "including guided steps, contraindications, evidence rating, and the "
+        "license and attribution the content is published under. The caller "
+        "should present the steps to the user sequentially, and should carry "
+        "the attribution wherever it presents the practice."
     ),
     input_schema={
         "type": "object",
@@ -262,7 +252,7 @@ def run_skill_tool(name: str) -> dict:
     ValueError
         If the skill name is not found in the registry.
     """
-    registry = _get_skill_registry()
+    registry = get_skill_registry()
     try:
         skill = registry.get(name)
     except SkillNotFoundError as exc:
@@ -276,6 +266,9 @@ def run_skill_tool(name: str) -> dict:
         "evidence_rating": skill.evidence_rating,
         "contraindications": list(skill.contraindications),
         "duration_minutes": skill.duration_minutes,
+        "license": skill.license,
+        "attribution": skill.attribution,
+        "source_url": skill.source_url,
     }
 
 

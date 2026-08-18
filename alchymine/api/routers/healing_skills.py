@@ -2,56 +2,21 @@
 
 from __future__ import annotations
 
-import logging
-from pathlib import Path
-
 from fastapi import APIRouter, Depends, HTTPException, Query
 
+# The registry is built in the engine, not here, so the MCP server mounts
+# the same bundled-plus-external skill set from the same configuration.
+# Building it in this router is what let the two surfaces drift apart
+# (issue #265), and it is where a mistyped HEALING_SKILLS_EXTERNAL_DIR
+# used to be warned past instead of raised.
 from alchymine.engine.healing.skills import (
     SkillDefinition,
     SkillNotFoundError,
     SkillRegistry,
-    SkillValidationError,
-    get_default_yaml_dir,
+    get_skill_registry,
 )
 
-logger = logging.getLogger(__name__)
 router = APIRouter()
-
-# Module-level registry, loaded on first request and reused thereafter.
-_registry: SkillRegistry | None = None
-
-
-def get_skill_registry() -> SkillRegistry:
-    """FastAPI dependency that returns the lazy-loaded SkillRegistry.
-
-    Loads skills from the bundled YAML directory first, then merges in
-    any external skills from ``HEALING_SKILLS_EXTERNAL_DIR`` (if
-    configured).
-    """
-    global _registry
-    if _registry is None:
-        from alchymine.config import get_settings
-
-        reg = SkillRegistry()
-        reg.load_directory(get_default_yaml_dir())
-
-        settings = get_settings()
-        ext_dir = settings.healing_skills_external_dir
-        if ext_dir:
-            ext_path = Path(ext_dir)
-            try:
-                reg.load_directory(ext_path, replace=False)
-                logger.info(
-                    "Loaded external healing skills from %s (%d total)",
-                    ext_path,
-                    len(reg),
-                )
-            except (FileNotFoundError, SkillValidationError) as exc:
-                logger.warning("Skipping external healing skills: %s", exc)
-
-        _registry = reg
-    return _registry
 
 
 @router.get("/healing/skills")
