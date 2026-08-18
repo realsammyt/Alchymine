@@ -16,6 +16,12 @@
 # then append the printed digest below (sorted order is a convention, not a
 # requirement) and rerun the scan.
 #
+# Watch the word count. The scanner checks 1-, 2- and 3-grams, so a term whose
+# normalized form runs longer than three words can never match and becomes
+# silent dead weight: once it is a digest, nothing here can tell it apart from
+# a working entry. `--hash` warns when you hand it one. For a longer name, pick
+# the most distinctive three-word span of it instead.
+#
 # Known tradeoff: sha256 of a well-known name is recoverable by anyone who
 # guesses the name. This is not secrecy against determined analysis. It keeps
 # the names out of repo text, out of diffs and out of CI logs.

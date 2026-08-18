@@ -481,6 +481,18 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     if args.hash is not None:
         print(hash_term(args.hash))
+        words = len(normalize(args.hash).split())
+        if words > MAX_NGRAM:
+            # Only checkable while the plaintext is in hand, which is here and
+            # nowhere else: the list stores digests, so an over-long entry is
+            # indistinguishable from a good one once it has been written down.
+            print(
+                f"pack-boundary: warning, this term normalizes to {words} words. "
+                f"The scanner checks up to {MAX_NGRAM}-grams, so this digest can never "
+                "match and would sit on the denylist as dead weight. Use a distinctive "
+                f"form of {MAX_NGRAM} words or fewer instead.",
+                file=sys.stderr,
+            )
         return 0
 
     root = args.root.resolve()

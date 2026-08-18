@@ -357,6 +357,27 @@ class TestCommandLine:
         assert checker.main(["--hash", SENTINEL]) == 0
         assert capsys.readouterr().out.strip() == checker.hash_term(SENTINEL)
 
+    def test_hash_warns_when_a_term_is_too_long_to_ever_match(
+        self, checker: ModuleType, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """A term longer than MAX_NGRAM words is silent dead weight on the list.
+
+        The word count is only knowable while the plaintext is in hand, which is
+        here and nowhere else, so this is the one place it can be caught.
+        """
+        assert checker.main(["--hash", "one two three four"]) == 0
+
+        captured = capsys.readouterr()
+        assert captured.out.strip() == checker.hash_term("one two three four")
+        assert "4 words" in captured.err
+        assert str(checker.MAX_NGRAM) in captured.err
+
+    def test_hash_stays_quiet_at_the_ngram_limit(
+        self, checker: ModuleType, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        assert checker.main(["--hash", "one two three"]) == 0
+        assert capsys.readouterr().err == ""
+
     def test_exits_non_zero_on_a_violation(
         self, checker: ModuleType, tmp_path: Path, capsys: pytest.CaptureFixture[str]
     ) -> None:
@@ -416,6 +437,37 @@ class TestCommandLine:
         assert checker.load_exceptions(frozen) == {checker.hash_term(SENTINEL): ("notes.md",)}
         assert checker.scan_tree(tmp_path, denylist, frozen) == []
 
+    def test_freeze_never_records_the_control_files(
+        self, checker: ModuleType, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """Freezing scans with no exceptions filter, so it must still skip them.
+
+        Otherwise a second run writes an entry for the exceptions file itself and
+        the frozen footprint grows on every invocation.
+        """
+        denylist = write_denylist(tmp_path / "denylist.txt", [SENTINEL])
+        (tmp_path / "notes.md").write_text("Zorbatic Sentinel Modality\n", encoding="utf-8")
+        (tmp_path / ".github").mkdir()
+        (tmp_path / ".github" / "pack-boundary-exceptions.txt").write_text(
+            f"{checker.hash_term(SENTINEL)} docs/zorbatic-sentinel-modality.md\n", encoding="utf-8"
+        )
+        frozen = tmp_path / "frozen.txt"
+
+        rc = checker.main(
+            [
+                "--root",
+                str(tmp_path),
+                "--denylist",
+                str(denylist),
+                "--freeze-exceptions",
+                str(frozen),
+            ]
+        )
+        capsys.readouterr()
+
+        assert rc == 0
+        assert checker.load_exceptions(frozen) == {checker.hash_term(SENTINEL): ("notes.md",)}
+
 
 # ─── The rail itself ──────────────────────────────────────────────────────────
 
@@ -446,6 +498,31 @@ class TestRepositoryHoldsTheRail:
         remaining = checker.apply_exceptions(repo_violations, PROJECT_ROOT, repo_exceptions)
         rendered = "\n".join(checker.format_violation(v, PROJECT_ROOT) for v in remaining)
         assert not remaining, f"pack-boundary violations found:\n{rendered}"
+
+    def test_a_raw_scan_of_this_repo_never_reports_the_control_files(
+        self, checker: ModuleType, repo_violations: list[object]
+    ) -> None:
+        """Regression: the real exceptions file names terms in its own entries.
+
+        `repo_violations` is a scan of this repository with `exceptions_path`
+        set to None while the real exceptions file sits on disk. That is the
+        shape that used to trip the denylist against itself, and it is the shape
+        `--freeze-exceptions` uses, so it has to skip the control files whether
+        or not it is filtering by them.
+        """
+        assert EXCEPTIONS_PATH.exists(), "this regression needs the real exceptions file present"
+
+        # Not a vacuous pass: the file's own content really does hit the denylist.
+        digests = checker.load_denylist(DENYLIST_PATH)
+        assert checker.scan_text(EXCEPTIONS_PATH.read_text(encoding="utf-8"), digests), (
+            "the exceptions file no longer trips the denylist, so this test proves nothing"
+        )
+
+        control = {DENYLIST_PATH.resolve(), EXCEPTIONS_PATH.resolve()}
+        reported = sorted(
+            {relative for v in repo_violations if (relative := v.path.resolve()) in control}
+        )
+        assert reported == [], f"a raw scan reported the checker's own control files: {reported}"
 
     def test_every_exception_points_at_a_path_that_exists(
         self, checker: ModuleType, repo_exceptions: dict[str, tuple[str, ...]]
