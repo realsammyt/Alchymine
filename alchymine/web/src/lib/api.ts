@@ -1632,6 +1632,18 @@ export interface PracticeLogEntry {
   self_check_response: string | null;
 }
 
+export interface PracticeLogListResponse {
+  entries: PracticeLogEntry[];
+  /**
+   * How many rows match the filter, which can exceed `entries.length`.
+   * A caller deciding something from the rows has to read this too, or
+   * it is deciding from one page and calling it the whole day.
+   */
+  total: number;
+  page: number;
+  per_page: number;
+}
+
 export interface PracticeLogCreate {
   pack_id: string;
   practice_slug: string;
@@ -1693,6 +1705,34 @@ export async function logPractice(
     method: "POST",
     body: JSON.stringify(entry),
   });
+}
+
+/**
+ * A page of the caller's own practice log, newest first.
+ *
+ * `from` and `to` are inclusive local day keys and filter on the same
+ * `day_key` the log was written with, so "today" means the user's today
+ * rather than the server's. Build them with `localDayKey()`.
+ */
+export async function listPracticeLog(opts?: {
+  from?: string;
+  to?: string;
+  status?: "completed" | "skipped" | "started";
+  page?: number;
+  perPage?: number;
+  signal?: AbortSignal;
+}): Promise<PracticeLogListResponse> {
+  const params = new URLSearchParams();
+  if (opts?.from) params.set("from", opts.from);
+  if (opts?.to) params.set("to", opts.to);
+  if (opts?.status) params.set("status", opts.status);
+  if (opts?.page) params.set("page", String(opts.page));
+  if (opts?.perPage) params.set("per_page", String(opts.perPage));
+  const query = params.toString();
+  return request<PracticeLogListResponse>(
+    `${BASE}/practice/log${query ? `?${query}` : ""}`,
+    { signal: opts?.signal },
+  );
 }
 
 /**

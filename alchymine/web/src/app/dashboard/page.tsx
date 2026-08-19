@@ -13,6 +13,7 @@ import {
   MotionStaggerItem,
 } from "@/components/shared/MotionReveal";
 import ProfileSummaryCard from "@/components/shared/ProfileSummaryCard";
+import PracticeNudge from "@/components/practice/PracticeNudge";
 import {
   getOutcomeSummary,
   getJournalStats,
@@ -733,6 +734,14 @@ export default function DashboardPage() {
                     <hr className="rule-gold mt-6 max-w-[80px] mx-auto" />
                   </div>
                 </MotionReveal>
+
+                {/* ── Daily practice invitation ────────────────────────
+                    Above the tabs rather than inside the overview panel:
+                    it belongs to the page, and a user reading the journal
+                    tab has not stopped being someone with a protocol
+                    today. It renders nothing unless there is something
+                    left to return to. */}
+                <PracticeNudge />
 
                 {/* ── Tab Navigation ───────────────────────────────── */}
                 <MotionReveal delay={0.2} y={12}>
