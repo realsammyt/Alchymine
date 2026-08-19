@@ -1083,9 +1083,31 @@ async def get_journey_anchors(session: AsyncSession, user_id: str) -> tuple[str 
     all of history costs one row of output each rather than all of it.
     ``day_key`` is a zero-padded ``YYYY-MM-DD`` string, so the
     lexicographic minimum is the chronological one.
+
+    The two filter differently, on purpose.
+
+    *first_practice_day* counts completions only, the same rule the rest
+    of the series applies. The status on a log row comes from the
+    client, so a user can hold a log full of ``skipped`` rows without
+    ever having practiced; an unfiltered minimum would answer "March"
+    for them, and the page reads exactly this field to decide whether to
+    show its empty state. They would get a chart of empty columns
+    captioned with a day they never practiced on.
+
+    *first_loop_day* counts every closed loop whatever the practice's
+    status. ``POST /practice/integration`` accepts a log row of any
+    status and writes the derived ``practice_integration`` outcome row
+    either way, so filtering here would make the journey report fewer
+    loops than the dashboard for the same events. A ``started`` practice
+    is also a real experience to reflect on. The pair can therefore be
+    lopsided, which is safe: a user with no completion sees the empty
+    state, where neither anchor is rendered.
     """
     earliest_practice = await session.execute(
-        select(func.min(PracticeLogEntry.day_key)).where(PracticeLogEntry.user_id == user_id)
+        select(func.min(PracticeLogEntry.day_key)).where(
+            PracticeLogEntry.user_id == user_id,
+            PracticeLogEntry.status == "completed",
+        )
     )
     earliest_loop = await session.execute(
         select(func.min(PracticeLogEntry.day_key))

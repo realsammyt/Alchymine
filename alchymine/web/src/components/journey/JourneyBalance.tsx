@@ -52,7 +52,9 @@ export default function JourneyBalance({
           : `Nothing completed in these ${windowDays} days. The five capacities are here for when there is.`}
       </p>
 
-      <ul className="list-none p-0 m-0 flex flex-col gap-3">
+      {/* `role="list"` because Safari with VoiceOver drops list
+          semantics from a `<ul>` styled `list-style: none`. */}
+      <ul role="list" className="list-none p-0 m-0 flex flex-col gap-3">
         {counts.map(({ purpose, count }) => (
           <li key={purpose} className="flex items-center gap-3">
             <span className="font-body text-sm text-text/80 w-28 shrink-0">

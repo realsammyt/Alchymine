@@ -242,20 +242,22 @@ describe("JourneyPage empty state", () => {
     ).not.toBeInTheDocument();
   });
 
-  it("keeps a quiet window separate from never having started", async () => {
-    // Zero in the window, but a log going back to March: a real reader
-    // with a quiet month, not a new user.
-    mockGet.mockResolvedValue(
-      response({
-        totals: {
-          days_practiced: 0,
-          completed: 0,
-          loops_closed: 0,
-          first_practice_day: "2026-03-04",
-          first_loop_day: null,
-        },
-      }),
-    );
+  // The two states differ by one field and nothing else. Both payloads
+  // below carry the same all-zero `days` array, so a gate that keyed on
+  // "is the window empty" rather than on the anchor would pass one of
+  // these and fail the other. Seeding only the populated shape, as an
+  // earlier version of this test did, cannot tell the two apart.
+  const quietWindow = {
+    days_practiced: 0,
+    completed: 0,
+    loops_closed: 0,
+    first_practice_day: "2026-03-04",
+    first_loop_day: null,
+  };
+  const neverStarted = { ...quietWindow, first_practice_day: null };
+
+  it("draws the chart for a quiet window on an old log", async () => {
+    mockGet.mockResolvedValue(response({ totals: quietWindow }));
     render(<JourneyPage />);
 
     expect(
@@ -264,6 +266,29 @@ describe("JourneyPage empty state", () => {
     expect(
       screen.queryByRole("heading", { name: /starts with one practice/i }),
     ).not.toBeInTheDocument();
+  });
+
+  it("invites a start on the same window when nothing was ever completed", async () => {
+    mockGet.mockResolvedValue(response({ totals: neverStarted }));
+    render(<JourneyPage />);
+
+    expect(
+      await screen.findByRole("heading", { name: /starts with one practice/i }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("heading", { name: /practice and integration/i }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("never captions the chart with a day the user has not practiced", async () => {
+    // The shape a skip-only log produces once the anchor filters on
+    // completions. The page must not reach the totals block at all, so
+    // there is nothing to caption.
+    mockGet.mockResolvedValue(response({ totals: neverStarted }));
+    render(<JourneyPage />);
+
+    await screen.findByRole("heading", { name: /starts with one practice/i });
+    expect(screen.queryByText(/Practicing since/i)).not.toBeInTheDocument();
   });
 });
 

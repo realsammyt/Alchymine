@@ -396,6 +396,60 @@ class TestAnchors:
         assert body["totals"]["first_practice_day"] == TODAY
         assert body["totals"]["first_loop_day"] is None
 
+    @pytest.mark.parametrize("status", ["skipped", "started"])
+    def test_a_history_with_no_completion_has_no_first_practice_day(
+        self, env: Env, status: str
+    ) -> None:
+        """The anchor renders as "Practicing since X". A skip is not that.
+
+        ``POST /practice/log`` takes the status from the client, so a
+        user can hold a log full of rows without ever having practiced.
+        An unfiltered anchor turns that into a non-null date, and the
+        page's empty-state gate reads exactly this field: the user would
+        get a chart of empty columns captioned with a day they never
+        practiced on, instead of the invitation to start.
+        """
+        env.log_practice("2026-03-04", status=status)
+        env.log_practice(TODAY, status=status)
+
+        body = env.get(days=7).json()
+
+        assert body["totals"]["first_practice_day"] is None
+        assert body["totals"]["completed"] == 0
+        assert body["totals"]["days_practiced"] == 0
+
+    def test_the_anchor_is_the_first_completion_not_the_first_row(self, env: Env) -> None:
+        env.log_practice("2026-03-04", status="skipped")
+        env.log_practice("2026-04-01", status="started")
+        env.log_practice("2026-05-06")
+
+        body = env.get().json()
+
+        assert body["totals"]["first_practice_day"] == "2026-05-06"
+
+    def test_a_loop_on_an_uncompleted_practice_still_has_a_first_loop_day(self, env: Env) -> None:
+        """The asymmetry with the practice anchor is deliberate, so pin it.
+
+        ``POST /practice/integration`` accepts a log row of any status
+        and writes the derived ``practice_integration`` outcome row
+        either way, which is what the dashboard counts. Filtering loops
+        to completed practices here would make the journey report fewer
+        loops than the dashboard for the same events, which is the drift
+        :func:`~alchymine.engine.practice.journey.loop_shift_value`
+        exists to prevent. A ``started`` practice is a real experience to
+        reflect on; the log status says so in as many words.
+
+        There is no reachable contradiction on screen: a user with no
+        completion at all gets the empty state, where neither anchor is
+        rendered.
+        """
+        env.close_loop(env.log_practice("2026-03-04", status="started"))
+
+        body = env.get().json()
+
+        assert body["totals"]["first_loop_day"] == "2026-03-04"
+        assert body["totals"]["first_practice_day"] is None
+
 
 # ─── Ownership ──────────────────────────────────────────────────────────
 

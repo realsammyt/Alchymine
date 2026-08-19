@@ -123,7 +123,13 @@ export default function JourneyChart({ days }: JourneyChartProps) {
           box so the page itself never does. */}
       <div className="overflow-x-auto -mx-1 px-1 pb-1">
         <div style={{ minWidth: `${trackWidth}px` }}>
+          {/* `role="list"` is redundant markup that is not redundant in
+              practice: Safari with VoiceOver drops list semantics from a
+              `<ul>` styled `list-style: none`, and every column's
+              description lives in a list item. jsdom cannot catch this,
+              so the attribute is the only guard. */}
           <ul
+            role="list"
             className="flex items-stretch list-none p-0 m-0"
             style={{ gap: `${COLUMN_GAP_PX}px` }}
           >
