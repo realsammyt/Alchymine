@@ -17,6 +17,12 @@
  * cutting in.  Red here would train people to discount the red that
  * matters.
  *
+ * A reply the server delivered but could not write to the user's
+ * history carries ``unsaved``.  Same convention, different fact, and no
+ * retry button: the answer above is complete, and asking again would
+ * spend a turn to be told the same thing.  A reply can be both, and then
+ * both notes show, because they are two separate things to know.
+ *
  * DRAFT copy, awaiting Tyler's sign-off.
  */
 
@@ -39,10 +45,17 @@ interface Props {
 
 const INTERRUPTED_NOTE = "This reply may be incomplete. The connection ended before it finished.";
 
+const UNSAVED_NOTE = "This reply could not be saved to your history.";
+
+/** Shared by both notes, so neither reads as the louder of the two. */
+const NOTE_CLASSES =
+  "mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-yellow-700/30 pt-2 text-xs font-body text-yellow-200/90";
+
 export default function ChatMessage({ message, isStreaming, onRetry }: Props) {
   const isUser = message.role === "user";
   const ariaLabel = isUser ? "You said" : "Growth Assistant replied";
   const showInterrupted = !isUser && message.interrupted === true;
+  const showUnsaved = !isUser && message.unsaved === true;
 
   return (
     <div
@@ -77,10 +90,7 @@ export default function ChatMessage({ message, isStreaming, onRetry }: Props) {
           />
         )}
         {showInterrupted && (
-          <div
-            role="status"
-            className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-yellow-700/30 pt-2 text-xs font-body text-yellow-200/90"
-          >
+          <div role="status" className={NOTE_CLASSES}>
             <span>{INTERRUPTED_NOTE}</span>
             {onRetry && (
               <button
@@ -91,6 +101,11 @@ export default function ChatMessage({ message, isStreaming, onRetry }: Props) {
                 Ask again
               </button>
             )}
+          </div>
+        )}
+        {showUnsaved && (
+          <div role="status" className={NOTE_CLASSES}>
+            <span>{UNSAVED_NOTE}</span>
           </div>
         )}
       </div>

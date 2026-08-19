@@ -373,7 +373,14 @@ class TestChatPersistenceFailure:
         session: AsyncSession,
         monkeypatch: pytest.MonkeyPatch,
     ) -> None:
-        """A broken transcript must not cost the user their answer."""
+        """A broken transcript must not cost the user their answer.
+
+        Nor may it pass for a clean turn.  Both write attempts have
+        failed by the time the stream ends, so the server knows the reply
+        the reader is looking at will not be in their history tomorrow.
+        An ``unsaved`` frame says so, and ``done`` still follows it: the
+        reply *was* delivered, and the sentinel means exactly that.
+        """
 
         monkeypatch.setattr(
             chat_router.repository, "save_chat_message", _failing_assistant_write([])
@@ -382,7 +389,97 @@ class TestChatPersistenceFailure:
         body = "".join([frame async for frame in _chat_stream(session)])
 
         assert streamed_text(body) == REPLY
+        assert [name for name, _ in parse_sse(body)][-2:] == ["unsaved", "done"]
         assert body.endswith("event: done\ndata: \n\n")
+
+    async def test_the_unsaved_frame_carries_nothing_for_a_client_to_render(
+        self,
+        session: AsyncSession,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """The event name is the whole signal.
+
+        A client that predates the frame reads an event with an empty
+        data payload and has nothing to show, so it ignores it and keeps
+        reading.  That is what makes this safe to deploy ahead of the
+        client that understands it, and it only holds while the payload
+        stays empty.
+        """
+        monkeypatch.setattr(
+            chat_router.repository, "save_chat_message", _failing_assistant_write([])
+        )
+
+        body = "".join([frame async for frame in _chat_stream(session)])
+
+        assert ("unsaved", "") in parse_sse(body)
+        assert "event: unsaved\ndata: \n\n" in body
+
+    async def test_a_reply_that_persisted_carries_no_unsaved_signal(
+        self, session: AsyncSession
+    ) -> None:
+        """An ordinary turn is unchanged.  The signal means what it says."""
+        body = "".join([frame async for frame in _chat_stream(session)])
+
+        assert "unsaved" not in body
+        assert body.endswith("event: done\ndata: \n\n")
+
+    async def test_a_disconnect_with_a_failed_write_still_closes_cleanly(
+        self,
+        session: AsyncSession,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """Nobody is left to signal to, so nothing is signalled.
+
+        The frame is emitted after the streaming block, never from inside
+        the ``finally``: a generator that yields while it is being closed
+        raises ``RuntimeError``, which would turn a transcript outage into
+        a second failure on the way out.
+        """
+        monkeypatch.setattr(
+            chat_router.repository, "save_chat_message", _failing_assistant_write([])
+        )
+
+        stream = _chat_stream(session)
+        await stream.__anext__()
+
+        # Must not raise: the close is what a closed tab does here.
+        await stream.aclose()
+
+    async def test_a_cancelled_write_rolls_the_request_session_back(
+        self,
+        session_factory: async_sessionmaker[AsyncSession],
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """The inline attempt may have flushed before it was cancelled.
+
+        A cancelled scope re-raises at every await, so the commit may
+        never have run over an INSERT that did.  The rollback discards it
+        before the detached retry writes the same row on a session of its
+        own, and the cancellation still continues on its way afterwards.
+        """
+
+        class _RollbackSpy:
+            def __init__(self) -> None:
+                self.rollbacks = 0
+
+            async def rollback(self) -> None:
+                self.rollbacks += 1
+
+        async def _cancelled_write(*args: object, **kwargs: object) -> None:
+            raise asyncio.CancelledError
+
+        monkeypatch.setattr(chat_router, "_write_reply", _cancelled_write)
+        spy = _RollbackSpy()
+
+        with pytest.raises(asyncio.CancelledError):
+            await chat_router._persist_assistant_reply(
+                session=spy,  # type: ignore[arg-type]
+                user_id=TEST_USER_ID,
+                content=REPLY,
+                system_key=None,
+            )
+
+        assert spy.rollbacks == 1
 
     async def test_a_failed_write_is_logged_without_the_message_text(
         self,
@@ -463,6 +560,36 @@ class TestCrisisDisconnectPersistence:
         await stream.aclose()
 
         assert await _messages(session_factory) == []
+
+
+class TestCrisisPersistenceFailure:
+    async def test_a_failed_crisis_write_announces_itself_before_done(
+        self,
+        session: AsyncSession,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """The path that can least afford a silent gap gets the same signal.
+
+        Both generators share ``_persist_assistant_reply``, so they share
+        what it knows.  The resources still stream in full and the copy is
+        untouched: the frame is added beside it, not woven into it.
+        """
+        monkeypatch.setattr(
+            chat_router.repository, "save_chat_message", _failing_assistant_write([])
+        )
+
+        body = "".join([frame async for frame in _crisis_stream(session)])
+
+        assert [name for name, _ in parse_sse(body)][-2:] == ["unsaved", "done"]
+        assert streamed_text(body) == " ".join(chat_router._crisis_frames(_crisis(), None))
+        assert "988" in streamed_text(body)
+
+    async def test_a_persisted_crisis_turn_carries_no_unsaved_signal(
+        self, session: AsyncSession
+    ) -> None:
+        body = "".join([frame async for frame in _crisis_stream(session)])
+
+        assert "unsaved" not in body
 
 
 class TestCrisisFraming:

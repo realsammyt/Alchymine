@@ -246,3 +246,68 @@ describe("streamChat interruption signal", () => {
     expect(lastOutcome).toBe("done");
   });
 });
+
+/**
+ * The server knows when it delivered a reply it could not write to the
+ * user's history, and says so with an `event: unsaved` frame just before
+ * `done`. The reply is real and stays on screen; what is gone is the
+ * copy of it the user would look for tomorrow.
+ *
+ * `for await` throws the generator's return value away, so this reads
+ * the stream by hand the way the hook does.
+ */
+async function drain(
+  frames: string[],
+): Promise<{ chunks: string[]; unsaved: boolean }> {
+  global.fetch = jest.fn().mockResolvedValue(sseResponse(frames));
+  const chunks: string[] = [];
+  const stream = streamChat({ message: "hi", system_key: null });
+  for (;;) {
+    const step = await stream.next();
+    if (step.done) return { chunks, unsaved: step.value?.unsaved === true };
+    chunks.push(step.value);
+  }
+}
+
+describe("streamChat unsaved signal", () => {
+  it("reports a reply the server could not keep", async () => {
+    const { chunks, unsaved } = await drain([
+      "data: kept\n\n",
+      "event: unsaved\ndata: \n\n",
+      "event: done\ndata: \n\n",
+    ]);
+
+    // The text is untouched: the frame is a fact about the transcript,
+    // not about the answer.
+    expect(chunks).toEqual(["kept"]);
+    expect(unsaved).toBe(true);
+  });
+
+  it("reports nothing of the sort for an ordinary stream", async () => {
+    const { chunks, unsaved } = await drain([
+      "data: kept\n\n",
+      "event: done\ndata: \n\n",
+    ]);
+
+    expect(chunks).toEqual(["kept"]);
+    expect(unsaved).toBe(false);
+  });
+
+  /**
+   * Rollback safety. A client shipped before this frame existed runs
+   * exactly today's parser minus the `unsaved` case, so an unknown event
+   * name with an empty payload is the shape it would meet. It has to
+   * yield nothing and leave the stream running: an old client must not
+   * render a stray line or lose its `done`.
+   */
+  it("ignores an unknown named event with an empty payload", async () => {
+    const chunks = await collect([
+      "event: somethingnewer\ndata: \n\n",
+      "data: kept\n\n",
+      "event: done\ndata: \n\n",
+    ]);
+
+    expect(chunks).toEqual(["kept"]);
+    expect(lastOutcome).toBe("done");
+  });
+});

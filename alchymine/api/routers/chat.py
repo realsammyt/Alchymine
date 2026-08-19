@@ -524,6 +524,18 @@ _SSE_HEADERS = {
 }
 
 
+# Sent just before ``done`` when the reply reached the reader but could
+# not be written to their history.  ``done`` still follows it, because
+# the reply was delivered and that is all the sentinel ever claimed.
+#
+# The payload is deliberately empty: the event name carries the whole
+# signal, and the wording belongs to the client.  A client that predates
+# this frame resolves an unnamed-to-it event with no data to show and
+# ignores it, so the server can ship first without the older client
+# rendering a stray line or losing its place in the stream.
+_UNSAVED_FRAME = "event: unsaved\ndata: \n\n"
+
+
 # Assistant writes that outlived the request that started them.  A
 # cancelled caller lets its write finish in the background, and the set
 # keeps a reference so the loop cannot garbage-collect a task mid-flight.
@@ -618,7 +630,7 @@ async def _persist_assistant_reply(
     user_id: str,
     content: str,
     system_key: str | None,
-) -> None:
+) -> bool:
     """Write the assistant half of one chat turn.  Raises nothing of its own.
 
     Called from the ``finally`` of both stream generators, which is the
@@ -647,14 +659,28 @@ async def _persist_assistant_reply(
 
     Nothing here logs message content.  Chat text is user data, and a
     transcript outage is not a reason to turn one into a disclosure.
+
+    Returns ``True`` when the row is written and ``False`` when both
+    attempts have failed for reasons that are not cancellation.  A caller
+    still on the wire tells the reader about the second case (see
+    ``_UNSAVED_FRAME``); a caller whose reader has already gone gets the
+    cancellation re-raised instead and never reads the value.
     """
     cancelled: BaseException | None = None
+    written = False
 
     try:
         await _write_reply(session, user_id=user_id, content=content, system_key=system_key)
-        return
+        return True
     except asyncio.CancelledError as exc:
         cancelled = exc
+        # Same reasoning as the net below: the INSERT may have flushed
+        # before the cancellation landed on the commit, and the detached
+        # retry is about to write that row on a session of its own.
+        try:
+            await session.rollback()
+        except Exception:
+            logger.debug("Rollback after a cancelled chat persist also failed", exc_info=True)
     except Exception:
         logger.warning(
             "Chat reply for user %s did not persist on the request session "
@@ -671,6 +697,7 @@ async def _persist_assistant_reply(
 
     try:
         await _write_reply_detached(user_id=user_id, content=content, system_key=system_key)
+        written = True
     except asyncio.CancelledError as exc:
         # The detached write is already running and finishes on its own.
         cancelled = cancelled or exc
@@ -686,6 +713,8 @@ async def _persist_assistant_reply(
 
     if cancelled is not None:
         raise cancelled
+
+    return written
 
 
 async def _chat_event_stream(
@@ -761,6 +790,10 @@ async def _chat_event_stream(
     # turn with a blank assistant bubble.  True until something says
     # otherwise, and only a disconnect does.
     finished = True
+    # Assume the transcript is intact until a write says otherwise.  An
+    # ephemeral turn and a turn with nothing to write both leave it True:
+    # neither of them lost anything the reader was promised.
+    persisted = True
 
     try:
         chunk_count = 0
@@ -845,13 +878,19 @@ async def _chat_event_stream(
         elif unavailable:
             assistant_text = "[assistant temporarily unavailable]"
         if not ephemeral and (assistant_text or finished):
-            await _persist_assistant_reply(
+            persisted = await _persist_assistant_reply(
                 session=session,
                 user_id=user_id,
                 content=assistant_text,
                 system_key=system_key,
             )
 
+    # Outside the ``finally`` on purpose.  Yielding from inside one while
+    # the generator is being closed raises ``RuntimeError``, and the
+    # reader on that path is gone anyway: these two lines are reached only
+    # when the stream survived to its own end.
+    if not persisted:
+        yield _UNSAVED_FRAME
     yield "event: done\ndata: \n\n"
 
 
@@ -885,6 +924,7 @@ async def _crisis_event_stream(
 
     frames = _crisis_frames(crisis, system_key)
     reply = " ".join(frames)
+    persisted = True
 
     # Committed up front, matching _chat_event_stream, so a disconnect
     # cannot take it with it.
@@ -917,13 +957,17 @@ async def _crisis_event_stream(
         # reply is ours and complete before the first frame leaves, so a
         # reader who closes the tab still gets the turn recorded whole.
         if not ephemeral:
-            await _persist_assistant_reply(
+            persisted = await _persist_assistant_reply(
                 session=session,
                 user_id=user_id,
                 content=reply,
                 system_key=system_key,
             )
 
+    # Same placement and the same reason as the model path.  The copy
+    # above is untouched: this frame sits beside it and carries no text.
+    if not persisted:
+        yield _UNSAVED_FRAME
     yield "event: done\ndata: \n\n"
 
 

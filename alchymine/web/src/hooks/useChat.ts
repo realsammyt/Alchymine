@@ -23,6 +23,13 @@
  * where a truncated reply looked exactly like a finished one and a
  * failed one was deleted out from under the reader.
  *
+ * Unsaved replies are the other half of that: the reply arrived whole
+ * and the server could not write it to the user's history, which it
+ * reports on the way out.  That marks the message ``unsaved`` and is
+ * deliberately not ``interrupted``: nothing is missing from the text, so
+ * there is nothing to ask again for, and the note says only what is
+ * true.
+ *
  * Abort semantics:
  *   - ``cancelStream()`` triggers the ``AbortController`` attached to
  *     the in-flight fetch.  Any content already received stays in the
@@ -199,12 +206,23 @@ export function useChat(options?: UseChatOptions): UseChatResult {
       let accumulated = "";
       let aborted = false;
       let interrupted = false;
+      let unsaved = false;
       try {
-        for await (const chunk of streamChat(
+        // Read by hand rather than with `for await`, which throws the
+        // generator's return value away.  That value is where the
+        // transport reports what the server said about the turn as a
+        // whole, and the note under an unsaved reply depends on it.
+        const stream = streamChat(
           { message: trimmed, system_key: systemKey },
           controller.signal,
-        )) {
-          accumulated += chunk;
+        );
+        for (;;) {
+          const step = await stream.next();
+          if (step.done) {
+            unsaved = step.value?.unsaved === true;
+            break;
+          }
+          accumulated += step.value;
           // Functional update so concurrent sends can't clobber state.
           setMessages((prev) =>
             prev.map((m) =>
@@ -273,6 +291,11 @@ export function useChat(options?: UseChatOptions): UseChatResult {
             prev.map((m) =>
               m.id === assistantId ? { ...m, interrupted: true } : m,
             ),
+          );
+        }
+        if (unsaved) {
+          setMessages((prev) =>
+            prev.map((m) => (m.id === assistantId ? { ...m, unsaved: true } : m)),
           );
         }
       }

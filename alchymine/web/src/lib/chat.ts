@@ -47,6 +47,14 @@ export interface ChatMessage {
    * the UI would mark completed turns as broken.
    */
   interrupted?: boolean;
+  /**
+   * The server delivered this reply whole and then could not write it to
+   * the user's history.  Distinct from ``interrupted``: nothing is
+   * missing from what is on screen, and asking again would not help.
+   * What is gone is tomorrow's copy of it, which is worth saying while
+   * the text is still in front of them.
+   */
+  unsaved?: boolean;
 }
 
 /** Backend request body for POST /api/v1/chat. */
@@ -121,8 +129,24 @@ const BASE = (process.env.NEXT_PUBLIC_API_URL ?? "") + "/api/v1";
 type FrameOutcome =
   | { kind: "chunk"; text: string }
   | { kind: "done" }
+  | { kind: "unsaved" }
   | { kind: "error"; message: string }
   | { kind: "empty" };
+
+/**
+ * What a finished stream says beyond the text it delivered.
+ *
+ * Returned rather than yielded: it describes the turn as a whole, and a
+ * consumer that only wants the words keeps working untouched.
+ */
+export interface ChatStreamEnd {
+  /**
+   * The server delivered the reply and could not write it to history.
+   * True only when the server said so; a stream that ends any other way
+   * makes no claim either way.
+   */
+  unsaved: boolean;
+}
 
 /**
  * Resolve one completed event from its name and its ``data:`` lines.
@@ -132,9 +156,15 @@ type FrameOutcome =
  * paragraph breaks in it arrives as several lines of one event. An
  * event with no data lines, or one whose data is empty, carries nothing
  * to show.
+ *
+ * That last rule is what lets the server add a named signal without
+ * waiting for every client to learn it: a name this parser does not know,
+ * carrying an empty payload, resolves as nothing to show and the stream
+ * reads on. ``unsaved`` arrived that way.
  */
 function resolveFrame(name: string | null, dataLines: string[]): FrameOutcome {
   if (name === "done") return { kind: "done" };
+  if (name === "unsaved") return { kind: "unsaved" };
 
   const text = dataLines.join("\n");
 
@@ -166,12 +196,17 @@ function getLegacyAuthHeaders(): Record<string, string> {
  * Abort via the provided signal yields the native ``AbortError``
  * which callers can detect by name; an aborted read rejects inside the
  * loop, so a user-initiated cancel never reads as an interruption.
+ *
+ * A stream that reaches its ``done`` sentinel returns a ``ChatStreamEnd``
+ * describing the turn.  A caller that ends the stream early, by breaking
+ * out of a ``for await`` or throwing, gets ``undefined`` instead: there
+ * was no end to describe.
  */
 export async function* streamChat(
   request: ChatRequest,
   signal?: AbortSignal,
   ephemeral?: boolean,
-): AsyncGenerator<string> {
+): AsyncGenerator<string, ChatStreamEnd | undefined> {
   const url = ephemeral
     ? `${BASE}/chat?ephemeral=true`
     : `${BASE}/chat`;
@@ -209,7 +244,7 @@ export async function* streamChat(
   if (!response.body) {
     // Some test environments (and ancient browsers) may not expose a
     // ReadableStream.  Treat this as an empty reply rather than hanging.
-    return;
+    return { unsaved: false };
   }
 
   const reader = response.body.getReader();
@@ -217,6 +252,7 @@ export async function* streamChat(
   let buffer = "";
   let eventName: string | null = null;
   let dataLines: string[] = [];
+  let unsaved = false;
 
   try {
     while (true) {
@@ -253,7 +289,8 @@ export async function* streamChat(
         eventName = null;
         dataLines = [];
 
-        if (outcome.kind === "done") return;
+        if (outcome.kind === "done") return { unsaved };
+        if (outcome.kind === "unsaved") unsaved = true;
         if (outcome.kind === "error") throw new ChatError(outcome.message);
         if (outcome.kind === "chunk") yield outcome.text;
       }

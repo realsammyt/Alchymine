@@ -112,7 +112,7 @@ describe("useApi", () => {
       return next.promise;
     });
 
-    renderHook(() => useApi(fetcher, []));
+    const { result } = renderHook(() => useApi(fetcher, []));
     await waitFor(() => expect(controllers).toHaveLength(1));
 
     await act(async () => {
@@ -132,6 +132,92 @@ describe("useApi", () => {
     // already having a bad day.
     await new Promise((resolve) => setTimeout(resolve, 20));
     expect(fetcher).toHaveBeenCalledTimes(2);
+
+    // And giving up is a state, not a shrug.  Loading has to end where
+    // the retry budget does, because the error branch is the only one
+    // `ApiStateView` draws a Try Again button on: staying at loading:true
+    // is the stuck spinner this whole hook exists to prevent.
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(result.current.error).toBeTruthy();
+    expect(result.current.data).toBeNull();
+  });
+
+  it("settles a fetcher that resolves after its own abort", async () => {
+    // The `.then` twin of the branch above: an attempt whose signal
+    // aborted but whose promise resolves anyway, with the retry budget
+    // already spent.  It must not slip out of the hook leaving loading
+    // true either.
+    const attempts: ReturnType<typeof deferred<string>>[] = [];
+    const fetcher = jest.fn().mockImplementation(() => {
+      const next = deferred<string>();
+      attempts.push(next);
+      return next.promise;
+    });
+
+    const { result } = renderHook(() => useApi(fetcher, []));
+    await waitFor(() => expect(controllers).toHaveLength(1));
+
+    await act(async () => {
+      controllers[0].abort();
+      attempts[0].resolve("too late to matter");
+      await Promise.resolve();
+    });
+    await waitFor(() => expect(fetcher).toHaveBeenCalledTimes(2));
+
+    await act(async () => {
+      controllers[1].abort();
+      attempts[1].resolve("too late again");
+      await Promise.resolve();
+    });
+
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(result.current.error).toBeTruthy();
+    // The data belongs to a request nobody is waiting on any more.
+    expect(result.current.data).toBeNull();
+  });
+
+  it("gives a fetch on new deps its own retry budget", async () => {
+    // The budget is per fetch, not per hook instance.  A page that
+    // stranded once on Monday's key must not hand Tuesday's key a spent
+    // budget and a permanent error.
+    const attempts: ReturnType<typeof deferred<string>>[] = [];
+    const fetcher = jest.fn().mockImplementation(() => {
+      const next = deferred<string>();
+      attempts.push(next);
+      return next.promise;
+    });
+
+    const { rerender } = renderHook(
+      ({ key }: { key: string }) => useApi(fetcher, [key]),
+      { initialProps: { key: "a" } },
+    );
+    await waitFor(() => expect(controllers).toHaveLength(1));
+
+    // Spend the budget: strand, retry, strand again.
+    await act(async () => {
+      controllers[0].abort();
+      attempts[0].reject(new DOMException("Aborted", "AbortError"));
+      await Promise.resolve();
+    });
+    await waitFor(() => expect(fetcher).toHaveBeenCalledTimes(2));
+    await act(async () => {
+      controllers[1].abort();
+      attempts[1].reject(new DOMException("Aborted", "AbortError"));
+      await Promise.resolve();
+    });
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(fetcher).toHaveBeenCalledTimes(2);
+
+    rerender({ key: "b" });
+    await waitFor(() => expect(fetcher).toHaveBeenCalledTimes(3));
+
+    await act(async () => {
+      controllers[2].abort();
+      attempts[2].reject(new DOMException("Aborted", "AbortError"));
+      await Promise.resolve();
+    });
+
+    await waitFor(() => expect(fetcher).toHaveBeenCalledTimes(4));
   });
 
   it("does not retry an attempt a newer one already replaced", async () => {

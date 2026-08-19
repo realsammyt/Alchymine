@@ -359,3 +359,59 @@ describe("ChatPanel interrupted replies", () => {
     expect(screen.queryByRole("button", { name: /ask again/i })).not.toBeInTheDocument();
   });
 });
+
+/**
+ * A reply that arrived whole and never reached the user's history. The
+ * note says the one thing that is true, in the same quiet register as
+ * the interrupted one, and offers no retry: the text is complete, and
+ * asking again would answer a question they already have the answer to.
+ */
+describe("ChatPanel replies that were not saved", () => {
+  const notSaved: ChatMessage[] = [
+    { id: "u1", role: "user", content: "What next?", createdAt: "2026-08-19T10:00:00Z" },
+    {
+      id: "a1",
+      role: "assistant",
+      content: "Start by breathing.",
+      createdAt: "2026-08-19T10:00:01Z",
+      unsaved: true,
+    },
+  ];
+
+  it("says the reply could not be saved", () => {
+    useChatMock.mockReturnValue(defaults({ messages: notSaved }));
+    render(<ChatPanel systemKey={null} />);
+
+    expect(screen.getByText(/could not be saved to your history/i)).toBeInTheDocument();
+  });
+
+  it("reads as a status rather than an alert", () => {
+    useChatMock.mockReturnValue(defaults({ messages: notSaved }));
+    render(<ChatPanel systemKey={null} />);
+
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    expect(screen.getByRole("status")).toHaveTextContent(
+      /could not be saved to your history/i,
+    );
+  });
+
+  it("keeps the reply on screen and offers no retry", () => {
+    useChatMock.mockReturnValue(defaults({ messages: notSaved, retryLastTurn: jest.fn() }));
+    render(<ChatPanel systemKey={null} />);
+
+    expect(screen.getByTestId("md")).toHaveTextContent("Start by breathing.");
+    expect(screen.queryByRole("button", { name: /ask again/i })).not.toBeInTheDocument();
+    expect(screen.queryByText(/may be incomplete/i)).not.toBeInTheDocument();
+  });
+
+  it("says nothing about a reply that was saved", () => {
+    useChatMock.mockReturnValue(
+      defaults({ messages: [notSaved[0], { ...notSaved[1], unsaved: false }] }),
+    );
+    render(<ChatPanel systemKey={null} />);
+
+    expect(
+      screen.queryByText(/could not be saved to your history/i),
+    ).not.toBeInTheDocument();
+  });
+});

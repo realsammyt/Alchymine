@@ -17,6 +17,21 @@ export interface ApiState<T> {
 const MAX_ABORT_RETRIES = 1;
 
 /**
+ * Shown when the retry budget is spent and the attempt still stranded.
+ *
+ * It says what happened and what to do, and nothing about signals or
+ * controllers: from where the reader sits, the request stopped and the
+ * button is right there.  DRAFT copy, awaiting Tyler's sign-off.
+ */
+const GAVE_UP_MESSAGE = "The request was interrupted. Try again.";
+
+/** True when two dependency arrays differ in the way React compares them. */
+function depsDiffer(previous: unknown[] | null, next: unknown[]): boolean {
+  if (previous === null || previous.length !== next.length) return true;
+  return previous.some((value, index) => !Object.is(value, next[index]));
+}
+
+/**
  * Hook for fetching data from the API with loading/error handling.
  *
  * The fetcher receives an `AbortSignal` that is aborted when the effect
@@ -34,6 +49,18 @@ const MAX_ABORT_RETRIES = 1;
  * component, buys one automatic retry.  It is bounded deliberately: a
  * service having a bad day should meet one more request, not a loop.
  *
+ * When that budget is spent and the attempt strands again, the hook
+ * settles into the error state rather than returning quietly.  Returning
+ * quietly leaves `loading` true forever, which is the same permanent
+ * spinner by a longer route, and `ApiStateView` only draws its retry
+ * button on the error branch.  An honest error the reader can act on
+ * beats a truthful-looking spinner they cannot.
+ *
+ * The budget belongs to one fetch, not to the hook: when the deps
+ * change, the next fetch is asking a different question and starts with
+ * its own.  A retry re-runs this effect too, so the reset keys off the
+ * deps actually changing rather than off the effect running.
+ *
  * @param fetcher - Async function that returns the data (receives AbortSignal)
  * @param deps - Dependency array (re-fetches when deps change)
  */
@@ -50,6 +77,7 @@ export function useApi<T>(
   const currentControllerRef = useRef<AbortController | null>(null);
   const mountedRef = useRef(true);
   const abortRetriesRef = useRef(0);
+  const previousDepsRef = useRef<unknown[] | null>(null);
 
   const refetch = useCallback(() => setTrigger((n) => n + 1), []);
 
@@ -63,6 +91,14 @@ export function useApi<T>(
   }, []);
 
   useEffect(() => {
+    // A different question deserves its own retry budget, and this runs
+    // before the early return so a hook that starts with no fetcher
+    // still records the deps it saw.
+    if (depsDiffer(previousDepsRef.current, deps)) {
+      previousDepsRef.current = [...deps];
+      abortRetriesRef.current = 0;
+    }
+
     if (!fetcher) {
       setLoading(false);
       return;
@@ -81,6 +117,27 @@ export function useApi<T>(
     const isStranded = () =>
       mountedRef.current && currentControllerRef.current === controller;
 
+    /**
+     * Handle an attempt that ended on an aborted signal.
+     *
+     * Three outcomes, and only the first two used to exist: a newer
+     * attempt has taken over and this one goes quiet, the budget pays for
+     * one more try, or the budget is spent and this is the end of the
+     * line.  The budget is not refunded here on purpose: this deps
+     * generation has had its retry, and what the reader gets instead is a
+     * state with a button in it.
+     */
+    const retryOrGiveUp = () => {
+      if (!isStranded()) return;
+      if (abortRetriesRef.current < MAX_ABORT_RETRIES) {
+        abortRetriesRef.current += 1;
+        setTrigger((n) => n + 1);
+        return;
+      }
+      setError(GAVE_UP_MESSAGE);
+      setLoading(false);
+    };
+
     fetcher(controller.signal)
       .then((result) => {
         if (!controller.signal.aborted) {
@@ -89,17 +146,14 @@ export function useApi<T>(
           setLoading(false);
           return;
         }
-        if (isStranded() && abortRetriesRef.current < MAX_ABORT_RETRIES) {
-          abortRetriesRef.current += 1;
-          setTrigger((n) => n + 1);
-        }
+        // Resolved, but for a request that was already called off. The
+        // value is not this attempt's to show, and the strand is the
+        // same one the rejection path handles.
+        retryOrGiveUp();
       })
       .catch((err) => {
         if (controller.signal.aborted) {
-          if (isStranded() && abortRetriesRef.current < MAX_ABORT_RETRIES) {
-            abortRetriesRef.current += 1;
-            setTrigger((n) => n + 1);
-          }
+          retryOrGiveUp();
           return;
         }
         settled();

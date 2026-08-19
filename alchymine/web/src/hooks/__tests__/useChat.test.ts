@@ -492,6 +492,64 @@ describe("useChat interrupted replies", () => {
 });
 
 /**
+ * The server delivered the reply and could not write it to the user's
+ * history, and it says so with an `unsaved` frame before `done`. The
+ * reply is whole, so it stays exactly as it rendered; the note under it
+ * is about the transcript, not about the answer.
+ */
+describe("useChat replies the server could not save", () => {
+  it("marks the reply and keeps every word of it", async () => {
+    (global.fetch as jest.Mock)
+      .mockResolvedValueOnce(makeJsonResponse([]))
+      .mockResolvedValueOnce(
+        makeSseResponse([
+          "data: All of it\n\n",
+          "event: unsaved\ndata: \n\n",
+          "event: done\ndata: \n\n",
+        ]),
+      );
+
+    const { result } = renderHook(() => useChat({ systemKey: null }));
+    await waitFor(() => expect(result.current.isLoadingHistory).toBe(false));
+
+    await act(async () => {
+      await result.current.sendMessage("Hi");
+    });
+    await waitFor(() => expect(result.current.isStreaming).toBe(false));
+
+    expect(result.current.messages[1]).toMatchObject({
+      role: "assistant",
+      content: "All of it",
+      unsaved: true,
+    });
+    // Not interrupted: nothing is missing from what is on screen, and a
+    // note offering a retry would send them after text they already have.
+    expect(result.current.messages[1].interrupted).toBeFalsy();
+    // Not an error either. A red banner across the conversation would
+    // outweigh what actually happened.
+    expect(result.current.error).toBeNull();
+  });
+
+  it("leaves an ordinary reply unmarked", async () => {
+    (global.fetch as jest.Mock)
+      .mockResolvedValueOnce(makeJsonResponse([]))
+      .mockResolvedValueOnce(
+        makeSseResponse(["data: All of it\n\n", "event: done\ndata: \n\n"]),
+      );
+
+    const { result } = renderHook(() => useChat({ systemKey: null }));
+    await waitFor(() => expect(result.current.isLoadingHistory).toBe(false));
+
+    await act(async () => {
+      await result.current.sendMessage("Hi");
+    });
+    await waitFor(() => expect(result.current.isStreaming).toBe(false));
+
+    expect(result.current.messages[1].unsaved).toBeFalsy();
+  });
+});
+
+/**
  * Issue #313. Under StrictMode React runs each effect, cleans it up, and
  * runs it again. The history effect one-shotted on a ref that the
  * cleanup never reset, so the second run returned early while the first
