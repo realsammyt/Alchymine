@@ -12,8 +12,16 @@
  *   - ``error``       non-null when the most recent send failed
  *                     (network, HTTP, SSE error frame).  The user
  *                     message is *kept* in ``messages`` so the user
- *                     can see what they tried to say; the unfinished
- *                     assistant placeholder (if any) is removed.
+ *                     can see what they tried to say.  So is any
+ *                     assistant text that had already arrived; only an
+ *                     empty placeholder is removed.
+ *
+ * Interrupted replies (issue #297): a stream that ends without its done
+ * sentinel, and any fault that lands after some text has rendered, mark
+ * that assistant message ``interrupted``.  The bubble then says so and
+ * offers ``retryLastTurn``.  The alternative was the old behaviour,
+ * where a truncated reply looked exactly like a finished one and a
+ * failed one was deleted out from under the reader.
  *
  * Abort semantics:
  *   - ``cancelStream()`` triggers the ``AbortController`` attached to
@@ -28,6 +36,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import {
   ChatError,
+  ChatInterruptedError,
   ChatUpsellError,
   fetchChatHistory,
   streamChat,
@@ -53,6 +62,15 @@ interface UseChatResult {
    */
   upsell: PlanGateError | null;
   sendMessage: (content: string, systemKey?: string | null) => Promise<void>;
+  /**
+   * Send the last user message again, on the scope it was sent with.
+   * The affordance offered next to an interrupted reply.  It is a new
+   * turn rather than an edit: the question appears again and both
+   * exchanges stay in the transcript, because the server has no notion
+   * of replacing a turn and inventing one client-side would put the UI
+   * and the history out of step.
+   */
+  retryLastTurn: () => Promise<void>;
   cancelStream: () => void;
   resetConversation: () => void;
 }
@@ -74,7 +92,12 @@ export function useChat(options?: UseChatOptions): UseChatResult {
   const [error, setError] = useState<string | null>(null);
   const [upsell, setUpsell] = useState<PlanGateError | null>(null);
   const abortRef = useRef<AbortController | null>(null);
-  const historyLoadedRef = useRef(false);
+  // What ``retryLastTurn`` re-sends: the message and the scope it went
+  // out on, so a retry from a system page does not fall back to the
+  // general coach.
+  const lastTurnRef = useRef<{ content: string; systemKey: string | null } | null>(
+    null,
+  );
 
   const systemKey = options?.systemKey;
 
@@ -87,15 +110,17 @@ export function useChat(options?: UseChatOptions): UseChatResult {
     };
   }, []);
 
-  // Load persisted chat history on mount.  Only runs once per hook
-  // instance (guarded by historyLoadedRef).  The systemKey is passed
-  // explicitly rather than using the dependency array so a `null`
-  // key still triggers history load (all messages).
+  // Load persisted chat history when the scope is known, and again if it
+  // changes.  The `cancelled` flag is the only guard: a ref that latched
+  // on the first run and was never reset in cleanup made this effect
+  // unrunnable a second time, which under StrictMode meant the run that
+  // was allowed to set state was the one that had already been cancelled
+  // history arrived, nothing rendered, and the loading state never
+  // cleared (issue #313).  Dropping the ref costs one extra fetch per
+  // StrictMode mount in dev and nothing at all in production.
   useEffect(() => {
-    if (historyLoadedRef.current) return;
     // `systemKey` can be explicitly `undefined` to skip loading.
     if (systemKey === undefined) return;
-    historyLoadedRef.current = true;
 
     let cancelled = false;
     setIsLoadingHistory(true);
@@ -133,9 +158,10 @@ export function useChat(options?: UseChatOptions): UseChatResult {
     setError(null);
     setUpsell(null);
     setIsStreaming(false);
-    // Do NOT reset historyLoadedRef — a reset starts a fresh
-    // conversation, not a fresh session.  The user clicked "New
-    // conversation" intentionally.
+    // History is not reloaded: a reset starts a fresh conversation, not a
+    // fresh session.  The user clicked "New conversation" deliberately,
+    // and the effect above only re-runs on a scope change.
+    lastTurnRef.current = null;
   }, []);
 
   const sendMessage = useCallback(
@@ -165,12 +191,14 @@ export function useChat(options?: UseChatOptions): UseChatResult {
       // bubble the typing indicator will anchor to.
       setMessages((prev) => [...prev, userMessage, assistantPlaceholder]);
       setIsStreaming(true);
+      lastTurnRef.current = { content: trimmed, systemKey };
 
       const controller = new AbortController();
       abortRef.current = controller;
 
       let accumulated = "";
       let aborted = false;
+      let interrupted = false;
       try {
         for await (const chunk of streamChat(
           { message: trimmed, system_key: systemKey },
@@ -198,6 +226,12 @@ export function useChat(options?: UseChatOptions): UseChatResult {
           // empty assistant bubble goes away the same as on an error.
           setUpsell(err.gate);
           setMessages((prev) => prev.filter((m) => m.id !== assistantId));
+        } else if (err instanceof ChatInterruptedError) {
+          // The stream closed without its done sentinel.  Nothing here
+          // failed as such: what arrived is real, and what is missing is
+          // the rest of it.  That reads as a note on the bubble rather
+          // than a red banner across the conversation.
+          interrupted = true;
         } else {
           let message = "Something went wrong. Please try again.";
           if (err instanceof ChatError) {
@@ -212,10 +246,17 @@ export function useChat(options?: UseChatOptions): UseChatResult {
             message = err.message;
           }
           setError(message);
-          // Remove the empty assistant placeholder so the error banner
-          // isn't accompanied by a dangling blank bubble.  Keep the
-          // user message so they can see what they sent.
-          setMessages((prev) => prev.filter((m) => m.id !== assistantId));
+          if (accumulated.length > 0) {
+            // A fault mid-reply. The text already on screen is the
+            // user's to keep: evicting it traded a mostly-good answer
+            // for a banner, which is strictly less than they had.
+            interrupted = true;
+          } else {
+            // Nothing arrived, so the placeholder is an empty bubble
+            // next to the banner. Keep the user message so they can see
+            // what they sent.
+            setMessages((prev) => prev.filter((m) => m.id !== assistantId));
+          }
         }
       } finally {
         if (abortRef.current === controller) {
@@ -227,10 +268,23 @@ export function useChat(options?: UseChatOptions): UseChatResult {
           // assistant bubble so the UI doesn't show a stray placeholder.
           setMessages((prev) => prev.filter((m) => m.id !== assistantId));
         }
+        if (interrupted) {
+          setMessages((prev) =>
+            prev.map((m) =>
+              m.id === assistantId ? { ...m, interrupted: true } : m,
+            ),
+          );
+        }
       }
     },
     [isStreaming],
   );
+
+  const retryLastTurn = useCallback(async (): Promise<void> => {
+    const last = lastTurnRef.current;
+    if (!last) return;
+    await sendMessage(last.content, last.systemKey);
+  }, [sendMessage]);
 
   return {
     messages,
@@ -239,6 +293,7 @@ export function useChat(options?: UseChatOptions): UseChatResult {
     error,
     upsell,
     sendMessage,
+    retryLastTurn,
     cancelStream,
     resetConversation,
   };

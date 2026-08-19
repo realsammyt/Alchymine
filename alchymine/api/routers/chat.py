@@ -57,6 +57,7 @@ number.  Ordinary traffic is refused exactly as it was.
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import re
 import time
@@ -76,10 +77,11 @@ from alchymine.agents.quality.ethics_check import (
     check_text,
 )
 from alchymine.api.auth import Account, get_current_account, get_current_user
-from alchymine.api.deps import get_db_session
+from alchymine.api.deps import get_db_engine, get_db_session
 from alchymine.api.entitlements import require_chat
 from alchymine.config import get_settings
 from alchymine.db import repository
+from alchymine.db.base import get_async_session_factory
 from alchymine.db.usage_counters import CostCeilingExceeded
 from alchymine.engine.healing.crisis import CrisisResponse, CrisisSeverity, detect_crisis
 from alchymine.llm.attribution import set_request_id
@@ -400,13 +402,14 @@ _CRISIS_CLOSING_GENERAL = "I'll be here when you want to come back to the rest o
 
 
 def _crisis_frames(crisis: CrisisResponse, system_key: str | None) -> list[str]:
-    """Render the crisis response as one line per SSE ``data:`` frame.
+    """Render the crisis response as one part per SSE event.
 
-    One line per frame, one frame per event, and the client concatenates
-    the values it receives.  So the copy is written to read as continuous
-    prose rather than as a list.  The model path frames differently
-    because it has to carry whatever the model wrote (see
-    ``_sse_data_frame``); this copy is ours and holds no newlines.
+    One part per frame, and the client concatenates the values it
+    receives.  So the copy is written to read as continuous prose rather
+    than as a list, and the caller supplies the single space between
+    parts.  Framing goes through ``_sse_data_frame`` the same as the
+    model path: this copy holds no newlines today, and the shared helper
+    is what keeps that from being load-bearing.
 
     Only the opening and closing lines vary by scope.  The resources and
     the disclaimer come from ``engine/healing/crisis`` and are the same
@@ -521,6 +524,170 @@ _SSE_HEADERS = {
 }
 
 
+# Assistant writes that outlived the request that started them.  A
+# cancelled caller lets its write finish in the background, and the set
+# keeps a reference so the loop cannot garbage-collect a task mid-flight.
+# Shutdown and tests drain it through ``flush_pending_reply_writes``.
+_pending_reply_writes: set[asyncio.Task[None]] = set()
+
+
+def _on_reply_write_done(task: asyncio.Task[None]) -> None:
+    """Retire a detached write and make its failure audible.
+
+    On the disconnect path nobody is left waiting on this task, so an
+    exception here would otherwise surface as an unretrieved-task warning
+    at some later garbage collection and name neither the user nor the
+    turn.
+    """
+    _pending_reply_writes.discard(task)
+    if task.cancelled():
+        return
+    exc = task.exception()
+    if exc is not None:
+        logger.error("A delivered chat reply could not be persisted: %s", exc)
+
+
+async def flush_pending_reply_writes() -> None:
+    """Wait for every detached assistant write to finish.
+
+    For shutdown and for tests.  A write that outlived its cancelled
+    caller is still in flight, and dropping it on the way out would lose
+    exactly the reply this design went out of its way to keep.
+    """
+    while _pending_reply_writes:
+        await asyncio.gather(*list(_pending_reply_writes), return_exceptions=True)
+
+
+async def _write_reply(
+    session: AsyncSession,
+    *,
+    user_id: str,
+    content: str,
+    system_key: str | None,
+) -> None:
+    """INSERT one assistant row and commit it."""
+    await repository.save_chat_message(
+        session,
+        user_id=user_id,
+        role="assistant",
+        content=content,
+        system_key=system_key,
+        # Nobody reads the row back, and the refresh is a second round
+        # trip that fails outright once the task is being cancelled,
+        # taking the reply with it.
+        refresh=False,
+    )
+    await session.commit()
+
+
+async def _write_reply_detached(
+    *,
+    user_id: str,
+    content: str,
+    system_key: str | None,
+) -> None:
+    """Write the reply on a session of our own, in a task cancellation cannot reach.
+
+    A separate task does not inherit the caller's cancellation, and
+    ``shield`` means an unwinding caller lets the write finish in the
+    background rather than taking it down.  The session is ours rather
+    than the request's for the same reason: the request-scoped one is
+    mid-teardown by the time this runs, which is what made the inline
+    attempt fail.  Mirrors ``llm/ledger._write_detached``.
+    """
+
+    async def _write() -> None:
+        factory = get_async_session_factory(get_db_engine())
+        async with factory() as own_session:
+            await _write_reply(
+                own_session,
+                user_id=user_id,
+                content=content,
+                system_key=system_key,
+            )
+
+    task = asyncio.get_running_loop().create_task(_write())
+    _pending_reply_writes.add(task)
+    task.add_done_callback(_on_reply_write_done)
+    await asyncio.shield(task)
+
+
+async def _persist_assistant_reply(
+    *,
+    session: AsyncSession,
+    user_id: str,
+    content: str,
+    system_key: str | None,
+) -> None:
+    """Write the assistant half of one chat turn.  Raises nothing of its own.
+
+    Called from the ``finally`` of both stream generators, which is the
+    only place either of them writes this row.  Being in a ``finally`` is
+    the whole point: it runs on normal completion, on a reader who closed
+    the tab (``GeneratorExit`` thrown at the suspended ``yield``), and on
+    a cancelled request task.  A write placed after the streaming block
+    instead is skipped on both of the latter, and a reply the user
+    already read goes missing from their history with nothing to say so
+    (issue #297).
+
+    ``GeneratorExit`` and ``CancelledError`` are ``BaseException``, so
+    they walk straight past an ``except Exception`` net.  The nets here
+    are deliberately wide for that reason, and a cancellation caught on
+    the way through is re-raised at the end, after the write has been
+    attempted, because swallowing cancellation breaks the shutdown of
+    whoever asked for it.
+
+    Two attempts, because the disconnect case cannot use the first one.
+    Starlette runs the response inside an anyio task group and cancels it
+    when the socket drops; a cancelled scope re-raises at every await, so
+    the request-scoped session cannot finish a write any more and its
+    transaction is already broken.  The retry therefore goes out detached,
+    on a session of our own.  The ordinary path never reaches it and keeps
+    the single connection it always had.
+
+    Nothing here logs message content.  Chat text is user data, and a
+    transcript outage is not a reason to turn one into a disclosure.
+    """
+    cancelled: BaseException | None = None
+
+    try:
+        await _write_reply(session, user_id=user_id, content=content, system_key=system_key)
+        return
+    except asyncio.CancelledError as exc:
+        cancelled = exc
+    except Exception:
+        logger.warning(
+            "Chat reply for user %s did not persist on the request session "
+            "(%d chars, scope=%s), retrying detached",
+            user_id,
+            len(content),
+            system_key,
+            exc_info=True,
+        )
+        try:
+            await session.rollback()
+        except Exception:
+            logger.debug("Rollback after a failed chat persist also failed", exc_info=True)
+
+    try:
+        await _write_reply_detached(user_id=user_id, content=content, system_key=system_key)
+    except asyncio.CancelledError as exc:
+        # The detached write is already running and finishes on its own.
+        cancelled = cancelled or exc
+    except Exception:
+        # Loud: the user is looking at a reply that is not in their
+        # history, and only this line says so.  Counts, never content.
+        logger.exception(
+            "Chat reply for user %s was delivered but not persisted (%d chars, scope=%s)",
+            user_id,
+            len(content),
+            system_key,
+        )
+
+    if cancelled is not None:
+        raise cancelled
+
+
 async def _chat_event_stream(
     *,
     user_id: str,
@@ -531,9 +698,10 @@ async def _chat_event_stream(
 ) -> AsyncGenerator[str, None]:
     """Stream LLM reply chunks as SSE ``data:`` frames.
 
-    Persists the user message before streaming starts and the full
-    assistant message after the stream completes.  Each LLM chunk is
-    additionally checked against the safety patterns; the stream is
+    Persists the user message before streaming starts and the assistant
+    message on every way out of the streaming block, completion and
+    disconnect alike (see ``_persist_assistant_reply``).  Each LLM chunk
+    is additionally checked against the safety patterns; the stream is
     truncated and a sentinel emitted if blocked content is detected
     in the model's output.
 
@@ -586,6 +754,13 @@ async def _chat_event_stream(
     full_reply: list[str] = []
     blocked = False
     unavailable = False
+    # Distinguishes "the turn reached an end state" from "the reader left
+    # before it did".  An empty reply that finished is a turn that
+    # happened and belongs in the transcript; an empty one that was torn
+    # down is not a message, and writing it would seed every abandoned
+    # turn with a blank assistant bubble.  True until something says
+    # otherwise, and only a disconnect does.
+    finished = True
 
     try:
         chunk_count = 0
@@ -650,24 +825,32 @@ async def _chat_event_stream(
     except Exception as exc:  # pragma: no cover - defensive
         logger.exception("Chat streaming failed: %s", exc)
         yield "event: error\ndata: Streaming failed\n\n"
-
-    # Persist the assistant message even when truncated — the partial
-    # reply (or the empty string) is part of the conversation history.
-    # Skip persistence entirely when running in ephemeral mode.
-    if not ephemeral:
+    except BaseException:
+        # The reader is gone: ``GeneratorExit`` from a closed tab, or
+        # ``CancelledError`` when uvicorn cancels the request task.
+        # Neither is caught by the net above, and neither leaves an end
+        # state behind, but whatever already reached the screen is still
+        # real, so the ``finally`` below keeps it before this continues
+        # unwinding.
+        finished = False
+        raise
+    finally:
+        # Persist the assistant message even when truncated. The partial
+        # reply is part of the conversation history.  Skip persistence
+        # entirely when running in ephemeral mode, and skip an empty reply
+        # that never finished: there is no message in it to keep.
         assistant_text = "".join(full_reply)
         if blocked:
             assistant_text = "[response blocked by safety filter]"
         elif unavailable:
             assistant_text = "[assistant temporarily unavailable]"
-        await repository.save_chat_message(
-            session,
-            user_id=user_id,
-            role="assistant",
-            content=assistant_text,
-            system_key=system_key,
-        )
-        await session.commit()
+        if not ephemeral and (assistant_text or finished):
+            await _persist_assistant_reply(
+                session=session,
+                user_id=user_id,
+                content=assistant_text,
+                system_key=system_key,
+            )
 
     yield "event: done\ndata: \n\n"
 
@@ -694,7 +877,9 @@ async def _crisis_event_stream(
     one that keeps it, and the user message is committed *before* the
     first frame goes out for exactly that reason: a client that closes
     the tab mid-stream would otherwise roll the whole turn back, which
-    is the case where keeping it matters most.
+    is the case where keeping it matters most.  Both halves are covered
+    now: the assistant write sits in a ``finally`` so the same closed
+    tab cannot take the answer with it either (issue #297).
     """
     logger.info("Crisis gate engaged (scope=%s, severity=%s)", system_key, crisis.severity)
 
@@ -713,20 +898,31 @@ async def _crisis_event_stream(
         )
         await session.commit()
 
-    for part in frames:
-        # Trailing space: the client concatenates data values without a
-        # separator of its own, and this copy runs as continuous prose.
-        yield f"data: {part} \n\n"
-
-    if not ephemeral:
-        await repository.save_chat_message(
-            session,
-            user_id=user_id,
-            role="assistant",
-            content=reply,
-            system_key=system_key,
-        )
-        await session.commit()
+    try:
+        for index, part in enumerate(frames):
+            # Framed by the same helper the model path uses.  This copy
+            # holds no newlines today, but nothing enforced that, and a
+            # raw ``data:`` line truncates at the first one, which here
+            # would mean half a hotline number.  Defence in depth on the
+            # highest-stakes content in the app (issue #297).
+            #
+            # The leading space carries the separator the client would
+            # otherwise not have: it concatenates data values with nothing
+            # between them, and this copy runs as continuous prose.  It
+            # rides on the payload rather than the framing so the stream
+            # assembles to exactly the text ``reply`` persists.
+            yield _sse_data_frame(part if index == 0 else f" {part}")
+    finally:
+        # Unlike the model path there is nothing partial to weigh up: the
+        # reply is ours and complete before the first frame leaves, so a
+        # reader who closes the tab still gets the turn recorded whole.
+        if not ephemeral:
+            await _persist_assistant_reply(
+                session=session,
+                user_id=user_id,
+                content=reply,
+                system_key=system_key,
+            )
 
     yield "event: done\ndata: \n\n"
 

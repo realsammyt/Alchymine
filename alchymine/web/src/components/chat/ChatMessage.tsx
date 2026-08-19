@@ -8,6 +8,16 @@
  * ``react-markdown`` so bold/italic/lists/code render correctly.  The
  * root element uses ``role="listitem"`` so ``ChatMessageList`` can
  * wrap us in a ``role="list"`` for assistive tech.
+ *
+ * A reply whose stream ended without the server's done sentinel carries
+ * ``interrupted`` (issue #297).  It gets a note under the text and, when
+ * the caller supplies ``onRetry``, a way to ask again.  Deliberately a
+ * ``status`` rather than an ``alert``: nothing is broken and the text
+ * above it is still worth reading, so it announces politely instead of
+ * cutting in.  Red here would train people to discount the red that
+ * matters.
+ *
+ * DRAFT copy, awaiting Tyler's sign-off.
  */
 
 import Markdown from "react-markdown";
@@ -18,11 +28,21 @@ interface Props {
   message: ChatMessageType;
   /** Show an animated caret at the end of the bubble (typing cue). */
   isStreaming?: boolean;
+  /**
+   * Send the last turn again.  Supplied only for the newest assistant
+   * message: a retry re-sends the most recent question, so offering it
+   * on an older bubble would answer something other than what it sits
+   * under.
+   */
+  onRetry?: () => void;
 }
 
-export default function ChatMessage({ message, isStreaming }: Props) {
+const INTERRUPTED_NOTE = "This reply may be incomplete. The connection ended before it finished.";
+
+export default function ChatMessage({ message, isStreaming, onRetry }: Props) {
   const isUser = message.role === "user";
   const ariaLabel = isUser ? "You said" : "Growth Assistant replied";
+  const showInterrupted = !isUser && message.interrupted === true;
 
   return (
     <div
@@ -55,6 +75,23 @@ export default function ChatMessage({ message, isStreaming }: Props) {
             aria-hidden
             className="ml-1 inline-block h-3.5 w-1.5 animate-pulse rounded-sm bg-primary/60 align-middle"
           />
+        )}
+        {showInterrupted && (
+          <div
+            role="status"
+            className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-yellow-700/30 pt-2 text-xs font-body text-yellow-200/90"
+          >
+            <span>{INTERRUPTED_NOTE}</span>
+            {onRetry && (
+              <button
+                type="button"
+                onClick={onRetry}
+                className="rounded-md px-1.5 py-0.5 font-medium text-yellow-100 underline underline-offset-2 transition-colors hover:bg-yellow-500/10 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-yellow-300 focus-visible:ring-offset-2 focus-visible:ring-offset-surface"
+              >
+                Ask again
+              </button>
+            )}
+          </div>
         )}
       </div>
     </div>

@@ -13,6 +13,9 @@ export interface ApiState<T> {
   refetch: () => void;
 }
 
+/** How many times an aborted final attempt is retried on its own. */
+const MAX_ABORT_RETRIES = 1;
+
 /**
  * Hook for fetching data from the API with loading/error handling.
  *
@@ -20,6 +23,16 @@ export interface ApiState<T> {
  * cleans up (deps change or component unmounts).  Pass this signal
  * through to `fetch()` calls to cancel in-flight requests and prevent
  * race conditions.
+ *
+ * An aborted attempt writes no state, which is right when a newer
+ * attempt has taken over and wrong when there is no newer attempt: the
+ * hook would sit at `loading: true` with nothing left to move it, and
+ * `ApiStateView`'s retry button only exists on the error branch, so
+ * there is no way out by hand either.  That strand is what left /journey
+ * spinning and the practice nudge invisible on a first visit (issue
+ * #313).  So an abort that is still the current attempt, on a mounted
+ * component, buys one automatic retry.  It is bounded deliberately: a
+ * service having a bad day should meet one more request, not a loop.
  *
  * @param fetcher - Async function that returns the data (receives AbortSignal)
  * @param deps - Dependency array (re-fetches when deps change)
@@ -32,8 +45,22 @@ export function useApi<T>(
   const [loading, setLoading] = useState(!!fetcher);
   const [error, setError] = useState<string | null>(null);
   const [trigger, setTrigger] = useState(0);
+  // The attempt currently in flight, so a late rejection can tell "I was
+  // replaced" from "I am all there is".
+  const currentControllerRef = useRef<AbortController | null>(null);
+  const mountedRef = useRef(true);
+  const abortRetriesRef = useRef(0);
 
   const refetch = useCallback(() => setTrigger((n) => n + 1), []);
+
+  // Declared first so its cleanup runs before the fetch effect's, and a
+  // real unmount is already recorded by the time the abort below fires.
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
 
   useEffect(() => {
     if (!fetcher) {
@@ -42,18 +69,40 @@ export function useApi<T>(
     }
 
     const controller = new AbortController();
+    currentControllerRef.current = controller;
     setLoading(true);
     setError(null);
+
+    const settled = () => {
+      abortRetriesRef.current = 0;
+    };
+
+    /** Nothing newer has started, and there is still someone to show it to. */
+    const isStranded = () =>
+      mountedRef.current && currentControllerRef.current === controller;
 
     fetcher(controller.signal)
       .then((result) => {
         if (!controller.signal.aborted) {
+          settled();
           setData(result);
           setLoading(false);
+          return;
+        }
+        if (isStranded() && abortRetriesRef.current < MAX_ABORT_RETRIES) {
+          abortRetriesRef.current += 1;
+          setTrigger((n) => n + 1);
         }
       })
       .catch((err) => {
-        if (controller.signal.aborted) return;
+        if (controller.signal.aborted) {
+          if (isStranded() && abortRetriesRef.current < MAX_ABORT_RETRIES) {
+            abortRetriesRef.current += 1;
+            setTrigger((n) => n + 1);
+          }
+          return;
+        }
+        settled();
         setError(err instanceof Error ? err.message : "An error occurred");
         setLoading(false);
       });

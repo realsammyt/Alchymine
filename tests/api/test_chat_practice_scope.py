@@ -302,12 +302,18 @@ class TestCrisisGate:
 
         assert env.chat_messages() == []
 
-    def test_the_user_message_survives_a_disconnect(self, env: _Env) -> None:
+    def test_the_whole_turn_survives_a_disconnect(self, env: _Env) -> None:
         """The turn is committed before the first frame, not after the last.
 
         Somebody who closes the tab a second after typing this is the
         likeliest reader of all, and deferring the commit to the end of
         the stream would roll their message back precisely then.
+
+        The assistant half used to be the casualty instead: its write sat
+        after the frame loop, outside any ``try``, so the ``GeneratorExit``
+        below walked straight past it and the transcript kept the
+        disclosure with no resources under it.  Both halves survive now
+        (issue #297); the write moved into a ``finally``.
         """
 
         async def _abandon_after_first_frame() -> None:
@@ -327,15 +333,16 @@ class TestCrisisGate:
                 )
                 first = await stream.__anext__()
                 assert first.startswith("data: ")
-                # The client goes away. GeneratorExit, nothing after this
-                # point in the generator runs.
+                # The client goes away: GeneratorExit at the suspended
+                # yield. Only the generator's ``finally`` runs after this.
                 await stream.aclose()
 
         env.run(_abandon_after_first_frame())
 
         messages = env.chat_messages()
-        assert [m.role for m in messages] == ["user"]
+        assert [m.role for m in messages] == ["user", "assistant"]
         assert messages[0].content == EMERGENCY_MESSAGE
+        assert "988" in messages[1].content
 
 
 class TestKillSwitch:

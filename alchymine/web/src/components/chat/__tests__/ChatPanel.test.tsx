@@ -29,6 +29,7 @@ type UseChatValue = {
   error: string | null;
   upsell: PlanGateError | null;
   sendMessage: jest.Mock;
+  retryLastTurn: jest.Mock;
   cancelStream: jest.Mock;
   resetConversation: jest.Mock;
 };
@@ -51,6 +52,7 @@ function defaults(overrides: Partial<UseChatValue> = {}): UseChatValue {
     error: null,
     upsell: null,
     sendMessage: jest.fn(),
+    retryLastTurn: jest.fn(),
     cancelStream: jest.fn(),
     resetConversation: jest.fn(),
     ...overrides,
@@ -256,5 +258,104 @@ describe("ChatPanel", () => {
 
       expect(screen.getByRole("alert")).toHaveTextContent("Streaming failed");
     });
+  });
+});
+
+/**
+ * Issue #297. A reply that lost its connection used to render exactly
+ * like a finished one. The bubble now says so where the text is, quietly
+ * enough that it does not read as a fault, and offers the one thing that
+ * helps: asking again.
+ */
+describe("ChatPanel interrupted replies", () => {
+  const cutOff: ChatMessage[] = [
+    { id: "u1", role: "user", content: "What next?", createdAt: "2026-08-19T10:00:00Z" },
+    {
+      id: "a1",
+      role: "assistant",
+      content: "Start by",
+      createdAt: "2026-08-19T10:00:01Z",
+      interrupted: true,
+    },
+  ];
+
+  it("says the reply may be incomplete", () => {
+    useChatMock.mockReturnValue(defaults({ messages: cutOff }));
+    render(<ChatPanel systemKey={null} />);
+
+    expect(screen.getByText(/may be incomplete/i)).toBeInTheDocument();
+  });
+
+  it("reads as a status rather than an alert", () => {
+    // Nothing is broken and nobody needs interrupting: the connection
+    // ended, and the text on screen is still the user's to read.
+    useChatMock.mockReturnValue(defaults({ messages: cutOff }));
+    render(<ChatPanel systemKey={null} />);
+
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    expect(screen.getByRole("status")).toHaveTextContent(/may be incomplete/i);
+  });
+
+  it("offers to ask again, and asks again when clicked", () => {
+    const retryLastTurn = jest.fn();
+    useChatMock.mockReturnValue(defaults({ messages: cutOff, retryLastTurn }));
+    render(<ChatPanel systemKey={null} />);
+
+    fireEvent.click(screen.getByRole("button", { name: /ask again/i }));
+
+    expect(retryLastTurn).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps the partial text on screen", () => {
+    useChatMock.mockReturnValue(defaults({ messages: cutOff }));
+    render(<ChatPanel systemKey={null} />);
+
+    expect(screen.getByTestId("md")).toHaveTextContent("Start by");
+  });
+
+  it("says nothing about a reply that finished", () => {
+    useChatMock.mockReturnValue(
+      defaults({
+        messages: [
+          { ...cutOff[0] },
+          { ...cutOff[1], content: "Start by breathing.", interrupted: false },
+        ],
+      }),
+    );
+    render(<ChatPanel systemKey={null} />);
+
+    expect(screen.queryByText(/may be incomplete/i)).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /ask again/i })).not.toBeInTheDocument();
+  });
+
+  it("offers the retry on the newest reply only", () => {
+    // Retrying re-sends the *last* message, so offering the button on an
+    // older bubble would answer a different question than the one it sits
+    // under. The note stays; only the affordance is scoped.
+    useChatMock.mockReturnValue(
+      defaults({
+        messages: [
+          ...cutOff,
+          { id: "u2", role: "user", content: "And then?", createdAt: "2026-08-19T10:01:00Z" },
+          {
+            id: "a2",
+            role: "assistant",
+            content: "Then rest.",
+            createdAt: "2026-08-19T10:01:01Z",
+          },
+        ],
+      }),
+    );
+    render(<ChatPanel systemKey={null} />);
+
+    expect(screen.getByText(/may be incomplete/i)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /ask again/i })).not.toBeInTheDocument();
+  });
+
+  it("hides the retry while another reply is streaming", () => {
+    useChatMock.mockReturnValue(defaults({ messages: cutOff, isStreaming: true }));
+    render(<ChatPanel systemKey={null} />);
+
+    expect(screen.queryByRole("button", { name: /ask again/i })).not.toBeInTheDocument();
   });
 });

@@ -12,7 +12,7 @@
  * assertions are about the parser rather than about the hook above it.
  */
 
-import { ChatError, streamChat } from "../chat";
+import { ChatError, ChatInterruptedError, streamChat } from "../chat";
 
 /**
  * A `Response` whose body reads back *frames* in order, one network read
@@ -36,11 +36,28 @@ function sseResponse(frames: string[]): Response {
   } as unknown as Response;
 }
 
+/**
+ * How the last `collect` finished. A scripted stream that stops without
+ * `event: done` is an interrupted one, and `streamChat` now says so by
+ * throwing once it has handed over everything that did arrive. The
+ * framing tests below are about the parser rather than about that
+ * signal, so `collect` absorbs it and records it here instead of making
+ * every one of them catch.
+ */
+let lastOutcome: "done" | "interrupted" | null = null;
+
 async function collect(frames: string[]): Promise<string[]> {
   global.fetch = jest.fn().mockResolvedValue(sseResponse(frames));
   const chunks: string[] = [];
-  for await (const chunk of streamChat({ message: "hi", system_key: null })) {
-    chunks.push(chunk);
+  lastOutcome = null;
+  try {
+    for await (const chunk of streamChat({ message: "hi", system_key: null })) {
+      chunks.push(chunk);
+    }
+    lastOutcome = "done";
+  } catch (err) {
+    if (!(err instanceof ChatInterruptedError)) throw err;
+    lastOutcome = "interrupted";
   }
   return chunks;
 }
@@ -179,5 +196,53 @@ describe("streamChat control frames", () => {
     const wire = "event: ping\ndata: x\n\ndata: y\n\n";
 
     expect(await collect([wire])).toEqual(["x", "y"]);
+  });
+});
+
+/**
+ * Issue #297. The done sentinel is the only thing that distinguishes a
+ * finished reply from a truncated one, and the transport used to keep
+ * that to itself: a connection that closed mid-reply produced the same
+ * clean generator return as a completed one, so the UI above rendered a
+ * confident-looking answer that was missing its end.
+ */
+describe("streamChat interruption signal", () => {
+  it("reports a clean finish when the done sentinel arrives", async () => {
+    await collect(["data: whole\n\nevent: done\ndata: \n\n"]);
+
+    expect(lastOutcome).toBe("done");
+  });
+
+  it("throws ChatInterruptedError when the stream ends without the sentinel", async () => {
+    const chunks = await collect(["data: half a rep\n\n"]);
+
+    expect(chunks).toEqual(["half a rep"]);
+    expect(lastOutcome).toBe("interrupted");
+  });
+
+  it("hands over the unterminated tail before it throws", async () => {
+    // The order matters: signalling first would cost the caller the very
+    // text the signal is about.
+    const chunks = await collect(["data: kept\n\ndata: tail\n"]);
+
+    expect(chunks).toEqual(["kept", "tail"]);
+    expect(lastOutcome).toBe("interrupted");
+  });
+
+  it("is a ChatError, so existing handling still catches it", async () => {
+    global.fetch = jest.fn().mockResolvedValue(sseResponse(["data: partial\n\n"]));
+
+    const iterator = streamChat({ message: "hi", system_key: null });
+    await iterator.next();
+    const thrown = await iterator.next().catch((e) => e);
+
+    expect(thrown).toBeInstanceOf(ChatInterruptedError);
+    expect(thrown).toBeInstanceOf(ChatError);
+  });
+
+  it("does not fire for a stream that carried nothing but a sentinel", async () => {
+    await collect(["event: done\ndata: \n\n"]);
+
+    expect(lastOutcome).toBe("done");
   });
 });
