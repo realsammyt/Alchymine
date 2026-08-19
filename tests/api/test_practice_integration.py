@@ -21,6 +21,7 @@ otherwise ship:
 from __future__ import annotations
 
 import asyncio
+import os
 from collections.abc import AsyncGenerator, Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass
@@ -41,6 +42,7 @@ import alchymine.db.models  # noqa: F401 — register models with metadata
 from alchymine.api.auth import get_current_user
 from alchymine.api.deps import get_db_session
 from alchymine.api.main import app
+from alchymine.config import get_settings
 from alchymine.db import repository
 from alchymine.db.base import Base
 
@@ -567,6 +569,121 @@ class TestIdempotency:
         owners = env.query("SELECT DISTINCT user_id FROM integration_entries ORDER BY user_id")
         assert len(owners) == 2
         assert env.query("SELECT count(*) FROM integration_entries")[0][0] == 2
+
+
+# ─── The total note cap ─────────────────────────────────────────────────
+
+
+@contextmanager
+def small_note_cap(cap: int = 40) -> Iterator[None]:
+    """Shrink the merged-note ceiling for the duration of a block.
+
+    The shipped default is 20000 characters, which would take four
+    max-size posts to reach. The behaviour under the cap is the same at
+    any size, so the tests move the cap rather than the volume.
+    """
+    original = os.environ.get("INTEGRATION_NOTE_TOTAL_CHAR_CAP")
+    os.environ["INTEGRATION_NOTE_TOTAL_CHAR_CAP"] = str(cap)
+    get_settings.cache_clear()
+    try:
+        yield
+    finally:
+        if original is None:
+            os.environ.pop("INTEGRATION_NOTE_TOTAL_CHAR_CAP", None)
+        else:
+            os.environ["INTEGRATION_NOTE_TOTAL_CHAR_CAP"] = original
+        get_settings.cache_clear()
+
+
+class TestNoteGrowthCap:
+    """One entry's note accumulates across saves, so it needs a ceiling.
+
+    The ceiling refuses rather than truncates. Half a sentence stored
+    under the user's own name, with no sign that the rest was dropped,
+    is worse than a save that plainly did not land.
+    """
+
+    def test_a_note_that_would_pass_the_cap_is_refused(self, env: Env) -> None:
+        log_id = _log_practice(env.client)
+        with small_note_cap(40):
+            assert _integrate(env.client, practice_log_id=log_id, note="a" * 30).status_code == 201
+            response = _integrate(env.client, practice_log_id=log_id, note="b" * 30)
+
+        assert response.status_code == 422
+
+    def test_the_refusal_leaves_the_earlier_note_intact(self, env: Env) -> None:
+        log_id = _log_practice(env.client)
+        with small_note_cap(40):
+            _integrate(env.client, practice_log_id=log_id, note="a" * 30)
+            _integrate(env.client, practice_log_id=log_id, note="b" * 30)
+            body = _integrate(env.client, practice_log_id=log_id, capacity_delta=1).json()
+
+        assert body["note"] == "a" * 30
+
+    def test_the_refusal_writes_nothing(self, env: Env) -> None:
+        log_id = _log_practice(env.client)
+        with small_note_cap(40):
+            _integrate(env.client, practice_log_id=log_id, note="a" * 30)
+            _integrate(env.client, practice_log_id=log_id, capacity_delta=2, note="b" * 30)
+            body = _integrate(env.client, practice_log_id=log_id).json()
+
+        assert body["capacity_delta"] is None
+        assert env.query("SELECT count(*) FROM outcome_metrics")[0][0] == 1
+
+    def test_the_refusal_says_what_happened_without_a_traceback(self, env: Env) -> None:
+        log_id = _log_practice(env.client)
+        with small_note_cap(40):
+            _integrate(env.client, practice_log_id=log_id, note="a" * 30)
+            response = _integrate(env.client, practice_log_id=log_id, note="b" * 30)
+
+        detail = response.json()["detail"]
+        assert "full" in detail.lower()
+        assert "Traceback" not in response.text
+        assert "IntegrationNoteFull" not in response.text
+
+    def test_the_refused_text_is_not_echoed_back(self, env: Env) -> None:
+        """Nothing is gained by repeating it, and it travels into logs."""
+        log_id = _log_practice(env.client)
+        refused = "something I would rather not see in a log line"
+        with small_note_cap(40):
+            _integrate(env.client, practice_log_id=log_id, note="a" * 30)
+            response = _integrate(env.client, practice_log_id=log_id, note=refused)
+
+        assert refused not in response.text
+
+    def test_a_full_entry_still_accepts_a_save_with_no_note(self, env: Env) -> None:
+        log_id = _log_practice(env.client)
+        with small_note_cap(40):
+            _integrate(env.client, practice_log_id=log_id, note="a" * 38)
+            response = _integrate(env.client, practice_log_id=log_id, capacity_delta=1)
+
+        assert response.status_code == 200
+        assert response.json()["capacity_delta"] == 1
+
+    def test_a_full_entry_still_accepts_a_replayed_note(self, env: Env) -> None:
+        """A retry after a timeout adds nothing, so it cannot overflow."""
+        log_id = _log_practice(env.client)
+        note = "a" * 38
+        with small_note_cap(40):
+            _integrate(env.client, practice_log_id=log_id, note=note)
+            response = _integrate(env.client, practice_log_id=log_id, note=note)
+
+        assert response.status_code == 200
+        assert response.json()["note"] == note
+
+    def test_the_shipped_default_leaves_room_for_ordinary_writing(self, env: Env) -> None:
+        """Three max-size posts on one practice fit under the default.
+
+        The fourth is where 20000 runs out, and that is the point: the
+        ceiling is sized for a client looping on a save, not for anyone
+        writing at length about a single practice.
+        """
+        log_id = _log_practice(env.client)
+        for index in range(3):
+            response = _integrate(env.client, practice_log_id=log_id, note=f"{index}{'x' * 4999}")
+            assert response.status_code in (200, 201), response.text
+
+        assert len(_integrate(env.client, practice_log_id=log_id).json()["note"]) == 15004
 
 
 # ─── Encryption ─────────────────────────────────────────────────────────

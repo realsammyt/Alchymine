@@ -752,12 +752,24 @@ async def practice_summary(
     )
 
 
+# DRAFT copy, awaiting Tyler's sign-off. Three things it has to do:
+# say the save did not land, say the earlier writing is safe, and give
+# the user a way to keep what they just typed. It stays quiet about it
+# because a full note is not an emergency, and it never repeats the
+# refused text back, which would only put it somewhere else.
+NOTE_FULL_DETAIL = (
+    "This entry's note is full. Your earlier notes are saved. This new text was not "
+    "added, so copy it somewhere safe if you want to keep it."
+)
+
+
 @router.post(
     "/practice/integration",
     status_code=201,
     response_model=IntegrationResponse,
     responses={
-        200: {"description": "This completion already had an entry, and the save merged into it."}
+        200: {"description": "This completion already had an entry, and the save merged into it."},
+        422: {"description": "The note would pass this entry's total cap, so nothing was written."},
     },
 )
 async def create_integration(
@@ -789,6 +801,11 @@ async def create_integration(
     The derived row goes through the repository rather than
     ``POST /outcomes/activity``: that path drops its metadata, writes
     process-global dicts, and takes a client-supplied ``user_id``.
+
+    One entry's note is the merge of every save against that completion,
+    so it carries a total cap on top of the per-request 5000. A note
+    that would pass it answers 422 and writes nothing, rather than
+    storing a truncated version of what the user wrote.
     """
     user_id = current_user["sub"]
 
@@ -802,16 +819,19 @@ async def create_integration(
         if await repository.get_journal_entry_for_user(session, entry_id, user_id) is None:
             raise HTTPException(status_code=404, detail="Journal entry not found")
 
-    stored, created = await repository.upsert_integration_entry(
-        session,
-        user_id=user_id,
-        practice_log_id=log_entry.id,
-        purpose=log_entry.primary_purpose,
-        intention_entry_id=entry.intention_entry_id,
-        reflection_entry_id=entry.reflection_entry_id,
-        capacity_delta=entry.capacity_delta,
-        note=entry.note,
-    )
+    try:
+        stored, created = await repository.upsert_integration_entry(
+            session,
+            user_id=user_id,
+            practice_log_id=log_entry.id,
+            purpose=log_entry.primary_purpose,
+            intention_entry_id=entry.intention_entry_id,
+            reflection_entry_id=entry.reflection_entry_id,
+            capacity_delta=entry.capacity_delta,
+            note=entry.note,
+        )
+    except repository.IntegrationNoteFull as exc:
+        raise HTTPException(status_code=422, detail=NOTE_FULL_DETAIL) from exc
 
     # One row per completion, not one per save. The value is read off
     # the stored row rather than off this request, so the reading stands

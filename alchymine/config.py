@@ -255,6 +255,23 @@ class Settings(BaseSettings):
     # to-do list.
     practice_protocol_default_size: int = 5
 
+    # ── Integration entries ──────────────────────────────────────────────
+    # The ceiling on one integration entry's accumulated note. Each POST
+    # to /practice/integration is capped at 5000 characters by the
+    # request model, but the stored note is the merge of every save
+    # against one completion, so nothing bounded the total. 20000 is a
+    # shade under four max-size posts (the blank line between paragraphs
+    # takes the rest), or dozens of the two-or-three-sentence kind people
+    # actually write, on a single practice. Raise it if real entries come
+    # anywhere near it; the value exists to stop a client looping on a
+    # save, not to ration what anyone writes.
+    #
+    # Passing the cap refuses the save with a 422. It never truncates:
+    # half a sentence stored under the user's own name, with nothing to
+    # say the rest was dropped, is worse than a save that plainly did
+    # not land.
+    integration_note_total_char_cap: int = 20000
+
     # ── Misc ──────────────────────────────────────────────────────────────
     auto_create_tables: bool = False
 

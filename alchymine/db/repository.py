@@ -37,7 +37,7 @@ from datetime import UTC, date, datetime, time
 from typing import Any
 from uuid import NAMESPACE_URL, uuid4, uuid5
 
-from sqlalchemy import and_, func, or_, select
+from sqlalchemy import Select, and_, func, or_, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -1193,7 +1193,34 @@ async def update_ecology_recommendation(
 NOTE_SEPARATOR = "\n\n"
 
 
-def merge_notes(existing: str | None, incoming: str | None) -> str | None:
+class IntegrationNoteFull(Exception):
+    """The entry's stored note has no room left for the incoming text.
+
+    Raised instead of truncating. The note is the user's own writing
+    about their own practice; storing the front half of a sentence under
+    their name, with nothing in the record to say the rest was dropped,
+    is worse than a save that plainly did not land.
+
+    The message carries lengths only. It travels into application logs
+    and into the 422 body, and note content belongs in neither.
+    """
+
+    def __init__(self, *, stored_chars: int, incoming_chars: int, cap: int) -> None:
+        super().__init__(
+            f"integration note would reach {stored_chars + incoming_chars} characters, "
+            f"over the {cap} cap"
+        )
+        self.stored_chars = stored_chars
+        self.incoming_chars = incoming_chars
+        self.cap = cap
+
+
+def merge_notes(
+    existing: str | None,
+    incoming: str | None,
+    *,
+    total_char_cap: int | None = None,
+) -> str | None:
     """Fold *incoming* into *existing* without losing either.
 
     A completed practice offers two prompts, and each can carry a note.
@@ -1201,32 +1228,71 @@ def merge_notes(existing: str | None, incoming: str | None) -> str | None:
     arriving in separate saves, so they are kept as separate paragraphs
     rather than one overwriting the other.
 
-    A note that is already one of those paragraphs is not appended
-    again, which is what makes a save replayed after a timeout read as
-    one note instead of two copies of it.
+    The save is the unit of dedup, not the paragraph. *incoming* is
+    skipped only when it is the whole stored note or the tail of it,
+    which is exactly the shape a replayed save has: whatever the last
+    accepted save appended is still on the end. Two earlier readings of
+    this both came out wrong. Splitting the stored note on blank lines
+    dropped a new single-paragraph note that happened to match something
+    written earlier, and it never matched a replayed multi-paragraph
+    save at all, because the joined string is not one of the pieces.
+
+    *total_char_cap* bounds the merged result. ``None`` means no bound,
+    for callers that have already checked or do not store the result.
+    Passing it raises :class:`IntegrationNoteFull`; a save that appends
+    nothing (empty, or a replay) cannot raise, however full the entry
+    already is.
     """
     trimmed = incoming.strip() if incoming else ""
     if not trimmed:
         return existing
-    if not existing:
-        return trimmed
-    if trimmed in existing.split(NOTE_SEPARATOR):
-        return existing
-    return f"{existing}{NOTE_SEPARATOR}{trimmed}"
+
+    if existing:
+        if trimmed == existing or existing.endswith(f"{NOTE_SEPARATOR}{trimmed}"):
+            return existing
+        merged = f"{existing}{NOTE_SEPARATOR}{trimmed}"
+    else:
+        merged = trimmed
+
+    if total_char_cap is not None and len(merged) > total_char_cap:
+        raise IntegrationNoteFull(
+            stored_chars=len(existing or ""),
+            incoming_chars=len(trimmed),
+            cap=total_char_cap,
+        )
+    return merged
 
 
-async def _get_integration_entry(
-    session: AsyncSession, user_id: str, practice_log_id: str
-) -> IntegrationEntry | None:
-    """The caller's integration entry for one completion, or ``None``.
+def _integration_note_cap() -> int:
+    """The configured ceiling on one entry's accumulated note."""
+    from alchymine.config import get_settings
+
+    return get_settings().integration_note_total_char_cap
+
+
+def integration_entry_select(
+    user_id: str, practice_log_id: str, *, for_update: bool = False
+) -> Select[tuple[IntegrationEntry]]:
+    """The statement behind every read of one completion's entry.
 
     Ordered and limited rather than a bare fetch. The unique key makes
     more than one row impossible going forward, but a database carrying
     duplicates from before it landed would otherwise turn every save on
     an affected practice into a 500. The earliest row wins, matching
     what the cleanup script keeps.
+
+    *for_update* takes the row lock, and every read that leads to a
+    merge asks for it. Without it, two saves arriving after the row
+    exists both read the same starting note, merge separately, and the
+    later flush silently drops the earlier one. Client-side queuing only
+    serializes one mounted card in one tab.
+
+    Built as a statement rather than executed here so the lock is
+    assertable: SQLite compiles ``FOR UPDATE`` away, so no test against
+    the test database can show it, and compiling against the PostgreSQL
+    dialect is the only honest proof that production takes the lock.
     """
-    result = await session.execute(
+    statement = (
         select(IntegrationEntry)
         .where(
             IntegrationEntry.user_id == user_id,
@@ -1235,6 +1301,16 @@ async def _get_integration_entry(
         .order_by(IntegrationEntry.created_at.asc(), IntegrationEntry.id.asc())
         .limit(1)
         .execution_options(populate_existing=True)
+    )
+    return statement.with_for_update() if for_update else statement
+
+
+async def _get_integration_entry(
+    session: AsyncSession, user_id: str, practice_log_id: str, *, for_update: bool = False
+) -> IntegrationEntry | None:
+    """The caller's integration entry for one completion, or ``None``."""
+    result = await session.execute(
+        integration_entry_select(user_id, practice_log_id, for_update=for_update)
     )
     return result.scalars().first()
 
@@ -1268,6 +1344,19 @@ async def upsert_integration_entry(
     - notes accumulate (:func:`merge_notes`) rather than overwrite;
     - the same save replayed changes nothing.
 
+    Both reads take the row lock (:func:`integration_entry_select`),
+    because both lead to a merge: the found-existing path, and the
+    re-select after a concurrent first save won the insert. The merge is
+    read-modify-write in Python rather than an atomic SQL ``UPDATE``
+    because ``note`` is an encrypted column. Its ciphertext is not
+    concatenable or comparable in SQL, so the lock is what makes the
+    read and the write one step.
+
+    A note that would push the merged text past
+    ``integration_note_total_char_cap`` raises
+    :class:`IntegrationNoteFull`. Nothing is written in that case, and
+    nothing already stored is touched.
+
     *purpose* is the practice's, read off the ``practice_log`` row by
     the caller. It is a parameter rather than a lookup here so this
     module keeps having no opinion about the practice registry, and it
@@ -1278,7 +1367,8 @@ async def upsert_integration_entry(
     writes are visible as two calls at the call site rather than hidden
     inside one.
     """
-    entry = await _get_integration_entry(session, user_id, practice_log_id)
+    cap = _integration_note_cap()
+    entry = await _get_integration_entry(session, user_id, practice_log_id, for_update=True)
 
     if entry is None:
         entry_id = str(uuid4())
@@ -1294,7 +1384,7 @@ async def upsert_integration_entry(
                 reflection_entry_id=reflection_entry_id,
                 purpose=purpose,
                 capacity_delta=capacity_delta,
-                note=merge_notes(None, note),
+                note=merge_notes(None, note, total_char_cap=cap),
             )
             .on_conflict_do_nothing(index_elements=["user_id", "practice_log_id"])
         )
@@ -1302,12 +1392,17 @@ async def upsert_integration_entry(
         # from the same user is a merge instead of a 500. Whether this
         # call was the one that inserted is read off the id that came
         # back, which needs no RETURNING and no rowcount.
-        stored = await _get_integration_entry(session, user_id, practice_log_id)
+        stored = await _get_integration_entry(session, user_id, practice_log_id, for_update=True)
         if stored is None:  # pragma: no cover, the row was just written
             raise RuntimeError("integration entry vanished between write and read")
         if stored.id == entry_id:
             return stored, True
         entry = stored
+
+    # The note first, so a refusal happens before anything on this row
+    # is touched. A save that is rejected leaves the entry exactly as it
+    # was, including the capacity reading it happened to carry.
+    merged_note = merge_notes(entry.note, note, total_char_cap=cap)
 
     if intention_entry_id is not None:
         entry.intention_entry_id = intention_entry_id
@@ -1315,7 +1410,7 @@ async def upsert_integration_entry(
         entry.reflection_entry_id = reflection_entry_id
     if capacity_delta is not None:
         entry.capacity_delta = capacity_delta
-    entry.note = merge_notes(entry.note, note)
+    entry.note = merged_note
 
     await session.flush()
     await session.refresh(entry)
