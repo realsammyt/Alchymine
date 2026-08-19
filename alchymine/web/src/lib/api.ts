@@ -1772,6 +1772,68 @@ export async function listPracticePacks(
   return request<PackResponse[]>(`${BASE}/practices/packs`, { signal });
 }
 
+/**
+ * The two stored settings that shape every protocol.
+ *
+ * `active_pack_ids` is `null` when the user has never picked a subset,
+ * meaning every mounted pack. Null is a real value here rather than an
+ * absence, and the recommender reads it that way.
+ */
+export interface EcologySettings {
+  protocol_size: number;
+  active_pack_ids: string[] | null;
+}
+
+/**
+ * A change to one setting or both.
+ *
+ * An omitted field is left alone, which is what makes this a PATCH. So
+ * `active_pack_ids` is the awkward one: sending `null` and omitting it
+ * are different requests, since null means every mounted pack. Build
+ * the object with only the keys that actually changed.
+ */
+export interface EcologySettingsUpdate {
+  protocol_size?: number;
+  active_pack_ids?: string[] | null;
+}
+
+/** The protocol sizes the server accepts. Anything else is a 422, not a clamp. */
+export const PROTOCOL_SIZES = [3, 4, 5, 6, 7] as const;
+export type ProtocolSize = (typeof PROTOCOL_SIZES)[number];
+
+/**
+ * The caller's practice settings.
+ *
+ * A user who has never opened the settings has no stored row yet, and
+ * this answers the defaults rather than 404: "you have not changed
+ * anything" is not an error state.
+ */
+export async function getEcologySettings(
+  signal?: AbortSignal,
+): Promise<EcologySettings> {
+  return request<EcologySettings>(`${BASE}/practice/ecology`, { signal });
+}
+
+/**
+ * Save a change to the practice settings.
+ *
+ * The server refuses rather than corrects: a size out of range, a pack
+ * id that is not mounted, an empty pack list and a body that asks for
+ * no change are all 422s, each with a sentence written for the reader.
+ * Nothing is written in any of those cases.
+ *
+ * An accepted change clears the stored protocol, so the next
+ * `getPracticeToday` recomputes rather than replaying the old one.
+ */
+export async function updateEcologySettings(
+  patch: EcologySettingsUpdate,
+): Promise<EcologySettings> {
+  return request<EcologySettings>(`${BASE}/practice/ecology`, {
+    method: "PATCH",
+    body: JSON.stringify(patch),
+  });
+}
+
 // ─── Journey ─────────────────────────────────────────────────────────
 
 /** One column of the journey chart. */
