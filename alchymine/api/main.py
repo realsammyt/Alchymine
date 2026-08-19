@@ -116,6 +116,10 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     # one down with it. Draining them here keeps a shutdown from dropping
     # spend that was already delivered and billed.
     await flush_pending_writes()
+    # Same reasoning for the chat transcript: a reply whose write outlived
+    # a disconnected reader is still in flight, and shutting down on top
+    # of it would drop an answer the user already read.
+    await chat.flush_pending_reply_writes()
     await dispose_engine()
 
 

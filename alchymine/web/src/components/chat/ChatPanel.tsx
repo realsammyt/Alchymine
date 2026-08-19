@@ -53,6 +53,7 @@ export default function ChatPanel({
     error,
     upsell,
     sendMessage,
+    retryLastTurn,
     resetConversation,
   } = useChat({ systemKey });
   const [errorDismissed, setErrorDismissed] = useState(false);
@@ -73,6 +74,13 @@ export default function ChatPanel({
     // Reset the dismissed flag so the next error is shown.
     setErrorDismissed(false);
     void sendMessage(text, systemKey);
+  };
+
+  const handleRetry = () => {
+    // Same reset as a fresh send: the retry is a new turn, and a banner
+    // dismissed for the previous one should not outlive it.
+    setErrorDismissed(false);
+    void retryLastTurn();
   };
 
   const starterPrompts = getStarterPrompts(systemKey);
@@ -152,6 +160,7 @@ export default function ChatPanel({
       <ChatMessageList
         messages={messages}
         isStreaming={isStreaming}
+        onRetry={handleRetry}
         emptyState={
           <div className="max-w-sm text-center">
             <p className="mb-2 font-display text-lg text-text/90">

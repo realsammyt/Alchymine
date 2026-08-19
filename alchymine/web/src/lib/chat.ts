@@ -21,7 +21,9 @@
  *     event: error\ndata: <error message>\n\n
  *
  * We expose a single async generator ``streamChat`` that yields the
- * content chunks and throws on transport/HTTP/error-event failures.
+ * content chunks and throws on transport/HTTP/error-event failures, and
+ * on a stream that ends without that sentinel (``ChatInterruptedError``,
+ * after handing over whatever did arrive).
  * The hook layer (``useChat``) owns React state and wires this to the
  * UI; the transport is kept side-effect-free so it can be unit tested
  * with a mocked ``fetch``.
@@ -37,6 +39,22 @@ export interface ChatMessage {
   role: "user" | "assistant";
   content: string;
   createdAt: string; // ISO 8601
+  /**
+   * The stream carrying this reply ended without its done sentinel, so
+   * what is displayed may be missing its end.  Set on assistant messages
+   * only, and never on anything loaded from history: a persisted reply
+   * is whatever the server managed to keep, and second-guessing it in
+   * the UI would mark completed turns as broken.
+   */
+  interrupted?: boolean;
+  /**
+   * The server delivered this reply whole and then could not write it to
+   * the user's history.  Distinct from ``interrupted``: nothing is
+   * missing from what is on screen, and asking again would not help.
+   * What is gone is tomorrow's copy of it, which is worth saying while
+   * the text is still in front of them.
+   */
+  unsaved?: boolean;
 }
 
 /** Backend request body for POST /api/v1/chat. */
@@ -74,6 +92,26 @@ export class ChatUpsellError extends ChatError {
   }
 }
 
+/**
+ * Thrown when the stream ended without the server's ``event: done``.
+ *
+ * A clean close mid-reply and a completed reply look identical to a
+ * generator that just returns, which is how a truncated answer used to
+ * reach the screen looking finished (issue #297).  Everything that did
+ * arrive is yielded first; this throws afterwards, so the caller keeps
+ * the text and learns it is not the whole of it.
+ *
+ * A ``ChatError`` subclass so callers that already catch one keep
+ * working, and so a consumer that does nothing special still fails
+ * loudly rather than silently rendering a partial reply as complete.
+ */
+export class ChatInterruptedError extends ChatError {
+  constructor(message = "The reply stopped before it finished.") {
+    super(message, null);
+    this.name = "ChatInterruptedError";
+  }
+}
+
 /** Backend response shape for GET /api/v1/chat/history items. */
 export interface ChatHistoryItem {
   id: string;
@@ -91,8 +129,24 @@ const BASE = (process.env.NEXT_PUBLIC_API_URL ?? "") + "/api/v1";
 type FrameOutcome =
   | { kind: "chunk"; text: string }
   | { kind: "done" }
+  | { kind: "unsaved" }
   | { kind: "error"; message: string }
   | { kind: "empty" };
+
+/**
+ * What a finished stream says beyond the text it delivered.
+ *
+ * Returned rather than yielded: it describes the turn as a whole, and a
+ * consumer that only wants the words keeps working untouched.
+ */
+export interface ChatStreamEnd {
+  /**
+   * The server delivered the reply and could not write it to history.
+   * True only when the server said so; a stream that ends any other way
+   * makes no claim either way.
+   */
+  unsaved: boolean;
+}
 
 /**
  * Resolve one completed event from its name and its ``data:`` lines.
@@ -102,9 +156,15 @@ type FrameOutcome =
  * paragraph breaks in it arrives as several lines of one event. An
  * event with no data lines, or one whose data is empty, carries nothing
  * to show.
+ *
+ * That last rule is what lets the server add a named signal without
+ * waiting for every client to learn it: a name this parser does not know,
+ * carrying an empty payload, resolves as nothing to show and the stream
+ * reads on. ``unsaved`` arrived that way.
  */
 function resolveFrame(name: string | null, dataLines: string[]): FrameOutcome {
   if (name === "done") return { kind: "done" };
+  if (name === "unsaved") return { kind: "unsaved" };
 
   const text = dataLines.join("\n");
 
@@ -131,15 +191,22 @@ function getLegacyAuthHeaders(): Record<string, string> {
  * they arrive.
  *
  * Throws ``ChatError`` (with HTTP status when available) on non-OK
- * responses or on ``event: error`` frames emitted by the server.
+ * responses or on ``event: error`` frames emitted by the server, and
+ * ``ChatInterruptedError`` when the stream ends without ``event: done``.
  * Abort via the provided signal yields the native ``AbortError``
- * which callers can detect by name.
+ * which callers can detect by name; an aborted read rejects inside the
+ * loop, so a user-initiated cancel never reads as an interruption.
+ *
+ * A stream that reaches its ``done`` sentinel returns a ``ChatStreamEnd``
+ * describing the turn.  A caller that ends the stream early, by breaking
+ * out of a ``for await`` or throwing, gets ``undefined`` instead: there
+ * was no end to describe.
  */
 export async function* streamChat(
   request: ChatRequest,
   signal?: AbortSignal,
   ephemeral?: boolean,
-): AsyncGenerator<string> {
+): AsyncGenerator<string, ChatStreamEnd | undefined> {
   const url = ephemeral
     ? `${BASE}/chat?ephemeral=true`
     : `${BASE}/chat`;
@@ -177,7 +244,7 @@ export async function* streamChat(
   if (!response.body) {
     // Some test environments (and ancient browsers) may not expose a
     // ReadableStream.  Treat this as an empty reply rather than hanging.
-    return;
+    return { unsaved: false };
   }
 
   const reader = response.body.getReader();
@@ -185,6 +252,7 @@ export async function* streamChat(
   let buffer = "";
   let eventName: string | null = null;
   let dataLines: string[] = [];
+  let unsaved = false;
 
   try {
     while (true) {
@@ -221,16 +289,19 @@ export async function* streamChat(
         eventName = null;
         dataLines = [];
 
-        if (outcome.kind === "done") return;
+        if (outcome.kind === "done") return { unsaved };
+        if (outcome.kind === "unsaved") unsaved = true;
         if (outcome.kind === "error") throw new ChatError(outcome.message);
         if (outcome.kind === "chunk") yield outcome.text;
       }
     }
 
-    // The reader is finished.  Data lines still pending here belong to an
-    // event whose terminating blank line never arrived, which means the
-    // connection closed mid-reply.  The text in them is real, so it goes
-    // to the caller rather than being discarded silently.  Any trailing
+    // The reader is finished and the done sentinel never came, so the
+    // connection closed mid-reply.
+    //
+    // Data lines still pending here belong to an event whose terminating
+    // blank line never arrived.  The text in them is real, so it goes to
+    // the caller rather than being discarded silently.  Any trailing
     // partial line left in ``buffer`` stays unparsed: a half-written
     // field cannot be told apart from a complete one.
     if (dataLines.length > 0) {
@@ -238,6 +309,11 @@ export async function* streamChat(
       if (outcome.kind === "error") throw new ChatError(outcome.message);
       if (outcome.kind === "chunk") yield outcome.text;
     }
+
+    // Only now, with everything salvageable already delivered.  The
+    // return path above is the one that means "finished"; reaching here
+    // means the reply has an end the caller never got.
+    throw new ChatInterruptedError();
   } finally {
     try {
       reader.releaseLock();

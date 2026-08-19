@@ -1685,6 +1685,7 @@ async def save_chat_message(
     role: str,
     content: str,
     system_key: str | None = None,
+    refresh: bool = True,
 ) -> ChatMessage:
     """Persist a single chat message and return the ORM row.
 
@@ -1701,12 +1702,19 @@ async def save_chat_message(
     system_key:
         Optional system scope (``"intelligence" | "healing" | "wealth" |
         "creative" | "perspective"``) or ``None`` for the general coach.
+    refresh:
+        Read the generated columns back after the flush.  Callers that
+        use ``id`` or ``created_at`` need it.  The one caller that does
+        not is the assistant write on the disconnect path, and there the
+        extra round trip is what fails: once the request task is being
+        cancelled the refresh raises and takes the whole write with it,
+        losing a reply the reader already saw.
 
     Returns
     -------
     ChatMessage
-        The newly created row, refreshed so ``id`` and ``created_at`` are
-        populated.
+        The newly created row.  ``id`` and ``created_at`` are populated
+        unless *refresh* was turned off.
     """
     msg = ChatMessage(
         user_id=user_id,
@@ -1716,7 +1724,8 @@ async def save_chat_message(
     )
     session.add(msg)
     await session.flush()
-    await session.refresh(msg)
+    if refresh:
+        await session.refresh(msg)
     return msg
 
 

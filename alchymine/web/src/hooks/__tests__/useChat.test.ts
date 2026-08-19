@@ -7,6 +7,8 @@
  * ``body.getReader()``) so we don't need a real ReadableStream impl.
  */
 
+import { StrictMode } from "react";
+
 import { act, renderHook, waitFor } from "@testing-library/react";
 
 import { useChat } from "@/hooks/useChat";
@@ -322,6 +324,259 @@ describe("useChat", () => {
     // Should not set an error — history failure is non-fatal.
     expect(result.current.error).toBeNull();
     expect(result.current.messages).toHaveLength(0);
+  });
+});
+
+/**
+ * Issue #297. An interrupted reply used to be indistinguishable from a
+ * finished one, and a reply that failed mid-flight was thrown away
+ * wholesale. Both are about the same thing: the user is entitled to know
+ * what happened to the text in front of them.
+ */
+describe("useChat interrupted replies", () => {
+  it("keeps a partial reply and marks it when the stream ends without the sentinel", async () => {
+    (global.fetch as jest.Mock)
+      .mockResolvedValueOnce(makeJsonResponse([]))
+      .mockResolvedValueOnce(makeSseResponse(["data: Start of an ans\n\n"]));
+
+    const { result } = renderHook(() => useChat({ systemKey: null }));
+    await waitFor(() => expect(result.current.isLoadingHistory).toBe(false));
+
+    await act(async () => {
+      await result.current.sendMessage("Hi");
+    });
+    await waitFor(() => expect(result.current.isStreaming).toBe(false));
+
+    expect(result.current.messages).toHaveLength(2);
+    expect(result.current.messages[1]).toMatchObject({
+      role: "assistant",
+      content: "Start of an ans",
+      interrupted: true,
+    });
+    // A cut connection is not a fault worth a red banner. The bubble
+    // says what happened, quietly, where the text is.
+    expect(result.current.error).toBeNull();
+  });
+
+  it("keeps what already rendered when the read fails mid-stream", async () => {
+    const encoder = new TextEncoder();
+    let read = 0;
+    const reader = {
+      read: jest.fn().mockImplementation(async () => {
+        read += 1;
+        if (read === 1) {
+          return { done: false, value: encoder.encode("data: most of it\n\n") };
+        }
+        throw new TypeError("network error");
+      }),
+      releaseLock: jest.fn(),
+    };
+
+    (global.fetch as jest.Mock)
+      .mockResolvedValueOnce(makeJsonResponse([]))
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        body: { getReader: () => reader },
+      } as unknown as Response);
+
+    const { result } = renderHook(() => useChat({ systemKey: null }));
+    await waitFor(() => expect(result.current.isLoadingHistory).toBe(false));
+
+    await act(async () => {
+      await result.current.sendMessage("Hi");
+    });
+    await waitFor(() => expect(result.current.isStreaming).toBe(false));
+
+    // Evicting the bubble here replaced a mostly-good reply with a
+    // banner, which is strictly less than the user already had.
+    expect(result.current.messages).toHaveLength(2);
+    expect(result.current.messages[1]).toMatchObject({
+      content: "most of it",
+      interrupted: true,
+    });
+    expect(result.current.error).not.toBeNull();
+  });
+
+  it("still drops the placeholder when the failure lands before any content", async () => {
+    (global.fetch as jest.Mock)
+      .mockResolvedValueOnce(makeJsonResponse([]))
+      .mockRejectedValueOnce(new TypeError("Failed to fetch"));
+
+    const { result } = renderHook(() => useChat({ systemKey: null }));
+    await waitFor(() => expect(result.current.isLoadingHistory).toBe(false));
+
+    await act(async () => {
+      await result.current.sendMessage("Hi");
+    });
+    await waitFor(() => expect(result.current.isStreaming).toBe(false));
+
+    // Nothing to keep, so an empty bubble next to the banner would be
+    // noise rather than content.
+    expect(result.current.messages).toHaveLength(1);
+    expect(result.current.messages[0].role).toBe("user");
+  });
+
+  it("leaves a completed reply unmarked", async () => {
+    (global.fetch as jest.Mock)
+      .mockResolvedValueOnce(makeJsonResponse([]))
+      .mockResolvedValueOnce(
+        makeSseResponse(["data: All of it\n\n", "event: done\ndata: \n\n"]),
+      );
+
+    const { result } = renderHook(() => useChat({ systemKey: null }));
+    await waitFor(() => expect(result.current.isLoadingHistory).toBe(false));
+
+    await act(async () => {
+      await result.current.sendMessage("Hi");
+    });
+    await waitFor(() => expect(result.current.isStreaming).toBe(false));
+
+    expect(result.current.messages[1].interrupted).toBeFalsy();
+  });
+
+  it("retryLastTurn sends the last user message again as a new turn", async () => {
+    (global.fetch as jest.Mock)
+      .mockResolvedValueOnce(makeJsonResponse([]))
+      .mockResolvedValueOnce(makeSseResponse(["data: cut off\n\n"]))
+      .mockResolvedValueOnce(
+        makeSseResponse(["data: the whole answer\n\n", "event: done\ndata: \n\n"]),
+      );
+
+    const { result } = renderHook(() => useChat({ systemKey: "healing" }));
+    await waitFor(() => expect(result.current.isLoadingHistory).toBe(false));
+
+    await act(async () => {
+      await result.current.sendMessage("What should I try?", "healing");
+    });
+    await waitFor(() => expect(result.current.messages[1].interrupted).toBe(true));
+
+    await act(async () => {
+      await result.current.retryLastTurn();
+    });
+    await waitFor(() => expect(result.current.isStreaming).toBe(false));
+
+    // A retry is a new turn, not an edit: the question is asked again,
+    // so both exchanges stay on screen and in the transcript.
+    expect(result.current.messages).toHaveLength(4);
+    expect(result.current.messages[2]).toMatchObject({
+      role: "user",
+      content: "What should I try?",
+    });
+    expect(result.current.messages[3]).toMatchObject({
+      role: "assistant",
+      content: "the whole answer",
+    });
+
+    // The retry keeps the scope the original turn was sent on.
+    const retryCall = (global.fetch as jest.Mock).mock.calls[2];
+    expect(JSON.parse((retryCall[1] as RequestInit).body as string)).toEqual({
+      message: "What should I try?",
+      system_key: "healing",
+    });
+  });
+
+  it("retryLastTurn does nothing before anything has been sent", async () => {
+    (global.fetch as jest.Mock).mockResolvedValueOnce(makeJsonResponse([]));
+
+    const { result } = renderHook(() => useChat({ systemKey: null }));
+    await waitFor(() => expect(result.current.isLoadingHistory).toBe(false));
+
+    await act(async () => {
+      await result.current.retryLastTurn();
+    });
+
+    expect(global.fetch).toHaveBeenCalledTimes(1);
+    expect(result.current.messages).toHaveLength(0);
+  });
+});
+
+/**
+ * The server delivered the reply and could not write it to the user's
+ * history, and it says so with an `unsaved` frame before `done`. The
+ * reply is whole, so it stays exactly as it rendered; the note under it
+ * is about the transcript, not about the answer.
+ */
+describe("useChat replies the server could not save", () => {
+  it("marks the reply and keeps every word of it", async () => {
+    (global.fetch as jest.Mock)
+      .mockResolvedValueOnce(makeJsonResponse([]))
+      .mockResolvedValueOnce(
+        makeSseResponse([
+          "data: All of it\n\n",
+          "event: unsaved\ndata: \n\n",
+          "event: done\ndata: \n\n",
+        ]),
+      );
+
+    const { result } = renderHook(() => useChat({ systemKey: null }));
+    await waitFor(() => expect(result.current.isLoadingHistory).toBe(false));
+
+    await act(async () => {
+      await result.current.sendMessage("Hi");
+    });
+    await waitFor(() => expect(result.current.isStreaming).toBe(false));
+
+    expect(result.current.messages[1]).toMatchObject({
+      role: "assistant",
+      content: "All of it",
+      unsaved: true,
+    });
+    // Not interrupted: nothing is missing from what is on screen, and a
+    // note offering a retry would send them after text they already have.
+    expect(result.current.messages[1].interrupted).toBeFalsy();
+    // Not an error either. A red banner across the conversation would
+    // outweigh what actually happened.
+    expect(result.current.error).toBeNull();
+  });
+
+  it("leaves an ordinary reply unmarked", async () => {
+    (global.fetch as jest.Mock)
+      .mockResolvedValueOnce(makeJsonResponse([]))
+      .mockResolvedValueOnce(
+        makeSseResponse(["data: All of it\n\n", "event: done\ndata: \n\n"]),
+      );
+
+    const { result } = renderHook(() => useChat({ systemKey: null }));
+    await waitFor(() => expect(result.current.isLoadingHistory).toBe(false));
+
+    await act(async () => {
+      await result.current.sendMessage("Hi");
+    });
+    await waitFor(() => expect(result.current.isStreaming).toBe(false));
+
+    expect(result.current.messages[1].unsaved).toBeFalsy();
+  });
+});
+
+/**
+ * Issue #313. Under StrictMode React runs each effect, cleans it up, and
+ * runs it again. The history effect one-shotted on a ref that the
+ * cleanup never reset, so the second run returned early while the first
+ * run's `cancelled` flag suppressed both the messages and the
+ * `setIsLoadingHistory(false)`. The result in dev was a permanent
+ * "Loading your conversation history..." over a conversation that had
+ * already arrived.
+ */
+describe("useChat history under StrictMode", () => {
+  it("finishes loading history when the effect runs twice", async () => {
+    const historyItems = [
+      {
+        id: "h1",
+        role: "user",
+        content: "Previous Q",
+        created_at: "2026-04-08T10:00:00Z",
+      },
+    ];
+    (global.fetch as jest.Mock).mockResolvedValue(makeJsonResponse(historyItems));
+
+    const { result } = renderHook(() => useChat({ systemKey: "healing" }), {
+      wrapper: StrictMode,
+    });
+
+    await waitFor(() => expect(result.current.isLoadingHistory).toBe(false));
+    expect(result.current.messages).toHaveLength(1);
+    expect(result.current.messages[0]).toMatchObject({ content: "Previous Q" });
   });
 });
 

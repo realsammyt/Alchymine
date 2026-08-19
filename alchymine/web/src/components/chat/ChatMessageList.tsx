@@ -26,6 +26,12 @@ interface Props {
   messages: ChatMessageType[];
   isStreaming: boolean;
   emptyState?: React.ReactNode;
+  /**
+   * Send the last turn again.  Passed down to the newest assistant
+   * bubble only, and only when it was interrupted: a retry re-sends the
+   * most recent question, which is the wrong answer to an older one.
+   */
+  onRetry?: () => void;
 }
 
 const NEAR_BOTTOM_PX = 80;
@@ -34,6 +40,7 @@ export default function ChatMessageList({
   messages,
   isStreaming,
   emptyState,
+  onRetry,
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -95,6 +102,14 @@ export default function ChatMessageList({
               key={m.id}
               message={m}
               isStreaming={isStreaming && m.id === lastAssistantId}
+              // Not while another reply is in flight: a second send would
+              // be refused by the hook anyway, and a button that does
+              // nothing is worse than no button.
+              onRetry={
+                onRetry && !isStreaming && m.id === lastAssistantId
+                  ? onRetry
+                  : undefined
+              }
             />
           ))}
         </div>
