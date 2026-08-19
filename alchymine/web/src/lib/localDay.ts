@@ -47,3 +47,30 @@ export function dayLabel(when: Date): string {
     month: "long",
   });
 }
+
+/**
+ * A compact day label such as `12 Aug`, for chart axes where the full
+ * form will not fit. Sighted readers get this; screen readers get
+ * `dayLabel` from the per-day description, so nothing is lost to the
+ * abbreviation.
+ */
+export function shortDayLabel(when: Date): string {
+  return when.toLocaleDateString("en-GB", {
+    day: "numeric",
+    month: "short",
+  });
+}
+
+/**
+ * A day label carrying its year, such as `4 March 2026`.
+ *
+ * Used for the anchors that reach back past the visible window, where
+ * the year is the part that stops "4 March" from being ambiguous.
+ */
+export function anchorDayLabel(when: Date): string {
+  return when.toLocaleDateString("en-GB", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  });
+}

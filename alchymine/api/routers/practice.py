@@ -1,4 +1,4 @@
-"""Practice endpoints: the library views, and the practice log.
+"""Practice endpoints: the library views, the practice log, the journey.
 
 Auth is required on every route but no plan gate is applied: nothing
 here costs money, and gating the retention loop would defeat the loop.
@@ -8,6 +8,12 @@ The registry is built at application startup, so the library handlers
 never touch the filesystem. The log handlers read it too, because the
 registry is the only thing that knows whether a practice exists and
 what capacity it develops.
+
+``GET /journey/timeseries`` lives here rather than in a router of its
+own because it reads exactly what this module writes: the practice log,
+and the loops closed against it. Nothing else in the app owns that pair,
+and a second module reading it would need its own copy of the day-axis
+rule the fold depends on.
 """
 
 from __future__ import annotations
@@ -47,6 +53,14 @@ from alchymine.engine.practice.ecology import (
     default_ecology_settings,
     recommend_today,
     summarize_practice,
+)
+from alchymine.engine.practice.journey import (
+    JOURNEY_WINDOW_DEFAULT,
+    JOURNEY_WINDOW_MAX,
+    JOURNEY_WINDOW_MIN,
+    JourneyRow,
+    build_journey_series,
+    loop_shift_value,
 )
 from alchymine.engine.practice.purposes import system_for_purpose
 
@@ -305,6 +319,69 @@ class PracticeSummaryResponse(BaseModel):
     last_7: list[bool]
     by_purpose: dict[str, int]
     total_completed: int
+
+
+class JourneyDayResponse(BaseModel):
+    """One column of the journey chart.
+
+    ``average_shift`` is ``null`` rather than 0.0 on a day with no
+    closed loops. Zero is a real self-report meaning "nothing moved",
+    and a day nobody wrote about is not that.
+    """
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    day_key: str
+    completed: int = Field(..., description="Practices completed on this day")
+    purposes: list[str] = Field(
+        ..., description="The distinct capacities practiced, in fixed display order"
+    )
+    loops: int = Field(..., description="Integration loops closed against this day's practices")
+    average_shift: float | None = Field(
+        None, description="Mean recorded shift for those loops, null when there were none"
+    )
+
+
+class JourneyTotalsResponse(BaseModel):
+    """The figures under the chart.
+
+    The first three describe the window. The two anchors do not: they
+    reach back through the whole log, because "practicing since March"
+    is the line that makes a thirty-day chart mean something and is
+    unanswerable from thirty days of rows.
+    """
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    days_practiced: int
+    completed: int
+    loops_closed: int
+    first_practice_day: str | None = Field(
+        None, description="The user's earliest logged practice day, or null if there is none"
+    )
+    first_loop_day: str | None = Field(
+        None, description="The practice day of the earliest closed loop, or null"
+    )
+
+
+class JourneyTimeseriesResponse(BaseModel):
+    """The journey series: what the user did, day by day.
+
+    ``days`` is always exactly ``window_days`` long and oldest first, so
+    a client renders it left to right without reversing anything and a
+    day with nothing on it is a gap rather than a missing column.
+    """
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    day_key: str = Field(..., description="The window's last day, as the caller sent it")
+    start_day: str
+    window_days: int
+    days: list[JourneyDayResponse]
+    by_purpose: dict[str, int] = Field(
+        ..., description="Completions per capacity inside the window, zero-filled across all five"
+    )
+    totals: JourneyTotalsResponse
 
 
 # ─────────────────────────────────────────────────────────────────────
@@ -739,15 +816,16 @@ async def create_integration(
     # One row per completion, not one per save. The value is read off
     # the stored row rather than off this request, so the reading stands
     # whichever prompt the user filled in first and a later note-only
-    # save does not walk it back. ``capacity_delta`` is the user's own
-    # read when they gave one; when they did not, the practice still
-    # happened, and that is worth 1.0 rather than 0.0.
+    # save does not walk it back. The rule for an absent self-report
+    # lives in :func:`loop_shift_value`, shared with the journey series:
+    # if the two had their own copies and one changed, the dashboard and
+    # the journey would report different numbers for the same loop.
     await repository.record_outcome_metric(
         session,
         user_id=user_id,
         system=system_for_purpose(log_entry.primary_purpose),
         metric_name="practice_integration",
-        value=float(stored.capacity_delta) if stored.capacity_delta is not None else 1.0,
+        value=loop_shift_value(stored.capacity_delta),
         period="daily",
         metric_id=repository.derived_metric_id(stored.id, "practice_integration"),
     )
@@ -765,6 +843,84 @@ async def create_integration(
         capacity_delta=stored.capacity_delta,
         note=stored.note,
         created_at=stored.created_at,
+    )
+
+
+@router.get("/journey/timeseries", response_model=JourneyTimeseriesResponse, tags=["journey"])
+async def journey_timeseries(
+    today: TodayQuery,
+    days: int = Query(
+        JOURNEY_WINDOW_DEFAULT,
+        ge=JOURNEY_WINDOW_MIN,
+        le=JOURNEY_WINDOW_MAX,
+        description=(
+            "How many days the window covers, ending on 'today'. Bounded here "
+            "rather than clamped: a caller asking for a year should find out "
+            "it cannot have one."
+        ),
+    ),
+    current_user: dict = Depends(get_current_user),
+    session: AsyncSession = Depends(get_db_session),
+) -> JourneyTimeseriesResponse:
+    """Return the caller's practice and integration history as a series.
+
+    Read-only, deterministic, and scoped to the caller: the owner comes
+    from the token, so there is no shape of request that reads somebody
+    else's journey. No plan gate, matching the rest of the practice
+    layer and the dashboard, and no LLM anywhere on the path.
+
+    A user with no history gets a full zero-filled window rather than an
+    empty body. "You have not started yet" is a state the page renders,
+    not a failure it handles.
+
+    Two reads, both bounded. The series comes from one query scoped to
+    the window; the anchors in ``totals`` are scalar aggregates over an
+    index, which is how "practicing since March" is answerable without
+    loading March.
+    """
+    user_id = current_user["sub"]
+    window_start = date.fromisoformat(today) - timedelta(days=days - 1)
+
+    rows = await repository.list_journey_rows(session, user_id, from_day=window_start.isoformat())
+    first_practice_day, first_loop_day = await repository.get_journey_anchors(session, user_id)
+
+    series = build_journey_series(
+        [
+            JourneyRow(
+                day_key=row.day_key,
+                primary_purpose=row.primary_purpose,
+                status=row.status,
+                has_loop=row.integration_id is not None,
+                capacity_delta=row.capacity_delta,
+            )
+            for row in rows
+        ],
+        today=today,
+        window_days=days,
+    )
+
+    return JourneyTimeseriesResponse(
+        day_key=today,
+        start_day=series.start_day,
+        window_days=series.window_days,
+        days=[
+            JourneyDayResponse(
+                day_key=point.day_key,
+                completed=point.completed,
+                purposes=list(point.purposes),
+                loops=point.loops,
+                average_shift=point.average_shift,
+            )
+            for point in series.days
+        ],
+        by_purpose=series.by_purpose,
+        totals=JourneyTotalsResponse(
+            days_practiced=series.days_practiced,
+            completed=series.total_completed,
+            loops_closed=series.total_loops,
+            first_practice_day=first_practice_day,
+            first_loop_day=first_loop_day,
+        ),
     )
 
 

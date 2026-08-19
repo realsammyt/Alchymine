@@ -1,413 +1,174 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useId, useMemo, useState } from "react";
 import Link from "next/link";
 import ProtectedRoute from "@/components/shared/ProtectedRoute";
-import { useAuth } from "@/lib/AuthContext";
-import UpsellNotice from "@/components/shared/UpsellNotice";
-import type { PlanGateError } from "@/lib/planGate";
-import { getProfile, ProfileResponse, listUserReports, ReportListItem } from "@/lib/api";
+import ApiStateView from "@/components/shared/ApiStateView";
+import JourneyBalance from "@/components/journey/JourneyBalance";
+import JourneyChart from "@/components/journey/JourneyChart";
+import JourneyEmpty from "@/components/journey/JourneyEmpty";
+import { useApi } from "@/lib/useApi";
+import { anchorDayLabel, localDayKey, parseDayKey } from "@/lib/localDay";
 import {
-  ArtUnavailableError,
-  asPlanGate,
-  generateArt,
-  listGeneratedImages,
-  fetchImageBlobUrl,
-  GeneratedImageMetadata,
-} from "@/lib/artApi";
+  getJourneyTimeseries,
+  JOURNEY_WINDOWS,
+  type JourneyTimeseriesResponse,
+  type JourneyWindow,
+} from "@/lib/api";
 
-// ── Milestone definitions ───────────────────────────────────────────
+/** The window the page opens on. Long enough to have a shape, short
+ *  enough to still read a column at a time on a phone. */
+const DEFAULT_WINDOW: JourneyWindow = 30;
 
-interface Milestone {
-  id: string;
+interface StatProps {
+  value: number;
   label: string;
-  description: string;
-  /** Returns true when the milestone is complete for this profile. */
-  check: (profile: ProfileResponse | null, reports: ReportListItem[]) => boolean;
 }
 
-const MILESTONES: Milestone[] = [
-  {
-    id: "intake",
-    label: "Intake",
-    description: "Completed your initial intake and assessment",
-    check: (p) => !!p?.intake,
-  },
-  {
-    id: "identity",
-    label: "Identity",
-    description: "Identity profile computed from your birth data",
-    check: (p) => !!p?.identity,
-  },
-  {
-    id: "healing",
-    label: "Healing",
-    description: "Explored ethical healing modalities",
-    check: (p) => !!p?.healing,
-  },
-  {
-    id: "wealth",
-    label: "Wealth",
-    description: "Mapped your generational wealth profile",
-    check: (p) => !!p?.wealth,
-  },
-  {
-    id: "creative",
-    label: "Creative",
-    description: "Assessed your creative development style",
-    check: (p) => !!p?.creative,
-  },
-  {
-    id: "perspective",
-    label: "Perspective",
-    description: "Enhanced your perspective and growth stage",
-    check: (p) => !!p?.perspective,
-  },
-  {
-    id: "synthesis",
-    label: "Synthesis",
-    description: "Generated your full Alchymine report",
-    check: (_p, reports) => reports.some((r) => r.status === "complete"),
-  },
-];
-
-// ── Types ───────────────────────────────────────────────────────────
-
-type PageStatus =
-  | { kind: "loading" }
-  | { kind: "idle" }
-  | { kind: "generating"; milestoneId: string }
-  // Daily allowance spent or spend breaker tripped: a wait, not a fault.
-  // ``upsell`` is set only when the refusal is answered by upgrading;
-  // the daily cap and the global breaker clear on their own.
-  | { kind: "unavailable"; message: string; upsell: PlanGateError | null }
-  | { kind: "error"; message: string };
-
-interface MilestoneImage {
-  milestoneId: string;
-  blobUrl: string;
+function Stat({ value, label }: StatProps) {
+  return (
+    <div className="flex flex-col gap-0.5">
+      <dt className="font-body text-xs uppercase tracking-wider text-text/60 order-2">
+        {label}
+      </dt>
+      <dd className="font-display text-2xl font-light text-text order-1 m-0">
+        {value}
+      </dd>
+    </div>
+  );
 }
-
-// ── Component ───────────────────────────────────────────────────────
 
 function JourneyBody() {
-  const { user } = useAuth();
-  const userId = user?.id ?? null;
+  // The user's local day, fixed for the life of the page. Recomputing it
+  // per render would move the window under the reader for anyone who
+  // leaves the tab open across midnight, and a page open that long can
+  // be reloaded.
+  const dayKey = useMemo(() => localDayKey(), []);
+  const [windowDays, setWindowDays] = useState<JourneyWindow>(DEFAULT_WINDOW);
+  const windowGroupId = useId();
 
-  const [profile, setProfile] = useState<ProfileResponse | null>(null);
-  const [reports, setReports] = useState<ReportListItem[]>([]);
-  const [status, setStatus] = useState<PageStatus>({ kind: "loading" });
-  const [milestoneImages, setMilestoneImages] = useState<MilestoneImage[]>([]);
-
-  // Load profile and reports
-  useEffect(() => {
-    if (!userId) return;
-    let cancelled = false;
-    setStatus({ kind: "loading" });
-
-    Promise.all([
-      getProfile(userId).catch(() => null),
-      listUserReports(userId, { limit: 20 }).catch(() => null),
-    ]).then(([profileRes, reportsRes]) => {
-      if (cancelled) return;
-      setProfile(profileRes);
-      setReports(reportsRes?.reports ?? []);
-      setStatus({ kind: "idle" });
-    });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [userId]);
-
-  // Load existing generated images and try to match them to milestones
-  useEffect(() => {
-    let cancelled = false;
-    listGeneratedImages(50, 0)
-      .then(async (response) => {
-        if (cancelled) return;
-        const matched: MilestoneImage[] = [];
-        for (const img of response.images) {
-          const milestoneId = _matchImageToMilestone(img);
-          if (milestoneId) {
-            const blobUrl = await fetchImageBlobUrl(img.id);
-            if (blobUrl && !cancelled) {
-              matched.push({ milestoneId, blobUrl });
-            }
-          }
-        }
-        if (!cancelled) setMilestoneImages(matched);
-      })
-      .catch(() => {
-        /* silent — gallery loading is best-effort */
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  const completedMilestones = useMemo(
-    () =>
-      new Set(
-        MILESTONES.filter((m) => m.check(profile, reports)).map((m) => m.id),
-      ),
-    [profile, reports],
+  const journey = useApi<JourneyTimeseriesResponse>(
+    (signal) => getJourneyTimeseries(dayKey, windowDays, signal),
+    [dayKey, windowDays],
   );
 
-  const imageMap = useMemo(() => {
-    const map = new Map<string, string>();
-    for (const mi of milestoneImages) {
-      if (!map.has(mi.milestoneId)) {
-        map.set(mi.milestoneId, mi.blobUrl);
-      }
-    }
-    return map;
-  }, [milestoneImages]);
-
-  const handleGenerateForMilestone = useCallback(
-    async (milestoneId: string) => {
-      setStatus({ kind: "generating", milestoneId });
-      try {
-        const result = await generateArt({
-          style_preset: "mystical",
-          user_prompt_extension: `Journey milestone illustration for the "${milestoneId}" stage of personal transformation`,
-        });
-        if (result === null) {
-          setStatus({
-            kind: "error",
-            message: "Image generation is offline. Try later.",
-          });
-          return;
-        }
-        const blobUrl = await fetchImageBlobUrl(result.image_id);
-        if (blobUrl) {
-          setMilestoneImages((prev) => [
-            ...prev,
-            { milestoneId, blobUrl },
-          ]);
-        }
-        setStatus({ kind: "idle" });
-      } catch (err: unknown) {
-        if (err instanceof ArtUnavailableError) {
-          setStatus({
-            kind: "unavailable",
-            message: err.message,
-            upsell: asPlanGate(err),
-          });
-          return;
-        }
-        const message =
-          err instanceof Error ? err.message : "Generation failed";
-        setStatus({ kind: "error", message });
-      }
-    },
-    [],
-  );
-
-  const progressPct =
-    MILESTONES.length > 0
-      ? Math.round((completedMilestones.size / MILESTONES.length) * 100)
-      : 0;
+  const data = journey.data;
+  // Never having practiced is a different state from a quiet month. The
+  // first has nothing to draw; the second is a real, readable window of
+  // zeros that still belongs to somebody who has been at this a while.
+  const neverPracticed =
+    data !== null && data.totals.first_practice_day === null;
 
   return (
     <main
       id="main-content"
-      className="grain-overlay bg-atmosphere min-h-screen px-4 sm:px-6 lg:px-8 py-8"
+      className="min-h-screen px-4 sm:px-6 lg:px-8 py-8 sm:py-12"
     >
-      <div className="max-w-4xl mx-auto">
-        <header className="mb-10">
-          <h1 className="font-display text-display-md font-light text-gradient-purple mb-3">
-            Your Journey
+      <div className="max-w-3xl mx-auto flex flex-col gap-8">
+        <header className="flex flex-col gap-2">
+          <h1 className="font-display text-2xl sm:text-3xl font-medium text-text">
+            Your journey
           </h1>
-          <hr className="rule-gold mb-4" aria-hidden="true" />
-          <p className="font-body text-text/50 text-base max-w-2xl">
-            A visual timeline of your transformation path. Each milestone
-            unlocks as you progress through the five Alchymine systems.
+          <p className="font-body text-sm text-text/70 leading-relaxed max-w-prose">
+            What you have actually done, day by day. Nothing here is a target
+            and nothing resets.
           </p>
           <Link
             href="/dashboard"
-            className="inline-flex items-center gap-2 mt-4 text-sm font-body text-secondary hover:text-secondary-light focus:outline-none focus:underline"
+            className="touch-target inline-flex items-center self-start text-sm font-body text-primary underline underline-offset-4 transition-colors duration-200 hover:text-primary-light focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-bg rounded"
           >
-            &larr; Back to Dashboard
+            Back to dashboard
           </Link>
         </header>
 
-        {/* Progress bar */}
-        <section className="mb-10" aria-label="Journey progress">
-          <div className="flex items-center justify-between mb-2">
-            <span className="font-body text-sm text-text/60">Progress</span>
-            <span
-              className="font-mono text-sm text-primary"
-              aria-live="polite"
-            >
-              {progressPct}%
-            </span>
+        {/* Three windows, one choice: a radio group rather than three
+            buttons, so arrow keys move between them and the current
+            window is announced as the selected option. */}
+        <fieldset className="border-0 p-0 m-0">
+          <legend className="font-body text-xs uppercase tracking-wider text-text/60 mb-2">
+            Window
+          </legend>
+          <div className="flex flex-wrap gap-2">
+            {JOURNEY_WINDOWS.map((option) => (
+              <div key={option}>
+                <input
+                  type="radio"
+                  id={`${windowGroupId}-${option}`}
+                  name={windowGroupId}
+                  className="sr-only peer"
+                  checked={windowDays === option}
+                  onChange={() => setWindowDays(option)}
+                />
+                <label
+                  htmlFor={`${windowGroupId}-${option}`}
+                  className="touch-target inline-flex items-center px-4 py-2 rounded-lg cursor-pointer font-body text-sm border border-white/10 text-text/70 transition-colors duration-200 hover:text-text hover:border-white/20 peer-checked:border-primary peer-checked:bg-primary/15 peer-checked:text-primary peer-focus-visible:ring-2 peer-focus-visible:ring-primary peer-focus-visible:ring-offset-2 peer-focus-visible:ring-offset-bg"
+                >
+                  {option} days
+                </label>
+              </div>
+            ))}
           </div>
-          <div
-            className="w-full h-3 bg-surface rounded-full overflow-hidden border border-white/[0.06]"
-            role="progressbar"
-            aria-valuenow={progressPct}
-            aria-valuemin={0}
-            aria-valuemax={100}
-            aria-label={`Journey ${progressPct}% complete`}
-          >
-            <div
-              className="h-full bg-gradient-to-r from-primary via-secondary to-accent transition-all duration-700 ease-out rounded-full"
-              style={{ width: `${progressPct}%` }}
-            />
-          </div>
-        </section>
+        </fieldset>
 
-        {status.kind === "unavailable" &&
-          (status.upsell ? (
-            <UpsellNotice error={status.upsell} className="mb-6" />
-          ) : (
-            <div
-              role="status"
-              className="mb-6 px-4 py-3 rounded-lg bg-yellow-900/20 border border-yellow-700/30 text-yellow-200 text-sm font-body"
-            >
-              {status.message}
-            </div>
-          ))}
+        <ApiStateView
+          loading={journey.loading}
+          error={journey.error}
+          loadingText="Loading your journey..."
+          onRetry={journey.refetch}
+        >
+          {data && neverPracticed && <JourneyEmpty />}
 
-        {status.kind === "error" && (
-          <div
-            role="alert"
-            className="mb-6 px-4 py-3 rounded-lg bg-red-900/20 border border-red-700/30 text-red-200 text-sm font-body"
-          >
-            {status.message}
-          </div>
-        )}
-
-        {/* Timeline */}
-        <section aria-label="Transformation timeline">
-          <ol className="relative border-l-2 border-white/[0.08] ml-4 space-y-8">
-            {MILESTONES.map((milestone) => {
-              const completed = completedMilestones.has(milestone.id);
-              const blobUrl = imageMap.get(milestone.id);
-              const isGenerating =
-                status.kind === "generating" &&
-                status.milestoneId === milestone.id;
-
-              return (
-                <li key={milestone.id} className="pl-8 relative">
-                  {/* Node marker */}
-                  <div
-                    className={`absolute -left-[11px] top-1 w-5 h-5 rounded-full border-2 flex items-center justify-center ${
-                      completed
-                        ? "bg-primary border-primary"
-                        : "bg-surface border-white/20"
-                    }`}
-                    aria-hidden="true"
-                  >
-                    {completed && (
-                      <svg
-                        className="w-3 h-3 text-bg"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                        strokeWidth={3}
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          d="M5 13l4 4L19 7"
-                        />
-                      </svg>
-                    )}
-                  </div>
-
-                  <div
-                    className={`rounded-xl border p-4 transition-colors ${
-                      completed
-                        ? "border-primary/20 bg-primary/5"
-                        : "border-white/[0.06] bg-surface"
-                    }`}
-                  >
-                    <div className="flex items-center gap-3 mb-1">
-                      <h3
-                        className={`font-display text-lg font-medium ${
-                          completed ? "text-primary" : "text-text/70"
-                        }`}
-                      >
-                        {milestone.label}
-                      </h3>
-                      {completed && (
-                        <span className="px-2 py-0.5 rounded-full bg-primary/20 text-primary text-[10px] font-body uppercase tracking-wider">
-                          Complete
-                        </span>
+          {data && !neverPracticed && (
+            <div className="flex flex-col gap-8">
+              <section
+                aria-labelledby="journey-totals-heading"
+                className="card-surface px-4 py-5 sm:px-6 sm:py-6"
+              >
+                <h2
+                  id="journey-totals-heading"
+                  className="font-display text-base font-medium text-text mb-4"
+                >
+                  These {data.window_days} days
+                </h2>
+                <dl className="grid grid-cols-3 gap-4 mb-4">
+                  <Stat value={data.totals.completed} label="Practices" />
+                  <Stat
+                    value={data.totals.days_practiced}
+                    label="Days practiced"
+                  />
+                  <Stat value={data.totals.loops_closed} label="Loops closed" />
+                </dl>
+                <p className="font-body text-sm text-text/70 leading-relaxed max-w-prose">
+                  {data.totals.first_practice_day && (
+                    <>
+                      Practicing since{" "}
+                      {anchorDayLabel(
+                        parseDayKey(data.totals.first_practice_day),
                       )}
-                    </div>
-                    <p className="font-body text-sm text-text/50 mb-3">
-                      {milestone.description}
-                    </p>
+                      .{" "}
+                    </>
+                  )}
+                  {data.totals.first_loop_day
+                    ? `First loop closed on ${anchorDayLabel(
+                        parseDayKey(data.totals.first_loop_day),
+                      )}.`
+                    : "No loops closed yet. Closing one records what a practice changed, in your own words."}
+                </p>
+              </section>
 
-                    {/* Milestone illustration */}
-                    {blobUrl && (
-                      <div className="mb-3">
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img
-                          src={blobUrl}
-                          alt={`Illustration for ${milestone.label} milestone`}
-                          className="w-full max-h-48 object-cover rounded-lg"
-                        />
-                      </div>
-                    )}
+              <JourneyChart days={data.days} />
 
-                    {/* Generate illustration button */}
-                    {completed && !blobUrl && (
-                      <button
-                        type="button"
-                        onClick={() =>
-                          handleGenerateForMilestone(milestone.id)
-                        }
-                        disabled={status.kind === "generating"}
-                        className="px-4 py-2 min-h-[44px] text-xs font-body font-medium rounded-lg bg-secondary/20 text-secondary border border-secondary/30 hover:bg-secondary/30 disabled:opacity-50 disabled:cursor-not-allowed transition-colors focus:outline-none focus:ring-2 focus:ring-secondary/60"
-                        aria-label={`Generate illustration for ${milestone.label} milestone`}
-                      >
-                        {isGenerating
-                          ? "Generating..."
-                          : "Generate Milestone Art"}
-                      </button>
-                    )}
-
-                    {isGenerating && (
-                      <div
-                        role="status"
-                        aria-label="Generating milestone illustration"
-                        className="mt-2 w-full h-32 rounded-lg bg-gradient-to-br from-secondary/30 via-primary/20 to-accent/30 animate-pulse"
-                      />
-                    )}
-                  </div>
-                </li>
-              );
-            })}
-          </ol>
-        </section>
+              <JourneyBalance
+                byPurpose={data.by_purpose}
+                windowDays={data.window_days}
+              />
+            </div>
+          )}
+        </ApiStateView>
       </div>
     </main>
   );
 }
-
-// ── Helpers ──────────────────────────────────────────────────────────
-
-/**
- * Heuristic: try to match a generated image's prompt text to a milestone id.
- * Returns the milestone id if a keyword match is found, or null.
- */
-function _matchImageToMilestone(
-  img: GeneratedImageMetadata,
-): string | null {
-  const lower = img.prompt.toLowerCase();
-  for (const m of MILESTONES) {
-    if (lower.includes(`"${m.id}"`) || lower.includes(`'${m.id}'`)) {
-      return m.id;
-    }
-  }
-  return null;
-}
-
-// ── Default export ──────────────────────────────────────────────────
 
 export default function JourneyPage() {
   return (

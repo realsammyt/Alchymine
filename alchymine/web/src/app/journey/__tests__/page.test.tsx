@@ -1,7 +1,16 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import JourneyPage from "../page";
-import { ArtUnavailableError, generateArt } from "@/lib/artApi";
-import { getProfile } from "@/lib/api";
+import {
+  getJourneyTimeseries,
+  type JourneyTimeseriesResponse,
+} from "@/lib/api";
+import { LOSS_AVERSION_BANNED } from "@/components/practice/PracticeRhythm";
 
 jest.mock("next/link", () => {
   return function MockLink({
@@ -34,183 +43,358 @@ jest.mock("@/lib/AuthContext", () => ({
   }),
 }));
 
-jest.mock("@/lib/api", () => ({
-  getProfile: jest.fn().mockResolvedValue({
-    id: "user-1",
-    version: "2.0",
-    intake: { full_name: "Test User" },
-    identity: {
-      archetype: { primary: "sage" },
-      astrology: { sun_sign: "Pisces" },
-    },
-    healing: null,
-    wealth: null,
-    creative: null,
-    perspective: null,
-  }),
-  listUserReports: jest.fn().mockResolvedValue({ reports: [], count: 0 }),
-}));
-
-jest.mock("@/lib/artApi", () => {
-  class MockArtUnavailableError extends Error {
-    code: string;
-    retryAt: Date | null;
-    upgradeUrl: string | null;
-    constructor(
-      code: string,
-      message: string,
-      retryAt: Date | null,
-      upgradeUrl: string | null = null,
-    ) {
-      super(message);
-      this.name = "ArtUnavailableError";
-      this.code = code;
-      this.retryAt = retryAt;
-      this.upgradeUrl = upgradeUrl;
-    }
-  }
-  // Mirrors the real narrowing: the two plan codes become an upsell with
-  // somewhere to click, everything else stays a plain wait state.
-  const { PlanGateError } = jest.requireActual("@/lib/planGate");
+jest.mock("@/lib/api", () => {
+  const actual = jest.requireActual("@/lib/api");
   return {
-    ArtUnavailableError: MockArtUnavailableError,
-    asPlanGate: (error: MockArtUnavailableError) =>
-      error.code === "plan_upgrade_required" ||
-      error.code === "plan_allowance_reached"
-        ? new PlanGateError(
-            error.code,
-            error.message,
-            error.retryAt,
-            null,
-            error.upgradeUrl ?? "/pricing",
-          )
-        : null,
-    listGeneratedImages: jest.fn().mockResolvedValue({ images: [] }),
-    generateArt: jest.fn(),
-    fetchImageBlobUrl: jest.fn(),
+    ...actual,
+    getJourneyTimeseries: jest.fn(),
   };
 });
 
-describe("JourneyPage", () => {
+const mockGet = getJourneyTimeseries as jest.Mock;
+
+function day(
+  dayKey: string,
+  overrides: Partial<JourneyTimeseriesResponse["days"][number]> = {},
+) {
+  return {
+    day_key: dayKey,
+    completed: 0,
+    purposes: [] as string[],
+    loops: 0,
+    average_shift: null as number | null,
+    ...overrides,
+  };
+}
+
+/** Seven consecutive days ending 2026-08-18, the shape the API returns. */
+const WEEK = [
+  "2026-08-12",
+  "2026-08-13",
+  "2026-08-14",
+  "2026-08-15",
+  "2026-08-16",
+  "2026-08-17",
+  "2026-08-18",
+];
+
+function response(
+  overrides: Partial<JourneyTimeseriesResponse> = {},
+): JourneyTimeseriesResponse {
+  return {
+    day_key: "2026-08-18",
+    start_day: "2026-08-12",
+    window_days: 7,
+    days: WEEK.map((key) => day(key)),
+    by_purpose: {
+      "self-knowledge": 0,
+      steadiness: 0,
+      stewardship: 0,
+      expression: 0,
+      reframing: 0,
+    },
+    totals: {
+      days_practiced: 0,
+      completed: 0,
+      loops_closed: 0,
+      first_practice_day: null,
+      first_loop_day: null,
+    },
+    ...overrides,
+  };
+}
+
+/** A user with real history: two practices, one closed loop. */
+function withHistory(): JourneyTimeseriesResponse {
+  return response({
+    days: [
+      day("2026-08-12"),
+      day("2026-08-13"),
+      day("2026-08-14"),
+      day("2026-08-15", {
+        completed: 2,
+        purposes: ["steadiness", "expression"],
+        loops: 1,
+        average_shift: 1.5,
+      }),
+      day("2026-08-16"),
+      day("2026-08-17"),
+      day("2026-08-18", { completed: 1, purposes: ["reframing"] }),
+    ],
+    by_purpose: {
+      "self-knowledge": 0,
+      steadiness: 1,
+      stewardship: 0,
+      expression: 1,
+      reframing: 1,
+    },
+    totals: {
+      days_practiced: 2,
+      completed: 3,
+      loops_closed: 1,
+      first_practice_day: "2026-03-04",
+      first_loop_day: "2026-03-09",
+    },
+  });
+}
+
+beforeEach(() => {
+  jest.clearAllMocks();
+  mockGet.mockResolvedValue(response());
+});
+
+describe("JourneyPage shell", () => {
   it("renders the page heading", async () => {
     render(<JourneyPage />);
     await waitFor(() => {
-      expect(
-        screen.getByRole("heading", { level: 1 }),
-      ).toHaveTextContent(/Your Journey/);
+      expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent(
+        /Your journey/i,
+      );
     });
   });
 
-  it("renders the progress bar", async () => {
+  it("has a back link to the dashboard", async () => {
     render(<JourneyPage />);
-    await waitFor(() => {
-      expect(screen.getByRole("progressbar")).toBeInTheDocument();
+    const link = await screen.findByRole("link", {
+      name: /back to dashboard/i,
     });
+    expect(link).toHaveAttribute("href", "/dashboard");
   });
 
-  it("renders milestone items", async () => {
+  it("asks the API for the caller's local day and the default window", async () => {
     render(<JourneyPage />);
-    await waitFor(() => {
-      expect(screen.getByText("Intake")).toBeInTheDocument();
-      expect(screen.getByText("Identity")).toBeInTheDocument();
-      expect(screen.getByText("Healing")).toBeInTheDocument();
-      expect(screen.getByText("Wealth")).toBeInTheDocument();
-      expect(screen.getByText("Creative")).toBeInTheDocument();
-      expect(screen.getByText("Perspective")).toBeInTheDocument();
-      expect(screen.getByText("Synthesis")).toBeInTheDocument();
-    });
+    await waitFor(() => expect(mockGet).toHaveBeenCalled());
+
+    const [today, days] = mockGet.mock.calls[0];
+    expect(today).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    expect(days).toBe(30);
+  });
+});
+
+describe("JourneyPage async states", () => {
+  it("shows a loading state before the series arrives", () => {
+    mockGet.mockReturnValue(new Promise(() => {}));
+    render(<JourneyPage />);
+
+    expect(screen.getByRole("status")).toHaveTextContent(
+      /loading your journey/i,
+    );
   });
 
-  it("marks completed milestones", async () => {
+  it("shows a recoverable error state rather than a blank page", async () => {
+    mockGet.mockRejectedValue(new Error("Request timed out."));
     render(<JourneyPage />);
-    await waitFor(() => {
-      // Intake and Identity are completed (mocked profile has them)
-      const completeBadges = screen.getAllByText("Complete");
-      expect(completeBadges.length).toBeGreaterThanOrEqual(2);
-    });
+
+    expect(await screen.findByText(/could not load data/i)).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /try again/i }),
+    ).toBeInTheDocument();
   });
 
-  it("has a back link to dashboard", async () => {
+  it("retries the request when the error state is dismissed", async () => {
+    mockGet.mockRejectedValueOnce(new Error("nope"));
+    mockGet.mockResolvedValue(withHistory());
     render(<JourneyPage />);
+
+    fireEvent.click(await screen.findByRole("button", { name: /try again/i }));
+
+    expect(
+      await screen.findByRole("heading", { name: /practice and integration/i }),
+    ).toBeInTheDocument();
+  });
+
+  it("shows no raw error object when the message is not a plain string", async () => {
+    mockGet.mockRejectedValue(new Error("[object Object]"));
+    render(<JourneyPage />);
+
+    await screen.findByText(/could not load data/i);
+    expect(screen.queryByText(/traceback/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/File "/)).not.toBeInTheDocument();
+  });
+});
+
+describe("JourneyPage empty state", () => {
+  it("invites a first practice when nothing has ever been logged", async () => {
+    render(<JourneyPage />);
+
+    expect(
+      await screen.findByRole("heading", {
+        name: /your journey starts with one practice/i,
+      }),
+    ).toBeInTheDocument();
+  });
+
+  it("points at the practice page", async () => {
+    render(<JourneyPage />);
+
+    const link = await screen.findByRole("link", {
+      name: /go to today's practice/i,
+    });
+    expect(link).toHaveAttribute("href", "/practice");
+  });
+
+  it("draws no chart, because there is nothing to draw", async () => {
+    render(<JourneyPage />);
+    await screen.findByRole("heading", { name: /starts with one practice/i });
+
+    expect(
+      screen.queryByRole("heading", { name: /practice and integration/i }),
+    ).not.toBeInTheDocument();
+  });
+
+  // The two states differ by one field and nothing else. Both payloads
+  // below carry the same all-zero `days` array, so a gate that keyed on
+  // "is the window empty" rather than on the anchor would pass one of
+  // these and fail the other. Seeding only the populated shape, as an
+  // earlier version of this test did, cannot tell the two apart.
+  const quietWindow = {
+    days_practiced: 0,
+    completed: 0,
+    loops_closed: 0,
+    first_practice_day: "2026-03-04",
+    first_loop_day: null,
+  };
+  const neverStarted = { ...quietWindow, first_practice_day: null };
+
+  it("draws the chart for a quiet window on an old log", async () => {
+    mockGet.mockResolvedValue(response({ totals: quietWindow }));
+    render(<JourneyPage />);
+
+    expect(
+      await screen.findByRole("heading", { name: /practice and integration/i }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("heading", { name: /starts with one practice/i }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("invites a start on the same window when nothing was ever completed", async () => {
+    mockGet.mockResolvedValue(response({ totals: neverStarted }));
+    render(<JourneyPage />);
+
+    expect(
+      await screen.findByRole("heading", { name: /starts with one practice/i }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("heading", { name: /practice and integration/i }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("never captions the chart with a day the user has not practiced", async () => {
+    // The shape a skip-only log produces once the anchor filters on
+    // completions. The page must not reach the totals block at all, so
+    // there is nothing to caption.
+    mockGet.mockResolvedValue(response({ totals: neverStarted }));
+    render(<JourneyPage />);
+
+    await screen.findByRole("heading", { name: /starts with one practice/i });
+    expect(screen.queryByText(/Practicing since/i)).not.toBeInTheDocument();
+  });
+});
+
+describe("JourneyPage series", () => {
+  beforeEach(() => {
+    mockGet.mockResolvedValue(withHistory());
+  });
+
+  it("renders the window totals", async () => {
+    render(<JourneyPage />);
+    const totals = await screen.findByRole("region", { name: /these 7 days/i });
+
+    expect(within(totals).getByText("3")).toBeInTheDocument();
+    expect(within(totals).getByText("Practices")).toBeInTheDocument();
+    expect(within(totals).getByText("Loops closed")).toBeInTheDocument();
+  });
+
+  it("names the day the user started, which is older than the window", async () => {
+    render(<JourneyPage />);
+    const totals = await screen.findByRole("region", { name: /these 7 days/i });
+
+    expect(totals).toHaveTextContent(/Practicing since 4 March 2026/i);
+    expect(totals).toHaveTextContent(/First loop closed on 9 March 2026/i);
+  });
+
+  it("gives every column of the chart a text description", async () => {
+    render(<JourneyPage />);
+    await screen.findByRole("heading", { name: /practice and integration/i });
+
+    expect(
+      screen.getByText(
+        /Saturday 15 August: 2 practices completed \(Steadiness, Expression\), 1 loop closed, recorded shift \+1\.5\./i,
+      ),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/Wednesday 12 August: nothing logged\./i),
+    ).toBeInTheDocument();
+  });
+
+  it("renders all five capacities with their counts", async () => {
+    render(<JourneyPage />);
+    const balance = await screen.findByRole("region", {
+      name: /where the practice went/i,
+    });
+
+    for (const label of [
+      "Self-knowledge",
+      "Steadiness",
+      "Stewardship",
+      "Expression",
+      "Reframing",
+    ]) {
+      expect(within(balance).getByText(label)).toBeInTheDocument();
+    }
+  });
+});
+
+describe("JourneyPage window picker", () => {
+  beforeEach(() => {
+    mockGet.mockResolvedValue(withHistory());
+  });
+
+  it("offers the three windows the server accepts", async () => {
+    render(<JourneyPage />);
+    await waitFor(() => expect(mockGet).toHaveBeenCalled());
+
+    for (const label of [/7 days/, /30 days/, /90 days/]) {
+      expect(screen.getByRole("radio", { name: label })).toBeInTheDocument();
+    }
+  });
+
+  it("opens on thirty days", async () => {
+    render(<JourneyPage />);
+    await waitFor(() => expect(mockGet).toHaveBeenCalled());
+
+    expect(screen.getByRole("radio", { name: /30 days/ })).toBeChecked();
+  });
+
+  it("refetches with the chosen window", async () => {
+    render(<JourneyPage />);
+    await waitFor(() => expect(mockGet).toHaveBeenCalled());
+
+    fireEvent.click(screen.getByRole("radio", { name: /90 days/ }));
+
     await waitFor(() => {
-      const link = screen.getByText(/Back to Dashboard/);
-      expect(link.closest("a")).toHaveAttribute("href", "/dashboard");
+      expect(mockGet).toHaveBeenLastCalledWith(
+        expect.any(String),
+        90,
+        expect.anything(),
+      );
     });
   });
 });
 
-describe("JourneyPage milestone art cost states", () => {
-  const CAP_MESSAGE =
-    "That's all of today's image generations. Your next one unlocks at midnight UTC.";
+describe("JourneyPage copy", () => {
+  it.each([
+    ["with history", withHistory],
+    ["with nothing logged", response],
+  ])("uses no loss-aversion language %s", async (_name, build) => {
+    mockGet.mockResolvedValue(build());
+    const { container } = render(<JourneyPage />);
+    await waitFor(() => expect(mockGet).toHaveBeenCalled());
 
-  beforeEach(() => {
-    jest.clearAllMocks();
-    // A completed milestone is what puts a Generate button on screen.
-    (getProfile as jest.Mock).mockResolvedValue({
-      id: "user-1",
-      version: "2.0",
-      intake: { full_name: "Test User" },
-      identity: { archetype: { primary: "sage" } },
-      healing: { modalities: ["breathwork"] },
-      wealth: null,
-      creative: null,
-      perspective: null,
-    });
-  });
-
-  async function generateMilestoneArt(): Promise<void> {
-    // Several milestones complete from this profile, so several buttons
-    // render. Any one of them exercises the same handler.
-    const buttons = await screen.findAllByRole("button", {
-      name: /generate illustration/i,
-    });
-    fireEvent.click(buttons[0]);
-  }
-
-  it("renders a spent allowance as a wait, not a failure", async () => {
-    (generateArt as jest.Mock).mockRejectedValue(
-      new ArtUnavailableError(
-        "daily_art_cap_reached",
-        CAP_MESSAGE,
-        new Date("2099-01-01T00:00:00Z"),
-      ),
-    );
-
-    render(<JourneyPage />);
-    await generateMilestoneArt();
-
-    await waitFor(() => {
-      expect(screen.getByText(new RegExp(CAP_MESSAGE, "i"))).toBeInTheDocument();
-    });
-    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
-  });
-
-  it("renders a tripped spend breaker the same way", async () => {
-    (generateArt as jest.Mock).mockRejectedValue(
-      new ArtUnavailableError(
-        "llm_temporarily_unavailable",
-        "This feature is taking a short break while we catch up on demand. Please try again later.",
-        new Date("2099-01-01T00:00:00Z"),
-      ),
-    );
-
-    render(<JourneyPage />);
-    await generateMilestoneArt();
-
-    await waitFor(() => {
-      expect(screen.getByText(/short break/i)).toBeInTheDocument();
-    });
-    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
-  });
-
-  it("still shows a real error banner for genuine failures", async () => {
-    (generateArt as jest.Mock).mockRejectedValue(new Error("network down"));
-
-    render(<JourneyPage />);
-    await generateMilestoneArt();
-
-    await waitFor(() => {
-      expect(screen.getByRole("alert")).toHaveTextContent(/network down/i);
-    });
+    const text = (container.textContent ?? "").toLowerCase();
+    for (const banned of LOSS_AVERSION_BANNED) {
+      expect(text).not.toContain(banned);
+    }
   });
 });
