@@ -564,6 +564,29 @@ describe("DailyProtocol hydration", () => {
     expect(screen.getAllByText("Done today.")).toHaveLength(2);
   });
 
+  it("keeps a slotted row on its own card and puts an unslotted one elsewhere", () => {
+    renderProtocol({
+      loggedToday: [
+        logEntry({ id: "log-evening", protocol_slot: "evening" }),
+        logEntry({ id: "log-loose", protocol_slot: null }),
+      ],
+    });
+
+    expect(
+      within(within(eveningSection()).getAllByRole("article")[0]).getByText(
+        "Done today.",
+      ),
+    ).toBeInTheDocument();
+    // The unslotted row took the earliest free slot rather than shoving
+    // the slotted one off the card it names.
+    expect(
+      within(within(morningSection()).getAllByRole("article")[0]).getByText(
+        "Done today.",
+      ),
+    ).toBeInTheDocument();
+    expect(screen.getAllByText("Done today.")).toHaveLength(2);
+  });
+
   it("ignores a row for a practice today's protocol does not carry", () => {
     renderProtocol({
       loggedToday: [logEntry({ practice_slug: "rotated-out-of-today" })],

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import ProtectedRoute from "@/components/shared/ProtectedRoute";
 import ApiStateView from "@/components/shared/ApiStateView";
@@ -91,10 +91,26 @@ function PracticeInner() {
     return data.entries;
   }, [logToday.data]);
 
-  // The protocol waits for the log so the cards mount in the state they
-  // are already in. If the protocol itself failed there is nothing left
-  // to wait for, and waiting would only hold a spinner over an error.
-  const protocolLoading = today.loading || (logToday.loading && !today.error);
+  // True once the day's log has settled, whether it came back or failed.
+  const [logSettled, setLogSettled] = useState(false);
+  useEffect(() => {
+    if (!logToday.loading) setLogSettled(true);
+  }, [logToday.loading]);
+
+  // The protocol waits for the log the first time, so the cards mount in
+  // the state they are already in. It waits only that once.
+  //
+  // A second read is a retry from the notice below, and taking the page
+  // back to a spinner for it would unmount the protocol and throw away
+  // every card with it: a completion the user has just tapped whose
+  // write is still in flight, anything typed into a prompt, every
+  // dismissal. The retried log merges into the cards in place instead,
+  // which is what DailyProtocol's merge was built for.
+  //
+  // If the protocol itself failed there is nothing left to wait for, and
+  // waiting would only hold a spinner over an error.
+  const protocolLoading =
+    today.loading || (logToday.loading && !logSettled && !today.error);
 
   // The protocol carries a title and a summary but not the practice's
   // self-check question, so the library index supplies it. One request

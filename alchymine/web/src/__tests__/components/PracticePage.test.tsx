@@ -343,6 +343,81 @@ describe("PracticePage hydration", () => {
     expect(screen.queryByText(/may look untouched/i)).not.toBeInTheDocument();
   });
 
+  it("keeps what the user has done when the log is read again", async () => {
+    // Retrying the log used to take the protocol back to its spinner,
+    // which unmounts DailyProtocol and throws away every card: an
+    // optimistic completion still in flight, and anything typed into a
+    // prompt underneath it.
+    mockListPracticeLog.mockRejectedValueOnce(new Error("HTTP 500"));
+    mockListPracticeLog.mockResolvedValue(logPage([]));
+    // The write stays in flight across the retry, which is the state
+    // there is no recovering from once the card is gone.
+    mockLogPractice.mockReturnValue(new Promise(() => {}));
+
+    render(<PracticePage />);
+
+    await screen.findByText(/may look untouched/i);
+    const card = within(
+      screen.getByRole("region", { name: /morning/i }),
+    ).getAllByRole("article")[0];
+    fireEvent.click(within(card).getByRole("button", { name: /^done$/i }));
+    expect(within(card).getByText("Done today.")).toBeInTheDocument();
+
+    fireEvent.change(
+      within(card).getByLabelText(/anything else worth writing down/i),
+      { target: { value: "Half a thought." } },
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /try again/i }));
+
+    await waitFor(() =>
+      expect(screen.queryByText(/may look untouched/i)).not.toBeInTheDocument(),
+    );
+    // Same card, not a replacement: the protocol never went back to a
+    // spinner, so nothing on it was rebuilt.
+    expect(card).toBeInTheDocument();
+    expect(within(card).getByText("Done today.")).toBeInTheDocument();
+    expect(
+      within(card).getByLabelText(/anything else worth writing down/i),
+    ).toHaveValue("Half a thought.");
+    expect(
+      screen.queryByText(/putting today's practice together/i),
+    ).not.toBeInTheDocument();
+  });
+
+  it("merges a re-read log into the cards in place", async () => {
+    mockListPracticeLog.mockRejectedValueOnce(new Error("HTTP 500"));
+    mockListPracticeLog.mockResolvedValue(
+      logPage([logEntry({ id: "log-evening", protocol_slot: "evening" })]),
+    );
+    mockLogPractice.mockResolvedValue(logEntry({ id: "log-morning" }));
+
+    render(<PracticePage />);
+
+    await screen.findByText(/may look untouched/i);
+    const card = within(
+      screen.getByRole("region", { name: /morning/i }),
+    ).getAllByRole("article")[0];
+    fireEvent.click(within(card).getByRole("button", { name: /^done$/i }));
+    await waitFor(() => expect(mockLogPractice).toHaveBeenCalled());
+
+    fireEvent.click(screen.getByRole("button", { name: /try again/i }));
+
+    // The evening row arrives and lands on its own card; the morning one
+    // the user tapped is left exactly as it was.
+    await waitFor(() =>
+      expect(
+        within(
+          within(screen.getByRole("region", { name: /evening/i })).getAllByRole(
+            "article",
+          )[0],
+        ).getByText("Done today."),
+      ).toBeInTheDocument(),
+    );
+    expect(within(card).getByText("Done today.")).toBeInTheDocument();
+    expect(screen.getAllByText("Done today.")).toHaveLength(2);
+  });
+
   it("does not fill the cards from part of a day", async () => {
     // More rows match than came back, so this page is a fragment of the
     // day and cards drawn from it would be guesswork.
