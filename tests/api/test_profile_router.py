@@ -357,6 +357,137 @@ async def test_create_profile_too_many_intentions(client: AsyncClient) -> None:
     assert resp.status_code == 422
 
 
+# ─── POST /api/v1/profile — Create-or-update (issue #314) ─────────────
+
+
+async def _seed_registered_user(
+    session_factory: async_sessionmaker[AsyncSession],
+    user_id: str = TEST_USER_ID,
+) -> None:
+    """Insert the durable users row that ``/auth/register`` creates.
+
+    The JWT ``sub`` of a registered account IS this row's primary key, so
+    every POST /profile from that account lands on an existing users row.
+    """
+    async with session_factory() as session:
+        session.add(
+            User(
+                id=user_id,
+                email=f"{user_id}@example.com",
+                password_hash="$2b$12$fake.registered.account.hash",
+                invite_code_used="BETA-INVITE",
+                plan="beta",
+            )
+        )
+        await session.commit()
+
+
+@pytest.mark.asyncio
+async def test_post_profile_for_registered_account_returns_200(
+    client: AsyncClient,
+    session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    """POST by an already-registered account updates instead of 500ing (#314)."""
+    await _seed_registered_user(session_factory)
+
+    resp = await client.post("/api/v1/profile", json=_VALID_PROFILE)
+
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["id"] == TEST_USER_ID
+    assert data["intake"]["full_name"] == "Maria Elena Vasquez"
+
+
+@pytest.mark.asyncio
+async def test_post_profile_preserves_account_credentials(
+    client: AsyncClient,
+    session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    """Fields outside ProfileCreateRequest survive a POST untouched."""
+    await _seed_registered_user(session_factory)
+    async with session_factory() as session:
+        before = await session.get(User, TEST_USER_ID)
+        assert before is not None
+        created_at = before.created_at
+
+    resp = await client.post("/api/v1/profile", json=_FULL_PROFILE)
+    assert resp.status_code == 200
+
+    async with session_factory() as session:
+        after = await session.get(User, TEST_USER_ID)
+        assert after is not None
+        assert after.email == f"{TEST_USER_ID}@example.com"
+        assert after.password_hash == "$2b$12$fake.registered.account.hash"
+        assert after.invite_code_used == "BETA-INVITE"
+        assert after.plan == "beta"
+        assert after.created_at == created_at
+
+
+@pytest.mark.asyncio
+async def test_post_profile_is_idempotent(client: AsyncClient) -> None:
+    """First POST creates (201), the second updates (200) with the same state."""
+    first = await client.post("/api/v1/profile", json=_FULL_PROFILE)
+    assert first.status_code == 201
+
+    second = await client.post("/api/v1/profile", json=_FULL_PROFILE)
+    assert second.status_code == 200
+
+    assert second.json()["id"] == first.json()["id"] == TEST_USER_ID
+    assert second.json()["intake"] == first.json()["intake"]
+
+
+@pytest.mark.asyncio
+async def test_post_profile_clears_optional_fields_not_resupplied(
+    client: AsyncClient,
+) -> None:
+    """The body is the whole profile: optional fields left out are cleared."""
+    full = await client.post("/api/v1/profile", json=_FULL_PROFILE)
+    assert full.status_code == 201
+    assert full.json()["intake"]["birth_city"] == "Mexico City"
+
+    minimal = await client.post("/api/v1/profile", json=_VALID_PROFILE)
+    assert minimal.status_code == 200
+    intake = minimal.json()["intake"]
+    assert intake["birth_time"] is None
+    assert intake["birth_city"] is None
+    assert intake["assessment_responses"] is None
+    assert intake["family_structure"] is None
+
+
+@pytest.mark.asyncio
+async def test_post_profile_keeps_other_layers(client: AsyncClient) -> None:
+    """Re-posting intake does not wipe the identity/healing layers."""
+    create = await client.post("/api/v1/profile", json=_VALID_PROFILE)
+    user_id = create.json()["id"]
+    await client.put(
+        f"/api/v1/profile/{user_id}/identity",
+        json={"data": {"numerology": {"life_path": 7}}},
+    )
+
+    resp = await client.post("/api/v1/profile", json=_VALID_PROFILE)
+
+    assert resp.status_code == 200
+    assert resp.json()["identity"]["numerology"]["life_path"] == 7
+
+
+@pytest.mark.asyncio
+async def test_post_profile_does_not_log_profile_pii(
+    client: AsyncClient,
+    session_factory: async_sessionmaker[AsyncSession],
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """Intake fields are PII — no code path on this route may log them."""
+    await _seed_registered_user(session_factory)
+
+    with caplog.at_level("DEBUG", logger="alchymine"):
+        resp = await client.post("/api/v1/profile", json=_FULL_PROFILE)
+
+    assert resp.status_code == 200
+    assert "Maria Elena Vasquez" not in caplog.text
+    assert "Mexico City" not in caplog.text
+    assert "1992-03-15" not in caplog.text
+
+
 # ─── GET /api/v1/profile/{user_id} — Read ─────────────────────────────
 
 

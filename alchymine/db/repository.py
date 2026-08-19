@@ -7,6 +7,7 @@ All database access goes through this module so that:
 
 Functions — Profiles
 ~~~~~~~~~~~~~~~~~~~~
+- ``create_or_update_profile`` — write intake for a user, creating it when absent
 - ``create_profile``  — create a User with intake data and optional layers
 - ``get_profile``     — fetch a full User by id (eager-loads all relationships)
 - ``update_layer``    — update a specific layer (identity, healing, etc.)
@@ -93,6 +94,112 @@ def _eager_options() -> list:
 # ─── CREATE ─────────────────────────────────────────────────────────────
 
 
+async def _ensure_user_row(session: AsyncSession, user_id: str | None) -> tuple[User, bool]:
+    """Return the users row for *user_id*, inserting it when absent.
+
+    The second element is ``True`` when this call created the row.  A
+    registered account always has one already — ``/auth/register`` writes
+    it and the JWT ``sub`` IS its primary key — so for those callers this
+    is a plain read.
+    """
+    if user_id is None:
+        user = User()
+        session.add(user)
+        await session.flush()  # generate user.id
+        return user, True
+
+    found = await session.execute(select(User).where(User.id == user_id))
+    existing = found.scalar_one_or_none()
+    if existing is not None:
+        return existing, False
+
+    # INSERT ... ON CONFLICT DO NOTHING rather than a bare INSERT: two
+    # concurrent first-time writes would otherwise race between the SELECT
+    # above and this statement, and the loser would hit the same users_pkey
+    # violation this function exists to remove (#314).
+    dialect_name = session.bind.dialect.name  # type: ignore[union-attr]
+    insert_stmt: Any
+    if dialect_name == "postgresql":
+        insert_stmt = (
+            pg_insert(User).values(id=user_id).on_conflict_do_nothing(index_elements=["id"])
+        )
+    else:
+        insert_stmt = (
+            sqlite_insert(User).values(id=user_id).on_conflict_do_nothing(index_elements=["id"])
+        )
+    await session.execute(insert_stmt)
+    await session.flush()
+
+    inserted = await session.execute(select(User).where(User.id == user_id))
+    return inserted.scalar_one(), True
+
+
+async def create_or_update_profile(
+    session: AsyncSession,
+    *,
+    full_name: str,
+    birth_date: date,
+    intention: str,
+    birth_time: time | None = None,
+    birth_city: str | None = None,
+    birth_timezone: str | None = None,
+    assessment_responses: dict[str, Any] | None = None,
+    family_structure: str | None = None,
+    intentions: list[str] | None = None,
+    user_id: str | None = None,
+) -> tuple[User, bool]:
+    """Write the intake profile for *user_id*, creating the user if needed.
+
+    Returns ``(user, created)`` where *user* has all layer relationships
+    loaded and *created* says whether the users row was inserted by this
+    call.  When ``user_id`` is provided it is used as the primary key
+    (e.g. to tie the profile to the authenticated user's JWT sub).
+
+    The arguments are the whole intake payload, so an existing intake row
+    is overwritten field for field: anything not supplied is set back to
+    NULL rather than merged.  Partial edits belong on ``update_layer``.
+
+    Only the intake row is touched.  Account columns on ``users`` (email,
+    password_hash, plan, invite_code_used, created_at) and the other
+    profile layers are left exactly as they were.
+    """
+    user, created = await _ensure_user_row(session, user_id)
+    resolved_user_id = user.id
+
+    intake_values: dict[str, Any] = {
+        "full_name": full_name,
+        "birth_date": birth_date,
+        "birth_time": birth_time,
+        "birth_city": birth_city,
+        "birth_timezone": birth_timezone,
+        # Primary intention comes from the list when one was provided
+        "intention": intentions[0] if intentions else intention,
+        "intentions": intentions,
+        "assessment_responses": assessment_responses,
+        "family_structure": family_structure,
+    }
+
+    found_intake = await session.execute(
+        select(IntakeData).where(IntakeData.user_id == resolved_user_id)
+    )
+    intake = found_intake.scalar_one_or_none()
+    if intake is None:
+        session.add(IntakeData(user_id=resolved_user_id, **intake_values))
+    else:
+        # Assign through the ORM so the EncryptedString columns keep going
+        # through their type decorator.
+        for key, value in intake_values.items():
+            setattr(intake, key, value)
+    await session.flush()
+
+    # Expire the cached User so the reload below sees the fresh layers.
+    session.expire(user)
+    refreshed = await get_profile(session, resolved_user_id)
+    if refreshed is None:  # pragma: no cover — the row was just flushed
+        raise ValueError(f"Profile not found after write for user_id={resolved_user_id!r}")
+    return refreshed, created
+
+
 async def create_profile(
     session: AsyncSession,
     *,
@@ -107,39 +214,25 @@ async def create_profile(
     intentions: list[str] | None = None,
     user_id: str | None = None,
 ) -> User:
-    """Create a new user with intake data.
+    """Create a user with intake data, or overwrite the intake if it exists.
 
-    Returns the newly created ``User`` with its ``intake`` relationship
-    populated.  When ``user_id`` is provided it is used as the primary key
-    (e.g. to tie the profile to the authenticated user's JWT sub).
+    Thin wrapper over :func:`create_or_update_profile` for callers that do
+    not care whether the users row was new.
     """
-    user = User(id=user_id) if user_id else User()
-    session.add(user)
-    await session.flush()  # generate user.id (if not already set)
-
-    # Derive primary intention from the list when provided
-    _primary = intentions[0] if intentions else intention
-
-    intake = IntakeData(
-        user_id=user.id,
+    user, _created = await create_or_update_profile(
+        session,
         full_name=full_name,
         birth_date=birth_date,
+        intention=intention,
         birth_time=birth_time,
         birth_city=birth_city,
         birth_timezone=birth_timezone,
-        intention=_primary,
-        intentions=intentions,
         assessment_responses=assessment_responses,
         family_structure=family_structure,
+        intentions=intentions,
+        user_id=user_id,
     )
-    session.add(intake)
-    await session.flush()
-
-    # Reload with relationships
-    result = await session.execute(
-        select(User).where(User.id == user.id).options(*_eager_options())
-    )
-    return result.scalar_one()
+    return user
 
 
 # ─── READ ───────────────────────────────────────────────────────────────

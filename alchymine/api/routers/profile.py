@@ -11,7 +11,7 @@ from datetime import date, datetime, time
 from typing import Any
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Response
 from pydantic import BaseModel, Field, field_validator
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -189,14 +189,34 @@ def _user_to_response(user: User) -> ProfileResponse:
 # ─── Endpoints ─────────────────────────────────────────────────────────
 
 
-@router.post("/profile", status_code=201)
+@router.post(
+    "/profile",
+    status_code=201,
+    responses={200: {"description": "Existing profile updated", "model": ProfileResponse}},
+)
 async def create_profile(
     request: ProfileCreateRequest,
+    response: Response,
     session: AsyncSession = Depends(get_db_session),
     current_user: dict = Depends(get_current_user),
 ) -> ProfileResponse:
-    """Create a new user profile with intake data."""
-    user = await repository.create_profile(
+    """Save the caller's profile intake — create it, or overwrite it.
+
+    A registered account already owns a users row (``/auth/register``
+    writes it, and the JWT ``sub`` IS its primary key), so a plain insert
+    here collided with ``users_pkey`` and turned every such call into a
+    500 (#314).  The route now writes intake onto the existing account
+    instead: 201 when the row is created, 200 when it is updated.
+
+    The body is the complete intake payload, so optional fields left out
+    are cleared.  Partial edits belong on ``PUT /profile/{user_id}/intake``.
+
+    Ownership is the JWT subject alone — no user id is read from the body
+    or the path — so this route cannot touch another account's profile.
+    Account columns (email, password_hash, plan, invite code) and the
+    other profile layers are never written here.
+    """
+    user, created = await repository.create_or_update_profile(
         session,
         full_name=request.full_name,
         birth_date=request.birth_date,
@@ -209,10 +229,12 @@ async def create_profile(
         family_structure=request.family_structure,
         user_id=current_user["sub"],
     )
+    if not created:
+        response.status_code = 200
     try:
         return _user_to_response(user)
     except Exception:
-        logger.exception("Failed to serialize profile for new user %s", user.id)
+        logger.exception("Failed to serialize profile for user %s", user.id)
         raise
 
 
