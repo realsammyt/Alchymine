@@ -1,7 +1,19 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import PracticePage from "@/app/practice/page";
 import { LOSS_AVERSION_BANNED } from "@/components/practice/PracticeRhythm";
-import type { PracticeSummaryResponse, TodayResponse } from "@/lib/api";
+import type {
+  PracticeLogEntry,
+  PracticeLogListResponse,
+  PracticeSummaryResponse,
+  TodayResponse,
+} from "@/lib/api";
 
 jest.mock("next/link", () => {
   return function MockLink({
@@ -40,13 +52,19 @@ jest.mock("@/lib/AuthContext", () => ({
 const mockGetToday = jest.fn();
 const mockGetSummary = jest.fn();
 const mockListPractices = jest.fn();
+const mockListPracticeLog = jest.fn();
 const mockLogPractice = jest.fn();
 const mockCreateIntegration = jest.fn();
 
+// The routes the page calls are stubbed; everything else stays real, so
+// a value the page's tree imports for its own use (`ApiError`, which
+// DailyProtocol narrows a refused save on) is the real one.
 jest.mock("@/lib/api", () => ({
+  ...jest.requireActual("@/lib/api"),
   getPracticeToday: (...args: unknown[]) => mockGetToday(...args),
   getPracticeSummary: (...args: unknown[]) => mockGetSummary(...args),
   listPractices: (...args: unknown[]) => mockListPractices(...args),
+  listPracticeLog: (...args: unknown[]) => mockListPracticeLog(...args),
   logPractice: (...args: unknown[]) => mockLogPractice(...args),
   createIntegration: (...args: unknown[]) => mockCreateIntegration(...args),
 }));
@@ -102,11 +120,46 @@ const SUMMARY: PracticeSummaryResponse = {
   total_completed: 6,
 };
 
+function logEntry(overrides: Partial<PracticeLogEntry> = {}): PracticeLogEntry {
+  return {
+    id: "log-1",
+    user_id: "test-user",
+    pack_id: "alchymine-foundations",
+    practice_slug: "find-the-floor",
+    primary_purpose: "steadiness",
+    purposes: ["steadiness"],
+    category: "somatic",
+    status: "completed",
+    protocol_slot: "morning",
+    duration_minutes: null,
+    occurred_at: "2026-08-14T08:05:00+00:00",
+    day_key: "2026-08-14",
+    created_at: "2026-08-14T08:05:00+00:00",
+    reflection: null,
+    self_check_response: null,
+    ...overrides,
+  };
+}
+
+function logPage(
+  entries: PracticeLogEntry[],
+  overrides: Partial<PracticeLogListResponse> = {},
+): PracticeLogListResponse {
+  return {
+    entries,
+    total: entries.length,
+    page: 1,
+    per_page: 100,
+    ...overrides,
+  };
+}
+
 beforeEach(() => {
   jest.clearAllMocks();
   mockGetToday.mockResolvedValue(TODAY);
   mockGetSummary.mockResolvedValue(SUMMARY);
   mockListPractices.mockResolvedValue([]);
+  mockListPracticeLog.mockResolvedValue(logPage([]));
   // 21:45 local on 14 August. Late enough that anywhere east of UTC has
   // already rolled over in UTC terms, which is exactly the case a
   // toISOString()-based day key gets wrong.
@@ -129,6 +182,7 @@ describe("PracticePage", () => {
 
   it("shows a loading state before the protocol arrives", () => {
     mockGetToday.mockReturnValue(new Promise(() => {}));
+    mockListPracticeLog.mockReturnValue(new Promise(() => {}));
     render(<PracticePage />);
 
     expect(screen.getAllByRole("status").length).toBeGreaterThan(0);
@@ -202,5 +256,101 @@ describe("PracticePage", () => {
     for (const banned of LOSS_AVERSION_BANNED) {
       expect(rendered).not.toContain(banned);
     }
+  });
+});
+
+// ─── Hydration (issue #312) ──────────────────────────────────────────
+
+describe("PracticePage hydration", () => {
+  it("reads the day's log for the user's local day", async () => {
+    render(<PracticePage />);
+
+    await waitFor(() => expect(mockListPracticeLog).toHaveBeenCalled());
+    expect(mockListPracticeLog).toHaveBeenCalledWith(
+      expect.objectContaining({
+        from: "2026-08-14",
+        to: "2026-08-14",
+        perPage: 100,
+      }),
+    );
+  });
+
+  it("shows the cards in the state the log left them", async () => {
+    mockListPracticeLog.mockResolvedValue(logPage([logEntry()]));
+
+    render(<PracticePage />);
+
+    const morning = await screen.findByRole("region", { name: /morning/i });
+    expect(
+      within(within(morning).getAllByRole("article")[0]).getByText(
+        "Done today.",
+      ),
+    ).toBeInTheDocument();
+    // The row named its slot, so it marks that card and no other.
+    expect(screen.getAllByText("Done today.")).toHaveLength(1);
+  });
+
+  it("holds the cards back until the log has landed", async () => {
+    let release: (value: PracticeLogListResponse) => void = () => {};
+    mockListPracticeLog.mockReturnValue(
+      new Promise<PracticeLogListResponse>((resolve) => {
+        release = resolve;
+      }),
+    );
+
+    render(<PracticePage />);
+
+    await waitFor(() => expect(mockGetToday).toHaveBeenCalled());
+    expect(
+      screen.queryByRole("button", { name: /^done$/i }),
+    ).not.toBeInTheDocument();
+
+    await act(async () => {
+      release(logPage([logEntry()]));
+    });
+
+    // Drawn settled the first time rather than flipped a moment later,
+    // which would move focus onto a completion nobody just made.
+    expect(await screen.findByText("Done today.")).toBeInTheDocument();
+  });
+
+  it("draws the cards anyway when the log cannot be read, and says so", async () => {
+    mockListPracticeLog.mockRejectedValue(new Error("HTTP 500"));
+
+    render(<PracticePage />);
+
+    await screen.findAllByText("Find the Floor");
+    expect(
+      screen.getAllByRole("button", { name: /^done$/i }).length,
+    ).toBeGreaterThan(0);
+    expect(screen.getByText(/may look untouched/i)).toBeInTheDocument();
+  });
+
+  it("reads the log again when the notice's retry is used", async () => {
+    mockListPracticeLog.mockRejectedValueOnce(new Error("HTTP 500"));
+    mockListPracticeLog.mockResolvedValue(logPage([logEntry()]));
+
+    render(<PracticePage />);
+
+    const notice = await screen.findByText(/may look untouched/i);
+    fireEvent.click(
+      within(notice.parentElement as HTMLElement).getByRole("button", {
+        name: /try again/i,
+      }),
+    );
+
+    expect(await screen.findByText("Done today.")).toBeInTheDocument();
+    expect(screen.queryByText(/may look untouched/i)).not.toBeInTheDocument();
+  });
+
+  it("does not fill the cards from part of a day", async () => {
+    // More rows match than came back, so this page is a fragment of the
+    // day and cards drawn from it would be guesswork.
+    mockListPracticeLog.mockResolvedValue(logPage([logEntry()], { total: 150 }));
+
+    render(<PracticePage />);
+
+    await screen.findAllByText("Find the Floor");
+    expect(screen.queryByText("Done today.")).not.toBeInTheDocument();
   });
 });

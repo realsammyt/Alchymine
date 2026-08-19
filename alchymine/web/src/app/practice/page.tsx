@@ -4,6 +4,7 @@ import { useCallback, useMemo, useState } from "react";
 import Link from "next/link";
 import ProtectedRoute from "@/components/shared/ProtectedRoute";
 import ApiStateView from "@/components/shared/ApiStateView";
+import Button from "@/components/shared/Button";
 import SystemCoachBanner from "@/components/chat/SystemCoachBanner";
 import DailyProtocol from "@/components/practice/DailyProtocol";
 import PracticeRhythm from "@/components/practice/PracticeRhythm";
@@ -13,15 +14,24 @@ import {
   createIntegration,
   getPracticeSummary,
   getPracticeToday,
+  listPracticeLog,
   listPractices,
   logPractice,
   type IntegrationCreate,
   type PracticeDefinition,
   type PracticeLogCreate,
+  type PracticeLogListResponse,
   type PracticeResponse,
   type PracticeSummaryResponse,
   type TodayResponse,
 } from "@/lib/api";
+
+/**
+ * One page is far more than a day of practice holds. It bounds the
+ * read rather than paging it: a day with more rows than this is not a
+ * day whose cards can be drawn from one page anyway.
+ */
+const LOG_PAGE_SIZE = 100;
 
 function PracticeInner() {
   // The user's local day, fixed for the life of the page. Recomputing it
@@ -51,6 +61,40 @@ function PracticeInner() {
     (signal) => listPractices({ signal }),
     [],
   );
+
+  // What the user has already done today. Completion is optimistic and
+  // lives in component state, so without this read a reload handed back
+  // a day of untouched cards while the rows sat in the log (#312).
+  //
+  // One unfiltered read rather than one per status: the cards show both
+  // what was done and what was waved off, and the route takes a single
+  // status per call. It is not tied to `logNonce`; a write the page
+  // already knows about does not need reading back.
+  const logToday = useApi<PracticeLogListResponse>(
+    (signal) =>
+      listPracticeLog({
+        from: dayKey,
+        to: dayKey,
+        perPage: LOG_PAGE_SIZE,
+        signal,
+      }),
+    [dayKey],
+  );
+
+  // More rows match than came back means this page is a fragment of the
+  // day, and cards filled from a fragment would be guesswork. They fall
+  // back to un-hydrated, which is what they were before this read.
+  const loggedToday = useMemo(() => {
+    const data = logToday.data;
+    if (!data) return null;
+    if (data.total > data.entries.length) return null;
+    return data.entries;
+  }, [logToday.data]);
+
+  // The protocol waits for the log so the cards mount in the state they
+  // are already in. If the protocol itself failed there is nothing left
+  // to wait for, and waiting would only hold a spinner over an error.
+  const protocolLoading = today.loading || (logToday.loading && !today.error);
 
   // The protocol carries a title and a summary but not the practice's
   // self-check question, so the library index supplies it. One request
@@ -126,19 +170,45 @@ function PracticeInner() {
         </ApiStateView>
 
         <ApiStateView
-          loading={today.loading}
+          loading={protocolLoading}
           error={today.error}
           loadingText="Putting today's practice together..."
           onRetry={today.refetch}
         >
           {today.data && (
-            <DailyProtocol
-              today={today.data}
-              lookup={lookup}
-              onLog={handleLog}
-              onIntegrate={handleIntegrate}
-              onLogged={handleLogged}
-            />
+            <div className="flex flex-col gap-4">
+              {/* The protocol is the page, so a log that will not load
+                  costs the reader the read-back and nothing else. Saying
+                  so beats letting them find out by logging a practice
+                  twice. DRAFT copy, awaiting Tyler's sign-off. */}
+              {logToday.error && (
+                <div
+                  role="status"
+                  className="card-surface px-5 py-4 flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between"
+                >
+                  <p className="text-sm font-body text-text/60 leading-relaxed">
+                    We couldn&apos;t check what you logged earlier today, so
+                    these cards may look untouched. Nothing you logged is lost.
+                  </p>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={logToday.refetch}
+                    className="shrink-0 touch-target"
+                  >
+                    Try again
+                  </Button>
+                </div>
+              )}
+              <DailyProtocol
+                today={today.data}
+                loggedToday={loggedToday}
+                lookup={lookup}
+                onLog={handleLog}
+                onIntegrate={handleIntegrate}
+                onLogged={handleLogged}
+              />
+            </div>
           )}
         </ApiStateView>
       </div>
