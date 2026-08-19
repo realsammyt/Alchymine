@@ -481,6 +481,60 @@ class TestChatPersistenceFailure:
 
         assert spy.rollbacks == 1
 
+    async def test_a_cancelled_rollback_does_not_cost_the_detached_retry(
+        self,
+        session_factory: async_sessionmaker[AsyncSession],
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """The rollback runs inside a scope that is still cancelled.
+
+        anyio cancellation is level triggered: every await inside a
+        cancelled scope raises again, and the rollback is an await like
+        any other.  ``CancelledError`` is a ``BaseException``, so a net
+        that only catches ``Exception`` lets it straight out of this
+        helper before the detached retry is reached.  On an ordinary
+        disconnect that loses the reply the reader already saw, with no
+        operator log to say so, which is the whole of issue #297 undone
+        by a guard meant to tidy up after it.
+        """
+
+        class _CancellingRollback:
+            def __init__(self) -> None:
+                self.rollbacks = 0
+
+            async def rollback(self) -> None:
+                self.rollbacks += 1
+                raise asyncio.CancelledError
+
+        spy = _CancellingRollback()
+        real_write_reply = chat_router._write_reply
+
+        async def _cancel_on_the_request_session(target: object, **kwargs: object) -> None:
+            # The detached retry brings a session of its own, and that one
+            # is outside the cancelled scope and writes for real.
+            if target is spy:
+                raise asyncio.CancelledError
+            await real_write_reply(target, **kwargs)  # type: ignore[arg-type]
+
+        monkeypatch.setattr(chat_router, "_write_reply", _cancel_on_the_request_session)
+
+        with pytest.raises(asyncio.CancelledError):
+            await chat_router._persist_assistant_reply(
+                session=spy,  # type: ignore[arg-type]
+                user_id=TEST_USER_ID,
+                content=REPLY,
+                system_key=None,
+            )
+
+        assert spy.rollbacks == 1
+
+        # The point of the whole exercise: the reply is in the transcript,
+        # written by the fallback the narrow net used to skip.
+        await flush_pending_reply_writes()
+        rows = await _messages(session_factory)
+        assert [row.role for row in rows] == ["assistant"]
+        assert rows[0].content == REPLY
+
     async def test_a_failed_write_is_logged_without_the_message_text(
         self,
         session: AsyncSession,

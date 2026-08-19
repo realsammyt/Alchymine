@@ -677,9 +677,19 @@ async def _persist_assistant_reply(
         # Same reasoning as the net below: the INSERT may have flushed
         # before the cancellation landed on the commit, and the detached
         # retry is about to write that row on a session of its own.
+        #
+        # The net is wide for the reason ``_record_stream_usage`` gives:
+        # anyio cancellation is level triggered, so this rollback is an
+        # await inside a scope that is still cancelled and raises
+        # ``CancelledError`` again.  That is a ``BaseException``, and an
+        # ``except Exception`` here would let it out of this function
+        # before the detached retry below is ever attempted, losing the
+        # reply on the ordinary disconnect this whole helper exists for.
+        # Swallowing this second one costs nothing: the first is already
+        # held in ``cancelled`` and re-raised at the end.
         try:
             await session.rollback()
-        except Exception:
+        except BaseException:
             logger.debug("Rollback after a cancelled chat persist also failed", exc_info=True)
     except Exception:
         logger.warning(
