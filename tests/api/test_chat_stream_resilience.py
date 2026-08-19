@@ -535,6 +535,70 @@ class TestChatPersistenceFailure:
         assert [row.role for row in rows] == ["assistant"]
         assert rows[0].content == REPLY
 
+    async def test_a_cancelled_rollback_after_an_ordinary_failure_keeps_the_retry(
+        self,
+        session: AsyncSession,
+        session_factory: async_sessionmaker[AsyncSession],
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """The same hazard on the sibling net, reached the other way round.
+
+        Here the inline write fails for an ordinary reason and the
+        cancellation arrives during the rollback that follows it, which is
+        a disconnect landing on top of a database fault.  The cancellation
+        is first seen inside the rollback rather than at the write, and it
+        means the same thing either way: the caller is going away.  So it
+        is captured and re-raised at the end, after the detached retry has
+        made the write safe, because the caller's teardown still has to
+        see it.
+
+        And no ``unsaved`` frame: the stream is being torn down, there is
+        nobody left to tell, and the reply is on its way to the transcript
+        regardless.
+        """
+
+        class _CancellingRollbackSession:
+            """The request session, with a rollback that lands mid-cancellation."""
+
+            def __init__(self, inner: AsyncSession) -> None:
+                self._inner = inner
+                self.rollbacks = 0
+
+            def __getattr__(self, name: str) -> object:
+                return getattr(self._inner, name)
+
+            async def rollback(self) -> None:
+                self.rollbacks += 1
+                raise asyncio.CancelledError
+
+        proxy = _CancellingRollbackSession(session)
+        real_write_reply = chat_router._write_reply
+
+        async def _fail_on_the_request_session(target: object, **kwargs: object) -> None:
+            if target is proxy:
+                raise RuntimeError("chat_messages is unreachable")
+            await real_write_reply(target, **kwargs)  # type: ignore[arg-type]
+
+        monkeypatch.setattr(chat_router, "_write_reply", _fail_on_the_request_session)
+
+        frames: list[str] = []
+        with pytest.raises(asyncio.CancelledError):
+            async for frame in _chat_stream(proxy):  # type: ignore[arg-type]
+                frames.append(frame)
+
+        body = "".join(frames)
+        assert streamed_text(body) == REPLY
+        assert proxy.rollbacks == 1
+
+        # Torn down before either sentinel, so neither one goes out.
+        assert "unsaved" not in body
+        assert "event: done" not in body
+
+        await flush_pending_reply_writes()
+        rows = await _messages(session_factory)
+        assert [row.role for row in rows] == ["user", "assistant"]
+        assert rows[1].content == REPLY
+
     async def test_a_failed_write_is_logged_without_the_message_text(
         self,
         session: AsyncSession,

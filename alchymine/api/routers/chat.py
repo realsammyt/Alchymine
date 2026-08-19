@@ -700,10 +700,19 @@ async def _persist_assistant_reply(
             system_key,
             exc_info=True,
         )
+        # Wide for the same reason as the branch above, and one step
+        # further: nothing has captured a cancellation on this path yet,
+        # so a ``CancelledError`` first seen here has to be held rather
+        # than dropped.  It means what it means at the write, that the
+        # caller is going away, and it must not be swallowed: the
+        # detached retry below has already made the write safe, and the
+        # caller's teardown still needs to see the cancellation.
         try:
             await session.rollback()
-        except Exception:
+        except BaseException as rollback_exc:
             logger.debug("Rollback after a failed chat persist also failed", exc_info=True)
+            if isinstance(rollback_exc, asyncio.CancelledError):
+                cancelled = rollback_exc
 
     try:
         await _write_reply_detached(user_id=user_id, content=content, system_key=system_key)
