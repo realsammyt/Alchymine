@@ -1280,6 +1280,75 @@ async def update_ecology_recommendation(
     return state
 
 
+class Unchanged:
+    """The type of :data:`UNCHANGED`. Public so callers can annotate with it."""
+
+    __slots__ = ()
+
+    def __repr__(self) -> str:  # pragma: no cover - debugging aid
+        return "UNCHANGED"
+
+
+UNCHANGED = Unchanged()
+"""Leave a settings field as it is.
+
+Needed because ``None`` is a real value for ``active_pack_ids``: it means
+"every mounted pack". A default of ``None`` would make "do not touch it"
+and "reset it to all packs" the same call.
+"""
+
+
+async def update_ecology_settings(
+    session: AsyncSession,
+    user_id: str,
+    *,
+    protocol_size: int | Unchanged = UNCHANGED,
+    active_pack_ids: list[str] | None | Unchanged = UNCHANGED,
+) -> EcologyState:
+    """Write the user's recommender settings, clearing today's protocol if they moved.
+
+    The caller validates the values. This function's own job is the part
+    that is easy to get wrong: a settings change has to invalidate the
+    stored protocol, or the user waits until tomorrow to see it.
+
+    Only ``active_pack_ids`` travels in the stable-day fingerprint, so a
+    change to ``protocol_size`` alone would leave the stored envelope
+    replayable and the next ``/practice/today`` would answer yesterday's
+    protocol at yesterday's size. Both fields therefore clear
+    ``last_recommendation`` and ``last_recommended_at`` when they
+    actually change. Clearing on the wider condition rather than the
+    fingerprint's is deliberate: the cost is one recomputation, and the
+    alternative is a rule that has to stay in step with the fingerprint
+    forever.
+
+    A write that changes nothing clears nothing, so opening the settings
+    page and saving it untouched does not reshuffle the protocol under
+    the user. The rotation cursor is left alone either way: it is the
+    user's position in the purpose rotation, not part of the protocol
+    being discarded.
+    """
+    state = await get_or_create_ecology_state(session, user_id)
+
+    changed = False
+    if not isinstance(protocol_size, Unchanged) and protocol_size != state.protocol_size:
+        state.protocol_size = protocol_size
+        changed = True
+    if not isinstance(active_pack_ids, Unchanged) and active_pack_ids != state.active_pack_ids:
+        # Compared against the raw column rather than a normalized read
+        # of it, so a value that is not a list of strings is replaced
+        # rather than mistaken for the absence of a subset.
+        state.active_pack_ids = active_pack_ids
+        changed = True
+
+    if changed:
+        state.last_recommendation = None
+        state.last_recommended_at = None
+
+    await session.flush()
+    await session.refresh(state)
+    return state
+
+
 # ── Integration entries ───────────────────────────────────────────────────
 
 
