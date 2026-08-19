@@ -400,6 +400,10 @@ describe("ProtocolSettings accessibility", () => {
       screen.getByRole("radio", { name: ALL_PACKS }),
     ]) {
       expect(control.className).toContain("focus-visible:ring-2");
+      // /60 rather than the /50 used elsewhere in the app: it is the
+      // computed value that clears the 3:1 floor WCAG 1.4.11 asks of a
+      // focus indicator. Pinned so the ring cannot drift back down.
+      expect(control.className).toContain("focus-visible:ring-primary/60");
     }
   });
 

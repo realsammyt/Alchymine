@@ -234,6 +234,11 @@ export default function ProtocolSettings({ onSaved }: ProtocolSettingsProps) {
       {/* h2 to match the page's other blocks, wrapping the button so the
           settings keep a place in the heading outline while collapsed. */}
       <h2 className="m-0">
+        {/* ring-primary/60 on every focus ring in this component, not the
+            /50 used elsewhere: /60 is the computed value that clears the
+            3:1 WCAG 1.4.11 floor against both the page background and the
+            card surface. The /50 convention sits at 2.92:1 and is tracked
+            repo-wide as #275, so new code stops adding to it. */}
         <button
           type="button"
           aria-expanded={open}
@@ -242,10 +247,10 @@ export default function ProtocolSettings({ onSaved }: ProtocolSettingsProps) {
             setEverOpened(true);
             setOpen((current) => !current);
           }}
-          className="touch-target w-full text-left flex items-center justify-between gap-3 py-1 text-sm font-body text-text/60 transition-colors duration-200 hover:text-text/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2 focus-visible:ring-offset-bg rounded"
+          className="touch-target w-full text-left flex items-center justify-between gap-3 py-1 text-sm font-body text-text/60 transition-colors duration-200 hover:text-text/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60 focus-visible:ring-offset-2 focus-visible:ring-offset-bg rounded"
         >
           Protocol settings
-          <span aria-hidden="true" className="text-xs text-text/40">
+          <span aria-hidden="true" className="text-xs text-text/60">
             {open ? "Hide" : "Show"}
           </span>
         </button>
@@ -281,7 +286,7 @@ export default function ProtocolSettings({ onSaved }: ProtocolSettingsProps) {
                       resetNotice();
                       setSize(Number(event.target.value));
                     }}
-                    className="touch-target w-full sm:w-auto rounded-lg bg-white/[0.03] border border-white/10 px-3 py-2 text-sm font-body text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+                    className="touch-target w-full sm:w-auto rounded-lg bg-white/[0.03] border border-white/10 px-3 py-2 text-sm font-body text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60"
                   >
                     {PROTOCOL_SIZES.map((option) => (
                       <option key={option} value={option}>
@@ -333,7 +338,7 @@ export default function ProtocolSettings({ onSaved }: ProtocolSettingsProps) {
                               resetNotice();
                               setMode(option.value);
                             }}
-                            className="accent-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
+                            className="accent-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60"
                           />
                           {option.label}
                         </label>
@@ -358,7 +363,7 @@ export default function ProtocolSettings({ onSaved }: ProtocolSettingsProps) {
                                 onChange={() =>
                                   toggleChosen(pack.manifest.pack_id)
                                 }
-                                className="accent-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
+                                className="accent-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60"
                               />
                               {pack.manifest.title}
                             </label>
@@ -382,7 +387,7 @@ export default function ProtocolSettings({ onSaved }: ProtocolSettingsProps) {
                     aria-disabled={!canSave}
                     aria-busy={saving}
                     aria-describedby={notice ? noticeId : undefined}
-                    className={`touch-target px-4 py-2 rounded-lg text-sm font-body font-medium bg-primary/15 text-primary border border-primary/30 transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2 focus-visible:ring-offset-bg ${
+                    className={`touch-target px-4 py-2 rounded-lg text-sm font-body font-medium bg-primary/15 text-primary border border-primary/30 transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60 focus-visible:ring-offset-2 focus-visible:ring-offset-bg ${
                       canSave
                         ? "hover:bg-primary/25"
                         : "opacity-50 cursor-not-allowed"
