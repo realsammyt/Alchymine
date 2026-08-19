@@ -11,9 +11,11 @@ from datetime import date, time
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from alchymine.db.models import User
 from alchymine.db.repository import (
     count_reports_by_user,
     create_journal_entry,
+    create_or_update_profile,
     create_profile,
     create_report,
     delete_journal_entry,
@@ -131,6 +133,141 @@ async def test_create_profile_legacy_single_intention(session: AsyncSession) -> 
 
     assert user.intake.intentions is None
     assert user.intake.resolved_intentions == ["health"]
+
+
+# ─── create_or_update_profile (issue #314) ─────────────────────────────
+
+
+async def _seed_user_row(session: AsyncSession, user_id: str) -> None:
+    """Insert the users row that registration creates, with no profile layers."""
+    session.add(
+        User(
+            id=user_id,
+            email=f"{user_id}@example.com",
+            password_hash="$2b$12$fake.registered.account.hash",
+            invite_code_used="BETA-INVITE",
+            plan="beta",
+        )
+    )
+    await session.flush()
+
+
+@pytest.mark.asyncio
+async def test_create_or_update_profile_reports_created_for_new_user(
+    session: AsyncSession,
+) -> None:
+    """No users row yet — the row is created and the flag says so."""
+    user, created = await create_or_update_profile(
+        session,
+        full_name="Fresh User",
+        birth_date=date(1992, 3, 15),
+        intention="family",
+        user_id="brand-new-user",
+    )
+
+    assert created is True
+    assert user.id == "brand-new-user"
+    assert user.intake is not None
+    assert user.intake.full_name == "Fresh User"
+
+
+@pytest.mark.asyncio
+async def test_create_or_update_profile_updates_registered_user(
+    session: AsyncSession,
+) -> None:
+    """A registered account gets its intake written, not a duplicate users row."""
+    await _seed_user_row(session, "registered-user")
+
+    user, created = await create_or_update_profile(
+        session,
+        full_name="Registered User",
+        birth_date=date(1990, 1, 2),
+        intention="career",
+        user_id="registered-user",
+    )
+
+    assert created is False
+    assert user.id == "registered-user"
+    assert user.intake is not None
+    assert user.intake.full_name == "Registered User"
+
+
+@pytest.mark.asyncio
+async def test_create_or_update_profile_preserves_account_columns(
+    session: AsyncSession,
+) -> None:
+    """Columns outside the intake payload are never touched."""
+    await _seed_user_row(session, "keeps-credentials")
+
+    user, _created = await create_or_update_profile(
+        session,
+        full_name="Keeps Credentials",
+        birth_date=date(1990, 1, 2),
+        intention="career",
+        user_id="keeps-credentials",
+    )
+
+    assert user.email == "keeps-credentials@example.com"
+    assert user.password_hash == "$2b$12$fake.registered.account.hash"
+    assert user.invite_code_used == "BETA-INVITE"
+    assert user.plan == "beta"
+
+
+@pytest.mark.asyncio
+async def test_create_or_update_profile_overwrites_intake_fields(
+    session: AsyncSession,
+) -> None:
+    """The payload is authoritative: absent optionals clear the stored value."""
+    await create_or_update_profile(
+        session,
+        full_name="First Pass",
+        birth_date=date(1992, 3, 15),
+        intention="family",
+        birth_time=time(14, 14),
+        birth_city="Mexico City",
+        birth_timezone="America/Mexico_City",
+        assessment_responses={"big_five_1": 4},
+        family_structure="single parent",
+        user_id="overwrite-user",
+    )
+
+    user, created = await create_or_update_profile(
+        session,
+        full_name="Second Pass",
+        birth_date=date(1985, 8, 10),
+        intention="health",
+        user_id="overwrite-user",
+    )
+
+    assert created is False
+    assert user.intake is not None
+    assert user.intake.full_name == "Second Pass"
+    assert user.intake.intention == "health"
+    assert user.intake.birth_time is None
+    assert user.intake.birth_city is None
+    assert user.intake.birth_timezone is None
+    assert user.intake.assessment_responses is None
+    assert user.intake.family_structure is None
+
+
+@pytest.mark.asyncio
+async def test_create_profile_on_existing_user_does_not_raise(
+    session: AsyncSession,
+) -> None:
+    """The legacy create_profile entry point no longer hits users_pkey."""
+    await _seed_user_row(session, "legacy-entry-point")
+
+    user = await create_profile(
+        session,
+        full_name="Legacy Entry Point",
+        birth_date=date(1990, 1, 2),
+        intention="career",
+        user_id="legacy-entry-point",
+    )
+
+    assert user.id == "legacy-entry-point"
+    assert user.intake is not None
+    assert user.intake.full_name == "Legacy Entry Point"
 
 
 # ─── get_profile ────────────────────────────────────────────────────────
