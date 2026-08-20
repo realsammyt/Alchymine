@@ -30,6 +30,7 @@ from pydantic import (
     Field,
     StringConstraints,
     ValidationError,
+    field_validator,
 )
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -46,6 +47,8 @@ from alchymine.engine.practice import (
     get_practice_registry,
 )
 from alchymine.engine.practice.ecology import (
+    PROTOCOL_SIZE_MAX,
+    PROTOCOL_SIZE_MIN,
     EcologySettings,
     EcologyStateInput,
     PracticeLogRow,
@@ -319,6 +322,81 @@ class PracticeSummaryResponse(BaseModel):
     last_7: list[bool]
     by_purpose: dict[str, int]
     total_completed: int
+
+
+# A pack id is a directory name on disk, so it is short by construction.
+# The bound is here so a refusal that names the ids it could not find
+# cannot be turned into a way to bounce arbitrary text off the API.
+PackId = Annotated[str, StringConstraints(min_length=1, max_length=64)]
+
+# More opted-in packs than anyone will ever mount. Same reason.
+ACTIVE_PACKS_MAX = 32
+
+
+class EcologySettingsResponse(BaseModel):
+    """The two stored settings that shape every protocol.
+
+    Not the whole ``ecology_state`` row. ``rotation_cursor`` and
+    ``last_recommendation`` are the recommender's bookkeeping, and a
+    client that could read them would start depending on them.
+    """
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    protocol_size: int = Field(..., description="How many practices a day's protocol holds")
+    active_pack_ids: list[str] | None = Field(
+        None,
+        description=(
+            "The packs the user opted into, or null for every mounted pack. "
+            "Null is the default and stays the default for anyone who never chooses."
+        ),
+    )
+
+
+class EcologySettingsUpdate(BaseModel):
+    """A request to change one or both settings.
+
+    Both fields are optional and an omitted one is left alone, which is
+    what makes this a PATCH. ``active_pack_ids`` is the awkward one:
+    ``null`` is a real value there, meaning every mounted pack, so
+    omitting it and sending null are different requests. For
+    ``protocol_size`` null means nothing at all and is refused, rather
+    than quietly treated as "leave it".
+
+    Unknown fields are refused. A body with a typo'd field name would
+    otherwise answer 200 having saved nothing, which reads as a save.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    protocol_size: Annotated[int, Field(ge=PROTOCOL_SIZE_MIN, le=PROTOCOL_SIZE_MAX)] | None = Field(
+        None,
+        description=(
+            f"How many practices a day's protocol holds, {PROTOCOL_SIZE_MIN} to "
+            f"{PROTOCOL_SIZE_MAX}. Out of range is refused rather than clamped: a "
+            "request for 99 that stored 7 would be a lie about what saved."
+        ),
+    )
+    active_pack_ids: list[PackId] | None = Field(
+        None,
+        max_length=ACTIVE_PACKS_MAX,
+        description=(
+            "The packs to draw practices from. Null means every mounted pack. "
+            "Every id has to be mounted, and repeats are stored once."
+        ),
+    )
+
+    @field_validator("protocol_size")
+    @classmethod
+    def _reject_an_explicit_null_size(cls, value: int | None) -> int | None:
+        """Refuse ``{"protocol_size": null}``.
+
+        Only runs when the field was actually sent, so an omitted field
+        still means "leave it alone".
+        """
+        if value is None:
+            raise ValueError("omit this field to leave the protocol size unchanged")
+        return value
 
 
 class JourneyDayResponse(BaseModel):
@@ -750,6 +828,140 @@ async def practice_summary(
         by_purpose=summary.by_purpose,
         total_completed=summary.total_completed,
     )
+
+
+# ── The practice settings ───────────────────────────────────────────
+#
+# Both literal paths, declared above /practices/{pack_id}/{slug}, and
+# both derive the owner from the token: there is no user_id in the body
+# and none in the query, so there is no shape of request that reads or
+# writes somebody else's settings.
+
+# DRAFT copy, awaiting Tyler's sign-off. All three say what is wrong and
+# what to send instead, and none of them repeats the request back beyond
+# the ids the server could not find.
+NOTHING_TO_CHANGE_DETAIL = "Nothing to change. Send protocol_size, active_pack_ids, or both."
+EMPTY_PACK_SUBSET_DETAIL = (
+    "A protocol needs at least one pack. Send null to draw on every mounted pack, "
+    "or name the packs to draw on."
+)
+
+
+def _settings_response(state: EcologyState) -> EcologySettingsResponse:
+    """Render the stored settings the way the recommender reads them.
+
+    A stored ``active_pack_ids`` that is not a non-empty list of strings
+    answers null, matching :func:`_state_input`. The settings page and
+    the recommender then agree about what is active, which they would
+    not if this echoed the raw column.
+    """
+    active = state.active_pack_ids
+    packs = [str(entry) for entry in active] if isinstance(active, list) and active else None
+    return EcologySettingsResponse(protocol_size=state.protocol_size, active_pack_ids=packs)
+
+
+def _resolve_pack_subset(
+    registry: PracticeRegistry, requested: list[str] | None
+) -> list[str] | None:
+    """Return the subset to store, or raise a 422 saying what was wrong.
+
+    Empty is refused rather than stored. A protocol drawn from no packs
+    is not a smaller protocol, it is no protocol, and a user who wants
+    every pack has null to say so.
+
+    An unmounted id is refused rather than dropped, because dropping it
+    would answer 200 with a subset the user did not ask for. The refusal
+    names the ids it could not find and nothing else: the caller sent the
+    rest and does not learn anything from having it read back.
+    """
+    if requested is None:
+        return None
+    if not requested:
+        raise HTTPException(status_code=422, detail=EMPTY_PACK_SUBSET_DETAIL)
+
+    mounted = {manifest.pack_id for manifest in registry.list_packs()}
+    unknown = sorted(set(requested) - mounted)
+    if unknown:
+        label = "id" if len(unknown) == 1 else "ids"
+        names = ", ".join(repr(entry) for entry in unknown)
+        raise HTTPException(
+            status_code=422,
+            detail=(
+                f"No mounted pack has the {label} {names}. "
+                "See /api/v1/practices/packs for what is mounted."
+            ),
+        )
+    # Deduplicated and ordered, so the stored value is canonical: saving
+    # the same choice twice is then detectably the same choice, and the
+    # protocol is not discarded for a reordering.
+    return sorted(set(requested))
+
+
+@router.get("/practice/ecology", response_model=EcologySettingsResponse)
+async def get_practice_ecology(
+    current_user: dict = Depends(get_current_user),
+    session: AsyncSession = Depends(get_db_session),
+) -> EcologySettingsResponse:
+    """Return the caller's practice settings, creating them if absent.
+
+    The settings surface reads before it writes, and a user who has never
+    opened it has no row yet. Answering the defaults rather than 404
+    keeps "you have not changed anything" from being an error state the
+    client has to handle.
+    """
+    state = await repository.get_or_create_ecology_state(session, current_user["sub"])
+    return _settings_response(state)
+
+
+@router.patch(
+    "/practice/ecology",
+    response_model=EcologySettingsResponse,
+    responses={
+        422: {
+            "description": (
+                "The size is out of range, a pack id is not mounted, the pack list is "
+                "empty, or the body asked for no change. Nothing is written in any case."
+            )
+        }
+    },
+)
+async def update_practice_ecology(
+    body: EcologySettingsUpdate,
+    registry: PracticeRegistry = Depends(registry_dependency),
+    current_user: dict = Depends(get_current_user),
+    session: AsyncSession = Depends(get_db_session),
+) -> EcologySettingsResponse:
+    """Change the protocol size, the opted-in packs, or both.
+
+    Validation happens before the write and refuses rather than corrects.
+    A size outside the recommender's own bounds is a 422, not a clamp,
+    and an unmounted pack id is a 422, not a silent drop: both would
+    otherwise answer 200 describing a setting the user did not choose.
+
+    A change to either field clears the stored protocol, so the next
+    ``GET /practice/today`` recomputes. Only the pack set travels in the
+    stable-day fingerprint, so a size change alone would replay the
+    stored protocol at the old size and the setting would look broken
+    until tomorrow. Saving the page unchanged clears nothing.
+    """
+    if not body.model_fields_set:
+        raise HTTPException(status_code=422, detail=NOTHING_TO_CHANGE_DETAIL)
+
+    size: int | repository.Unchanged = repository.UNCHANGED
+    if body.protocol_size is not None:
+        size = body.protocol_size
+
+    packs: list[str] | None | repository.Unchanged = repository.UNCHANGED
+    if "active_pack_ids" in body.model_fields_set:
+        packs = _resolve_pack_subset(registry, body.active_pack_ids)
+
+    state = await repository.update_ecology_settings(
+        session,
+        current_user["sub"],
+        protocol_size=size,
+        active_pack_ids=packs,
+    )
+    return _settings_response(state)
 
 
 # DRAFT copy, awaiting Tyler's sign-off. Three things it has to do:

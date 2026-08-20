@@ -1061,7 +1061,14 @@ class PracticeLogEntry(Base):
 
 
 class EcologyState(Base):
-    """Per-user recommender state. No writers until slice 3.
+    """Per-user recommender state.
+
+    Two kinds of column with two kinds of writer. ``protocol_size`` and
+    ``active_pack_ids`` are the user's own settings, written by
+    ``PATCH /practice/ecology``. The rest is the recommender's
+    bookkeeping, written by ``GET /practice/today`` when it recomputes.
+    A settings write clears the bookkeeping, because a stored protocol
+    computed under the old settings is stale.
 
     ``user_id`` is both the primary key and the foreign key, so
     one-row-per-user is a schema fact rather than an application rule.

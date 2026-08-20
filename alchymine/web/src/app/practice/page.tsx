@@ -8,6 +8,7 @@ import Button from "@/components/shared/Button";
 import SystemCoachBanner from "@/components/chat/SystemCoachBanner";
 import DailyProtocol from "@/components/practice/DailyProtocol";
 import PracticeRhythm from "@/components/practice/PracticeRhythm";
+import ProtocolSettings from "@/components/practice/ProtocolSettings";
 import { useApi } from "@/lib/useApi";
 import { localDayKey } from "@/lib/localDay";
 import {
@@ -167,6 +168,14 @@ function PracticeInner() {
             </button>
           </div>
         </header>
+
+        {/* Under the header rather than in it: the settings belong with
+            the other affordances above the practices, and keeping the
+            toggle next to its own panel keeps the focus order sane.
+            A saved change clears the stored protocol server-side, so
+            reading today again is what makes the setting visible now
+            rather than tomorrow. */}
+        <ProtocolSettings onSaved={today.refetch} />
 
         <SystemCoachBanner systemKey="practice" />
 

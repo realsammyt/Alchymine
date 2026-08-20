@@ -428,3 +428,111 @@ async def test_update_ecology_recommendation_writes_all_three_fields(
     # It creates the row when there is none, so a first-ever request does
     # not need a separate write.
     assert state.protocol_size == 5
+
+
+async def _state_with_a_stored_protocol(session: AsyncSession) -> str:
+    """Give a fresh user a stored protocol, and return their id."""
+    user = await _user(session)
+    await repository.update_ecology_recommendation(
+        session,
+        user.id,
+        rotation_cursor=1,
+        last_recommendation={"envelope_version": 1, "day_key": "2026-08-14", "payload": {}},
+        last_recommended_at=_at(14),
+    )
+    return user.id
+
+
+@pytest.mark.asyncio
+async def test_update_ecology_settings_creates_the_row_and_writes_both_fields(
+    session: AsyncSession,
+) -> None:
+    user = await _user(session)
+
+    state = await repository.update_ecology_settings(
+        session, user.id, protocol_size=3, active_pack_ids=["alchymine-foundations"]
+    )
+
+    assert state.protocol_size == 3
+    assert state.active_pack_ids == ["alchymine-foundations"]
+
+
+@pytest.mark.asyncio
+async def test_update_ecology_settings_leaves_an_omitted_field_alone(
+    session: AsyncSession,
+) -> None:
+    user = await _user(session)
+    await repository.update_ecology_settings(
+        session, user.id, protocol_size=7, active_pack_ids=["alchymine-foundations"]
+    )
+
+    state = await repository.update_ecology_settings(session, user.id, protocol_size=4)
+
+    assert state.protocol_size == 4
+    assert state.active_pack_ids == ["alchymine-foundations"]
+
+
+@pytest.mark.asyncio
+async def test_update_ecology_settings_can_clear_the_pack_subset(
+    session: AsyncSession,
+) -> None:
+    """``None`` is a value here, not an absence: it means every mounted pack."""
+    user = await _user(session)
+    await repository.update_ecology_settings(
+        session, user.id, active_pack_ids=["alchymine-foundations"]
+    )
+
+    state = await repository.update_ecology_settings(session, user.id, active_pack_ids=None)
+
+    assert state.active_pack_ids is None
+
+
+@pytest.mark.asyncio
+async def test_a_size_change_clears_the_stored_protocol(session: AsyncSession) -> None:
+    """``protocol_size`` is not in the pack fingerprint, so nobody else will."""
+    user_id = await _state_with_a_stored_protocol(session)
+
+    state = await repository.update_ecology_settings(session, user_id, protocol_size=3)
+
+    assert state.last_recommendation is None
+    assert state.last_recommended_at is None
+
+
+@pytest.mark.asyncio
+async def test_a_pack_subset_change_clears_the_stored_protocol(session: AsyncSession) -> None:
+    user_id = await _state_with_a_stored_protocol(session)
+
+    state = await repository.update_ecology_settings(
+        session, user_id, active_pack_ids=["alchymine-foundations"]
+    )
+
+    assert state.last_recommendation is None
+
+
+@pytest.mark.asyncio
+async def test_a_settings_write_that_changes_nothing_keeps_the_stored_protocol(
+    session: AsyncSession,
+) -> None:
+    """Saving the settings page unchanged must not reshuffle today's protocol."""
+    user_id = await _state_with_a_stored_protocol(session)
+    stored = await repository.get_or_create_ecology_state(session, user_id)
+    envelope = stored.last_recommendation
+
+    state = await repository.update_ecology_settings(
+        session, user_id, protocol_size=5, active_pack_ids=None
+    )
+
+    assert state.last_recommendation == envelope
+    assert state.last_recommended_at is not None
+
+
+@pytest.mark.asyncio
+async def test_update_ecology_settings_keeps_the_rotation_cursor(
+    session: AsyncSession,
+) -> None:
+    """Clearing the protocol is not a reason to restart the purpose rotation."""
+    user_id = await _state_with_a_stored_protocol(session)
+
+    state = await repository.update_ecology_settings(session, user_id, protocol_size=6)
+
+    assert state.rotation_cursor == 1
