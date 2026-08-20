@@ -23,8 +23,8 @@
 
 | Thing | Value | How to check |
 | ----- | ----- | ------------ |
-| Backend tests | 3161 passed, 1 skipped | `$env:CELERY_ALWAYS_EAGER='true'; .venv\Scripts\python.exe -m pytest tests/ -q` |
-| Frontend tests | 526 passed (55 suites) | `cd alchymine/web; npm test` |
+| Backend tests | 3581 passed, 1 skipped | `$env:CELERY_ALWAYS_EAGER='true'; .venv\Scripts\python.exe -m pytest tests/ -q` |
+| Frontend tests | 725 passed (63 suites) | `cd alchymine/web; npm test` |
 | mypy / ruff | clean | `.venv\Scripts\python.exe -m mypy alchymine/` / `-m ruff check alchymine/` |
 | CI | green on main | `gh run list -R realsammyt/Alchymine --limit 3` |
 
