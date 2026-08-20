@@ -43,7 +43,12 @@ const Button = forwardRef<HTMLButtonElement, ButtonProps>(
       <button
         ref={ref}
         disabled={disabled || loading}
-        className={`inline-flex items-center justify-center gap-2 font-body font-medium tracking-wide transition-all duration-300 ease-out disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 disabled:active:scale-100 focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2 focus-visible:ring-offset-bg focus-visible:outline-none ${variantStyles[variant]} ${sizeStyles[size]} ${className}`}
+        // ring-primary/60, not the /50 this carried before: /50 computes
+        // 2.92:1 against the page background, under the 3:1 WCAG 1.4.11
+        // asks of a focus indicator. /60 clears it at 3.74:1 on the
+        // background and 3.55:1 on a card surface. The rest of the
+        // repo's /40 and /50 rings are tracked in issue #275.
+        className={`inline-flex items-center justify-center gap-2 font-body font-medium tracking-wide transition-all duration-300 ease-out disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 disabled:active:scale-100 focus-visible:ring-2 focus-visible:ring-primary/60 focus-visible:ring-offset-2 focus-visible:ring-offset-bg focus-visible:outline-none ${variantStyles[variant]} ${sizeStyles[size]} ${className}`}
         {...props}
       >
         {loading && (

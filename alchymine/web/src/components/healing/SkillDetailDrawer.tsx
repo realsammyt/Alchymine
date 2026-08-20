@@ -38,6 +38,55 @@ function EvidenceTag({ rating }: { rating: string }) {
   );
 }
 
+// ── Attribution ──────────────────────────────────────────────────────
+
+/**
+ * Who wrote a skill and under what license.
+ *
+ * Same obligation, same shape, and deliberately the same look as the
+ * practice library's `PackAttribution`: skills can be loaded from a
+ * directory outside this repo under licenses Alchymine does not own, and
+ * most of those licenses require the attribution to travel with the
+ * content. Showing it next to the practice is how that is met.
+ *
+ * It renders for bundled skills as well as external ones. The reader has
+ * no use for a badge separating the two, the license terms apply either
+ * way, and a surface that only credits strangers is a surface that stops
+ * being read.
+ *
+ * `source_url` is a plain anchor. The engine schema already rejects any
+ * scheme but http(s), so there is nothing to sanitise a second time.
+ */
+function SkillAttribution({ skill }: { skill: HealingSkill }) {
+  return (
+    <p
+      className="text-xs font-body text-text/60 leading-relaxed break-words"
+      data-testid="skill-attribution"
+    >
+      <span>{skill.attribution}</span>
+      <span aria-hidden="true"> · </span>
+      <span>{skill.license}</span>
+      {skill.source_url && (
+        <>
+          <span aria-hidden="true"> · </span>
+          <a
+            href={skill.source_url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="touch-target inline-flex items-center underline underline-offset-2 transition-colors duration-200 hover:text-text/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60 rounded"
+          >
+            Source
+            {/* Says where the link goes before it is followed. A new tab
+                that arrives unannounced leaves a screen-reader user in a
+                document they did not ask for, with no back button. */}
+            <span className="sr-only"> (opens in a new tab)</span>
+          </a>
+        </>
+      )}
+    </p>
+  );
+}
+
 // ── Props ────────────────────────────────────────────────────────────
 
 interface SkillDetailDrawerProps {
@@ -251,6 +300,9 @@ export default function SkillDetailDrawer({
                   </ul>
                 </div>
               )}
+
+              {/* Attribution */}
+              <SkillAttribution skill={skill} />
 
               {/* Action button */}
               {onStartPractice && (

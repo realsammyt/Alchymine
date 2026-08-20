@@ -577,6 +577,17 @@ export interface HealingSkill {
   evidence_rating: "A" | "B" | "C" | "D";
   contraindications: string[];
   duration_minutes: number;
+  /**
+   * Licensing metadata, the same four fields and the same rules as
+   * `PackManifest`. The engine schema defaults `license` and
+   * `attribution` for bundled content and requires an external skills
+   * directory to declare its own, so both always arrive filled in.
+   * `source_url` is the only one that can be absent.
+   */
+  license: string;
+  attribution: string;
+  source_url: string | null;
+  bundled: boolean;
 }
 
 export async function listHealingSkills(
