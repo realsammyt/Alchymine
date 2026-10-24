@@ -13,6 +13,7 @@ on:
           - diagnose
           - hotfix-pull-restart
           - rollback
+          - host-stats
 
 jobs:
   run:
@@ -66,6 +67,16 @@ jobs:
               $DC ps nginx
               curl -sk https://localhost/ -o /dev/null -w "HTTPS: %{http_code}\n" || echo "443 still down"
               curl -s http://localhost/nginx-health -o /dev/null -w "HTTP: %{http_code}\n" || echo "80 still down"
+            elif [ "${{ inputs.action }}" = "host-stats" ]; then
+              set +e
+              uptime; nproc; free -m; swapon --show
+              cat /proc/pressure/cpu /proc/pressure/memory /proc/pressure/io 2>/dev/null
+              vmstat 1 5
+              ps aux --sort=-%mem | head -15
+              ps aux --sort=-%cpu | head -10
+              docker stats --no-stream
+              dmesg -T 2>/dev/null | grep -iE "oom|killed process|blocked for more|I/O error" | tail -20
+              ps aux | grep -E "docker pull|dockerd|containerd" | grep -v grep
             else
               echo "=== Container status ==="
               $DC ps -a
