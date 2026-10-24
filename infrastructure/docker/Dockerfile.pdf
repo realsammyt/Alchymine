@@ -2,7 +2,7 @@
 # Alchymine PDF Service — Puppeteer-based PDF generation
 # ============================================================================
 
-FROM node:20-slim
+FROM node:22-slim
 
 LABEL maintainer="Alchymine <tyler@futuretalk.ca>"
 LABEL description="Alchymine PDF Service - Puppeteer-based PDF generation"
@@ -10,6 +10,7 @@ LABEL description="Alchymine PDF Service - Puppeteer-based PDF generation"
 # Install Chromium dependencies and tini
 # Using Debian slim so we use apt-get
 RUN apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates \
     chromium \
     fonts-liberation \
     fonts-noto-color-emoji \
