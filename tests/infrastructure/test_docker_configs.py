@@ -213,6 +213,11 @@ class TestDockerfiles:
         content = (self.DOCKER_DIR / "Dockerfile.web").read_text()
         assert "node:22-alpine" in content, "Dockerfile.web should use node:22-alpine"
 
+    def test_no_dockerfile_uses_node20(self) -> None:
+        """Node 20 is EOL and never got the eMudhra distrust fix."""
+        for f in self.DOCKER_DIR.glob("Dockerfile.*"):
+            assert "node:20" not in f.read_text(), f"{f.name} still uses node:20"
+
     def test_dockerfile_api_non_root_user(self) -> None:
         """Dockerfile.api runs as non-root user."""
         content = (self.DOCKER_DIR / "Dockerfile.api").read_text()
