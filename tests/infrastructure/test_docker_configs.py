@@ -208,10 +208,10 @@ class TestDockerfiles:
         content = (self.DOCKER_DIR / "Dockerfile.api").read_text()
         assert "python:3.11-slim" in content, "Dockerfile.api should use python:3.11-slim"
 
-    def test_dockerfile_web_base_node20(self) -> None:
-        """Dockerfile.web uses node:20-alpine as base."""
+    def test_dockerfile_web_base_node22(self) -> None:
+        """Dockerfile.web uses node:22-alpine as base."""
         content = (self.DOCKER_DIR / "Dockerfile.web").read_text()
-        assert "node:20-alpine" in content, "Dockerfile.web should use node:20-alpine"
+        assert "node:22-alpine" in content, "Dockerfile.web should use node:22-alpine"
 
     def test_dockerfile_api_non_root_user(self) -> None:
         """Dockerfile.api runs as non-root user."""
