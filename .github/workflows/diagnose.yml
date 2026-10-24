@@ -71,7 +71,7 @@ jobs:
             elif [ "${{ inputs.action }}" = "add-swap" ]; then
               # 2 GB droplet with no swap OOM-kills containers and stalls image pulls.
               # Idempotent. Undo: sudo swapoff /swapfile, rm it, drop the fstab line.
-              pkill -f "docker pull" || true
+              pkill -f "^docker pull " || true
               if ! sudo -n true 2>/dev/null; then
                 echo "ERROR: deploy user has no passwordless sudo; add swap from the DigitalOcean console as root."
                 exit 1
