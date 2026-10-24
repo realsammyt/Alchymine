@@ -13,6 +13,8 @@ on:
           - diagnose
           - hotfix-pull-restart
           - rollback
+          - host-stats
+          - add-swap
 
 jobs:
   run:
@@ -66,6 +68,32 @@ jobs:
               $DC ps nginx
               curl -sk https://localhost/ -o /dev/null -w "HTTPS: %{http_code}\n" || echo "443 still down"
               curl -s http://localhost/nginx-health -o /dev/null -w "HTTP: %{http_code}\n" || echo "80 still down"
+            elif [ "${{ inputs.action }}" = "add-swap" ]; then
+              # 2 GB droplet with no swap OOM-kills containers and stalls image pulls.
+              # Idempotent. Undo: sudo swapoff /swapfile, rm it, drop the fstab line.
+              pkill -f "^docker pull " || true
+              if ! sudo -n true 2>/dev/null; then
+                echo "ERROR: deploy user has no passwordless sudo; add swap from the DigitalOcean console as root."
+                exit 1
+              fi
+              if ! swapon --show | grep -q /swapfile; then
+                [ -f /swapfile ] || sudo fallocate -l 4G /swapfile
+                sudo chmod 600 /swapfile; sudo mkswap /swapfile; sudo swapon /swapfile
+              fi
+              grep -q "^/swapfile " /etc/fstab || echo "/swapfile none swap sw 0 0" | sudo tee -a /etc/fstab
+              sudo sysctl -w vm.swappiness=10
+              echo "vm.swappiness=10" | sudo tee /etc/sysctl.d/99-swappiness.conf
+              free -m; swapon --show
+            elif [ "${{ inputs.action }}" = "host-stats" ]; then
+              set +e
+              uptime; nproc; free -m; swapon --show
+              cat /proc/pressure/cpu /proc/pressure/memory /proc/pressure/io 2>/dev/null
+              vmstat 1 5
+              ps aux --sort=-%mem | head -15
+              ps aux --sort=-%cpu | head -10
+              docker stats --no-stream
+              dmesg -T 2>/dev/null | grep -iE "oom|killed process|blocked for more|I/O error" | tail -20
+              ps aux | grep -E "docker pull|dockerd|containerd" | grep -v grep
             else
               echo "=== Container status ==="
               $DC ps -a
