@@ -22,17 +22,21 @@ dependencies = [
     "celery[redis]>=5.4.0",
     "redis>=5.2.0",
     # Database
-    "sqlalchemy>=2.0.0",
+    # 2.1 drops implicit greenlet and changes Select typing; cap until migrated
+    "sqlalchemy[asyncio]>=2.0.0,<2.1",
     "asyncpg>=0.30.0",
     "alembic>=1.14.0",
     # Astrology
     "pyswisseph>=2.10.0",
     # Security
     "cryptography>=43.0.0",
+    # 2026.10.19 drops the 8 compromised eMudhra intermediates (httpx/anthropic trust store)
+    "certifi>=2026.10.19",
     "python-jose[cryptography]>=3.3.0",
     "passlib[bcrypt]>=1.7.4",
     # LLM
-    "anthropic>=0.40.0",
+    # 2.x is a breaking major (no temperature kwarg); cap until migrated
+    "anthropic>=0.40.0,<1",
     "httpx>=0.28.0",
     # Email
     "resend>=2.0.0",
