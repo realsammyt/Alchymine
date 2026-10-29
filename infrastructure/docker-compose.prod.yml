@@ -2,6 +2,8 @@
 # Alchymine - Production Overrides
 # Usage: docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
 # ============================================================================
+# ponytail: memory budget sized for a 2 GB droplet (+ swap). Reservations sum
+# to ~1.1 GB; limits are per-container ceilings. Raise them if the host grows.
 
 services:
   # ─── Nginx Reverse Proxy ─────────────────────────────────────────────
@@ -39,7 +41,7 @@ services:
     deploy:
       resources:
         limits:
-          memory: 256m
+          memory: 128m
           cpus: "0.5"
         reservations:
           memory: 64m
@@ -89,7 +91,7 @@ services:
       uvicorn alchymine.api.main:app
       --host 0.0.0.0
       --port 8000
-      --workers 4
+      --workers 2
       --loop uvloop
       --http httptools
       --log-level warning
@@ -100,10 +102,10 @@ services:
     deploy:
       resources:
         limits:
-          memory: 1g
+          memory: 512m
           cpus: "1.0"
         reservations:
-          memory: 512m
+          memory: 256m
           cpus: "0.5"
     healthcheck:
       test:
@@ -132,7 +134,7 @@ services:
     command: >
       celery -A alchymine.workers.celery_app worker
       --loglevel=${LOG_LEVEL:-info}
-      --concurrency=${CELERY_WORKER_CONCURRENCY:-4}
+      --concurrency=${CELERY_WORKER_CONCURRENCY:-2}
       --max-tasks-per-child=1000
       --queues=celery,reports
       --without-heartbeat
@@ -144,10 +146,10 @@ services:
     deploy:
       resources:
         limits:
-          memory: 1g
+          memory: 384m
           cpus: "1.0"
         reservations:
-          memory: 256m
+          memory: 128m
           cpus: "0.25"
     healthcheck:
       test:
@@ -183,10 +185,10 @@ services:
     deploy:
       resources:
         limits:
-          memory: 512m
+          memory: 384m
           cpus: "0.5"
         reservations:
-          memory: 256m
+          memory: 128m
           cpus: "0.25"
     healthcheck:
       test:
@@ -215,10 +217,10 @@ services:
     deploy:
       resources:
         limits:
-          memory: 1g
+          memory: 512m
           cpus: "1.0"
         reservations:
-          memory: 512m
+          memory: 128m
           cpus: "0.5"
     logging:
       driver: json-file
@@ -235,19 +237,19 @@ services:
         required: true
     command: >
       postgres
-      -c shared_buffers=256MB
-      -c effective_cache_size=768MB
-      -c maintenance_work_mem=128MB
+      -c shared_buffers=128MB
+      -c effective_cache_size=512MB
+      -c maintenance_work_mem=64MB
       -c work_mem=8MB
       -c max_connections=100
       -c log_min_duration_statement=1000
     deploy:
       resources:
         limits:
-          memory: 1g
+          memory: 384m
           cpus: "1.0"
         reservations:
-          memory: 512m
+          memory: 256m
           cpus: "0.5"
     healthcheck:
       test:
@@ -273,7 +275,7 @@ services:
       redis-server
       --requirepass ${REDIS_PASSWORD:?REDIS_PASSWORD must be set}
       --appendonly yes
-      --maxmemory 512mb
+      --maxmemory 192mb
       --maxmemory-policy allkeys-lru
       --save 900 1
       --save 300 10
@@ -282,10 +284,10 @@ services:
     deploy:
       resources:
         limits:
-          memory: 768m
+          memory: 256m
           cpus: "0.5"
         reservations:
-          memory: 256m
+          memory: 64m
           cpus: "0.25"
     healthcheck:
       test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]

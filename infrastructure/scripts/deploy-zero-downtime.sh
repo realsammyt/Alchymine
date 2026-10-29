@@ -192,7 +192,7 @@ docker run -d \
   "${IMAGE_PREFIX}-api:${VERSION}" \
   uvicorn alchymine.api.main:app \
     --host 0.0.0.0 --port 8000 \
-    --workers 4 --loop uvloop --http httptools \
+    --workers 2 --loop uvloop --http httptools \
     --log-level warning --access-log
 
 # Connect temp API to pdf-net so it can reach pdf-service during swap window
