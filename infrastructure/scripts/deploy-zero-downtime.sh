@@ -189,10 +189,11 @@ docker run -d \
   -e "ENVIRONMENT=production" \
   -e "LOG_LEVEL=WARNING" \
   -e "PDF_SERVICE_URL=http://pdf-service:3001" \
+  --memory 512m \
   "${IMAGE_PREFIX}-api:${VERSION}" \
   uvicorn alchymine.api.main:app \
     --host 0.0.0.0 --port 8000 \
-    --workers 4 --loop uvloop --http httptools \
+    --workers 2 --loop uvloop --http httptools \
     --log-level warning --access-log
 
 # Connect temp API to pdf-net so it can reach pdf-service during swap window
@@ -203,6 +204,8 @@ docker run -d \
   --name alchymine-web-tmp \
   --network alchymine-net \
   -e "NODE_ENV=production" \
+  -e "NODE_OPTIONS=--max-old-space-size=256" \
+  --memory 384m \
   "${IMAGE_PREFIX}-web:${VERSION}"
 
 TEMPS_RUNNING=true
