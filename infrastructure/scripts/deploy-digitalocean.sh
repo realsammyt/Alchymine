@@ -288,7 +288,7 @@ CELERY_BROKER_URL=redis://:${REDIS_PASSWORD}@redis:6379/0
 CELERY_RESULT_BACKEND=redis://:${REDIS_PASSWORD}@redis:6379/1
 
 # ── Celery ───────────────────────────────────────────────────────────────────
-CELERY_WORKER_CONCURRENCY=4
+CELERY_WORKER_CONCURRENCY=2
 
 # ── Next.js Frontend ─────────────────────────────────────────────────────────
 NEXT_PUBLIC_API_URL=https://${DOMAIN}/api

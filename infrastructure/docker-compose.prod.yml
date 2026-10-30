@@ -4,6 +4,8 @@
 # ============================================================================
 # ponytail: memory budget sized for a 2 GB droplet (+ swap). Reservations sum
 # to ~1.1 GB; limits are per-container ceilings. Raise them if the host grows.
+# Redis is also the Celery broker: allkeys-lru at 192mb can evict queued tasks
+# under pressure. Accepted at beta scale (dataset is tens of MB).
 
 services:
   # ─── Nginx Reverse Proxy ─────────────────────────────────────────────
@@ -146,7 +148,7 @@ services:
     deploy:
       resources:
         limits:
-          memory: 384m
+          memory: 448m
           cpus: "1.0"
         reservations:
           memory: 128m
@@ -182,6 +184,7 @@ services:
         required: true
     environment:
       - NODE_ENV=production
+      - NODE_OPTIONS=--max-old-space-size=256
     deploy:
       resources:
         limits:
