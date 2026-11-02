@@ -64,7 +64,8 @@ RUN apt-get update && \
 
 # Upgrade system-level setuptools/wheel to fix vendored vulnerabilities
 # (must run BEFORE venv copy so pip targets /usr/local/lib, not the venv)
-RUN pip install --no-cache-dir --upgrade pip setuptools wheel
+# ensurepip's bundled wheels are never used at runtime and carry old setuptools.
+RUN pip install --no-cache-dir --upgrade pip setuptools wheel &&     rm -rf /usr/local/lib/python3.11/ensurepip/_bundled
 
 # Copy virtual environment from builder
 COPY --from=builder /opt/venv /opt/venv

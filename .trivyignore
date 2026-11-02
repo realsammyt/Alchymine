@@ -1,27 +1,2 @@
-# ecdsa CVE-2024-23342: Minerva timing attack on P-256 curve
-# python-ecdsa maintainer considers side-channel attacks out of scope; no fix planned.
-# This is a transitive dep of python-jose[cryptography]. We use HMAC (HS256) for JWT,
-# not ECDSA signatures, so this vulnerability does not affect our application.
-CVE-2024-23342
-
-# minimatch CVE-2026-27903 and CVE-2026-27904: DoS via glob pattern backtracking
-# These exist in the system npm's internal dependencies (/usr/local/lib/node_modules/npm/).
-# Our web container only runs `node server.js` and never invokes npm at runtime,
-# so these are not exploitable in our deployment context.
-CVE-2026-27903
-CVE-2026-27904
-
-# tar GHSA-qffp-2rhf-9h96 / CVE-2026-29786: Hardlink path traversal via drive-relative linkpath
-# Affects tar 7.5.9 bundled inside system npm (/usr/local/lib/node_modules/npm/).
-# Our web container only runs `node server.js` and never invokes npm/tar at runtime,
-# so this is not exploitable in our deployment context.
-GHSA-qffp-2rhf-9h96
-CVE-2026-29786
-
-# picomatch CVE-2026-33671: ReDoS via crafted extglob patterns
-# Affects picomatch 4.0.3 bundled inside system npm's tinyglobby dep
-# (/usr/local/lib/node_modules/npm/node_modules/tinyglobby/node_modules/picomatch/).
-# Our web container only runs `node server.js` and never invokes npm at runtime,
-# so this is not exploitable in our deployment context. App-level picomatch is
-# pinned to the fixed version via alchymine/web/package-lock.json.
-CVE-2026-33671
+# Intentionally empty. Previous entries covered python-ecdsa (gone with
+# python-jose) and npm-internal deps (npm is no longer in the web runner).
