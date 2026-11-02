@@ -431,3 +431,33 @@ class TestRateLimitSlidingWindow:
 
         loop.run_until_complete(_check_key())
         loop.close()
+
+
+class TestRateLimitStuckKeys:
+    """A key orphaned without a TTL (process died between INCR and EXPIRE)
+    must not count forever. Seen in prod: 127.0.0.1 /health key at 48k/100."""
+
+    @pytest.fixture
+    def fake_redis(self):
+        return _get_fake_redis()
+
+    def test_key_without_ttl_gets_one_on_next_request(self, fake_redis):
+        app = _make_rate_limit_app(max_requests=5, window_seconds=60)
+        key = "rate_limit:testclient:default:60"
+        asyncio.run(fake_redis.set(key, 48463))  # no TTL, as left by a crash
+        with _patch_redis(fake_redis):
+            TestClient(app).get("/ping")
+        ttl = asyncio.run(fake_redis.ttl(key))
+        assert 0 < ttl <= 60
+
+    def test_health_is_never_rate_limited(self, fake_redis):
+        app = _make_rate_limit_app(max_requests=1, window_seconds=60)
+
+        @app.get("/health")
+        async def health():
+            return {"status": "ok"}
+
+        with _patch_redis(fake_redis):
+            client = TestClient(app)
+            for _ in range(5):
+                assert client.get("/health").status_code == 200
