@@ -32,7 +32,7 @@ dependencies = [
     "cryptography>=43.0.0",
     # 2026.10.19 drops the 8 compromised eMudhra intermediates (httpx/anthropic trust store)
     "certifi>=2026.10.19",
-    "python-jose[cryptography]>=3.3.0",
+    "PyJWT>=2.10.0",
     "passlib[bcrypt]>=1.7.4",
     # LLM
     # 2.x is a breaking major (no temperature kwarg); cap until migrated
@@ -130,7 +130,6 @@ module = [
     "celery.*",
     "redis.*",
     "swisseph.*",
-    "jose.*",
     "passlib.*",
     "bcrypt.*",
     "fastapi.*",
