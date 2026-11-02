@@ -236,8 +236,11 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         return (self.max_requests, self.window_seconds)
 
     async def dispatch(self, request: Request, call_next: Callable) -> Response:
-        client_ip = self._get_client_ip(request)
         path = request.url.path
+        if path == "/health":
+            # Liveness probes (docker, deploy script) must never see a 429.
+            return await call_next(request)
+        client_ip = self._get_client_ip(request)
         max_req, window = self._resolve_limits(path)
 
         redis_conn = await self._get_redis()
@@ -284,10 +287,12 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
                 break
         key = f"rate_limit:{client_ip}:{bucket}:{window}"
         try:
-            current_count: int = await redis_conn.incr(key)
-            if current_count == 1:
-                # First request in this window — set expiry
-                await redis_conn.expire(key, window)
+            # INCR + EXPIRE NX in one MULTI so a crash between them can't
+            # orphan a key with no TTL; NX also heals keys orphaned earlier.
+            pipe = redis_conn.pipeline(transaction=True)
+            pipe.incr(key)
+            pipe.expire(key, window, nx=True)
+            current_count: int = (await pipe.execute())[0]
 
             if current_count > max_req:
                 ttl: int = await redis_conn.ttl(key)
